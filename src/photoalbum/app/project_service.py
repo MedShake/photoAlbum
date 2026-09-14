@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from photoalbum.database import ProjectDatabase
+from photoalbum.database import PhotoRepository, ProjectDatabase
+from photoalbum.models import Photo
 
 
 class ProjectService:
@@ -49,6 +50,13 @@ class ProjectService:
 
         self._database = ProjectDatabase(path)
         self._database.initialize()
+
+    def list_photos(self) -> list[Photo]:
+        database = self._require_database()
+
+        repository = PhotoRepository(database)
+
+        return repository.list_all()
 
     def close(self) -> None:
         if self._database is not None:

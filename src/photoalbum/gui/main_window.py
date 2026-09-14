@@ -1,30 +1,49 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
+from PySide6.QtCore import (
+    QSortFilterProxyModel,
+    QThread,
+    Qt,
+)
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
+    QPlainTextEdit,
+    QSplitter,
     QStatusBar,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
 
 from photoalbum.app import ProjectService
-
+from photoalbum.gui.models import PhotoTableModel
+from photoalbum.gui.workers import ScanWorker
+from photoalbum.scanner import (
+    LibraryScanResult,
+    ProcessingEvent,
+)
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
 
         self._project_service = ProjectService()
+
+        self._scan_thread: QThread | None = None
+        self._scan_worker: ScanWorker | None = None
 
         self.setWindowTitle("Photo Album")
         self.resize(1100, 700)
@@ -37,6 +56,15 @@ class MainWindow(QMainWindow):
         self._update_project_state()
 
     def closeEvent(self, event) -> None:
+        if self._scan_thread is not None:
+            QMessageBox.warning(
+                self,
+                "Photo Album",
+                "A photo analysis is still running.",
+            )
+            event.ignore()
+            return
+
         self._project_service.close()
         super().closeEvent(event)
 
@@ -117,7 +145,85 @@ class MainWindow(QMainWindow):
         )
 
         layout.addWidget(self._recursive_checkbox)
-        layout.addStretch()
+
+        action_layout = QHBoxLayout()
+
+        self._analyze_button = QPushButton(
+            "Analyze Photos"
+        )
+        self._analyze_button.clicked.connect(
+            self._start_scan
+        )
+
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setVisible(False)
+
+        action_layout.addWidget(self._analyze_button)
+        action_layout.addWidget(self._progress_bar, 1)
+
+        layout.addLayout(action_layout)
+
+        self._summary_label = QLabel(
+            "No analysis performed."
+        )
+        layout.addWidget(self._summary_label)
+
+        self._photo_model = PhotoTableModel(parent=self)
+
+        self._photo_proxy_model = QSortFilterProxyModel(self)
+        self._photo_proxy_model.setSourceModel(
+            self._photo_model
+        )
+        self._photo_proxy_model.setSortRole(
+            PhotoTableModel.SORT_ROLE
+        )
+        self._photo_proxy_model.setSortCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        self._photo_proxy_model.setDynamicSortFilter(True)
+
+        self._photo_table = QTableView()
+        self._photo_table.setModel(
+            self._photo_proxy_model
+        )
+
+        self._photo_table.setSelectionBehavior(
+            QTableView.SelectionBehavior.SelectRows
+        )
+        self._photo_table.setSelectionMode(
+            QTableView.SelectionMode.SingleSelection
+        )
+        self._photo_table.setAlternatingRowColors(True)
+        self._photo_table.setSortingEnabled(True)
+
+        self._photo_table.sortByColumn(
+            1,
+            Qt.SortOrder.AscendingOrder,
+        )
+
+        header = self._photo_table.horizontalHeader()
+        header.setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        header.setStretchLastSection(True)
+
+        self._log_view = QPlainTextEdit()
+        self._log_view.setReadOnly(True)
+
+        splitter = QSplitter(
+            Qt.Orientation.Vertical
+        )
+
+        splitter.addWidget(self._photo_table)
+        splitter.addWidget(self._log_view)
+
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 1)
+
+        layout.addWidget(
+            QLabel("Photos:")
+        )
+        layout.addWidget(splitter, 1)
 
         self.setCentralWidget(central_widget)
 
@@ -150,6 +256,7 @@ class MainWindow(QMainWindow):
             return
 
         self._load_project_settings()
+        self._load_project_photos()
         self._update_project_state()
 
     def _open_project(self) -> None:
@@ -170,6 +277,7 @@ class MainWindow(QMainWindow):
             return
 
         self._load_project_settings()
+        self._load_project_photos()
         self._update_project_state()
 
     def _close_project(self) -> None:
@@ -177,7 +285,11 @@ class MainWindow(QMainWindow):
 
         self._source_edit.clear()
         self._recursive_checkbox.setChecked(False)
-
+        self._summary_label.setText(
+            "No analysis performed."
+        )
+        self._log_view.clear()
+        self._photo_model.clear()
         self._update_project_state()
 
     def _choose_source_directory(self) -> None:
@@ -198,6 +310,7 @@ class MainWindow(QMainWindow):
             return
 
         self._source_edit.setText(directory)
+        self._update_project_state()
 
     def _recursive_changed(
         self,
@@ -223,12 +336,202 @@ class MainWindow(QMainWindow):
             self._project_service.get_recursive_scan()
         )
 
+    def _start_scan(self) -> None:
+        project_path = self._project_service.project_path
+        source_directory = (
+            self._project_service.get_source_directory()
+        )
+
+        if project_path is None:
+            self._show_error("No project is open.")
+            return
+
+        if source_directory is None:
+            self._show_error(
+                "Choose a source photo folder first."
+            )
+            return
+
+        if not source_directory.exists():
+            self._show_error(
+                f"Source folder does not exist: "
+                f"{source_directory}"
+            )
+            return
+
+        self._log_view.clear()
+        self._summary_label.setText(
+            "Analysis in progress..."
+        )
+
+        self._set_scan_running(True)
+
+        thread = QThread(self)
+
+        worker = ScanWorker(
+            project_path=project_path,
+            source_directory=source_directory,
+            recursive=(
+                self._project_service.get_recursive_scan()
+            ),
+            language="fr",
+            geocode=True,
+            user_agent="PhotoAlbum/0.1 development",
+        )
+
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+
+        worker.event_received.connect(
+            self._handle_processing_event
+        )
+        worker.completed.connect(
+            self._scan_completed
+        )
+        worker.failed.connect(
+            self._scan_failed
+        )
+
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(
+            self._scan_thread_finished
+        )
+
+        self._scan_thread = thread
+        self._scan_worker = worker
+
+        thread.start()
+
+    def _handle_processing_event(
+        self,
+        event: ProcessingEvent,
+    ) -> None:
+        self._log_view.appendPlainText(
+            f"[{event.type.value}] "
+            f"{event.path.name}: "
+            f"{event.message}"
+        )
+
+    def _scan_completed(
+        self,
+        result: LibraryScanResult,
+    ) -> None:
+        statistics = result.statistics
+
+        all_photos = [
+            *result.photos,
+            *result.date_anomalies,
+        ]
+
+        all_photos.sort(
+            key=lambda photo: (
+                photo.capture_datetime is None,
+                photo.capture_datetime
+                or datetime.max,
+                photo.filename.lower(),
+            )
+        )
+
+        self._photo_model.set_photos(all_photos)
+
+        self._summary_label.setText(
+            " | ".join(
+                [
+                    f"Discovered: {statistics.discovered}",
+                    f"Analyzed: {statistics.analyzed}",
+                    f"Reused: {statistics.reused}",
+                    f"Geocoded: {statistics.geocoded}",
+                    (
+                        "Date anomalies: "
+                        f"{statistics.date_anomalies}"
+                    ),
+                    f"Errors: {statistics.errors}",
+                ]
+            )
+        )
+
+        if result.date_anomalies:
+            self._log_view.appendPlainText("")
+            self._log_view.appendPlainText(
+                "Photos requiring a capture date:"
+            )
+
+            for photo in result.date_anomalies:
+                self._log_view.appendPlainText(
+                    str(photo.path)
+                )
+
+        self.statusBar().showMessage(
+            "Photo analysis completed."
+        )
+
+    def _scan_failed(
+        self,
+        message: str,
+    ) -> None:
+        self._summary_label.setText(
+            "Analysis failed."
+        )
+
+        self._show_error(message)
+
+    def _scan_thread_finished(self) -> None:
+        self._scan_thread = None
+        self._scan_worker = None
+
+        self._set_scan_running(False)
+
+    def _set_scan_running(
+        self,
+        running: bool,
+    ) -> None:
+        self._new_project_action.setEnabled(not running)
+        self._open_project_action.setEnabled(not running)
+        self._close_project_action.setEnabled(
+            not running
+            and self._project_service.is_open
+        )
+
+        self._browse_source_button.setEnabled(
+            not running
+            and self._project_service.is_open
+        )
+
+        self._recursive_checkbox.setEnabled(
+            not running
+            and self._project_service.is_open
+        )
+
+        self._analyze_button.setEnabled(
+            not running
+            and self._project_service.is_open
+            and bool(self._source_edit.text())
+        )
+
+        self._progress_bar.setVisible(running)
+
+        if running:
+            self._progress_bar.setRange(0, 0)
+            self.statusBar().showMessage(
+                "Analyzing photos..."
+            )
+        else:
+            self._progress_bar.setRange(0, 1)
+
     def _update_project_state(self) -> None:
         is_open = self._project_service.is_open
+        has_source = bool(self._source_edit.text())
 
         self._close_project_action.setEnabled(is_open)
         self._browse_source_button.setEnabled(is_open)
         self._recursive_checkbox.setEnabled(is_open)
+        self._analyze_button.setEnabled(
+            is_open and has_source
+        )
 
         if is_open:
             project_path = self._project_service.project_path
@@ -251,4 +554,44 @@ class MainWindow(QMainWindow):
             self,
             "Photo Album",
             message,
+        )
+
+    def _load_project_photos(self) -> None:
+        if not self._project_service.is_open:
+            self._photo_model.clear()
+            return
+
+        photos = self._project_service.list_photos()
+
+        self._photo_model.set_photos(photos)
+
+        total = len(photos)
+
+        date_anomalies = sum(
+            1
+            for photo in photos
+            if photo.is_date_anomaly
+        )
+
+        gps_photos = sum(
+            1
+            for photo in photos
+            if photo.has_gps
+        )
+
+        located_photos = sum(
+            1
+            for photo in photos
+            if photo.location_source.value != "unknown"
+        )
+
+        self._summary_label.setText(
+            " | ".join(
+                [
+                    f"Stored photos: {total}",
+                    f"GPS: {gps_photos}",
+                    f"Located: {located_photos}",
+                    f"Date anomalies: {date_anomalies}",
+                ]
+            )
         )
