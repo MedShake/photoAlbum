@@ -51,11 +51,13 @@ class PrintDiagnostics:
             return PrintDiagnostic(
                 page_count=page_count,
                 compatible=True,
+                page_multiple=multiple,
             )
 
         return PrintDiagnostic(
             page_count=page_count,
             compatible=False,
             pages_to_add=multiple - remainder,
+            page_multiple=multiple,
         )
 

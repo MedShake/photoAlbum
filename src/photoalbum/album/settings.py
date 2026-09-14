@@ -15,9 +15,34 @@ class DividerPlacement(str, Enum):
 
 
 @dataclass(frozen=True)
+class CoverScatterSettings:
+    # 0 means: use every eligible dated photo.
+    photo_count: int = 0
+
+    # All proposals remain reproducible.
+    seeds: tuple[int, ...] = (0,)
+    selected_seed_index: int = 0
+
+    @property
+    def seed(self) -> int:
+        if not self.seeds:
+            return 0
+
+        index = min(
+            max(self.selected_seed_index, 0),
+            len(self.seeds) - 1,
+        )
+
+        return self.seeds[index]
+
+
+@dataclass(frozen=True)
 class CoverSettings:
     position: CoverPosition
     template_id: str
+    scatter: CoverScatterSettings = field(
+        default_factory=CoverScatterSettings
+    )
 
 
 @dataclass(frozen=True)
@@ -47,6 +72,12 @@ class PageNumberSettings:
 
 
 @dataclass(frozen=True)
+class PrintSettings:
+    # None means no page-count constraint.
+    page_multiple: int | None = None
+
+
+@dataclass(frozen=True)
 class SpecialPage:
     template_id: str
 
@@ -62,6 +93,10 @@ class AlbumStructureSettings:
 
     page_numbers: PageNumberSettings = field(
         default_factory=PageNumberSettings
+    )
+
+    print_settings: PrintSettings = field(
+        default_factory=PrintSettings
     )
 
     front_matter: list[SpecialPage] = field(

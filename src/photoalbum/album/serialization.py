@@ -5,12 +5,14 @@ import json
 from .models import CoverPosition
 from .settings import (
     AlbumStructureSettings,
+    CoverScatterSettings,
     CoverSettings,
     DividerPlacement,
     DividerSettings,
     PageNumberSettings,
     PhotoCaptionSettings,
     PhotoPageSettings,
+    PrintSettings,
     SpecialPage,
 )
 
@@ -22,6 +24,17 @@ def album_settings_to_json(
         "covers": {
             position.value: {
                 "template_id": cover.template_id,
+                "scatter": {
+                    "photo_count": (
+                        cover.scatter.photo_count
+                    ),
+                    "seeds": list(
+                        cover.scatter.seeds
+                    ),
+                    "selected_seed_index": (
+                        cover.scatter.selected_seed_index
+                    ),
+                },
             }
             for position, cover in settings.covers.items()
         },
@@ -63,6 +76,13 @@ def album_settings_to_json(
         ],
     }
 
+    if settings.print_settings.page_multiple is not None:
+        data["print_settings"] = {
+            "page_multiple": (
+                settings.print_settings.page_multiple
+            ),
+        }
+
     return json.dumps(
         data,
         ensure_ascii=False,
@@ -81,6 +101,26 @@ def album_settings_from_json(
             template_id=data["covers"][position.value][
                 "template_id"
             ],
+            scatter=CoverScatterSettings(
+                photo_count=int(
+                    data["covers"][position.value]
+                    .get("scatter", {})
+                    .get("photo_count", 0)
+                ),
+                seeds=tuple(
+                    int(seed)
+                    for seed in (
+                        data["covers"][position.value]
+                        .get("scatter", {})
+                        .get("seeds", [0])
+                    )
+                ) or (0,),
+                selected_seed_index=int(
+                    data["covers"][position.value]
+                    .get("scatter", {})
+                    .get("selected_seed_index", 0)
+                ),
+            ),
         )
         for position in CoverPosition
     }
@@ -90,6 +130,7 @@ def album_settings_from_json(
     photo_data = data["photo_pages"]
     caption_data = photo_data.get("caption", {})
     page_number_data = data.get("page_numbers", {})
+    print_data = data.get("print_settings", {})
 
     return AlbumStructureSettings(
         covers=covers,
@@ -130,6 +171,11 @@ def album_settings_from_json(
                     "enabled",
                     True,
                 )
+            ),
+        ),
+        print_settings=PrintSettings(
+            page_multiple=print_data.get(
+                "page_multiple"
             ),
         ),
         front_matter=[

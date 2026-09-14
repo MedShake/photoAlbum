@@ -7,3 +7,5 @@ __all__ = [
     "AlbumPlanWidget",
     ]
 
+
+from .album_preview_widget import AlbumPreviewWidget

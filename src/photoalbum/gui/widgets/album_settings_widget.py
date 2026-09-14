@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -11,21 +13,25 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from photoalbum.i18n import Translator
+from photoalbum.gui.template_labels import template_display_name
 
 from photoalbum.album import (
     AlbumStructureSettings,
     CoverPosition,
+    CoverScatterSettings,
     CoverSettings,
     DividerPlacement,
     DividerSettings,
     PageNumberSettings,
     PhotoCaptionSettings,
     PhotoPageSettings,
+    PrintSettings,
     SpecialPage,
     TemplateKind,
     TemplateRegistry,
@@ -56,9 +62,13 @@ class AlbumSettingsWidget(QWidget):
         layout = QVBoxLayout(self)
 
         layout.addWidget(self._create_covers_group())
+        layout.addWidget(
+            self._create_cover_scatter_group()
+        )
         layout.addWidget(self._create_dividers_group())
         layout.addWidget(self._create_photo_pages_group())
         layout.addWidget(self._create_page_numbers_group())
+        layout.addWidget(self._create_print_group())
 
         special_layout = QHBoxLayout()
 
@@ -117,6 +127,14 @@ class AlbumSettingsWidget(QWidget):
             self._emit_settings_changed
         )
 
+        self._cover_photo_count_spin.valueChanged.connect(
+            self._emit_settings_changed
+        )
+
+        self._page_multiple_4_checkbox.toggled.connect(
+            self._emit_settings_changed
+        )
+
     def _emit_settings_changed(
         self,
         *args,
@@ -165,6 +183,168 @@ class AlbumSettingsWidget(QWidget):
         )
 
         return group
+
+    def _create_cover_scatter_group(
+        self,
+    ) -> QGroupBox:
+        group = QGroupBox(
+            self._translator.tr(
+                "album.cover_scatter"
+            )
+        )
+
+        layout = QVBoxLayout(group)
+
+        self._cover_photo_count_spin = QSpinBox()
+        self._cover_photo_count_spin.setRange(
+            0,
+            0,
+        )
+        self._cover_photo_count_spin.setValue(0)
+        self._cover_photo_count_spin.hide()
+
+        layout.addWidget(
+            QLabel(
+                self._translator.tr(
+                    "album.cover_all_photos"
+                )
+            )
+        )
+
+        self._cover_proposal_label = QLabel()
+        layout.addWidget(
+            self._cover_proposal_label
+        )
+
+        buttons = QHBoxLayout()
+
+        self._cover_previous_button = QPushButton(
+            self._translator.tr(
+                "album.cover_previous"
+            )
+        )
+        self._cover_new_button = QPushButton(
+            self._translator.tr(
+                "album.cover_new"
+            )
+        )
+        self._cover_next_button = QPushButton(
+            self._translator.tr(
+                "album.cover_next"
+            )
+        )
+
+        buttons.addWidget(
+            self._cover_previous_button
+        )
+        buttons.addWidget(
+            self._cover_new_button
+        )
+        buttons.addWidget(
+            self._cover_next_button
+        )
+
+        layout.addLayout(buttons)
+
+        self._cover_scatter_seeds = [0]
+        self._cover_scatter_index = 0
+
+        self._cover_previous_button.clicked.connect(
+            self._previous_cover_proposal
+        )
+        self._cover_new_button.clicked.connect(
+            self._new_cover_proposal
+        )
+        self._cover_next_button.clicked.connect(
+            self._next_cover_proposal
+        )
+
+        self._update_cover_proposal_controls()
+
+        return group
+
+    def _update_cover_proposal_controls(
+        self,
+    ) -> None:
+        total = len(
+            self._cover_scatter_seeds
+        )
+
+        self._cover_scatter_index = min(
+            max(
+                self._cover_scatter_index,
+                0,
+            ),
+            max(total - 1, 0),
+        )
+
+        self._cover_proposal_label.setText(
+            self._translator.tr(
+                "album.cover_proposal",
+                current=(
+                    self._cover_scatter_index + 1
+                ),
+                total=total,
+            )
+        )
+
+        self._cover_previous_button.setEnabled(
+            self._cover_scatter_index > 0
+        )
+
+        self._cover_next_button.setEnabled(
+            self._cover_scatter_index
+            < total - 1
+        )
+
+    def _previous_cover_proposal(
+        self,
+    ) -> None:
+        if self._cover_scatter_index <= 0:
+            return
+
+        self._cover_scatter_index -= 1
+        self._update_cover_proposal_controls()
+        self._emit_settings_changed()
+
+    def _next_cover_proposal(
+        self,
+    ) -> None:
+        if (
+            self._cover_scatter_index
+            >= len(self._cover_scatter_seeds) - 1
+        ):
+            return
+
+        self._cover_scatter_index += 1
+        self._update_cover_proposal_controls()
+        self._emit_settings_changed()
+
+    def _new_cover_proposal(
+        self,
+    ) -> None:
+        new_seed = secrets.randbelow(
+            2_147_483_647
+        )
+
+        self._cover_scatter_seeds.append(
+            new_seed
+        )
+
+        self._cover_scatter_index = (
+            len(self._cover_scatter_seeds) - 1
+        )
+
+        if len(self._cover_scatter_seeds) > 20:
+            self._cover_scatter_seeds = (
+                self._cover_scatter_seeds[-20:]
+            )
+            self._cover_scatter_index = (
+                len(self._cover_scatter_seeds) - 1
+            )
+
+        self._update_cover_proposal_controls()
+        self._emit_settings_changed()
 
     def _create_dividers_group(self) -> QGroupBox:
         group = QGroupBox(self._translator.tr("album.dividers"))
@@ -281,6 +461,25 @@ class AlbumSettingsWidget(QWidget):
 
         return group
 
+    def _create_print_group(self) -> QGroupBox:
+        group = QGroupBox(
+            self._translator.tr("album.printing")
+        )
+
+        layout = QVBoxLayout(group)
+
+        self._page_multiple_4_checkbox = QCheckBox(
+            self._translator.tr(
+                "album.page_multiple_4"
+            )
+        )
+
+        layout.addWidget(
+            self._page_multiple_4_checkbox
+        )
+
+        return group
+
     def _create_special_pages_group(
         self,
         *,
@@ -363,13 +562,10 @@ class AlbumSettingsWidget(QWidget):
         return group
 
     def _template_display_name(self, template) -> str:
-        key = f"template.{template.template_id}"
-        translated = self._translator.tr(key)
-
-        if translated == key:
-            return template.name
-
-        return translated
+        return template_display_name(
+            template,
+            self._translator,
+        )
 
     def _create_template_combo(
         self,
@@ -404,9 +600,15 @@ class AlbumSettingsWidget(QWidget):
         return combo
 
     def _apply_defaults(self) -> None:
+        self._cover_scatter_seeds = [0]
+        self._cover_scatter_index = 0
+        self._cover_photo_count_spin.setValue(0)
+        self._update_cover_proposal_controls()
+
         self._caption_datetime_checkbox.setChecked(True)
         self._caption_location_checkbox.setChecked(True)
         self._page_numbers_checkbox.setChecked(True)
+        self._page_multiple_4_checkbox.setChecked(False)
 
         self._set_combo_template(
             self._front_cover_combo,
@@ -498,6 +700,17 @@ class AlbumSettingsWidget(QWidget):
                     template_id=self._template_id(
                         self._front_cover_combo
                     ),
+                    scatter=CoverScatterSettings(
+                        photo_count=(
+                            self._cover_photo_count_spin.value()
+                        ),
+                        seeds=tuple(
+                            self._cover_scatter_seeds
+                        ),
+                        selected_seed_index=(
+                            self._cover_scatter_index
+                        ),
+                    ),
                 ),
                 CoverPosition.INSIDE_FRONT: CoverSettings(
                     position=CoverPosition.INSIDE_FRONT,
@@ -554,6 +767,13 @@ class AlbumSettingsWidget(QWidget):
             page_numbers=PageNumberSettings(
                 enabled=self._page_numbers_checkbox.isChecked(),
             ),
+            print_settings=PrintSettings(
+                page_multiple=(
+                    4
+                    if self._page_multiple_4_checkbox.isChecked()
+                    else None
+                ),
+            ),
             front_matter=self._special_pages(
                 self._front_matter_list
             ),
@@ -575,6 +795,28 @@ class AlbumSettingsWidget(QWidget):
                     CoverPosition.FRONT
                 ].template_id,
             )
+
+            front_scatter = settings.covers[
+                CoverPosition.FRONT
+            ].scatter
+
+            self._cover_photo_count_spin.setValue(
+                front_scatter.photo_count
+            )
+
+            self._cover_scatter_seeds = list(
+                front_scatter.seeds
+            ) or [0]
+
+            self._cover_scatter_index = min(
+                max(
+                    front_scatter.selected_seed_index,
+                    0,
+                ),
+                len(self._cover_scatter_seeds) - 1,
+            )
+
+            self._update_cover_proposal_controls()
 
             self._set_combo_template(
                 self._inside_front_cover_combo,
@@ -634,6 +876,10 @@ class AlbumSettingsWidget(QWidget):
             )
             self._page_numbers_checkbox.setChecked(
                 settings.page_numbers.enabled
+            )
+
+            self._page_multiple_4_checkbox.setChecked(
+                settings.print_settings.page_multiple == 4
             )
 
             self._set_special_pages(

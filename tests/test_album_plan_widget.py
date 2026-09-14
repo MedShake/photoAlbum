@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QApplication
 
 from photoalbum.album import (
+    create_builtin_template_registry,
     AlbumBuildResult,
     AlbumPlan,
     BlankPageReason,
@@ -22,7 +23,8 @@ def create_widget() -> AlbumPlanWidget:
         QApplication([])
 
     return AlbumPlanWidget(
-        translator=Translator("en")
+        create_builtin_template_registry(),
+        translator=Translator("en"),
     )
 
 

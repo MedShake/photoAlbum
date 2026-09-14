@@ -39,10 +39,12 @@ from photoalbum.scanner import (
 
 from photoalbum.album import (
     AlbumBuilder,
+    PrintConstraints,
     create_builtin_template_registry,
 )
 from photoalbum.gui.widgets import (
     AlbumPlanWidget,
+    AlbumPreviewWidget,
     AlbumSettingsWidget,
 )
 from photoalbum.i18n import Translator
@@ -231,10 +233,23 @@ class MainWindow(QMainWindow):
         )
 
         header = self._photo_table.horizontalHeader()
+
+        # Let the user resize columns manually.
         header.setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
+            QHeaderView.ResizeMode.Interactive
         )
-        header.setStretchLastSection(True)
+
+        # Sensible initial widths. Long filenames must not force
+        # the complete table to become excessively wide.
+        self._photo_table.setColumnWidth(0, 260)
+        self._photo_table.setColumnWidth(1, 170)
+        self._photo_table.setColumnWidth(2, 130)
+        self._photo_table.setColumnWidth(3, 70)
+        self._photo_table.setColumnWidth(4, 150)
+        self._photo_table.setColumnWidth(5, 160)
+        self._photo_table.setColumnWidth(6, 120)
+
+        header.setStretchLastSection(False)
 
         self._log_view = QPlainTextEdit()
         self._log_view.setReadOnly(True)
@@ -275,6 +290,13 @@ class MainWindow(QMainWindow):
         )
 
         self._album_plan_widget = AlbumPlanWidget(
+            self._template_registry,
+            translator=self._translator,
+            parent=self,
+        )
+
+        self._album_preview_widget = AlbumPreviewWidget(
+            self._template_registry,
             translator=self._translator,
             parent=self,
         )
@@ -282,6 +304,11 @@ class MainWindow(QMainWindow):
         self._tabs.addTab(
             self._album_plan_widget,
             self._translator.tr("tab.plan"),
+        )
+
+        self._tabs.addTab(
+            self._album_preview_widget,
+            self._translator.tr("tab.preview"),
         )
         self.setCentralWidget(central_widget)
 
@@ -340,6 +367,9 @@ class MainWindow(QMainWindow):
 
     def _close_project(self) -> None:
         self._project_service.close()
+
+        self._album_plan_widget.clear()
+        self._album_preview_widget.clear()
 
         self._source_edit.clear()
         self._recursive_checkbox.setChecked(False)
@@ -668,6 +698,7 @@ class MainWindow(QMainWindow):
     def _refresh_album_plan(self) -> None:
         if not self._project_service.is_open:
             self._album_plan_widget.clear()
+            self._album_preview_widget.clear()
             return
 
         try:
@@ -677,17 +708,33 @@ class MainWindow(QMainWindow):
                 self._album_settings_widget.settings()
             )
 
+            print_constraints = None
+
+            if settings.print_settings.page_multiple is not None:
+                print_constraints = PrintConstraints(
+                    page_multiple=(
+                        settings.print_settings.page_multiple
+                    )
+                )
+
             result = self._album_builder.build(
                 photos,
                 settings,
+                print_constraints=print_constraints,
             )
 
             self._album_plan_widget.set_result(
                 result
             )
 
+            self._album_preview_widget.set_result(
+                result,
+                settings,
+            )
+
         except Exception as exc:
             self._album_plan_widget.clear()
+            self._album_preview_widget.clear()
 
             self.statusBar().showMessage(
                 self._translator.tr(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -18,6 +18,34 @@ class TemplateDefinition:
     name: str
     allowed_kinds: frozenset[TemplateKind]
     photo_capacity: int = 0
+
+    # Optional translations supplied by the template provider.
+    # template_id remains the stable technical identifier.
+    localized_names: dict[str, str] = field(
+        default_factory=dict
+    )
+    localized_descriptions: dict[str, str] = field(
+        default_factory=dict
+    )
+
+    def display_name(
+        self,
+        language: str,
+    ) -> str:
+        return (
+            self.localized_names.get(language)
+            or self.localized_names.get("en")
+            or self.name
+        )
+
+    def display_description(
+        self,
+        language: str,
+    ) -> str | None:
+        return (
+            self.localized_descriptions.get(language)
+            or self.localized_descriptions.get("en")
+        )
 
     def __post_init__(self) -> None:
         if not self.template_id:

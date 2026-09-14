@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from photoalbum.i18n import Translator
+from photoalbum.gui.template_labels import template_display_name
 
 from PySide6.QtWidgets import (
     QGroupBox,
@@ -16,17 +17,20 @@ from photoalbum.album import (
     AlbumSummaryBuilder,
     BlankPageReason,
     PlanItemKind,
+    TemplateRegistry,
 )
 
 
 class AlbumPlanWidget(QWidget):
     def __init__(
         self,
+        registry: TemplateRegistry,
         translator: Translator | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
 
+        self._registry = registry
         self._translator = translator or Translator()
         self._summary_builder = AlbumSummaryBuilder()
 
@@ -78,10 +82,10 @@ class AlbumPlanWidget(QWidget):
         self._tree = QTreeWidget()
         self._tree.setHeaderLabels(
             [
-                "Section",
-                "Pages",
-                "Photos",
-                "Details",
+                self._translator.tr("plan.section"),
+                self._translator.tr("plan.pages"),
+                self._translator.tr("plan.photos"),
+                self._translator.tr("plan.details"),
             ]
         )
 
@@ -108,26 +112,32 @@ class AlbumPlanWidget(QWidget):
         self._summary_label.setText(
             " | ".join(
                 [
-                    f"Photos: {summary.photo_count}",
-                    f"Pages: {summary.total_pages}",
                     (
-                        "Photo pages: "
+                        f"{self._translator.tr('plan.photos')}: "
+                        f"{summary.photo_count}"
+                    ),
+                    (
+                        f"{self._translator.tr('plan.pages')}: "
+                        f"{summary.total_pages}"
+                    ),
+                    (
+                        f"{self._translator.tr('plan.photo_pages')}: "
                         f"{summary.photo_pages}"
                     ),
                     (
-                        "Dividers: "
+                        f"{self._translator.tr('plan.dividers')}: "
                         f"{summary.divider_pages}"
                     ),
                     (
-                        "Special pages: "
+                        f"{self._translator.tr('plan.special_pages')}: "
                         f"{summary.special_pages}"
                     ),
                     (
-                        "Technical blanks: "
+                        f"{self._translator.tr('plan.technical_blanks')}: "
                         f"{summary.technical_blank_pages}"
                     ),
                     (
-                        "Editorial blanks: "
+                        f"{self._translator.tr('plan.editorial_blanks')}: "
                         f"{summary.editorial_blank_pages}"
                     ),
                 ]
@@ -136,26 +146,28 @@ class AlbumPlanWidget(QWidget):
 
         if summary.print_page_multiple is None:
             self._print_label.setText(
-                "Print diagnostic: no page-count "
-                "constraint enabled."
+                self._translator.tr(
+                    "plan.print_disabled"
+                )
             )
 
         elif summary.print_compatible:
             self._print_label.setText(
-                "Print diagnostic: "
-                f"{summary.total_pages} pages — "
-                "compatible with a multiple of "
-                f"{summary.print_page_multiple}."
+                self._translator.tr(
+                    "plan.print_compatible",
+                    pages=summary.total_pages,
+                    multiple=summary.print_page_multiple,
+                )
             )
 
         else:
             self._print_label.setText(
-                "Print diagnostic: "
-                f"{summary.total_pages} pages — "
-                "not a multiple of "
-                f"{summary.print_page_multiple}. "
-                f"{summary.print_pages_to_add} "
-                "additional page(s) would be required."
+                self._translator.tr(
+                    "plan.print_incompatible",
+                    pages=summary.total_pages,
+                    multiple=summary.print_page_multiple,
+                    additional=summary.print_pages_to_add,
+                )
             )
 
         self._set_suggestions(summary)
@@ -182,10 +194,12 @@ class AlbumPlanWidget(QWidget):
             slots = suggestion.available_photo_slots
 
             lines.append(
-                f"{month_name} {suggestion.year}: "
-                f"up to {slots} additional photo(s) "
-                "can be added without increasing the "
-                "number of pages before the next period."
+                self._translator.tr(
+                    "plan.suggestion",
+                    month=month_name,
+                    year=suggestion.year,
+                    slots=slots,
+                )
             )
 
         self._suggestions_label.setText(
@@ -205,7 +219,12 @@ class AlbumPlanWidget(QWidget):
         ] = {}
 
         other_root = QTreeWidgetItem(
-            ["Other pages", "", "", ""]
+            [
+                self._translator.tr("plan.other_pages"),
+                "",
+                "",
+                "",
+            ]
         )
 
         has_other_pages = False
@@ -278,21 +297,21 @@ class AlbumPlanWidget(QWidget):
                 page.blank_reason
                 == BlankPageReason.TECHNICAL
             ):
-                page_type = "Technical blank"
+                page_type = self._translator.tr("plan.technical_blank")
             else:
-                page_type = "Editorial blank"
+                page_type = self._translator.tr("plan.editorial_blank")
 
         elif page.kind == PlanItemKind.PHOTO_GROUP:
-            page_type = "Photos"
+            page_type = self._translator.tr("plan.photos_page")
 
         elif page.kind == PlanItemKind.MONTH_DIVIDER:
-            page_type = "Month divider"
+            page_type = self._translator.tr("plan.month_divider")
 
         elif page.kind == PlanItemKind.YEAR_DIVIDER:
-            page_type = "Year divider"
+            page_type = self._translator.tr("plan.year_divider")
 
         elif page.kind == PlanItemKind.SPECIAL_PAGE:
-            page_type = "Special page"
+            page_type = self._translator.tr("plan.special_page")
 
         else:
             page_type = (
@@ -303,17 +322,40 @@ class AlbumPlanWidget(QWidget):
 
         photo_count = len(page.photos)
 
-        details = page.template_id or ""
+        details = ""
+
+        if page.template_id:
+            try:
+                template = self._registry.get(
+                    page.template_id
+                )
+
+                details = template_display_name(
+                    template,
+                    self._translator,
+                )
+            except KeyError:
+                # Unknown external template: retain its stable ID
+                # as a technical fallback.
+                details = page.template_id
 
         if page.unused_photo_slots:
+            unused_slots = self._translator.tr(
+                "plan.unused_slots",
+                count=page.unused_photo_slots,
+            )
+
             details = (
-                f"{details} — "
-                f"{page.unused_photo_slots} unused slot(s)"
+                f"{details} — {unused_slots}"
             )
 
         return QTreeWidgetItem(
             [
-                f"Page {page.number} — {page_type}",
+                self._translator.tr(
+                    "plan.page_label",
+                    number=page.number,
+                    type=page_type,
+                ),
                 "1",
                 str(photo_count),
                 details,

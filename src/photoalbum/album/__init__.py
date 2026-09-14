@@ -8,12 +8,14 @@ from .models import (
 
 from .settings import (
     AlbumStructureSettings,
+    CoverScatterSettings,
     CoverSettings,
     DividerPlacement,
     DividerSettings,
     PageNumberSettings,
     PhotoCaptionSettings,
     PhotoPageSettings,
+    PrintSettings,
     SpecialPage,
 )
 
@@ -69,6 +71,7 @@ __all__ = [
     "US_LETTER",
     "AlbumStructureSettings",
     "CoverPosition",
+    "CoverScatterSettings",
     "CoverSettings",
     "DividerPlacement",
     "DividerSettings",
@@ -76,6 +79,7 @@ __all__ = [
     "PageNumberSettings",
     "PhotoCaptionSettings",
     "PhotoPageSettings",
+    "PrintSettings",
     "PrintProfile",
     "SpecialPage",
     "TemplateDefinition",
@@ -104,3 +108,12 @@ __all__ = [
     "AlbumSummaryBuilder",
     "PeriodFillSuggestion",
 ]
+
+from .cover_scatter import (
+    CoverPeriod,
+    CoverScatterComposition,
+    CoverScatterItem,
+    compose_cover_scatter,
+    cover_period,
+    cover_period_title,
+)

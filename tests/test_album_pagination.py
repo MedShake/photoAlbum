@@ -2,6 +2,8 @@ from datetime import datetime
 from pathlib import Path
 
 from photoalbum.album import (
+    create_builtin_template_registry,
+    AlbumPlanner,
     AlbumPlan,
     PageSide,
     PaginationEngine,
@@ -730,3 +732,119 @@ def test_december_capacity_is_recorded_before_year_divider():
     )
 
     assert december.unused_photo_slots == 3
+
+
+def make_month_city_photo(
+    filename: str,
+    year: int,
+    month: int,
+    day: int,
+) -> Photo:
+    return Photo(
+        path=Path("/photos") / filename,
+        filename=filename,
+        capture_datetime=datetime(
+            year,
+            month,
+            day,
+        ),
+    )
+
+def test_month_divider_collects_unique_cities():
+    photos = (
+        make_month_city_photo(
+            "one.jpg",
+            2025,
+            3,
+            1,
+        ),
+        make_month_city_photo(
+            "two.jpg",
+            2025,
+            3,
+            2,
+        ),
+        make_month_city_photo(
+            "three.jpg",
+            2025,
+            3,
+            3,
+        ),
+    )
+
+    photos[0].city = "Paris"
+    photos[1].city = "Lyon"
+    photos[2].city = "Paris"
+
+    plan = AlbumPlan(
+        items=[
+            PlanItem(
+                kind=PlanItemKind.MONTH_DIVIDER,
+                template_id="month-divider-classic",
+                year=2025,
+                month=3,
+            ),
+            PlanItem(
+                kind=PlanItemKind.PHOTO_GROUP,
+                template_id="photo-page-2",
+                year=2025,
+                month=3,
+                photos=photos,
+            ),
+        ]
+    )
+
+    result = PaginationEngine(
+        create_builtin_template_registry()
+    ).paginate(plan)
+
+    divider = next(
+        page
+        for page in result.pages
+        if page.kind == PlanItemKind.MONTH_DIVIDER
+    )
+
+    assert divider.cities == (
+        "Paris",
+        "Lyon",
+    )
+
+
+def test_month_divider_accepts_month_without_city():
+    photo = make_month_city_photo(
+        "photo.jpg",
+        2025,
+        3,
+        1,
+    )
+
+    plan = AlbumPlan(
+        items=[
+            PlanItem(
+                kind=PlanItemKind.MONTH_DIVIDER,
+                template_id="month-divider-classic",
+                year=2025,
+                month=3,
+            ),
+            PlanItem(
+                kind=PlanItemKind.PHOTO_GROUP,
+                template_id="photo-page-2",
+                year=2025,
+                month=3,
+                photos=(photo,),
+            ),
+        ]
+    )
+
+    result = PaginationEngine(
+        create_builtin_template_registry()
+    ).paginate(plan)
+
+    divider = next(
+        page
+        for page in result.pages
+        if page.kind == PlanItemKind.MONTH_DIVIDER
+    )
+
+    assert divider.cities == ()
+

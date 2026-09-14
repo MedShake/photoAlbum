@@ -248,9 +248,16 @@ class TemplateLayoutRegistry:
 @dataclass(frozen=True)
 class PhotoTemplateLayout:
     cells: tuple[NormalizedRect, ...]
-    one_line_caption_ratio: float = 0.09
-    two_line_caption_ratio: float = 0.16
-    image_caption_gap: float = 0.012
+    # Classic built-in layout, inspired by the historical
+    # PHP renderer:
+    #
+    # - about 2 mm between image and caption
+    # - about 4 mm per caption line
+    #
+    # Values are normalized against an A4 portrait page height.
+    # Other template developers are free to use different values.
+    caption_line_height: float = 4.0 / 297.0
+    image_caption_gap: float = 2.0 / 297.0
     image_fit: ImageFit = ImageFit.CONTAIN
 
     page_number_height: float = 0.025
@@ -345,13 +352,9 @@ class PhotoTemplateLayout:
                 image_fit=self.image_fit,
             )
 
-        if reserved_lines == 1:
-            caption_ratio = self.one_line_caption_ratio
-        else:
-            caption_ratio = self.two_line_caption_ratio
-
         caption_height = (
-            cell.height * caption_ratio
+            self.caption_line_height
+            * reserved_lines
         )
 
         image_height = (

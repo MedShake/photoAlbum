@@ -127,3 +127,60 @@ def test_invalid_page_multiple_is_rejected():
             "Expected ValueError for page_multiple=0"
         )
 
+
+
+def test_diagnostic_preserves_page_multiple_when_compatible():
+    pagination = PaginationResult(
+        pages=[
+            PlannedPage(
+                number=index + 1,
+                side=(
+                    PageSide.RIGHT
+                    if index % 2 == 0
+                    else PageSide.LEFT
+                ),
+                kind=None,
+                template_id=None,
+            )
+            for index in range(4)
+        ]
+    )
+
+    diagnostic = PrintDiagnostics().analyze(
+        pagination,
+        PrintConstraints(
+            page_multiple=4,
+        ),
+    )
+
+    assert diagnostic.compatible
+    assert diagnostic.page_multiple == 4
+
+
+def test_diagnostic_preserves_page_multiple_when_incompatible():
+    pagination = PaginationResult(
+        pages=[
+            PlannedPage(
+                number=index + 1,
+                side=(
+                    PageSide.RIGHT
+                    if index % 2 == 0
+                    else PageSide.LEFT
+                ),
+                kind=None,
+                template_id=None,
+            )
+            for index in range(6)
+        ]
+    )
+
+    diagnostic = PrintDiagnostics().analyze(
+        pagination,
+        PrintConstraints(
+            page_multiple=4,
+        ),
+    )
+
+    assert not diagnostic.compatible
+    assert diagnostic.pages_to_add == 2
+    assert diagnostic.page_multiple == 4
