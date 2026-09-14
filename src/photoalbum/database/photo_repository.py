@@ -134,6 +134,131 @@ class PhotoRepository:
 
         self._database.connection.commit()
 
+    def set_manual_location(
+        self,
+        path: Path,
+        *,
+        place_name: str | None = None,
+        city: str | None = None,
+        address: str | None = None,
+    ) -> None:
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET place_name = ?,
+                city = ?,
+                address = ?,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                place_name,
+                city,
+                address,
+                LocationSource.MANUAL.value,
+                str(path),
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo is not registered in the project: {path}"
+            )
+
+        self._database.connection.commit()
+
+    def update_geocoded_location(
+        self,
+        photo: Photo,
+    ) -> None:
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET place_name = ?,
+                city = ?,
+                address = ?,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                photo.place_name,
+                photo.city,
+                photo.address,
+                LocationSource.GEOCODING.value,
+                str(photo.path),
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                "Photo is not registered in the project: "
+                f"{photo.path}"
+            )
+
+        self._database.connection.commit()
+
+    def set_manual_location(
+        self,
+        path: Path,
+        *,
+        place_name: str | None = None,
+        city: str | None = None,
+        address: str | None = None,
+    ) -> None:
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET place_name = ?,
+                city = ?,
+                address = ?,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                place_name,
+                city,
+                address,
+                LocationSource.MANUAL.value,
+                str(path),
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo is not registered in the project: {path}"
+            )
+
+        self._database.connection.commit()
+
+    def update_geocoded_location(
+        self,
+        photo: Photo,
+    ) -> None:
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET place_name = ?,
+                city = ?,
+                address = ?,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                photo.place_name,
+                photo.city,
+                photo.address,
+                LocationSource.GEOCODING.value,
+                str(photo.path),
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                "Photo is not registered in the project: "
+                f"{photo.path}"
+            )
+
+        self._database.connection.commit()
 
     @staticmethod
     def _row_to_photo(row) -> Photo:
