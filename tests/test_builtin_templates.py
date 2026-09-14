@@ -19,6 +19,7 @@ def test_builtin_registry_contains_photo_templates():
     assert ids == {
         "photo-page-1",
         "photo-page-2",
+        "photo-page-3",
         "photo-page-4",
     }
 

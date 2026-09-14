@@ -83,6 +83,16 @@ def create_builtin_template_registry() -> TemplateRegistry:
             photo_capacity=2,
         ),
         TemplateDefinition(
+            template_id="photo-page-3",
+            name="Three photos",
+            allowed_kinds=frozenset(
+                {
+                    TemplateKind.PHOTO_PAGE,
+                }
+            ),
+            photo_capacity=3,
+        ),
+        TemplateDefinition(
             template_id="photo-page-4",
             name="Four photos",
             allowed_kinds=frozenset(

@@ -8,6 +8,8 @@ from .settings import (
     CoverSettings,
     DividerPlacement,
     DividerSettings,
+    PageNumberSettings,
+    PhotoCaptionSettings,
     PhotoPageSettings,
     SpecialPage,
 )
@@ -35,6 +37,17 @@ def album_settings_to_json(
         },
         "photo_pages": {
             "template_id": settings.photo_pages.template_id,
+            "caption": {
+                "show_datetime": (
+                    settings.photo_pages.caption.show_datetime
+                ),
+                "show_location": (
+                    settings.photo_pages.caption.show_location
+                ),
+            },
+        },
+        "page_numbers": {
+            "enabled": settings.page_numbers.enabled,
         },
         "front_matter": [
             {
@@ -75,6 +88,8 @@ def album_settings_from_json(
     month_data = data["month_dividers"]
     year_data = data["year_dividers"]
     photo_data = data["photo_pages"]
+    caption_data = photo_data.get("caption", {})
+    page_number_data = data.get("page_numbers", {})
 
     return AlbumStructureSettings(
         covers=covers,
@@ -94,6 +109,28 @@ def album_settings_from_json(
         ),
         photo_pages=PhotoPageSettings(
             template_id=photo_data["template_id"],
+            caption=PhotoCaptionSettings(
+                show_datetime=bool(
+                    caption_data.get(
+                        "show_datetime",
+                        True,
+                    )
+                ),
+                show_location=bool(
+                    caption_data.get(
+                        "show_location",
+                        True,
+                    )
+                ),
+            ),
+        ),
+        page_numbers=PageNumberSettings(
+            enabled=bool(
+                page_number_data.get(
+                    "enabled",
+                    True,
+                )
+            ),
         ),
         front_matter=[
             SpecialPage(

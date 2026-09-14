@@ -23,6 +23,8 @@ from photoalbum.album import (
     CoverSettings,
     DividerPlacement,
     DividerSettings,
+    PageNumberSettings,
+    PhotoCaptionSettings,
     PhotoPageSettings,
     SpecialPage,
     TemplateKind,
@@ -56,6 +58,7 @@ class AlbumSettingsWidget(QWidget):
         layout.addWidget(self._create_covers_group())
         layout.addWidget(self._create_dividers_group())
         layout.addWidget(self._create_photo_pages_group())
+        layout.addWidget(self._create_page_numbers_group())
 
         special_layout = QHBoxLayout()
 
@@ -101,6 +104,16 @@ class AlbumSettingsWidget(QWidget):
             self._emit_settings_changed
         )
         self._year_dividers_checkbox.toggled.connect(
+            self._emit_settings_changed
+        )
+
+        self._caption_datetime_checkbox.toggled.connect(
+            self._emit_settings_changed
+        )
+        self._caption_location_checkbox.toggled.connect(
+            self._emit_settings_changed
+        )
+        self._page_numbers_checkbox.toggled.connect(
             self._emit_settings_changed
         )
 
@@ -236,6 +249,36 @@ class AlbumSettingsWidget(QWidget):
             self._photo_page_combo,
         )
 
+        self._caption_datetime_checkbox = QCheckBox(
+            self._translator.tr("album.caption_datetime")
+        )
+        self._caption_location_checkbox = QCheckBox(
+            self._translator.tr("album.caption_location")
+        )
+
+        form.addRow(
+            "",
+            self._caption_datetime_checkbox,
+        )
+        form.addRow(
+            "",
+            self._caption_location_checkbox,
+        )
+
+        return group
+
+    def _create_page_numbers_group(self) -> QGroupBox:
+        group = QGroupBox(
+            self._translator.tr("album.page_numbering")
+        )
+        layout = QVBoxLayout(group)
+
+        self._page_numbers_checkbox = QCheckBox(
+            self._translator.tr("album.show_page_numbers")
+        )
+
+        layout.addWidget(self._page_numbers_checkbox)
+
         return group
 
     def _create_special_pages_group(
@@ -361,6 +404,10 @@ class AlbumSettingsWidget(QWidget):
         return combo
 
     def _apply_defaults(self) -> None:
+        self._caption_datetime_checkbox.setChecked(True)
+        self._caption_location_checkbox.setChecked(True)
+        self._page_numbers_checkbox.setChecked(True)
+
         self._set_combo_template(
             self._front_cover_combo,
             "year-photo-scatter",
@@ -495,6 +542,17 @@ class AlbumSettingsWidget(QWidget):
                 template_id=self._template_id(
                     self._photo_page_combo
                 ),
+                caption=PhotoCaptionSettings(
+                    show_datetime=(
+                        self._caption_datetime_checkbox.isChecked()
+                    ),
+                    show_location=(
+                        self._caption_location_checkbox.isChecked()
+                    ),
+                ),
+            ),
+            page_numbers=PageNumberSettings(
+                enabled=self._page_numbers_checkbox.isChecked(),
             ),
             front_matter=self._special_pages(
                 self._front_matter_list
@@ -566,6 +624,16 @@ class AlbumSettingsWidget(QWidget):
             self._set_combo_template(
                 self._photo_page_combo,
                 settings.photo_pages.template_id,
+            )
+
+            self._caption_datetime_checkbox.setChecked(
+                settings.photo_pages.caption.show_datetime
+            )
+            self._caption_location_checkbox.setChecked(
+                settings.photo_pages.caption.show_location
+            )
+            self._page_numbers_checkbox.setChecked(
+                settings.page_numbers.enabled
             )
 
             self._set_special_pages(

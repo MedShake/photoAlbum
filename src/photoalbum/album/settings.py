@@ -28,8 +28,22 @@ class DividerSettings:
 
 
 @dataclass(frozen=True)
+class PhotoCaptionSettings:
+    show_datetime: bool = True
+    show_location: bool = True
+
+
+@dataclass(frozen=True)
 class PhotoPageSettings:
     template_id: str
+    caption: PhotoCaptionSettings = field(
+        default_factory=PhotoCaptionSettings
+    )
+
+
+@dataclass(frozen=True)
+class PageNumberSettings:
+    enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -45,6 +59,10 @@ class AlbumStructureSettings:
     year_dividers: DividerSettings
 
     photo_pages: PhotoPageSettings
+
+    page_numbers: PageNumberSettings = field(
+        default_factory=PageNumberSettings
+    )
 
     front_matter: list[SpecialPage] = field(
         default_factory=list

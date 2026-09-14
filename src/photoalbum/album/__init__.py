@@ -11,6 +11,8 @@ from .settings import (
     CoverSettings,
     DividerPlacement,
     DividerSettings,
+    PageNumberSettings,
+    PhotoCaptionSettings,
     PhotoPageSettings,
     SpecialPage,
 )
@@ -71,6 +73,8 @@ __all__ = [
     "DividerPlacement",
     "DividerSettings",
     "PageFormat",
+    "PageNumberSettings",
+    "PhotoCaptionSettings",
     "PhotoPageSettings",
     "PrintProfile",
     "SpecialPage",

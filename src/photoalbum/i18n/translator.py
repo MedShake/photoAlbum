@@ -98,6 +98,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.year_separators": "Year separators",
 
         "album.photo_pages": "Photo pages",
+        "album.caption_datetime": "Show capture date and time",
+        "album.caption_location": "Show location",
+        "album.page_numbering": "Page numbering",
+        "album.show_page_numbers": "Show page numbers",
         "album.template": "Template:",
 
         "album.front_matter": "Pages after inside front cover",
@@ -131,6 +135,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "template.month-divider-classic": "Classic month divider",
         "template.photo-page-1": "One photo",
         "template.photo-page-2": "Two photos",
+        "template.photo-page-3": "Three photos",
         "template.photo-page-4": "Four photos",
         "template.dedication": "Dedication",
         "template.blank": "Blank page",
@@ -293,6 +298,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.year_separators": "Séparateurs d’année",
 
         "album.photo_pages": "Pages photo",
+        "album.caption_datetime": "Afficher la date et l’heure",
+        "album.caption_location": "Afficher le lieu",
+        "album.page_numbering": "Numérotation",
+        "album.show_page_numbers": "Afficher les numéros de page",
         "album.template": "Modèle :",
 
         "album.front_matter": "Pages après la 2e de couverture",
@@ -326,6 +335,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "template.month-divider-classic": "Séparateur de mois classique",
         "template.photo-page-1": "Une photo",
         "template.photo-page-2": "Deux photos",
+        "template.photo-page-3": "Trois photos",
         "template.photo-page-4": "Quatre photos",
         "template.dedication": "Dédicace",
         "template.blank": "Page blanche",
