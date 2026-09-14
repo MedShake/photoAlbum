@@ -234,3 +234,51 @@ def test_processing_emits_start_and_completion_events():
     assert events[0].type == ProcessingEventType.ANALYSIS_STARTED
     assert events[-1].type == ProcessingEventType.ANALYSIS_COMPLETED
 
+from photoalbum.geocoding import GeocodingError
+
+
+def test_geocoding_error_does_not_fail_photo_processing():
+    photo = Photo(
+        path=Path("/photos/example.jpg"),
+        filename="example.jpg",
+        capture_datetime=datetime(2025, 1, 1),
+        date_source=DateSource.EXIF,
+        latitude=47.2184,
+        longitude=-1.5536,
+    )
+
+    class FailingResolver:
+        def resolve(
+            self,
+            latitude: float,
+            longitude: float,
+            *,
+            language: str | None = None,
+            force_refresh: bool = False,
+        ):
+            raise GeocodingError("Network unavailable")
+
+    events = []
+
+    processor = PhotoProcessor(
+        photo_analyzer=FakeAnalyzer(photo),
+        location_resolver=FailingResolver(),
+    )
+
+    result = processor.process(
+        photo.path,
+        on_event=events.append,
+    )
+
+    assert result is photo
+    assert result.location_source == LocationSource.UNKNOWN
+
+    assert (
+        ProcessingEventType.GEOCODING_ERROR
+        in [event.type for event in events]
+    )
+
+    assert (
+        events[-1].type
+        == ProcessingEventType.ANALYSIS_COMPLETED
+    )

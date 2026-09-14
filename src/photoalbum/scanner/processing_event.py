@@ -16,6 +16,7 @@ class ProcessingEventType(str, Enum):
     LOCATION_RESOLVED = "location_resolved"
     LOCATION_NOT_FOUND = "location_not_found"
     ANALYSIS_COMPLETED = "analysis_completed"
+    GEOCODING_ERROR = "geocoding_error"
 
 
 @dataclass(frozen=True)

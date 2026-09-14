@@ -1,9 +1,7 @@
 from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
-
-from photoalbum.geocoding import LocationResolver
+from photoalbum.geocoding import GeocodingError, LocationResolver
 from photoalbum.metadata import PhotoAnalyzer
 from photoalbum.models import (
     DateSource,
@@ -105,12 +103,21 @@ class PhotoProcessor:
             "Resolving geographic information.",
         )
 
-        location = self._location_resolver.resolve(
-            photo.latitude,
-            photo.longitude,
-            language=language,
-            force_refresh=force_refresh,
-        )
+        try:
+            location = self._location_resolver.resolve(
+                photo.latitude,
+                photo.longitude,
+                language=language,
+                force_refresh=force_refresh,
+            )
+        except GeocodingError as exc:
+            self._emit(
+                on_event,
+                ProcessingEventType.GEOCODING_ERROR,
+                photo.path,
+                f"Geocoding failed: {exc}",
+            )
+            return False
 
         if location is None:
             self._emit(

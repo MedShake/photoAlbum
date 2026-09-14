@@ -30,3 +30,6 @@ pythonpath = ["src"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+photo-album = "photoalbum.cli:main"
