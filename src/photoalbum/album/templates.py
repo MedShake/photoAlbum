@@ -16,7 +16,7 @@ class TemplateKind(str, Enum):
 class TemplateDefinition:
     template_id: str
     name: str
-    kind: TemplateKind
+    allowed_kinds: frozenset[TemplateKind]
     photo_capacity: int = 0
 
     def __post_init__(self) -> None:
@@ -26,28 +26,41 @@ class TemplateDefinition:
         if not self.name:
             raise ValueError("Template name cannot be empty.")
 
+        if not self.allowed_kinds:
+            raise ValueError(
+                "Template must allow at least one usage kind."
+            )
+
         if self.photo_capacity < 0:
             raise ValueError(
                 "Photo capacity cannot be negative."
             )
 
-        if (
-            self.kind == TemplateKind.PHOTO_PAGE
-            and self.photo_capacity == 0
-        ):
+        allows_photo_pages = (
+            TemplateKind.PHOTO_PAGE
+            in self.allowed_kinds
+        )
+
+        if allows_photo_pages and self.photo_capacity == 0:
             raise ValueError(
-                "A photo page template must expose "
+                "A template usable as a photo page must expose "
                 "at least one photo slot."
             )
 
         if (
-            self.kind != TemplateKind.PHOTO_PAGE
+            not allows_photo_pages
             and self.photo_capacity != 0
         ):
             raise ValueError(
-                "Only photo page templates may expose "
+                "Only templates usable as photo pages may expose "
                 "photo slots."
             )
+
+    def supports(
+        self,
+        kind: TemplateKind,
+    ) -> bool:
+        return kind in self.allowed_kinds
 
 
 class TemplateRegistry:
@@ -93,6 +106,5 @@ class TemplateRegistry:
         return [
             template
             for template in self._templates.values()
-            if template.kind == kind
+            if template.supports(kind)
         ]
-

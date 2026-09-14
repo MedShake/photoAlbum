@@ -11,7 +11,7 @@ def test_photo_template_exposes_capacity():
     template = TemplateDefinition(
         template_id="photo-classic-2",
         name="Classic - 2 photos",
-        kind=TemplateKind.PHOTO_PAGE,
+        allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
         photo_capacity=2,
     )
 
@@ -22,7 +22,7 @@ def test_photo_template_can_have_different_capacity():
     template = TemplateDefinition(
         template_id="photo-grid-4",
         name="Grid - 4 photos",
-        kind=TemplateKind.PHOTO_PAGE,
+        allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
         photo_capacity=4,
     )
 
@@ -34,7 +34,7 @@ def test_photo_template_requires_at_least_one_slot():
         TemplateDefinition(
             template_id="invalid",
             name="Invalid",
-            kind=TemplateKind.PHOTO_PAGE,
+            allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
         )
 
 
@@ -42,7 +42,7 @@ def test_non_photo_template_has_no_photo_capacity():
     template = TemplateDefinition(
         template_id="month-classic",
         name="Classic month",
-        kind=TemplateKind.MONTH_DIVIDER,
+        allowed_kinds=frozenset({TemplateKind.MONTH_DIVIDER}),
     )
 
     assert template.photo_capacity == 0
@@ -53,7 +53,7 @@ def test_non_photo_template_cannot_expose_photo_slots():
         TemplateDefinition(
             template_id="month-invalid",
             name="Invalid month",
-            kind=TemplateKind.MONTH_DIVIDER,
+            allowed_kinds=frozenset({TemplateKind.MONTH_DIVIDER}),
             photo_capacity=2,
         )
 
@@ -63,7 +63,7 @@ def test_negative_photo_capacity_is_rejected():
         TemplateDefinition(
             template_id="invalid",
             name="Invalid",
-            kind=TemplateKind.PHOTO_PAGE,
+            allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
             photo_capacity=-1,
         )
 
@@ -73,7 +73,7 @@ def test_empty_template_id_is_rejected():
         TemplateDefinition(
             template_id="",
             name="Template",
-            kind=TemplateKind.SPECIAL_PAGE,
+            allowed_kinds=frozenset({TemplateKind.SPECIAL_PAGE}),
         )
 
 
@@ -81,7 +81,7 @@ def test_registry_returns_registered_template():
     template = TemplateDefinition(
         template_id="photo-classic-2",
         name="Classic - 2 photos",
-        kind=TemplateKind.PHOTO_PAGE,
+        allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
         photo_capacity=2,
     )
 
@@ -94,7 +94,7 @@ def test_registry_rejects_duplicate_ids():
     template = TemplateDefinition(
         template_id="index",
         name="Index",
-        kind=TemplateKind.SPECIAL_PAGE,
+        allowed_kinds=frozenset({TemplateKind.SPECIAL_PAGE}),
     )
 
     registry = TemplateRegistry([template])
@@ -114,19 +114,19 @@ def test_registry_filters_templates_by_kind():
     photo_2 = TemplateDefinition(
         template_id="photo-2",
         name="Two photos",
-        kind=TemplateKind.PHOTO_PAGE,
+        allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
         photo_capacity=2,
     )
     photo_4 = TemplateDefinition(
         template_id="photo-4",
         name="Four photos",
-        kind=TemplateKind.PHOTO_PAGE,
+        allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
         photo_capacity=4,
     )
     index = TemplateDefinition(
         template_id="index",
         name="Index",
-        kind=TemplateKind.SPECIAL_PAGE,
+        allowed_kinds=frozenset({TemplateKind.SPECIAL_PAGE}),
     )
 
     registry = TemplateRegistry(
@@ -140,3 +140,45 @@ def test_registry_filters_templates_by_kind():
         photo_4,
     ]
 
+def test_template_can_support_multiple_usage_kinds():
+    template = TemplateDefinition(
+        template_id="calendar-index",
+        name="Calendar index",
+        allowed_kinds=frozenset(
+            {
+                TemplateKind.COVER,
+                TemplateKind.SPECIAL_PAGE,
+            }
+        ),
+    )
+
+    assert template.supports(
+        TemplateKind.COVER
+    )
+
+    assert template.supports(
+        TemplateKind.SPECIAL_PAGE
+    )
+
+
+def test_registry_lists_multi_use_template_for_each_kind():
+    template = TemplateDefinition(
+        template_id="geographic-word-cloud",
+        name="Geographic word cloud",
+        allowed_kinds=frozenset(
+            {
+                TemplateKind.COVER,
+                TemplateKind.SPECIAL_PAGE,
+            }
+        ),
+    )
+
+    registry = TemplateRegistry([template])
+
+    assert template in registry.list_by_kind(
+        TemplateKind.COVER
+    )
+
+    assert template in registry.list_by_kind(
+        TemplateKind.SPECIAL_PAGE
+    )

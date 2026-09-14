@@ -20,33 +20,33 @@ def create_registry() -> TemplateRegistry:
             TemplateDefinition(
                 template_id="cover",
                 name="Cover",
-                kind=TemplateKind.COVER,
+                allowed_kinds=frozenset({TemplateKind.COVER}),
             ),
             TemplateDefinition(
                 template_id="month",
                 name="Month divider",
-                kind=TemplateKind.MONTH_DIVIDER,
+                allowed_kinds=frozenset({TemplateKind.MONTH_DIVIDER}),
             ),
             TemplateDefinition(
                 template_id="year",
                 name="Year divider",
-                kind=TemplateKind.YEAR_DIVIDER,
+                allowed_kinds=frozenset({TemplateKind.YEAR_DIVIDER}),
             ),
             TemplateDefinition(
                 template_id="photo",
                 name="Photo page",
-                kind=TemplateKind.PHOTO_PAGE,
+                allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
                 photo_capacity=2,
             ),
             TemplateDefinition(
                 template_id="index",
                 name="Index",
-                kind=TemplateKind.SPECIAL_PAGE,
+                allowed_kinds=frozenset({TemplateKind.SPECIAL_PAGE}),
             ),
             TemplateDefinition(
                 template_id="dedication",
                 name="Dedication",
-                kind=TemplateKind.SPECIAL_PAGE,
+                allowed_kinds=frozenset({TemplateKind.SPECIAL_PAGE}),
             ),
         ]
     )

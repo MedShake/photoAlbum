@@ -45,6 +45,12 @@ from .print_diagnostics import (
     PrintDiagnostics,
 )
 
+from .builder import AlbumBuilder, AlbumBuildResult
+
+from .builtin_templates import (
+    create_builtin_template_registry,
+)
+
 __all__ = [
     "A4",
     "US_LETTER",
@@ -74,4 +80,7 @@ __all__ = [
     "PrintConstraints",
     "PrintDiagnostic",
     "PrintDiagnostics",
+    "AlbumBuilder",
+    "AlbumBuildResult",
+    "create_builtin_template_registry",
 ]

@@ -44,23 +44,23 @@ def registry(
             TemplateDefinition(
                 template_id="photo",
                 name="Photo page",
-                kind=TemplateKind.PHOTO_PAGE,
+                allowed_kinds=frozenset({TemplateKind.PHOTO_PAGE}),
                 photo_capacity=capacity,
             ),
             TemplateDefinition(
                 template_id="month",
                 name="Month divider",
-                kind=TemplateKind.MONTH_DIVIDER,
+                allowed_kinds=frozenset({TemplateKind.MONTH_DIVIDER}),
             ),
             TemplateDefinition(
                 template_id="year",
                 name="Year divider",
-                kind=TemplateKind.YEAR_DIVIDER,
+                allowed_kinds=frozenset({TemplateKind.YEAR_DIVIDER}),
             ),
             TemplateDefinition(
                 template_id="index",
                 name="Index",
-                kind=TemplateKind.SPECIAL_PAGE,
+                allowed_kinds=frozenset({TemplateKind.SPECIAL_PAGE}),
             ),
         ]
     )

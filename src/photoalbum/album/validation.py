@@ -55,10 +55,9 @@ class AlbumSettingsValidator:
     ) -> None:
         template = self._registry.get(template_id)
 
-        if template.kind != expected_kind:
+        if not template.supports(expected_kind):
             raise ValueError(
-                f"Template {template_id!r} has kind "
-                f"{template.kind.value!r}; expected "
+                f"Template {template_id!r} cannot be used as "
                 f"{expected_kind.value!r}."
             )
 

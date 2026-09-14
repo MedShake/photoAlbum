@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QVBoxLayout,
     QWidget,
+    QTabWidget,
 )
 
 from photoalbum.app import ProjectService
@@ -36,11 +37,20 @@ from photoalbum.scanner import (
     ProcessingEvent,
 )
 
+from photoalbum.album import (
+    create_builtin_template_registry,
+)
+from photoalbum.gui.widgets import AlbumSettingsWidget
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
 
         self._project_service = ProjectService()
+
+        self._template_registry = (
+            create_builtin_template_registry()
+        )
 
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
@@ -168,6 +178,13 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(self._summary_label)
 
+        self._tabs = QTabWidget()
+        layout.addWidget(self._tabs, 1)
+
+        photos_tab = QWidget()
+        photos_layout = QVBoxLayout(photos_tab)
+
+
         self._photo_model = PhotoTableModel(parent=self)
 
         self._photo_proxy_model = QSortFilterProxyModel(self)
@@ -220,10 +237,25 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)
 
-        layout.addWidget(
+        photos_layout.addWidget(
             QLabel("Photos:")
         )
-        layout.addWidget(splitter, 1)
+        photos_layout.addWidget(splitter, 1)
+
+        self._tabs.addTab(
+            photos_tab,
+            "Photos",
+        )
+
+        self._album_settings_widget = AlbumSettingsWidget(
+            self._template_registry,
+            parent=self,
+        )
+
+        self._tabs.addTab(
+            self._album_settings_widget,
+            "Album",
+        )
 
         self.setCentralWidget(central_widget)
 
@@ -290,6 +322,9 @@ class MainWindow(QMainWindow):
         )
         self._log_view.clear()
         self._photo_model.clear()
+        self._album_settings_widget.set_available_years(
+            set()
+        )
         self._update_project_state()
 
     def _choose_source_directory(self) -> None:
@@ -437,6 +472,7 @@ class MainWindow(QMainWindow):
         )
 
         self._photo_model.set_photos(all_photos)
+        self._update_album_years(all_photos)
 
         self._summary_label.setText(
             " | ".join(
@@ -549,6 +585,20 @@ class MainWindow(QMainWindow):
             )
             self.statusBar().showMessage("Ready")
 
+    def _update_album_years(
+        self,
+        photos,
+    ) -> None:
+        years = {
+            photo.capture_datetime.year
+            for photo in photos
+            if photo.capture_datetime is not None
+        }
+
+        self._album_settings_widget.set_available_years(
+            years
+        )
+
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(
             self,
@@ -564,6 +614,7 @@ class MainWindow(QMainWindow):
         photos = self._project_service.list_photos()
 
         self._photo_model.set_photos(photos)
+        self._update_album_years(photos)
 
         total = len(photos)
 
