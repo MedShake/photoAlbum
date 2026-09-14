@@ -72,7 +72,7 @@ def test_effective_scatter_photos_are_owned_by_backend():
         filename="undated.jpg",
     )
 
-    photos = service._effective_photos(
+    photos = service.effective_photos(
         instance,
         [
             dated,

@@ -18,6 +18,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from photoalbum.templates.defaults import (
+    DEFAULT_TEMPLATES,
+)
 from photoalbum.i18n import Translator
 from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
@@ -620,19 +623,19 @@ class AlbumSettingsWidget(QWidget):
 
         self._set_combo_template(
             self._front_cover_combo,
-            "year-photo-scatter",
+            DEFAULT_TEMPLATES.front_cover,
         )
         self._set_combo_template(
             self._inside_front_cover_combo,
-            "geographic-word-cloud",
+            DEFAULT_TEMPLATES.inside_front_cover,
         )
         self._set_combo_template(
             self._inside_back_cover_combo,
-            "calendar-index",
+            DEFAULT_TEMPLATES.inside_back_cover,
         )
         self._set_combo_template(
             self._back_cover_combo,
-            "geographic-word-cloud",
+            DEFAULT_TEMPLATES.back_cover,
         )
 
         self._month_dividers_checkbox.setChecked(True)
@@ -640,7 +643,7 @@ class AlbumSettingsWidget(QWidget):
 
         self._set_combo_template(
             self._photo_page_combo,
-            "photo-page-2",
+            DEFAULT_TEMPLATES.photo_page,
         )
 
         self._set_placement(

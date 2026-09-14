@@ -71,12 +71,12 @@ def test_scatter_effective_photos_ignore_undated():
         ),
     ]
 
-    first = service._effective_photos(
+    first = service.effective_photos(
         instance,
         dated,
     )
 
-    second = service._effective_photos(
+    second = service.effective_photos(
         instance,
         with_anomalies,
     )

@@ -115,7 +115,7 @@ class PreviewRenderService(QObject):
             )
         ).hexdigest()
 
-    def _effective_photos(
+    def effective_photos(
         self,
         instance: PageInstance,
         photos,
@@ -235,7 +235,7 @@ class PreviewRenderService(QObject):
         width: int | None = None,
         height: int | None = None,
     ) -> PreviewRenderKey:
-        photos = self._effective_photos(
+        photos = self.effective_photos(
             instance,
             photos,
         )
@@ -306,7 +306,7 @@ class PreviewRenderService(QObject):
             else None
         )
 
-        photos = self._effective_photos(
+        photos = self.effective_photos(
             instance,
             photos,
         )

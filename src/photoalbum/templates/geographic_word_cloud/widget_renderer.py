@@ -30,6 +30,9 @@ class GeographicWordCloudWidgetRenderer:
         page_width_mm: float = 210.0,
         page_height_mm: float = 297.0,
         album_pages=(),
+        composition=None,
+        thumbnail_cache=None,
+        pixel_rect=None,
     ) -> None:
         settings = instance.settings.get(
             "geographic_word_cloud",
