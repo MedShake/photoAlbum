@@ -130,17 +130,28 @@ class AlbumPlanWidget(QWidget):
             )
         )
 
-        if summary.print_compatible:
+        if summary.print_page_multiple is None:
             self._print_label.setText(
-                "Print diagnostic: page count is "
-                "a multiple of 4."
+                "Print diagnostic: no page-count "
+                "constraint enabled."
             )
+
+        elif summary.print_compatible:
+            self._print_label.setText(
+                "Print diagnostic: "
+                f"{summary.total_pages} pages — "
+                "compatible with a multiple of "
+                f"{summary.print_page_multiple}."
+            )
+
         else:
             self._print_label.setText(
-                "Print diagnostic: page count is not "
-                "a multiple of 4. "
-                f"{summary.print_pages_to_add} additional "
-                "page(s) would be needed for printing."
+                "Print diagnostic: "
+                f"{summary.total_pages} pages — "
+                "not a multiple of "
+                f"{summary.print_page_multiple}. "
+                f"{summary.print_pages_to_add} "
+                "additional page(s) would be required."
             )
 
         self._set_suggestions(summary)

@@ -105,16 +105,58 @@ def test_plan_widget_displays_summary():
     assert "Technical blanks: 1" in text
 
 
-def test_plan_widget_displays_print_compatibility():
+def test_plan_widget_displays_no_print_constraint():
     widget = create_widget()
 
     widget.set_result(create_result())
 
     assert (
-        "multiple of 4"
+        "no page-count constraint enabled"
         in widget._print_label.text()
     )
 
+def test_plan_widget_displays_print_compatibility():
+    widget = create_widget()
+
+    result = create_result()
+
+    constrained_result = AlbumBuildResult(
+        plan=result.plan,
+        pagination=result.pagination,
+        print_diagnostic=PrintDiagnostic(
+            page_count=4,
+            compatible=True,
+            pages_to_add=0,
+            page_multiple=4,
+        ),
+    )
+
+    widget.set_result(constrained_result)
+
+    assert "multiple of 4" in widget._print_label.text()
+
+def test_plan_widget_displays_print_warning():
+    widget = create_widget()
+
+    result = create_result()
+
+    constrained_result = AlbumBuildResult(
+        plan=result.plan,
+        pagination=result.pagination,
+        print_diagnostic=PrintDiagnostic(
+            page_count=6,
+            compatible=False,
+            pages_to_add=2,
+            page_multiple=4,
+        ),
+    )
+
+    widget.set_result(constrained_result)
+
+    text = widget._print_label.text()
+
+    assert "not a multiple of 4" in text
+    assert "2 additional page(s)" in text
 
 def test_plan_widget_displays_period_suggestion():
     widget = create_widget()

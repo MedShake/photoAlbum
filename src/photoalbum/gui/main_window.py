@@ -38,10 +38,13 @@ from photoalbum.scanner import (
 )
 
 from photoalbum.album import (
+    AlbumBuilder,
     create_builtin_template_registry,
 )
-from photoalbum.gui.widgets import AlbumSettingsWidget
-
+from photoalbum.gui.widgets import (
+    AlbumPlanWidget,
+    AlbumSettingsWidget,
+)
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -51,7 +54,9 @@ class MainWindow(QMainWindow):
         self._template_registry = (
             create_builtin_template_registry()
         )
-
+        self._album_builder = AlbumBuilder(
+            self._template_registry
+        )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
 
@@ -261,6 +266,14 @@ class MainWindow(QMainWindow):
             "Album",
         )
 
+        self._album_plan_widget = AlbumPlanWidget(
+            parent=self,
+        )
+
+        self._tabs.addTab(
+            self._album_plan_widget,
+            "Plan",
+        )
         self.setCentralWidget(central_widget)
 
     def _create_status_bar(self) -> None:
@@ -330,6 +343,7 @@ class MainWindow(QMainWindow):
             set()
         )
         self._album_settings_widget.reset_to_defaults()
+        self._album_plan_widget.clear()
         self._update_project_state()
 
     def _choose_source_directory(self) -> None:
@@ -489,6 +503,7 @@ class MainWindow(QMainWindow):
 
         self._photo_model.set_photos(all_photos)
         self._update_album_years(all_photos)
+        self._refresh_album_plan()
 
         self._summary_label.setText(
             " | ".join(
@@ -615,6 +630,34 @@ class MainWindow(QMainWindow):
             years
         )
 
+    def _refresh_album_plan(self) -> None:
+        if not self._project_service.is_open:
+            self._album_plan_widget.clear()
+            return
+
+        try:
+            photos = self._project_service.list_photos()
+
+            settings = (
+                self._album_settings_widget.settings()
+            )
+
+            result = self._album_builder.build(
+                photos,
+                settings,
+            )
+
+            self._album_plan_widget.set_result(
+                result
+            )
+
+        except Exception as exc:
+            self._album_plan_widget.clear()
+
+            self.statusBar().showMessage(
+                f"Could not build album plan: {exc}"
+            )
+
     def _save_album_settings(self) -> None:
         if not self._project_service.is_open:
             return
@@ -625,6 +668,7 @@ class MainWindow(QMainWindow):
             self._project_service.set_album_structure_settings(
                 settings
             )
+            self._refresh_album_plan()
         except Exception as exc:
             self._show_error(
                 f"Could not save album settings: {exc}"
@@ -677,3 +721,4 @@ class MainWindow(QMainWindow):
                 ]
             )
         )
+        self._refresh_album_plan()

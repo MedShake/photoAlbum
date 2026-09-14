@@ -24,6 +24,7 @@ class PrintDiagnostic:
     page_count: int
     compatible: bool
     pages_to_add: int = 0
+    page_multiple: int | None = None
 
 
 class PrintDiagnostics:

@@ -28,6 +28,7 @@ class AlbumPlanSummary:
 
     print_compatible: bool
     print_pages_to_add: int
+    print_page_multiple: int | None
 
     period_fill_suggestions: tuple[
         PeriodFillSuggestion,
@@ -112,6 +113,9 @@ class AlbumSummaryBuilder:
             ),
             print_pages_to_add=(
                 result.print_diagnostic.pages_to_add
+            ),
+            print_page_multiple=(
+                result.print_diagnostic.page_multiple
             ),
             period_fill_suggestions=suggestions,
         )
