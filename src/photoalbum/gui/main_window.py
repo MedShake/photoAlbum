@@ -77,7 +77,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Photo Album",
-                "A photo analysis is still running.",
+                self._translator.tr(
+                    "main.scan_running_warning"
+                ),
             )
             event.ignore()
             return
@@ -87,7 +89,7 @@ class MainWindow(QMainWindow):
 
     def _create_actions(self) -> None:
         self._new_project_action = QAction(
-            "New Project...",
+            self._translator.tr("main.new_project"),
             self,
         )
         self._new_project_action.triggered.connect(
@@ -95,7 +97,7 @@ class MainWindow(QMainWindow):
         )
 
         self._open_project_action = QAction(
-            "Open Project...",
+            self._translator.tr("main.open_project"),
             self,
         )
         self._open_project_action.triggered.connect(
@@ -103,7 +105,7 @@ class MainWindow(QMainWindow):
         )
 
         self._close_project_action = QAction(
-            "Close Project",
+            self._translator.tr("main.close_project"),
             self,
         )
         self._close_project_action.triggered.connect(
@@ -111,13 +113,13 @@ class MainWindow(QMainWindow):
         )
 
         self._quit_action = QAction(
-            "Quit",
+            self._translator.tr("main.quit"),
             self,
         )
         self._quit_action.triggered.connect(self.close)
 
     def _create_menu(self) -> None:
-        file_menu = self.menuBar().addMenu("File")
+        file_menu = self.menuBar().addMenu(self._translator.tr("main.file"))
 
         file_menu.addAction(self._new_project_action)
         file_menu.addAction(self._open_project_action)
@@ -142,20 +144,20 @@ class MainWindow(QMainWindow):
         self._source_edit.setReadOnly(True)
 
         self._browse_source_button = QPushButton(
-            "Choose Source Folder..."
+            self._translator.tr("main.choose_source")
         )
         self._browse_source_button.clicked.connect(
             self._choose_source_directory
         )
 
-        source_layout.addWidget(QLabel("Source folder:"))
+        source_layout.addWidget(QLabel(self._translator.tr("main.source_folder")))
         source_layout.addWidget(self._source_edit, 1)
         source_layout.addWidget(self._browse_source_button)
 
         layout.addLayout(source_layout)
 
         self._recursive_checkbox = QCheckBox(
-            "Include subdirectories"
+            self._translator.tr("main.include_subdirectories")
         )
         self._recursive_checkbox.toggled.connect(
             self._recursive_changed
@@ -166,7 +168,7 @@ class MainWindow(QMainWindow):
         action_layout = QHBoxLayout()
 
         self._analyze_button = QPushButton(
-            "Analyze Photos"
+            self._translator.tr("main.analyze_photos")
         )
         self._analyze_button.clicked.connect(
             self._start_scan
@@ -181,7 +183,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(action_layout)
 
         self._summary_label = QLabel(
-            "No analysis performed."
+            self._translator.tr("main.no_analysis")
         )
         layout.addWidget(self._summary_label)
 
@@ -192,7 +194,10 @@ class MainWindow(QMainWindow):
         photos_layout = QVBoxLayout(photos_tab)
 
 
-        self._photo_model = PhotoTableModel(parent=self)
+        self._photo_model = PhotoTableModel(
+            translator=self._translator,
+            parent=self,
+        )
 
         self._photo_proxy_model = QSortFilterProxyModel(self)
         self._photo_proxy_model.setSourceModel(
@@ -245,7 +250,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
 
         photos_layout.addWidget(
-            QLabel("Photos:")
+            QLabel(self._translator.tr("main.photos"))
         )
         photos_layout.addWidget(splitter, 1)
 
@@ -287,7 +292,7 @@ class MainWindow(QMainWindow):
     def _new_project(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Create Photo Album Project",
+            self._translator.tr("main.create_project_title"),
             "",
             "Photo Album Project (*.photoalbum)",
         )
@@ -315,7 +320,7 @@ class MainWindow(QMainWindow):
     def _open_project(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Open Photo Album Project",
+            self._translator.tr("main.open_project_title"),
             "",
             "Photo Album Project (*.photoalbum)",
         )
@@ -339,7 +344,7 @@ class MainWindow(QMainWindow):
         self._source_edit.clear()
         self._recursive_checkbox.setChecked(False)
         self._summary_label.setText(
-            "No analysis performed."
+            self._translator.tr("main.no_analysis")
         )
         self._log_view.clear()
         self._photo_model.clear()
@@ -353,7 +358,7 @@ class MainWindow(QMainWindow):
     def _choose_source_directory(self) -> None:
         directory = QFileDialog.getExistingDirectory(
             self,
-            "Choose Source Photo Folder",
+            self._translator.tr("main.choose_source_title"),
         )
 
         if not directory:
@@ -412,25 +417,31 @@ class MainWindow(QMainWindow):
         )
 
         if project_path is None:
-            self._show_error("No project is open.")
+            self._show_error(
+                self._translator.tr("main.no_project_error")
+            )
             return
 
         if source_directory is None:
             self._show_error(
-                "Choose a source photo folder first."
+                self._translator.tr(
+                    "main.choose_source_error"
+                )
             )
             return
 
         if not source_directory.exists():
             self._show_error(
-                f"Source folder does not exist: "
-                f"{source_directory}"
+                self._translator.tr(
+                    "main.source_missing_error",
+                    path=source_directory,
+                )
             )
             return
 
         self._log_view.clear()
         self._summary_label.setText(
-            "Analysis in progress..."
+            self._translator.tr("main.analysis_running")
         )
 
         self._set_scan_running(True)
@@ -512,15 +523,30 @@ class MainWindow(QMainWindow):
         self._summary_label.setText(
             " | ".join(
                 [
-                    f"Discovered: {statistics.discovered}",
-                    f"Analyzed: {statistics.analyzed}",
-                    f"Reused: {statistics.reused}",
-                    f"Geocoded: {statistics.geocoded}",
-                    (
-                        "Date anomalies: "
-                        f"{statistics.date_anomalies}"
+                    self._translator.tr(
+                        "main.discovered",
+                        count=statistics.discovered,
                     ),
-                    f"Errors: {statistics.errors}",
+                    self._translator.tr(
+                        "main.analyzed",
+                        count=statistics.analyzed,
+                    ),
+                    self._translator.tr(
+                        "main.reused",
+                        count=statistics.reused,
+                    ),
+                    self._translator.tr(
+                        "main.geocoded",
+                        count=statistics.geocoded,
+                    ),
+                    self._translator.tr(
+                        "main.date_anomalies",
+                        count=statistics.date_anomalies,
+                    ),
+                    self._translator.tr(
+                        "main.errors",
+                        count=statistics.errors,
+                    ),
                 ]
             )
         )
@@ -528,7 +554,9 @@ class MainWindow(QMainWindow):
         if result.date_anomalies:
             self._log_view.appendPlainText("")
             self._log_view.appendPlainText(
-                "Photos requiring a capture date:"
+                self._translator.tr(
+                    "main.photos_requiring_date"
+                )
             )
 
             for photo in result.date_anomalies:
@@ -537,7 +565,7 @@ class MainWindow(QMainWindow):
                 )
 
         self.statusBar().showMessage(
-            "Photo analysis completed."
+            self._translator.tr("main.analysis_completed")
         )
 
     def _scan_failed(
@@ -545,7 +573,7 @@ class MainWindow(QMainWindow):
         message: str,
     ) -> None:
         self._summary_label.setText(
-            "Analysis failed."
+            self._translator.tr("main.analysis_failed")
         )
 
         self._show_error(message)
@@ -588,7 +616,7 @@ class MainWindow(QMainWindow):
         if running:
             self._progress_bar.setRange(0, 0)
             self.statusBar().showMessage(
-                "Analyzing photos..."
+                self._translator.tr("main.analyzing")
             )
         else:
             self._progress_bar.setRange(0, 1)
@@ -608,7 +636,10 @@ class MainWindow(QMainWindow):
             project_path = self._project_service.project_path
 
             self._project_label.setText(
-                f"Project: {project_path.name}"
+                self._translator.tr(
+                    "main.project",
+                    name=project_path.name,
+                )
             )
 
             self.statusBar().showMessage(
@@ -616,9 +647,9 @@ class MainWindow(QMainWindow):
             )
         else:
             self._project_label.setText(
-                "No project open"
+                self._translator.tr("main.no_project")
             )
-            self.statusBar().showMessage("Ready")
+            self.statusBar().showMessage(self._translator.tr("main.ready"))
 
     def _update_album_years(
         self,
@@ -659,7 +690,10 @@ class MainWindow(QMainWindow):
             self._album_plan_widget.clear()
 
             self.statusBar().showMessage(
-                f"Could not build album plan: {exc}"
+                self._translator.tr(
+                    "main.build_plan_error",
+                    error=exc,
+                )
             )
 
     def _save_album_settings(self) -> None:
@@ -675,7 +709,10 @@ class MainWindow(QMainWindow):
             self._refresh_album_plan()
         except Exception as exc:
             self._show_error(
-                f"Could not save album settings: {exc}"
+                self._translator.tr(
+                    "main.save_album_error",
+                    error=exc,
+                )
             )
 
     def _show_error(self, message: str) -> None:
@@ -718,10 +755,22 @@ class MainWindow(QMainWindow):
         self._summary_label.setText(
             " | ".join(
                 [
-                    f"Stored photos: {total}",
-                    f"GPS: {gps_photos}",
-                    f"Located: {located_photos}",
-                    f"Date anomalies: {date_anomalies}",
+                    self._translator.tr(
+                        "main.stored_photos",
+                        count=total,
+                    ),
+                    self._translator.tr(
+                        "main.gps",
+                        count=gps_photos,
+                    ),
+                    self._translator.tr(
+                        "main.located",
+                        count=located_photos,
+                    ),
+                    self._translator.tr(
+                        "main.date_anomalies",
+                        count=date_anomalies,
+                    ),
                 ]
             )
         )

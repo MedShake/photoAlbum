@@ -4,8 +4,88 @@ from __future__ import annotations
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
         "tab.photos": "Photos",
+
+        "photos.column.filename": "Filename",
+        "photos.column.capture_date": "Capture date",
+        "photos.column.date_source": "Date source",
+        "photos.column.gps": "GPS",
+        "photos.column.city": "City",
+        "photos.column.location_source": "Location source",
+        "photos.column.status": "Status",
+
+        "photos.value.yes": "Yes",
+        "photos.value.no": "No",
+        "photos.value.ok": "OK",
+        "photos.value.missing_date": "Missing date",
+
+        "photos.date_source.exif": "EXIF",
+        "photos.date_source.filename": "Filename",
+        "photos.date_source.manual": "Manual",
+        "photos.date_source.unknown": "Unknown",
+
+        "photos.location_source.geocoding": "Geocoding",
+        "photos.location_source.manual": "Manual",
+        "photos.location_source.unknown": "Unknown",
         "tab.album": "Album",
         "tab.plan": "Plan",
+
+        "main.file": "File",
+        "main.new_project": "New Project...",
+        "main.open_project": "Open Project...",
+        "main.close_project": "Close Project",
+        "main.quit": "Quit",
+
+        "main.choose_source": "Choose Source Folder...",
+        "main.source_folder": "Source folder:",
+        "main.include_subdirectories": "Include subdirectories",
+        "main.analyze_photos": "Analyze Photos",
+        "main.photos": "Photos:",
+
+        "main.no_analysis": "No analysis performed.",
+        "main.analysis_running": "Analysis in progress...",
+        "main.analysis_failed": "Analysis failed.",
+        "main.analysis_completed": "Photo analysis completed.",
+        "main.analyzing": "Analyzing photos...",
+
+        "main.no_project": "No project open",
+        "main.ready": "Ready",
+        "main.project": "Project: {name}",
+
+        "main.create_project_title": "Create Photo Album Project",
+        "main.open_project_title": "Open Photo Album Project",
+        "main.choose_source_title": "Choose Source Photo Folder",
+
+        "main.scan_running_warning": (
+            "A photo analysis is still running."
+        ),
+        "main.no_project_error": "No project is open.",
+        "main.choose_source_error": (
+            "Choose a source photo folder first."
+        ),
+        "main.source_missing_error": (
+            "Source folder does not exist: {path}"
+        ),
+        "main.save_album_error": (
+            "Could not save album settings: {error}"
+        ),
+        "main.build_plan_error": (
+            "Could not build album plan: {error}"
+        ),
+
+        "main.discovered": "Discovered: {count}",
+        "main.analyzed": "Analyzed: {count}",
+        "main.reused": "Reused: {count}",
+        "main.geocoded": "Geocoded: {count}",
+        "main.date_anomalies": "Date anomalies: {count}",
+        "main.errors": "Errors: {count}",
+
+        "main.stored_photos": "Stored photos: {count}",
+        "main.gps": "GPS: {count}",
+        "main.located": "Located: {count}",
+
+        "main.photos_requiring_date": (
+            "Photos requiring a capture date:"
+        ),
 
         "album.covers": "Covers",
         "album.front_cover": "Front cover:",
@@ -119,8 +199,88 @@ CATALOGS: dict[str, dict[str, str]] = {
 
     "fr": {
         "tab.photos": "Photos",
+
+        "photos.column.filename": "Nom du fichier",
+        "photos.column.capture_date": "Date de prise de vue",
+        "photos.column.date_source": "Source de la date",
+        "photos.column.gps": "GPS",
+        "photos.column.city": "Ville",
+        "photos.column.location_source": "Source de localisation",
+        "photos.column.status": "Statut",
+
+        "photos.value.yes": "Oui",
+        "photos.value.no": "Non",
+        "photos.value.ok": "OK",
+        "photos.value.missing_date": "Date manquante",
+
+        "photos.date_source.exif": "EXIF",
+        "photos.date_source.filename": "Nom de fichier",
+        "photos.date_source.manual": "Manuelle",
+        "photos.date_source.unknown": "Inconnue",
+
+        "photos.location_source.geocoding": "Géocodage",
+        "photos.location_source.manual": "Manuelle",
+        "photos.location_source.unknown": "Inconnue",
         "tab.album": "Album",
         "tab.plan": "Plan",
+
+        "main.file": "Fichier",
+        "main.new_project": "Nouveau projet...",
+        "main.open_project": "Ouvrir un projet...",
+        "main.close_project": "Fermer le projet",
+        "main.quit": "Quitter",
+
+        "main.choose_source": "Choisir le dossier source...",
+        "main.source_folder": "Dossier source :",
+        "main.include_subdirectories": "Inclure les sous-dossiers",
+        "main.analyze_photos": "Analyser les photos",
+        "main.photos": "Photos :",
+
+        "main.no_analysis": "Aucune analyse effectuée.",
+        "main.analysis_running": "Analyse en cours...",
+        "main.analysis_failed": "Échec de l’analyse.",
+        "main.analysis_completed": "Analyse des photos terminée.",
+        "main.analyzing": "Analyse des photos en cours...",
+
+        "main.no_project": "Aucun projet ouvert",
+        "main.ready": "Prêt",
+        "main.project": "Projet : {name}",
+
+        "main.create_project_title": "Créer un projet Photo Album",
+        "main.open_project_title": "Ouvrir un projet Photo Album",
+        "main.choose_source_title": "Choisir le dossier des photos",
+
+        "main.scan_running_warning": (
+            "Une analyse des photos est encore en cours."
+        ),
+        "main.no_project_error": "Aucun projet n’est ouvert.",
+        "main.choose_source_error": (
+            "Choisissez d’abord un dossier source."
+        ),
+        "main.source_missing_error": (
+            "Le dossier source n’existe pas : {path}"
+        ),
+        "main.save_album_error": (
+            "Impossible d’enregistrer les réglages de l’album : {error}"
+        ),
+        "main.build_plan_error": (
+            "Impossible de construire le plan de l’album : {error}"
+        ),
+
+        "main.discovered": "Détectées : {count}",
+        "main.analyzed": "Analysées : {count}",
+        "main.reused": "Réutilisées : {count}",
+        "main.geocoded": "Géolocalisées : {count}",
+        "main.date_anomalies": "Anomalies de date : {count}",
+        "main.errors": "Erreurs : {count}",
+
+        "main.stored_photos": "Photos enregistrées : {count}",
+        "main.gps": "GPS : {count}",
+        "main.located": "Localisées : {count}",
+
+        "main.photos_requiring_date": (
+            "Photos nécessitant une date de prise de vue :"
+        ),
 
         "album.covers": "Couvertures",
         "album.front_cover": "1re de couverture :",

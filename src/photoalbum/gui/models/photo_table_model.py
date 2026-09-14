@@ -4,18 +4,19 @@ from collections.abc import Sequence
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
+from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 
 
 class PhotoTableModel(QAbstractTableModel):
-    HEADERS = (
-        "Filename",
-        "Capture date",
-        "Date source",
-        "GPS",
-        "City",
-        "Location source",
-        "Status",
+    HEADER_KEYS = (
+        "photos.column.filename",
+        "photos.column.capture_date",
+        "photos.column.date_source",
+        "photos.column.gps",
+        "photos.column.city",
+        "photos.column.location_source",
+        "photos.column.status",
     )
 
     SORT_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -23,9 +24,12 @@ class PhotoTableModel(QAbstractTableModel):
     def __init__(
         self,
         photos: Sequence[Photo] | None = None,
+        translator: Translator | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
+
+        self._translator = translator or Translator("en")
         self._photos = list(photos or [])
 
     def rowCount(
@@ -44,7 +48,7 @@ class PhotoTableModel(QAbstractTableModel):
         if parent.isValid():
             return 0
 
-        return len(self.HEADERS)
+        return len(self.HEADER_KEYS)
 
     def data(
         self,
@@ -91,9 +95,11 @@ class PhotoTableModel(QAbstractTableModel):
             role == Qt.ItemDataRole.DisplayRole
             and orientation
             == Qt.Orientation.Horizontal
-            and 0 <= section < len(self.HEADERS)
+            and 0 <= section < len(self.HEADER_KEYS)
         ):
-            return self.HEADERS[section]
+            return self._translator.tr(
+                self.HEADER_KEYS[section]
+            )
 
         return super().headerData(
             section,
@@ -121,8 +127,8 @@ class PhotoTableModel(QAbstractTableModel):
 
         return self._photos[row]
 
-    @staticmethod
     def _display_value(
+        self,
         photo: Photo,
         column: int,
     ) -> str:
@@ -139,22 +145,35 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         if column == 2:
-            return photo.date_source.value
+            return self._translator.tr(
+                f"photos.date_source.{photo.date_source.value}"
+            )
 
         if column == 3:
-            return "Yes" if photo.has_gps else "No"
+            return self._translator.tr(
+                "photos.value.yes"
+                if photo.has_gps
+                else "photos.value.no"
+            )
 
         if column == 4:
             return photo.city or "—"
 
         if column == 5:
-            return photo.location_source.value
+            return self._translator.tr(
+                "photos.location_source."
+                f"{photo.location_source.value}"
+            )
 
         if column == 6:
             if photo.is_date_anomaly:
-                return "Missing date"
+                return self._translator.tr(
+                    "photos.value.missing_date"
+                )
 
-            return "OK"
+            return self._translator.tr(
+                "photos.value.ok"
+            )
 
         return ""
 
