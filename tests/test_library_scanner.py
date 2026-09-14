@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+
 from PIL import Image
 
 from photoalbum.scanner import LibraryScanner
@@ -152,7 +153,11 @@ def test_invalid_image_is_reported_as_error(
     assert result.errors[0].message
 
 from photoalbum.database import Database, PhotoRepository
-from photoalbum.models import DateSource, Photo
+from photoalbum.models import (
+    DateSource,
+    LocationSource,
+    Photo,
+)
 
 
 def create_cached_scanner(
@@ -293,4 +298,180 @@ def test_library_scanner_caches_date_anomalies(
 
     database.close()
 
-    
+class FakePhotoProcessor:
+    def __init__(self) -> None:
+        self.process_calls = 0
+        self.enrich_calls = 0
+
+    def process(
+        self,
+        path: Path,
+        *,
+        language: str | None = None,
+        on_event=None,
+    ) -> Photo:
+        self.process_calls += 1
+
+        return Photo(
+            path=path,
+            filename=path.name,
+        )
+
+    def enrich_location(
+        self,
+        photo: Photo,
+        *,
+        language: str | None = None,
+        on_event=None,
+        force_refresh: bool = False,
+    ) -> bool:
+        self.enrich_calls += 1
+
+        photo.city = "Resolved City"
+        photo.location_source = LocationSource.GEOCODING
+
+        return True
+
+
+def test_cached_photo_with_unresolved_gps_is_enriched(
+    tmp_path: Path,
+):
+    database = Database(tmp_path / "library.sqlite3")
+    database.initialize()
+
+    repository = PhotoRepository(database)
+
+    image_path = tmp_path / "2025-01-01.jpg"
+    create_image(image_path)
+
+    file_stat = image_path.stat()
+
+    repository.save(
+        Photo(
+            path=image_path,
+            filename=image_path.name,
+            file_size=file_stat.st_size,
+            modified_time_ns=file_stat.st_mtime_ns,
+            capture_datetime=datetime(2025, 1, 1),
+            date_source=DateSource.FILENAME,
+            latitude=47.2184,
+            longitude=-1.5536,
+            location_source=LocationSource.UNKNOWN,
+        )
+    )
+
+    processor = FakePhotoProcessor()
+
+    scanner = LibraryScanner(
+        photo_repository=repository,
+        photo_processor=processor,
+    )
+
+    result = scanner.scan(tmp_path)
+
+    assert processor.process_calls == 0
+    assert processor.enrich_calls == 1
+
+    assert result.photos[0].city == "Resolved City"
+
+    persisted = repository.find_by_path(image_path)
+
+    assert persisted is not None
+    assert persisted.city == "Resolved City"
+    assert (
+        persisted.location_source
+        == LocationSource.GEOCODING
+    )
+
+    database.close()
+
+
+def test_cached_geocoded_photo_is_not_enriched_again(
+    tmp_path: Path,
+):
+    database = Database(tmp_path / "library.sqlite3")
+    database.initialize()
+
+    repository = PhotoRepository(database)
+
+    image_path = tmp_path / "2025-01-01.jpg"
+    create_image(image_path)
+
+    file_stat = image_path.stat()
+
+    repository.save(
+        Photo(
+            path=image_path,
+            filename=image_path.name,
+            file_size=file_stat.st_size,
+            modified_time_ns=file_stat.st_mtime_ns,
+            capture_datetime=datetime(2025, 1, 1),
+            date_source=DateSource.FILENAME,
+            latitude=47.2184,
+            longitude=-1.5536,
+            city="Existing City",
+            location_source=LocationSource.GEOCODING,
+        )
+    )
+
+    processor = FakePhotoProcessor()
+
+    scanner = LibraryScanner(
+        photo_repository=repository,
+        photo_processor=processor,
+    )
+
+    result = scanner.scan(tmp_path)
+
+    assert processor.process_calls == 0
+    assert processor.enrich_calls == 0
+    assert result.photos[0].city == "Existing City"
+
+    database.close()
+
+
+def test_cached_manual_location_is_preserved(
+    tmp_path: Path,
+):
+    database = Database(tmp_path / "library.sqlite3")
+    database.initialize()
+
+    repository = PhotoRepository(database)
+
+    image_path = tmp_path / "2025-01-01.jpg"
+    create_image(image_path)
+
+    file_stat = image_path.stat()
+
+    repository.save(
+        Photo(
+            path=image_path,
+            filename=image_path.name,
+            file_size=file_stat.st_size,
+            modified_time_ns=file_stat.st_mtime_ns,
+            capture_datetime=datetime(2025, 1, 1),
+            date_source=DateSource.FILENAME,
+            latitude=47.2184,
+            longitude=-1.5536,
+            city="Manual City",
+            location_source=LocationSource.MANUAL,
+        )
+    )
+
+    processor = FakePhotoProcessor()
+
+    scanner = LibraryScanner(
+        photo_repository=repository,
+        photo_processor=processor,
+    )
+
+    result = scanner.scan(tmp_path)
+
+    assert processor.enrich_calls == 0
+    assert result.photos[0].city == "Manual City"
+    assert (
+        result.photos[0].location_source
+        == LocationSource.MANUAL
+    )
+
+    database.close()
