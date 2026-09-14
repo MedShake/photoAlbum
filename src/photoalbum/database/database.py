@@ -4,7 +4,16 @@ import sqlite3
 from pathlib import Path
 
 
-class Database:
+class ProjectDatabase:
+    """
+    SQLite database attached to a single photo album project.
+
+    During early development, the schema may still change directly.
+    Migration support will be introduced before the first stable release.
+    """
+
+    CURRENT_SCHEMA_VERSION = 1
+
     def __init__(self, path: Path) -> None:
         self.path = path
         self.connection = sqlite3.connect(path)
@@ -14,9 +23,86 @@ class Database:
         self.connection.close()
 
     def initialize(self) -> None:
-        cursor = self.connection.cursor()
+        self._create_schema_version_table()
+        self._create_project_metadata_table()
+        self._create_photos_table()
+        self._set_schema_version(self.CURRENT_SCHEMA_VERSION)
 
-        cursor.execute(
+        self.connection.commit()
+
+    def get_schema_version(self) -> int:
+        row = self.connection.execute(
+            """
+            SELECT version
+            FROM schema_version
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if row is None:
+            return 0
+
+        return int(row["version"])
+
+    def set_project_metadata(
+        self,
+        key: str,
+        value: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO project_metadata (
+                key,
+                value
+            )
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value
+            """,
+            (key, value),
+        )
+
+        self.connection.commit()
+
+    def get_project_metadata(
+        self,
+        key: str,
+    ) -> str | None:
+        row = self.connection.execute(
+            """
+            SELECT value
+            FROM project_metadata
+            WHERE key = ?
+            """,
+            (key,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        return str(row["value"])
+
+    def _create_schema_version_table(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER NOT NULL
+            )
+            """
+        )
+
+    def _create_project_metadata_table(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS project_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+
+    def _create_photos_table(self) -> None:
+        self.connection.execute(
             """
             CREATE TABLE IF NOT EXISTS photos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,9 +120,42 @@ class Database:
                 longitude REAL,
                 place_name TEXT,
                 city TEXT,
-                address TEXT
+                address TEXT,
+                location_source TEXT NOT NULL DEFAULT 'unknown'
             )
             """
         )
 
-        self.connection.commit()
+    def _set_schema_version(
+        self,
+        version: int,
+    ) -> None:
+        row = self.connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM schema_version
+            """
+        ).fetchone()
+
+        if row["count"] == 0:
+            self.connection.execute(
+                """
+                INSERT INTO schema_version (
+                    version
+                )
+                VALUES (?)
+                """,
+                (version,),
+            )
+        else:
+            self.connection.execute(
+                """
+                UPDATE schema_version
+                SET version = ?
+                """,
+                (version,),
+            )
+
+
+# Temporary compatibility alias.
+Database = ProjectDatabase

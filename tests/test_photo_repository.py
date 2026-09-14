@@ -159,4 +159,56 @@ def test_repository_preserves_file_information(tmp_path: Path):
 
     database.close()
 
-    
+def test_manual_capture_datetime_can_be_set(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    path = Path("/photos/holiday.jpg")
+
+    repository.save(
+        Photo(
+            path=path,
+            filename="holiday.jpg",
+        )
+    )
+
+    repository.set_manual_capture_datetime(
+        path,
+        datetime(2025, 7, 14, 18, 30),
+    )
+
+    loaded = repository.find_by_path(path)
+
+    assert loaded is not None
+    assert loaded.capture_datetime == datetime(
+        2025,
+        7,
+        14,
+        18,
+        30,
+    )
+    assert loaded.date_source == DateSource.MANUAL
+    assert loaded.is_date_anomaly is False
+
+    database.close()
+
+
+def test_manual_capture_datetime_requires_registered_photo(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    missing = Path("/photos/missing.jpg")
+
+    try:
+        repository.set_manual_capture_datetime(
+            missing,
+            datetime(2025, 1, 1),
+        )
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("Expected KeyError")
+
+    database.close()

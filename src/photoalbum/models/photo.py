@@ -11,6 +11,12 @@ class DateSource(str, Enum):
     UNKNOWN = "unknown"
 
 
+class LocationSource(str, Enum):
+    GEOCODING = "geocoding"
+    MANUAL = "manual"
+    UNKNOWN = "unknown"
+
+
 @dataclass
 class Photo:
     path: Path
@@ -33,6 +39,7 @@ class Photo:
     place_name: str | None = None
     city: str | None = None
     address: str | None = None
+    location_source: LocationSource = LocationSource.UNKNOWN
 
     @property
     def has_capture_datetime(self) -> bool:
@@ -45,4 +52,3 @@ class Photo:
     @property
     def is_date_anomaly(self) -> bool:
         return not self.has_capture_datetime
-        

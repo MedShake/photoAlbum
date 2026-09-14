@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.models import DateSource, Photo
+from photoalbum.models import DateSource, LocationSource, Photo
 
 from .database import Database
 
@@ -36,9 +36,10 @@ class PhotoRepository:
                 longitude,
                 place_name,
                 city,
-                address
+                address,
+                location_source
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(path) DO UPDATE SET
                 filename = excluded.filename,
                 file_size = excluded.file_size,
@@ -53,7 +54,8 @@ class PhotoRepository:
                 longitude = excluded.longitude,
                 place_name = excluded.place_name,
                 city = excluded.city,
-                address = excluded.address
+                address = excluded.address,
+                location_source = excluded.location_source
             """,
             (
                 str(photo.path),
@@ -71,6 +73,7 @@ class PhotoRepository:
                 photo.place_name,
                 photo.city,
                 photo.address,
+                photo.location_source.value,
             ),
         )
 
@@ -105,6 +108,33 @@ class PhotoRepository:
             for row in rows
         ]
 
+    def set_manual_capture_datetime(
+        self,
+        path: Path,
+        capture_datetime: datetime,
+    ) -> None:
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET capture_datetime = ?,
+                date_source = ?
+            WHERE path = ?
+            """,
+            (
+                capture_datetime.isoformat(),
+                DateSource.MANUAL.value,
+                str(path),
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo is not registered in the project: {path}"
+            )
+
+        self._database.connection.commit()
+
+
     @staticmethod
     def _row_to_photo(row) -> Photo:
         capture_datetime = (
@@ -129,4 +159,7 @@ class PhotoRepository:
             place_name=row["place_name"],
             city=row["city"],
             address=row["address"],
+            location_source=LocationSource(
+                row["location_source"]
+            ),
         )
