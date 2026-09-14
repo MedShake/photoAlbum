@@ -26,6 +26,7 @@ class ProjectDatabase:
         self._create_schema_version_table()
         self._create_project_metadata_table()
         self._create_photos_table()
+        self._create_geocoding_cache_table()
         self._set_schema_version(self.CURRENT_SCHEMA_VERSION)
 
         self.connection.commit()
@@ -155,6 +156,20 @@ class ProjectDatabase:
                 """,
                 (version,),
             )
+
+    def _create_geocoding_cache_table(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS geocoding_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                place_name TEXT,
+                city TEXT,
+                address TEXT
+            )
+            """
+        )
 
 
 # Temporary compatibility alias.
