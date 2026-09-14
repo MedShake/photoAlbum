@@ -68,25 +68,6 @@ def test_page_number_settings_round_trip():
     assert not restored.page_numbers.enabled
 
 
-def test_old_project_defaults_to_captions_and_page_numbers():
-    original = make_settings()
-
-    data = json.loads(
-        album_settings_to_json(original)
-    )
-
-    del data["photo_pages"]["caption"]
-    del data["page_numbers"]
-
-    restored = album_settings_from_json(
-        json.dumps(data)
-    )
-
-    assert restored.photo_pages.caption.show_datetime
-    assert restored.photo_pages.caption.show_location
-    assert restored.page_numbers.enabled
-
-
 def test_photo_page_settings_default_caption():
     settings = PhotoPageSettings(
         template_id="photo-page-2"

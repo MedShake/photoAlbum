@@ -4,6 +4,27 @@ from __future__ import annotations
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
         "tab.photos": "Photos",
+        "main.analyze_photos": "Analyze photos",
+        "main.scan_discovered": "Discovered: {count}",
+        "main.scan_analyzed": "Analyzed: {count}",
+        "main.scan_reused": "Reused: {count}",
+        "main.scan_geocoded": "Geocoded: {count}",
+        "main.scan_anomalies": "Date anomalies: {count}",
+        "main.scan_errors": "Errors: {count}",
+        "main.analyze_again": "Analyze photos again",
+        "main.progress_photos": "{current} photos analyzed out of {total}",
+        "main.analysis_running_button": "Analysis in progress…",
+        "main.analysis_progress": (
+            "{current} / {total} photos — "
+            "{remaining} remaining"
+        ),
+        "scan.event.discovered": "Photo discovered",
+        "scan.event.analyzed": "Metadata analyzed",
+        "scan.event.reused": "Existing analysis reused",
+        "scan.event.geocoding": "Searching for location",
+        "scan.event.geocoded": "Location found",
+        "scan.event.date_anomaly": "Capture date missing",
+        "scan.event.error": "Analysis error",
 
         "photos.column.filename": "Filename",
         "photos.column.capture_date": "Capture date",
@@ -29,6 +50,14 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.album": "Design",
         "tab.plan": "Plan",
         "tab.preview": "Preview",
+        "page_settings.title": "Page settings",
+        "page_settings.close": "Close",
+        "page_settings.title_color": "Title color…",
+        "page_settings.title_color_value": "Title color: {color}",
+        "page_settings.choose_title_color": "Choose title color",
+        "page_settings.calculating": "Calculating preview…",
+        "page_settings.no_options": "No settings are available for this template.",
+        "page_settings.error": "Preview error: {error}",
 
         "preview.blank_page": "Blank page",
         "preview.cover.front": "Front cover",
@@ -99,6 +128,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
 
         "album.covers": "Covers",
+        "album.settings": "Settings…",
         "album.cover_scatter": "Cover collage",
         "album.cover_photo_count": "Photos:",
         "album.cover_all_photos": "All dated project photos are used.",
@@ -163,6 +193,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.summary": "Summary",
         "plan.optimizations": "Possible optimizations",
         "plan.structure": "Document structure",
+        "plan.album_body": "Album body",
         "plan.section": "Section",
         "plan.details": "Details",
         "plan.page_label": "Page {number} — {type}",
@@ -227,6 +258,27 @@ CATALOGS: dict[str, dict[str, str]] = {
 
     "fr": {
         "tab.photos": "Photos",
+        "main.analyze_photos": "Analyser les photos",
+        "main.scan_discovered": "Détectées : {count}",
+        "main.scan_analyzed": "Analysées : {count}",
+        "main.scan_reused": "Réutilisées : {count}",
+        "main.scan_geocoded": "Géolocalisées : {count}",
+        "main.scan_anomalies": "Anomalies de date : {count}",
+        "main.scan_errors": "Erreurs : {count}",
+        "main.analyze_again": "Analyser à nouveau les photos",
+        "main.progress_photos": "{current} photos analysées sur {total}",
+        "main.analysis_running_button": "Analyse en cours…",
+        "main.analysis_progress": (
+            "{current} / {total} photos — "
+            "{remaining} restantes"
+        ),
+        "scan.event.discovered": "Photo détectée",
+        "scan.event.analyzed": "Métadonnées analysées",
+        "scan.event.reused": "Analyse existante réutilisée",
+        "scan.event.geocoding": "Recherche du lieu",
+        "scan.event.geocoded": "Lieu trouvé",
+        "scan.event.date_anomaly": "Date de prise de vue manquante",
+        "scan.event.error": "Erreur d’analyse",
 
         "photos.column.filename": "Nom du fichier",
         "photos.column.capture_date": "Date de prise de vue",
@@ -252,6 +304,14 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.album": "Conception",
         "tab.plan": "Plan",
         "tab.preview": "Aperçu",
+        "page_settings.title": "Réglages de la page",
+        "page_settings.close": "Fermer",
+        "page_settings.title_color": "Couleur du titre…",
+        "page_settings.title_color_value": "Couleur du titre : {color}",
+        "page_settings.choose_title_color": "Choisir la couleur du titre",
+        "page_settings.calculating": "Calcul de l’aperçu…",
+        "page_settings.no_options": "Aucun réglage disponible pour ce modèle.",
+        "page_settings.error": "Erreur d’aperçu : {error}",
 
         "preview.blank_page": "Page blanche",
         "preview.cover.front": "1re de couverture",
@@ -322,6 +382,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
 
         "album.covers": "Couvertures",
+        "album.settings": "Réglages…",
         "album.cover_scatter": "Pêle-mêle de couverture",
         "album.cover_photo_count": "Photos :",
         "album.cover_all_photos": "Toutes les photos datées du projet sont utilisées.",
@@ -387,6 +448,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.summary": "Résumé",
         "plan.optimizations": "Optimisations possibles",
         "plan.structure": "Structure du document",
+        "plan.album_body": "Corps de l’album",
         "plan.section": "Section",
         "plan.details": "Détails",
         "plan.page_label": "Page {number} — {type}",

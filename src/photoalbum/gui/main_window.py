@@ -63,6 +63,9 @@ class MainWindow(QMainWindow):
         )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
+        self._scan_total_files = 0
+        self._scan_seen_paths: set[str] = set()
+        self._analysis_completed = False
 
         self.setWindowTitle("Photo Album")
         self.resize(1100, 700)
@@ -280,6 +283,10 @@ class MainWindow(QMainWindow):
             parent=self,
         )
 
+        self._album_settings_widget.set_photo_provider(
+            self._project_service.list_photos
+        )
+
         self._album_settings_widget.settings_changed.connect(
             self._save_album_settings
         )
@@ -319,7 +326,9 @@ class MainWindow(QMainWindow):
     def _new_project(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self,
-            self._translator.tr("main.create_project_title"),
+            self._translator.tr(
+                "main.new_project"
+            ),
             "",
             "Photo Album Project (*.photoalbum)",
         )
@@ -330,15 +339,65 @@ class MainWindow(QMainWindow):
         project_path = Path(path)
 
         if project_path.suffix != ".photoalbum":
-            project_path = project_path.with_suffix(
-                ".photoalbum"
+            project_path = (
+                project_path.with_suffix(
+                    ".photoalbum"
+                )
             )
 
         try:
-            self._project_service.create(project_path)
+            # QFileDialog already asked the user whether the
+            # existing file may be replaced. Honour that choice.
+            if self._project_service.is_open:
+                self._project_service.close()
+
+            if project_path.exists():
+                project_path.unlink()
+
+            self._project_service.create(
+                project_path
+            )
+
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(
+                str(exc)
+            )
             return
+
+        self._analysis_completed = False
+
+        self._source_edit.clear()
+
+        previous = (
+            self._recursive_checkbox.blockSignals(
+                True
+            )
+        )
+
+        self._recursive_checkbox.setChecked(
+            False
+        )
+
+        self._recursive_checkbox.blockSignals(
+            previous
+        )
+
+        self._summary_label.setText(
+            self._translator.tr(
+                "main.no_analysis"
+            )
+        )
+
+        self._log_view.clear()
+        self._photo_model.clear()
+
+        self._album_settings_widget.reset_to_defaults()
+        self._album_settings_widget.set_available_years(
+            set()
+        )
+
+        self._album_plan_widget.clear()
+        self._album_preview_widget.clear()
 
         self._load_project_settings()
         self._load_project_photos()
@@ -368,6 +427,10 @@ class MainWindow(QMainWindow):
     def _close_project(self) -> None:
         self._project_service.close()
 
+        self._analysis_completed = False
+        self._scan_total_files = 0
+        self._scan_seen_paths.clear()
+
         self._album_plan_widget.clear()
         self._album_preview_widget.clear()
 
@@ -388,7 +451,9 @@ class MainWindow(QMainWindow):
     def _choose_source_directory(self) -> None:
         directory = QFileDialog.getExistingDirectory(
             self,
-            self._translator.tr("main.choose_source_title"),
+            self._translator.tr(
+                "main.choose_source"
+            ),
         )
 
         if not directory:
@@ -399,11 +464,22 @@ class MainWindow(QMainWindow):
                 Path(directory)
             )
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(
+                str(exc)
+            )
             return
 
-        self._source_edit.setText(directory)
+        self._source_edit.setText(
+            directory
+        )
+
+        self._analysis_completed = False
+
         self._update_project_state()
+
+        # Choosing a source folder defines the photo library:
+        # analysis therefore starts immediately.
+        self._start_scan()
 
     def _recursive_changed(
         self,
@@ -412,7 +488,20 @@ class MainWindow(QMainWindow):
         if not self._project_service.is_open:
             return
 
-        self._project_service.set_recursive_scan(checked)
+        self._project_service.set_recursive_scan(
+            checked
+        )
+
+        source_directory = (
+            self._project_service.get_source_directory()
+        )
+
+        if (
+            source_directory is not None
+            and self._scan_thread is None
+        ):
+            self._analysis_completed = False
+            self._start_scan()
 
     def _load_project_settings(self) -> None:
         source_directory = (
@@ -441,6 +530,9 @@ class MainWindow(QMainWindow):
             )
 
     def _start_scan(self) -> None:
+        if self._scan_thread is not None:
+            return
+
         project_path = self._project_service.project_path
         source_directory = (
             self._project_service.get_source_directory()
@@ -516,14 +608,98 @@ class MainWindow(QMainWindow):
 
         thread.start()
 
+    def _update_scan_progress(
+        self,
+        current: int,
+    ) -> None:
+        total = self._scan_total_files
+
+        if total <= 0:
+            self._progress_bar.setRange(
+                0,
+                0,
+            )
+            self._progress_bar.setFormat(
+                self._translator.tr(
+                    "main.analysis_in_progress"
+                )
+            )
+            return
+
+        current = min(
+            max(current, 0),
+            total,
+        )
+
+        self._progress_bar.setRange(
+            0,
+            total,
+        )
+
+        self._progress_bar.setValue(
+            current
+        )
+
+        self._progress_bar.setFormat(
+            self._translator.tr(
+                "main.progress_photos",
+                current=current,
+                total=total,
+            )
+        )
+
+        self._summary_label.setText(
+            self._translator.tr(
+                "main.analysis_progress",
+                current=current,
+                total=total,
+                remaining=max(
+                    total - current,
+                    0,
+                ),
+            )
+        )
+
     def _handle_processing_event(
         self,
         event: ProcessingEvent,
     ) -> None:
+        path_key = str(
+            event.path
+        )
+
+        # Several events may concern the same photo
+        # (EXIF, GPS, geocoding...). Count the photo once.
+        if (
+            path_key
+            and path_key
+            not in self._scan_seen_paths
+        ):
+            self._scan_seen_paths.add(
+                path_key
+            )
+
+            self._update_scan_progress(
+                len(
+                    self._scan_seen_paths
+                )
+            )
+
+        message = (
+            self._translated_processing_event(
+                event
+            )
+            if hasattr(
+                self,
+                "_translated_processing_event"
+            )
+            else event.message
+        )
+
         self._log_view.appendPlainText(
             f"[{event.type.value}] "
-            f"{event.path.name}: "
-            f"{event.message}"
+            f"{event.path.name} : "
+            f"{message}"
         )
 
     def _scan_completed(
@@ -531,6 +707,11 @@ class MainWindow(QMainWindow):
         result: LibraryScanResult,
     ) -> None:
         statistics = result.statistics
+
+        self._update_scan_progress(
+            self._scan_total_files
+        )
+        self._analysis_completed = True
 
         all_photos = [
             *result.photos,
@@ -612,44 +793,104 @@ class MainWindow(QMainWindow):
         self._scan_thread = None
         self._scan_worker = None
 
-        self._set_scan_running(False)
+        self._set_scan_running(
+            False
+        )
+
+        if (
+            self._project_service.is_open
+            and bool(self._source_edit.text())
+        ):
+            self._analyze_button.setText(
+                self._translator.tr(
+                    "main.analyze_again"
+                )
+            )
 
     def _set_scan_running(
         self,
         running: bool,
     ) -> None:
-        self._new_project_action.setEnabled(not running)
-        self._open_project_action.setEnabled(not running)
-        self._close_project_action.setEnabled(
+        self._new_project_action.setEnabled(
             not running
-            and self._project_service.is_open
+        )
+
+        self._open_project_action.setEnabled(
+            not running
+        )
+
+        self._close_project_action.setEnabled(
+            (
+                not running
+                and self._project_service.is_open
+            )
         )
 
         self._browse_source_button.setEnabled(
-            not running
-            and self._project_service.is_open
+            (
+                not running
+                and self._project_service.is_open
+            )
         )
 
         self._recursive_checkbox.setEnabled(
-            not running
-            and self._project_service.is_open
+            (
+                not running
+                and self._project_service.is_open
+            )
         )
 
         self._analyze_button.setEnabled(
-            not running
-            and self._project_service.is_open
-            and bool(self._source_edit.text())
+            (
+                not running
+                and self._project_service.is_open
+                and bool(
+                    self._source_edit.text()
+                )
+            )
         )
 
-        self._progress_bar.setVisible(running)
+        # Photos remains available for progress/logs.
+        # Every derived view is locked while scanning.
+        for index in range(
+            1,
+            self._tabs.count(),
+        ):
+            self._tabs.setTabEnabled(
+                index,
+                not running,
+            )
+
+        self._progress_bar.setVisible(
+            running
+        )
 
         if running:
-            self._progress_bar.setRange(0, 0)
-            self.statusBar().showMessage(
-                self._translator.tr("main.analyzing")
+            self._analyze_button.setText(
+                self._translator.tr(
+                    "main.analysis_running_button"
+                )
             )
+
+            self.statusBar().showMessage(
+                self._translator.tr(
+                    "main.analysis_in_progress"
+                )
+            )
+
         else:
-            self._progress_bar.setRange(0, 1)
+            if self._analysis_completed:
+                self._analyze_button.setText(
+                    self._translator.tr(
+                        "main.analyze_again"
+                    )
+                )
+            else:
+                self._analyze_button.setText(
+                    self._translator.tr(
+                        "main.analyze_photos"
+                    )
+                )
 
     def _update_project_state(self) -> None:
         is_open = self._project_service.is_open
@@ -724,7 +965,8 @@ class MainWindow(QMainWindow):
             )
 
             self._album_plan_widget.set_result(
-                result
+                result,
+                settings,
             )
 
             self._album_preview_widget.set_result(

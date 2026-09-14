@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from uuid import uuid4
 
 from .models import CoverPosition
 
@@ -16,10 +17,6 @@ class DividerPlacement(str, Enum):
 
 @dataclass(frozen=True)
 class CoverScatterSettings:
-    # 0 means: use every eligible dated photo.
-    photo_count: int = 0
-
-    # All proposals remain reproducible.
     seeds: tuple[int, ...] = (0,)
     selected_seed_index: int = 0
 
@@ -28,21 +25,135 @@ class CoverScatterSettings:
         if not self.seeds:
             return 0
 
-        index = min(
-            max(self.selected_seed_index, 0),
-            len(self.seeds) - 1,
-        )
-
-        return self.seeds[index]
+        return self.seeds[
+            min(
+                max(self.selected_seed_index, 0),
+                len(self.seeds) - 1,
+            )
+        ]
 
 
 @dataclass(frozen=True)
+class PageInstance:
+    template_id: str
+
+    instance_id: str = field(
+        default_factory=lambda: uuid4().hex
+    )
+
+    # JSON-compatible template-specific settings.
+    settings: dict[str, object] = field(
+        default_factory=dict
+    )
+
+    def with_settings(
+        self,
+        settings: dict[str, object],
+    ) -> "PageInstance":
+        return PageInstance(
+            template_id=self.template_id,
+            instance_id=self.instance_id,
+            settings=dict(settings),
+        )
+
+
+def scatter_settings_from_instance(
+    instance: PageInstance,
+) -> CoverScatterSettings:
+    data = instance.settings.get("scatter", {})
+
+    if not isinstance(data, dict):
+        data = {}
+
+    seeds = tuple(
+        int(value)
+        for value in data.get("seeds", [0])
+    ) or (0,)
+
+    return CoverScatterSettings(
+        seeds=seeds,
+        selected_seed_index=int(
+            data.get(
+                "selected_seed_index",
+                0,
+            )
+        ),
+    )
+
+
+def instance_with_scatter_settings(
+    instance: PageInstance,
+    scatter: CoverScatterSettings,
+) -> PageInstance:
+    settings = dict(instance.settings)
+
+    settings["scatter"] = {
+        "seeds": list(scatter.seeds),
+        "selected_seed_index": (
+            scatter.selected_seed_index
+        ),
+    }
+
+    return instance.with_settings(settings)
+
+
+@dataclass(frozen=True, init=False)
 class CoverSettings:
     position: CoverPosition
-    template_id: str
-    scatter: CoverScatterSettings = field(
-        default_factory=CoverScatterSettings
-    )
+    page: PageInstance
+
+    def __init__(
+        self,
+        position: CoverPosition,
+        template_id: str | None = None,
+        *,
+        page: PageInstance | None = None,
+        scatter: CoverScatterSettings | None = None,
+    ) -> None:
+        if page is None:
+            if template_id is None:
+                raise ValueError(
+                    "template_id or page is required"
+                )
+
+            page = PageInstance(
+                template_id=template_id,
+            )
+
+            if scatter is not None:
+                page = instance_with_scatter_settings(
+                    page,
+                    scatter,
+                )
+
+        object.__setattr__(
+            self,
+            "position",
+            position,
+        )
+        object.__setattr__(
+            self,
+            "page",
+            page,
+        )
+
+    @property
+    def template_id(self) -> str:
+        return self.page.template_id
+
+    @property
+    def instance_id(self) -> str:
+        return self.page.instance_id
+
+    @property
+    def scatter(self) -> CoverScatterSettings:
+        return scatter_settings_from_instance(
+            self.page
+        )
+
+
+# A special page is now a real independent page occurrence.
+SpecialPage = PageInstance
 
 
 @dataclass(frozen=True)
@@ -75,11 +186,6 @@ class PageNumberSettings:
 class PrintSettings:
     # None means no page-count constraint.
     page_multiple: int | None = None
-
-
-@dataclass(frozen=True)
-class SpecialPage:
-    template_id: str
 
 
 @dataclass

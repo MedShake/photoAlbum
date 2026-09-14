@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 from PySide6.QtCore import (
+    QThreadPool,
     QRect,
     QSize,
     Qt,
@@ -39,6 +41,7 @@ from photoalbum.album.month_divider_layout import (
 
 from photoalbum.album.cover_scatter import (
     compose_cover_scatter,
+    visible_cover_scatter_items,
 )
 
 from photoalbum.album.composition import (
@@ -48,6 +51,8 @@ from photoalbum.album.composition import (
     PhotoSlotComposition,
 )
 from photoalbum.i18n import Translator
+
+from photoalbum.gui.cover_render_worker import CoverRenderWorker
 
 
 PREVIEW_PAGE_WIDTH = 300
@@ -236,6 +241,10 @@ class AlbumCoverPreview(_PreviewPageBase):
         self._scatter_cache_key = None
         self._scatter_cache_pixmap = QPixmap()
 
+        self._scatter_request_id = None
+        self._scatter_loading = False
+        self._scatter_title = ""
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         self._paint_paper(painter)
@@ -351,7 +360,6 @@ class AlbumCoverPreview(_PreviewPageBase):
         composition = compose_cover_scatter(
             photos,
             seed=scatter.seed,
-            photo_count=scatter.photo_count,
             month_name=self._translator.month_name,
         )
 
@@ -364,16 +372,27 @@ class AlbumCoverPreview(_PreviewPageBase):
         )
 
         if (
-            self._scatter_cache_key != cache_key
-            or self._scatter_cache_pixmap.isNull()
+            self._scatter_cache_key
+            != cache_key
         ):
-            self._scatter_cache_pixmap = (
-                self._render_scatter_pixmap(
-                    composition
-                )
+            self._start_scatter_render(
+                cache_key,
+                composition,
             )
 
-            self._scatter_cache_key = cache_key
+        if self._scatter_cache_pixmap.isNull():
+            painter.setPen(
+                Qt.GlobalColor.darkGray
+            )
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignmentFlag.AlignCenter,
+                self._translator.tr(
+                    "page_settings.calculating"
+                ),
+            )
+            return
 
         painter.drawPixmap(
             0,
@@ -381,65 +400,158 @@ class AlbumCoverPreview(_PreviewPageBase):
             self._scatter_cache_pixmap,
         )
 
-    def _render_scatter_pixmap(
+        self._paint_scatter_title(
+            painter
+        )
+
+        if self._scatter_loading:
+            painter.fillRect(
+                self.rect(),
+                QColor(
+                    255,
+                    255,
+                    255,
+                    150,
+                ),
+            )
+
+            painter.setPen(
+                Qt.GlobalColor.darkGray
+            )
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignmentFlag.AlignCenter,
+                self._translator.tr(
+                    "page_settings.calculating"
+                ),
+            )
+
+    def _start_scatter_render(
         self,
+        cache_key,
         composition,
-    ) -> QPixmap:
-        image = QImage(
-            self.size(),
-            QImage.Format.Format_ARGB32_Premultiplied,
+    ) -> None:
+        request_id = uuid4().hex
+
+        self._scatter_request_id = request_id
+        self._scatter_loading = True
+        self._scatter_cache_key = cache_key
+        self._scatter_title = composition.title
+
+        worker = CoverRenderWorker(
+            request_id=request_id,
+            width=self.width(),
+            height=self.height(),
+            items=visible_cover_scatter_items(
+                composition.items
+            ),
         )
 
-        image.fill(
-            Qt.GlobalColor.white
+        worker.signals.finished.connect(
+            self._scatter_render_ready
         )
 
-        painter = QPainter(image)
+        worker.signals.failed.connect(
+            self._scatter_render_failed
+        )
 
-        for item in composition.items:
-            rect = self._pixel_rect(
-                item.rect
+        QThreadPool.globalInstance().start(
+            worker
+        )
+
+    def _scatter_render_ready(
+        self,
+        request_id: str,
+        data: bytes,
+    ) -> None:
+        if (
+            request_id
+            != self._scatter_request_id
+        ):
+            return
+
+        pixmap = QPixmap()
+        pixmap.loadFromData(data)
+
+        if pixmap.isNull():
+            return
+
+        self._scatter_cache_pixmap = pixmap
+        self._scatter_loading = False
+
+        self.update()
+
+    def _scatter_render_failed(
+        self,
+        request_id: str,
+        message: str,
+    ) -> None:
+        if (
+            request_id
+            != self._scatter_request_id
+        ):
+            return
+
+        self._scatter_loading = False
+        self.update()
+
+    def _scatter_title_color(
+        self,
+    ) -> QColor:
+        try:
+            settings = (
+                self._cover_settings.page.settings
             )
 
-            pixmap = self._thumbnail_cache.load(
-                item.photo.path,
-                rect.size(),
+            scatter = settings.get(
+                "scatter",
+                {},
             )
 
-            if pixmap.isNull():
-                continue
+            value = (
+                scatter.get(
+                    "title_color",
+                    "#d0d0d0",
+                )
+                if isinstance(
+                    scatter,
+                    dict,
+                )
+                else "#d0d0d0"
+            )
+        except Exception:
+            value = "#d0d0d0"
 
-            scaled = pixmap.scaled(
-                rect.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
+        color = QColor(
+            str(value)
+        )
+
+        if not color.isValid():
+            color = QColor(
+                "#d0d0d0"
             )
 
-            x = (
-                rect.x()
-                + (rect.width() - scaled.width()) // 2
-            )
+        return color
 
-            y = (
-                rect.y()
-                + (rect.height() - scaled.height()) // 2
-            )
+    def _paint_scatter_title(
+        self,
+        painter: QPainter,
+    ) -> None:
+        font = QFont(
+            painter.font()
+        )
 
-            painter.drawPixmap(
-                x,
-                y,
-                scaled,
-            )
-
-        font = QFont(painter.font())
         font.setBold(True)
         font.setPixelSize(
-            self._print_font_pixel_size(72)
+            self._print_font_pixel_size(
+                72
+            )
         )
 
         painter.setFont(font)
         painter.setPen(
-            Qt.GlobalColor.white
+            self._scatter_title_color()
         )
 
         painter.drawText(
@@ -450,12 +562,8 @@ class AlbumCoverPreview(_PreviewPageBase):
                 -15,
             ),
             Qt.AlignmentFlag.AlignCenter,
-            composition.title,
+            self._scatter_title,
         )
-
-        painter.end()
-
-        return QPixmap.fromImage(image)
 
 
 class AlbumPagePreview(_PreviewPageBase):
@@ -466,6 +574,7 @@ class AlbumPagePreview(_PreviewPageBase):
         thumbnail_cache: PreviewThumbnailCache,
         page_format: PageFormat = A4,
         translator: Translator | None = None,
+        project_photos=None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(
@@ -480,6 +589,17 @@ class AlbumPagePreview(_PreviewPageBase):
             or Translator("en")
         )
 
+        self._project_photos = tuple(
+            project_photos or ()
+        )
+
+        # Async state for instantiated special-page scatter.
+        self._special_scatter_request_id = None
+        self._special_scatter_cache_key = None
+        self._special_scatter_pixmap = QPixmap()
+        self._special_scatter_loading = False
+        self._special_scatter_title = ""
+
     def paintEvent(
         self,
         event,
@@ -490,7 +610,16 @@ class AlbumPagePreview(_PreviewPageBase):
 
         page = self._composition.page
 
-        if page.kind == PlanItemKind.PHOTO_GROUP:
+        if (
+            page.kind == PlanItemKind.SPECIAL_PAGE
+            and page.template_id == "year-photo-scatter"
+            and page.page_instance is not None
+        ):
+            self._paint_special_scatter(
+                painter
+            )
+
+        elif page.kind == PlanItemKind.PHOTO_GROUP:
             self._paint_photo_page(
                 painter
             )
@@ -512,6 +641,300 @@ class AlbumPagePreview(_PreviewPageBase):
 
         self._paint_page_number(
             painter
+        )
+
+    def _special_scatter_seed(
+        self,
+    ) -> int:
+        page = self._composition.page
+
+        instance = page.page_instance
+
+        if instance is None:
+            return 0
+
+        scatter = instance.settings.get(
+            "scatter",
+            {},
+        )
+
+        if not isinstance(
+            scatter,
+            dict,
+        ):
+            return 0
+
+        seeds = scatter.get(
+            "seeds",
+            [0],
+        )
+
+        if not isinstance(
+            seeds,
+            (list, tuple),
+        ):
+            seeds = [0]
+
+        seeds = [
+            int(value)
+            for value in seeds
+        ] or [0]
+
+        index = int(
+            scatter.get(
+                "selected_seed_index",
+                0,
+            )
+        )
+
+        index = min(
+            max(index, 0),
+            len(seeds) - 1,
+        )
+
+        return seeds[index]
+
+    def _paint_special_scatter(
+        self,
+        painter: QPainter,
+    ) -> None:
+        page = self._composition.page
+
+        instance = page.page_instance
+
+        if instance is None:
+            return
+
+        seed = self._special_scatter_seed()
+
+        composition = compose_cover_scatter(
+            list(self._project_photos),
+            seed=seed,
+            month_name=self._translator.month_name,
+        )
+
+        cache_key = (
+            instance.instance_id,
+            seed,
+            composition.title,
+            len(composition.items),
+            self.width(),
+            self.height(),
+        )
+
+        if (
+            self._special_scatter_cache_key
+            != cache_key
+            and not self._special_scatter_loading
+        ):
+            self._start_special_scatter_render(
+                cache_key,
+                composition,
+            )
+
+        if (
+            self._special_scatter_pixmap.isNull()
+        ):
+            painter.setPen(
+                Qt.GlobalColor.darkGray
+            )
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignmentFlag.AlignCenter,
+                self._translator.tr(
+                    "page_settings.calculating"
+                ),
+            )
+
+            return
+
+        painter.drawPixmap(
+            0,
+            0,
+            self._special_scatter_pixmap,
+        )
+
+        self._paint_special_scatter_title(
+            painter
+        )
+
+        if self._special_scatter_loading:
+            painter.fillRect(
+                self.rect(),
+                QColor(
+                    255,
+                    255,
+                    255,
+                    150,
+                ),
+            )
+
+            painter.setPen(
+                Qt.GlobalColor.darkGray
+            )
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignmentFlag.AlignCenter,
+                self._translator.tr(
+                    "page_settings.calculating"
+                ),
+            )
+
+    def _start_special_scatter_render(
+        self,
+        cache_key,
+        composition,
+    ) -> None:
+        request_id = uuid4().hex
+
+        self._special_scatter_request_id = (
+            request_id
+        )
+
+        self._special_scatter_cache_key = (
+            cache_key
+        )
+
+        self._special_scatter_loading = True
+
+        self._special_scatter_title = (
+            composition.title
+        )
+
+        worker = CoverRenderWorker(
+            request_id=request_id,
+            width=self.width(),
+            height=self.height(),
+            items=visible_cover_scatter_items(
+                composition.items
+            ),
+        )
+
+        worker.signals.finished.connect(
+            self._special_scatter_ready
+        )
+
+        worker.signals.failed.connect(
+            self._special_scatter_failed
+        )
+
+        QThreadPool.globalInstance().start(
+            worker
+        )
+
+    def _special_scatter_ready(
+        self,
+        request_id: str,
+        data: bytes,
+    ) -> None:
+        if (
+            request_id
+            != self._special_scatter_request_id
+        ):
+            return
+
+        pixmap = QPixmap()
+        pixmap.loadFromData(
+            data
+        )
+
+        if pixmap.isNull():
+            self._special_scatter_loading = False
+            self.update()
+            return
+
+        self._special_scatter_pixmap = pixmap
+        self._special_scatter_loading = False
+
+        self.update()
+
+    def _special_scatter_failed(
+        self,
+        request_id: str,
+        message: str,
+    ) -> None:
+        if (
+            request_id
+            != self._special_scatter_request_id
+        ):
+            return
+
+        self._special_scatter_loading = False
+
+        self.update()
+
+    def _special_scatter_title_color(
+        self,
+    ) -> QColor:
+        page = self._composition.page
+
+        instance = page.page_instance
+
+        value = "#d0d0d0"
+
+        if instance is not None:
+            scatter = instance.settings.get(
+                "scatter",
+                {},
+            )
+
+            if isinstance(
+                scatter,
+                dict,
+            ):
+                value = str(
+                    scatter.get(
+                        "title_color",
+                        "#d0d0d0",
+                    )
+                )
+
+        color = QColor(
+            value
+        )
+
+        if not color.isValid():
+            color = QColor(
+                "#d0d0d0"
+            )
+
+        return color
+
+    def _paint_special_scatter_title(
+        self,
+        painter: QPainter,
+    ) -> None:
+        font = QFont(
+            painter.font()
+        )
+
+        font.setBold(True)
+
+        font.setPixelSize(
+            self._print_font_pixel_size(
+                72
+            )
+        )
+
+        painter.setFont(
+            font
+        )
+
+        painter.setPen(
+            self._special_scatter_title_color()
+        )
+
+        painter.drawText(
+            self.rect().adjusted(
+                15,
+                15,
+                -15,
+                -15,
+            ),
+            Qt.AlignmentFlag.AlignCenter,
+            self._special_scatter_title,
         )
 
     def _paint_photo_page(
@@ -986,6 +1409,28 @@ class AlbumPreviewWidget(QWidget):
 
         pages = result.pagination.pages
 
+        # One canonical list of project photos for templates
+        # that operate on the whole album, such as scatter.
+        project_photos = []
+        seen_photo_paths = set()
+
+        for plan_item in result.plan.items:
+            for photo in plan_item.photos:
+                key = str(
+                    photo.path
+                )
+
+                if key in seen_photo_paths:
+                    continue
+
+                seen_photo_paths.add(
+                    key
+                )
+
+                project_photos.append(
+                    photo
+                )
+
         # Interior starts on the right opposite the inside
         # front cover.
         for page in pages:
@@ -1000,6 +1445,7 @@ class AlbumPreviewWidget(QWidget):
                 thumbnail_cache=self._thumbnail_cache,
                 page_format=page_format,
                 translator=self._translator,
+                project_photos=project_photos,
             )
 
             # Interior spread row:

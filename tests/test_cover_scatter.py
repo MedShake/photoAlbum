@@ -156,3 +156,134 @@ def test_classic_cover_uses_all_dated_photos():
     # The classic built-in cover deliberately reproduces
     # the historical PHP behavior: every dated photo is used.
     assert len(composition.items) == 10
+
+
+def test_completely_hidden_photo_is_removed():
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.album.cover_scatter import (
+        CoverScatterItem,
+        visible_cover_scatter_items,
+    )
+
+    bottom = photo(
+        "bottom.jpg",
+        2025,
+        3,
+        1,
+    )
+    top = photo(
+        "top.jpg",
+        2025,
+        3,
+        2,
+    )
+
+    rect = NormalizedRect(
+        x=0.1,
+        y=0.1,
+        width=0.3,
+        height=0.3,
+    )
+
+    items = (
+        CoverScatterItem(bottom, rect),
+        CoverScatterItem(top, rect),
+    )
+
+    visible = visible_cover_scatter_items(
+        items
+    )
+
+    assert visible == (
+        items[1],
+    )
+
+
+def test_partially_visible_photo_is_kept():
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.album.cover_scatter import (
+        CoverScatterItem,
+        visible_cover_scatter_items,
+    )
+
+    bottom = photo(
+        "bottom.jpg",
+        2025,
+        3,
+        1,
+    )
+    top = photo(
+        "top.jpg",
+        2025,
+        3,
+        2,
+    )
+
+    items = (
+        CoverScatterItem(
+            bottom,
+            NormalizedRect(
+                0.1,
+                0.1,
+                0.4,
+                0.4,
+            ),
+        ),
+        CoverScatterItem(
+            top,
+            NormalizedRect(
+                0.2,
+                0.2,
+                0.2,
+                0.2,
+            ),
+        ),
+    )
+
+    assert (
+        visible_cover_scatter_items(
+            items
+        )
+        == items
+    )
+
+
+def test_png_is_not_used_as_opaque_occluder():
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.album.cover_scatter import (
+        CoverScatterItem,
+        visible_cover_scatter_items,
+    )
+
+    bottom = photo(
+        "bottom.jpg",
+        2025,
+        3,
+        1,
+    )
+
+    png = photo(
+        "overlay.png",
+        2025,
+        3,
+        2,
+    )
+
+    rect = NormalizedRect(
+        0.1,
+        0.1,
+        0.3,
+        0.3,
+    )
+
+    items = (
+        CoverScatterItem(bottom, rect),
+        CoverScatterItem(png, rect),
+    )
+
+    assert (
+        visible_cover_scatter_items(
+            items
+        )
+        == items
+    )

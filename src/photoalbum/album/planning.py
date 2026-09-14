@@ -5,7 +5,10 @@ from enum import Enum
 
 from photoalbum.models import Photo
 
-from .settings import AlbumStructureSettings
+from .settings import (
+    AlbumStructureSettings,
+    PageInstance,
+)
 
 
 class PlanItemKind(str, Enum):
@@ -23,6 +26,10 @@ class PlanItem:
     year: int | None = None
     month: int | None = None
     photos: tuple[Photo, ...] = ()
+
+    # Configurable page occurrence.
+    # Used notably by special pages.
+    page_instance: PageInstance | None = None
 
 
 @dataclass
@@ -166,6 +173,7 @@ class AlbumPlanner:
                 PlanItem(
                     kind=PlanItemKind.SPECIAL_PAGE,
                     template_id=page.template_id,
+                    page_instance=page,
                 )
             )
 

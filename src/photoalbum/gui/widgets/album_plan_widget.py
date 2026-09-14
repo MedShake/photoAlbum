@@ -4,6 +4,7 @@ from photoalbum.i18n import Translator
 from photoalbum.gui.template_labels import template_display_name
 
 from PySide6.QtWidgets import (
+    QHeaderView,
     QGroupBox,
     QLabel,
     QTreeWidget,
@@ -13,6 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.album import (
+    CoverPosition,
+    AlbumStructureSettings,
     AlbumBuildResult,
     AlbumSummaryBuilder,
     BlankPageReason,
@@ -89,6 +92,35 @@ class AlbumPlanWidget(QWidget):
             ]
         )
 
+        header = self._tree.header()
+
+        # La hiérarchie du document se trouve dans cette colonne.
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.Stretch,
+        )
+
+        header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+
+        header.setSectionResizeMode(
+            2,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+
+        header.setSectionResizeMode(
+            3,
+            QHeaderView.ResizeMode.Interactive,
+        )
+
+        self._tree.setColumnWidth(
+            3,
+            240,
+        )
+
+
         structure_layout.addWidget(self._tree)
 
         layout.addWidget(structure_group, 1)
@@ -106,6 +138,7 @@ class AlbumPlanWidget(QWidget):
     def set_result(
         self,
         result: AlbumBuildResult,
+        settings: AlbumStructureSettings | None = None,
     ) -> None:
         summary = self._summary_builder.build(result)
 
@@ -171,7 +204,10 @@ class AlbumPlanWidget(QWidget):
             )
 
         self._set_suggestions(summary)
-        self._set_structure(result)
+        self._set_structure(
+            result,
+            settings,
+        )
 
     def _set_suggestions(self, summary) -> None:
         suggestions = summary.period_fill_suggestions
@@ -206,13 +242,17 @@ class AlbumPlanWidget(QWidget):
             "\n".join(lines)
         )
 
-    def _set_structure(
+    def _set_basic_structure(
         self,
         result: AlbumBuildResult,
     ) -> None:
         self._tree.clear()
 
-        year_items: dict[int, QTreeWidgetItem] = {}
+        year_items: dict[
+            int,
+            QTreeWidgetItem,
+        ] = {}
+
         month_items: dict[
             tuple[int, int],
             QTreeWidgetItem,
@@ -220,7 +260,9 @@ class AlbumPlanWidget(QWidget):
 
         other_root = QTreeWidgetItem(
             [
-                self._translator.tr("plan.other_pages"),
+                self._translator.tr(
+                    "plan.other_pages"
+                ),
                 "",
                 "",
                 "",
@@ -233,7 +275,9 @@ class AlbumPlanWidget(QWidget):
             parent = None
 
             if page.year is not None:
-                parent = year_items.get(page.year)
+                parent = year_items.get(
+                    page.year
+                )
 
                 if parent is None:
                     parent = QTreeWidgetItem(
@@ -245,31 +289,60 @@ class AlbumPlanWidget(QWidget):
                         ]
                     )
 
-                    self._tree.addTopLevelItem(parent)
-                    year_items[page.year] = parent
+                    self._tree.addTopLevelItem(
+                        parent
+                    )
+
+                    year_items[
+                        page.year
+                    ] = parent
 
             if (
                 page.year is not None
                 and page.month is not None
             ):
-                key = (page.year, page.month)
+                key = (
+                    page.year,
+                    page.month,
+                )
 
-                month_item = month_items.get(key)
+                month_item = (
+                    month_items.get(
+                        key
+                    )
+                )
 
                 if month_item is None:
+                    month_name = (
+                        self._translator.month_name(
+                            page.month
+                        )
+                    )
+
+                    if month_name:
+                        month_name = (
+                            month_name[0].upper()
+                            + month_name[1:]
+                        )
+
                     month_item = QTreeWidgetItem(
                         [
-                            self._translator.month_name(
-                                page.month
-                            ),
+                            month_name,
                             "",
                             "",
                             "",
                         ]
                     )
 
-                    parent.addChild(month_item)
-                    month_items[key] = month_item
+                    assert parent is not None
+
+                    parent.addChild(
+                        month_item
+                    )
+
+                    month_items[
+                        key
+                    ] = month_item
 
                 parent = month_item
 
@@ -278,15 +351,425 @@ class AlbumPlanWidget(QWidget):
                 has_other_pages = True
 
             parent.addChild(
-                self._page_item(page)
+                self._page_item(
+                    page
+                )
             )
 
         if has_other_pages:
-            self._tree.addTopLevelItem(other_root)
+            self._tree.addTopLevelItem(
+                other_root
+            )
+
+        self._update_group_totals()
+        self._tree.collapseAll()
+
+    def _set_structure(
+        self,
+        result: AlbumBuildResult,
+        settings: AlbumStructureSettings | None = None,
+    ) -> None:
+        # Without AlbumStructureSettings we cannot know where
+        # covers/front matter/back matter belong. Preserve the
+        # historical year/month tree in that case. This also
+        # keeps AlbumPlanWidget usable independently.
+        if settings is None:
+            self._set_basic_structure(
+                result
+            )
+            return
+
+        self._tree.clear()
+
+        pages = list(
+            result.pagination.pages
+        )
+
+        # ----------------------------------------------------
+        # Covers
+        # ----------------------------------------------------
+
+        if settings is not None:
+            self._tree.addTopLevelItem(
+                self._cover_item(
+                    settings,
+                    CoverPosition.FRONT,
+                    "album.front_cover",
+                )
+            )
+
+            self._tree.addTopLevelItem(
+                self._cover_item(
+                    settings,
+                    CoverPosition.INSIDE_FRONT,
+                    "album.inside_front_cover",
+                )
+            )
+
+        # ----------------------------------------------------
+        # Determine which special pages belong before/after
+        # the album body.
+        #
+        # Prefer PageInstance IDs. The page-number fallback
+        # also keeps this robust during development.
+        # ----------------------------------------------------
+
+        front_ids: set[str] = set()
+        back_ids: set[str] = set()
+
+        front_count = 0
+        back_count = 0
+
+        if settings is not None:
+            front_count = len(
+                settings.front_matter
+            )
+            back_count = len(
+                settings.back_matter
+            )
+
+            front_ids = {
+                page.instance_id
+                for page in settings.front_matter
+            }
+
+            back_ids = {
+                page.instance_id
+                for page in settings.back_matter
+            }
+
+        front_fallback_numbers = {
+            page.number
+            for page in pages[:front_count]
+        }
+
+        back_fallback_numbers = (
+            {
+                page.number
+                for page in pages[
+                    len(pages) - back_count:
+                ]
+            }
+            if back_count
+            else set()
+        )
+
+        front_pages = []
+        back_pages = []
+        body_pages = []
+
+        for page in pages:
+            instance_id = None
+
+            if page.page_instance is not None:
+                instance_id = (
+                    page.page_instance.instance_id
+                )
+
+            if (
+                page.kind == PlanItemKind.SPECIAL_PAGE
+                and (
+                    instance_id in front_ids
+                    or (
+                        instance_id is None
+                        and page.number
+                        in front_fallback_numbers
+                    )
+                )
+            ):
+                front_pages.append(
+                    page
+                )
+                continue
+
+            if (
+                page.kind == PlanItemKind.SPECIAL_PAGE
+                and (
+                    instance_id in back_ids
+                    or (
+                        instance_id is None
+                        and page.number
+                        in back_fallback_numbers
+                    )
+                )
+            ):
+                back_pages.append(
+                    page
+                )
+                continue
+
+            body_pages.append(
+                page
+            )
+
+        # ----------------------------------------------------
+        # Pages immediately after inside-front cover
+        # ----------------------------------------------------
+
+        if front_pages:
+            front_root = QTreeWidgetItem(
+                [
+                    self._translator.tr(
+                        "album.front_matter"
+                    ),
+                    "",
+                    "",
+                    "",
+                ]
+            )
+
+            self._tree.addTopLevelItem(
+                front_root
+            )
+
+            for page in front_pages:
+                front_root.addChild(
+                    self._page_item(
+                        page
+                    )
+                )
+
+        # ----------------------------------------------------
+        # Main album body
+        # ----------------------------------------------------
+
+        body_root = QTreeWidgetItem(
+            [
+                self._translator.tr(
+                    "plan.album_body"
+                ),
+                "",
+                "",
+                "",
+            ]
+        )
+
+        year_items: dict[
+            int,
+            QTreeWidgetItem,
+        ] = {}
+
+        month_items: dict[
+            tuple[int, int],
+            QTreeWidgetItem,
+        ] = {}
+
+        other_body_root = QTreeWidgetItem(
+            [
+                self._translator.tr(
+                    "plan.other_pages"
+                ),
+                "",
+                "",
+                "",
+            ]
+        )
+
+        has_body = False
+        has_other_body = False
+
+        for page in body_pages:
+            has_body = True
+
+            parent: QTreeWidgetItem | None = None
+
+            if page.year is not None:
+                parent = year_items.get(
+                    page.year
+                )
+
+                if parent is None:
+                    parent = QTreeWidgetItem(
+                        [
+                            str(page.year),
+                            "",
+                            "",
+                            "",
+                        ]
+                    )
+
+                    body_root.addChild(
+                        parent
+                    )
+
+                    year_items[
+                        page.year
+                    ] = parent
+
+            if (
+                page.year is not None
+                and page.month is not None
+            ):
+                key = (
+                    page.year,
+                    page.month,
+                )
+
+                month_item = (
+                    month_items.get(
+                        key
+                    )
+                )
+
+                if month_item is None:
+                    month_name = (
+                        self._translator.month_name(
+                            page.month
+                        )
+                    )
+
+                    # Month separators use a capitalized month
+                    # name in the rest of the application.
+                    if month_name:
+                        month_name = (
+                            month_name[0].upper()
+                            + month_name[1:]
+                        )
+
+                    month_item = QTreeWidgetItem(
+                        [
+                            month_name,
+                            "",
+                            "",
+                            "",
+                        ]
+                    )
+
+                    assert parent is not None
+
+                    parent.addChild(
+                        month_item
+                    )
+
+                    month_items[
+                        key
+                    ] = month_item
+
+                parent = month_item
+
+            if parent is None:
+                parent = other_body_root
+                has_other_body = True
+
+            parent.addChild(
+                self._page_item(
+                    page
+                )
+            )
+
+        if has_other_body:
+            body_root.addChild(
+                other_body_root
+            )
+
+        if has_body:
+            self._tree.addTopLevelItem(
+                body_root
+            )
+
+        # ----------------------------------------------------
+        # Pages immediately before inside-back cover
+        # ----------------------------------------------------
+
+        if back_pages:
+            back_root = QTreeWidgetItem(
+                [
+                    self._translator.tr(
+                        "album.back_matter"
+                    ),
+                    "",
+                    "",
+                    "",
+                ]
+            )
+
+            self._tree.addTopLevelItem(
+                back_root
+            )
+
+            for page in back_pages:
+                back_root.addChild(
+                    self._page_item(
+                        page
+                    )
+                )
+
+        # ----------------------------------------------------
+        # Back covers
+        # ----------------------------------------------------
+
+        if settings is not None:
+            self._tree.addTopLevelItem(
+                self._cover_item(
+                    settings,
+                    CoverPosition.INSIDE_BACK,
+                    "album.inside_back_cover",
+                )
+            )
+
+            self._tree.addTopLevelItem(
+                self._cover_item(
+                    settings,
+                    CoverPosition.BACK,
+                    "album.back_cover",
+                )
+            )
 
         self._update_group_totals()
 
-        self._tree.collapseAll()
+        self._tree.expandAll()
+
+    def _template_name(
+        self,
+        template_id: str,
+    ) -> str:
+        key = (
+            f"template.{template_id}"
+        )
+
+        translated = (
+            self._translator.tr(
+                key
+            )
+        )
+
+        if translated != key:
+            return translated
+
+        if self._registry is not None:
+            try:
+                return (
+                    self._registry
+                    .get(template_id)
+                    .name
+                )
+            except KeyError:
+                pass
+
+        return template_id
+
+    def _cover_item(
+        self,
+        settings: AlbumStructureSettings,
+        position: CoverPosition,
+        label_key: str,
+    ) -> QTreeWidgetItem:
+        cover = settings.covers[
+            position
+        ]
+
+        return QTreeWidgetItem(
+            [
+                self._translator.tr(
+                    label_key
+                ),
+                "—",
+                "—",
+                self._template_name(
+                    cover.template_id
+                ),
+            ]
+        )
 
     def _page_item(
         self,

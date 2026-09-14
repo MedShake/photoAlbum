@@ -9,6 +9,7 @@ from .planning import AlbumPlan, PlanItem, PlanItemKind
 from .settings import (
     AlbumStructureSettings,
     DividerPlacement,
+    PageInstance,
 )
 from .templates import TemplateRegistry
 
@@ -39,6 +40,10 @@ class PlannedPage:
     # Editorial metadata used by divider templates.
     # Filled from the photos belonging to the same period.
     cities: tuple[str, ...] = ()
+
+    # Original configurable occurrence when this page comes
+    # from a PageInstance.
+    page_instance: PageInstance | None = None
 
     blank_reason: BlankPageReason | None = None
 
@@ -401,6 +406,7 @@ class PaginationEngine:
                 template_id=item.template_id,
                 year=item.year,
                 month=item.month,
+                page_instance=item.page_instance,
             )
         )
 

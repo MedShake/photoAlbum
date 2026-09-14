@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from photoalbum.i18n import Translator
 from photoalbum.gui.template_labels import template_display_name
+from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 
 from photoalbum.album import (
     AlbumStructureSettings,
@@ -28,6 +29,7 @@ from photoalbum.album import (
     CoverSettings,
     DividerPlacement,
     DividerSettings,
+    PageInstance,
     PageNumberSettings,
     PhotoCaptionSettings,
     PhotoPageSettings,
@@ -54,17 +56,27 @@ class AlbumSettingsWidget(QWidget):
         self._translator = translator or Translator("en")
         self._loading_settings = False
 
+        self._cover_instances: dict[
+            CoverPosition,
+            PageInstance,
+        ] = {}
+
+        self._photo_provider = None
+
         self._create_content()
         self._apply_defaults()
         self.set_available_years(set())
+
+    def set_photo_provider(
+        self,
+        provider,
+    ) -> None:
+        self._photo_provider = provider
 
     def _create_content(self) -> None:
         layout = QVBoxLayout(self)
 
         layout.addWidget(self._create_covers_group())
-        layout.addWidget(
-            self._create_cover_scatter_group()
-        )
         layout.addWidget(self._create_dividers_group())
         layout.addWidget(self._create_photo_pages_group())
         layout.addWidget(self._create_page_numbers_group())
@@ -127,10 +139,6 @@ class AlbumSettingsWidget(QWidget):
             self._emit_settings_changed
         )
 
-        self._cover_photo_count_spin.valueChanged.connect(
-            self._emit_settings_changed
-        )
-
         self._page_multiple_4_checkbox.toggled.connect(
             self._emit_settings_changed
         )
@@ -145,206 +153,155 @@ class AlbumSettingsWidget(QWidget):
         self.settings_changed.emit()
 
     def _create_covers_group(self) -> QGroupBox:
-        group = QGroupBox(self._translator.tr("album.covers"))
-        form = QFormLayout(group)
-
-        self._front_cover_combo = self._create_template_combo(
-            TemplateKind.COVER
-        )
-        self._inside_front_cover_combo = (
-            self._create_template_combo(
-                TemplateKind.COVER
-            )
-        )
-        self._inside_back_cover_combo = (
-            self._create_template_combo(
-                TemplateKind.COVER
-            )
-        )
-        self._back_cover_combo = self._create_template_combo(
-            TemplateKind.COVER
-        )
-
-        form.addRow(
-            self._translator.tr("album.front_cover"),
-            self._front_cover_combo,
-        )
-        form.addRow(
-            self._translator.tr("album.inside_front_cover"),
-            self._inside_front_cover_combo,
-        )
-        form.addRow(
-            self._translator.tr("album.inside_back_cover"),
-            self._inside_back_cover_combo,
-        )
-        form.addRow(
-            self._translator.tr("album.back_cover"),
-            self._back_cover_combo,
-        )
-
-        return group
-
-    def _create_cover_scatter_group(
-        self,
-    ) -> QGroupBox:
         group = QGroupBox(
             self._translator.tr(
-                "album.cover_scatter"
+                "album.covers"
             )
         )
 
-        layout = QVBoxLayout(group)
+        form = QFormLayout(group)
 
-        self._cover_photo_count_spin = QSpinBox()
-        self._cover_photo_count_spin.setRange(
-            0,
-            0,
-        )
-        self._cover_photo_count_spin.setValue(0)
-        self._cover_photo_count_spin.hide()
+        rows = [
+            (
+                CoverPosition.FRONT,
+                "album.front_cover",
+                "_front_cover_combo",
+            ),
+            (
+                CoverPosition.INSIDE_FRONT,
+                "album.inside_front_cover",
+                "_inside_front_cover_combo",
+            ),
+            (
+                CoverPosition.INSIDE_BACK,
+                "album.inside_back_cover",
+                "_inside_back_cover_combo",
+            ),
+            (
+                CoverPosition.BACK,
+                "album.back_cover",
+                "_back_cover_combo",
+            ),
+        ]
 
-        layout.addWidget(
-            QLabel(
+        for (
+            position,
+            label_key,
+            attribute_name,
+        ) in rows:
+            combo = self._create_template_combo(
+                TemplateKind.COVER
+            )
+
+            setattr(
+                self,
+                attribute_name,
+                combo,
+            )
+
+            container = QWidget()
+            row_layout = QHBoxLayout(
+                container
+            )
+            row_layout.setContentsMargins(
+                0,
+                0,
+                0,
+                0,
+            )
+
+            row_layout.addWidget(
+                combo,
+                1,
+            )
+
+            settings_button = QPushButton(
                 self._translator.tr(
-                    "album.cover_all_photos"
+                    "album.settings"
                 )
             )
-        )
 
-        self._cover_proposal_label = QLabel()
-        layout.addWidget(
-            self._cover_proposal_label
-        )
-
-        buttons = QHBoxLayout()
-
-        self._cover_previous_button = QPushButton(
-            self._translator.tr(
-                "album.cover_previous"
+            settings_button.clicked.connect(
+                lambda checked=False,
+                pos=position,
+                cb=combo:
+                self._configure_cover_instance(
+                    pos,
+                    cb,
+                )
             )
-        )
-        self._cover_new_button = QPushButton(
-            self._translator.tr(
-                "album.cover_new"
+
+            row_layout.addWidget(
+                settings_button
             )
-        )
-        self._cover_next_button = QPushButton(
-            self._translator.tr(
-                "album.cover_next"
+
+            form.addRow(
+                self._translator.tr(
+                    label_key
+                ),
+                container,
             )
-        )
-
-        buttons.addWidget(
-            self._cover_previous_button
-        )
-        buttons.addWidget(
-            self._cover_new_button
-        )
-        buttons.addWidget(
-            self._cover_next_button
-        )
-
-        layout.addLayout(buttons)
-
-        self._cover_scatter_seeds = [0]
-        self._cover_scatter_index = 0
-
-        self._cover_previous_button.clicked.connect(
-            self._previous_cover_proposal
-        )
-        self._cover_new_button.clicked.connect(
-            self._new_cover_proposal
-        )
-        self._cover_next_button.clicked.connect(
-            self._next_cover_proposal
-        )
-
-        self._update_cover_proposal_controls()
 
         return group
 
-    def _update_cover_proposal_controls(
+    def _cover_instance(
         self,
-    ) -> None:
-        total = len(
-            self._cover_scatter_seeds
+        position: CoverPosition,
+        combo: QComboBox,
+    ) -> PageInstance:
+        template_id = self._template_id(
+            combo
         )
 
-        self._cover_scatter_index = min(
-            max(
-                self._cover_scatter_index,
-                0,
-            ),
-            max(total - 1, 0),
+        instance = self._cover_instances.get(
+            position
         )
 
-        self._cover_proposal_label.setText(
-            self._translator.tr(
-                "album.cover_proposal",
-                current=(
-                    self._cover_scatter_index + 1
-                ),
-                total=total,
-            )
-        )
-
-        self._cover_previous_button.setEnabled(
-            self._cover_scatter_index > 0
-        )
-
-        self._cover_next_button.setEnabled(
-            self._cover_scatter_index
-            < total - 1
-        )
-
-    def _previous_cover_proposal(
-        self,
-    ) -> None:
-        if self._cover_scatter_index <= 0:
-            return
-
-        self._cover_scatter_index -= 1
-        self._update_cover_proposal_controls()
-        self._emit_settings_changed()
-
-    def _next_cover_proposal(
-        self,
-    ) -> None:
         if (
-            self._cover_scatter_index
-            >= len(self._cover_scatter_seeds) - 1
+            instance is None
+            or instance.template_id
+            != template_id
         ):
-            return
+            instance = PageInstance(
+                template_id=template_id,
+            )
 
-        self._cover_scatter_index += 1
-        self._update_cover_proposal_controls()
-        self._emit_settings_changed()
+            self._cover_instances[
+                position
+            ] = instance
 
-    def _new_cover_proposal(
+        return instance
+
+    def _configure_cover_instance(
         self,
+        position: CoverPosition,
+        combo: QComboBox,
     ) -> None:
-        new_seed = secrets.randbelow(
-            2_147_483_647
+        instance = self._cover_instance(
+            position,
+            combo,
         )
 
-        self._cover_scatter_seeds.append(
-            new_seed
+        photos = (
+            self._photo_provider()
+            if self._photo_provider
+            else []
         )
 
-        self._cover_scatter_index = (
-            len(self._cover_scatter_seeds) - 1
+        dialog = PageInstanceDialog(
+            instance,
+            photos,
+            translator=self._translator,
+            parent=self,
         )
 
-        if len(self._cover_scatter_seeds) > 20:
-            self._cover_scatter_seeds = (
-                self._cover_scatter_seeds[-20:]
-            )
-            self._cover_scatter_index = (
-                len(self._cover_scatter_seeds) - 1
-            )
+        if dialog.exec():
+            self._cover_instances[
+                position
+            ] = dialog.instance()
 
-        self._update_cover_proposal_controls()
-        self._emit_settings_changed()
+            self._emit_settings_changed()
+
 
     def _create_dividers_group(self) -> QGroupBox:
         group = QGroupBox(self._translator.tr("album.dividers"))
@@ -487,21 +444,30 @@ class AlbumSettingsWidget(QWidget):
         list_widget_name: str,
         combo_name: str,
     ) -> QGroupBox:
-        group = QGroupBox(title)
-        layout = QVBoxLayout(group)
+        group = QGroupBox(
+            title
+        )
+
+        layout = QVBoxLayout(
+            group
+        )
 
         list_widget = QListWidget()
+
         setattr(
             self,
             list_widget_name,
             list_widget,
         )
 
-        layout.addWidget(list_widget)
+        layout.addWidget(
+            list_widget
+        )
 
         combo = self._create_template_combo(
             TemplateKind.SPECIAL_PAGE
         )
+
         setattr(
             self,
             combo_name,
@@ -509,30 +475,61 @@ class AlbumSettingsWidget(QWidget):
         )
 
         add_layout = QHBoxLayout()
-        add_layout.addWidget(combo, 1)
 
-        add_button = QPushButton(self._translator.tr("album.add"))
+        add_layout.addWidget(
+            combo,
+            1,
+        )
+
+        add_button = QPushButton(
+            self._translator.tr(
+                "album.add"
+            )
+        )
+
         add_button.clicked.connect(
             lambda checked=False,
             lw=list_widget,
-            cb=combo: self._add_special_page(
+            cb=combo:
+            self._add_special_page(
                 lw,
                 cb,
             )
         )
 
-        add_layout.addWidget(add_button)
-        layout.addLayout(add_layout)
+        add_layout.addWidget(
+            add_button
+        )
 
+        layout.addLayout(
+            add_layout
+        )
+
+        # These actions concern the selected row as a whole.
         controls = QHBoxLayout()
 
-        up_button = QPushButton(self._translator.tr("album.up"))
-        down_button = QPushButton(self._translator.tr("album.down"))
-        remove_button = QPushButton(self._translator.tr("album.remove"))
+        up_button = QPushButton(
+            self._translator.tr(
+                "album.up"
+            )
+        )
+
+        down_button = QPushButton(
+            self._translator.tr(
+                "album.down"
+            )
+        )
+
+        remove_button = QPushButton(
+            self._translator.tr(
+                "album.remove"
+            )
+        )
 
         up_button.clicked.connect(
             lambda checked=False,
-            lw=list_widget: self._move_special_page(
+            lw=list_widget:
+            self._move_special_page(
                 lw,
                 -1,
             )
@@ -540,7 +537,8 @@ class AlbumSettingsWidget(QWidget):
 
         down_button.clicked.connect(
             lambda checked=False,
-            lw=list_widget: self._move_special_page(
+            lw=list_widget:
+            self._move_special_page(
                 lw,
                 1,
             )
@@ -548,16 +546,27 @@ class AlbumSettingsWidget(QWidget):
 
         remove_button.clicked.connect(
             lambda checked=False,
-            lw=list_widget: self._remove_special_page(
+            lw=list_widget:
+            self._remove_special_page(
                 lw
             )
         )
 
-        controls.addWidget(up_button)
-        controls.addWidget(down_button)
-        controls.addWidget(remove_button)
+        controls.addWidget(
+            up_button
+        )
+        controls.addWidget(
+            down_button
+        )
+        controls.addWidget(
+            remove_button
+        )
 
-        layout.addLayout(controls)
+        controls.addStretch()
+
+        layout.addLayout(
+            controls
+        )
 
         return group
 
@@ -600,10 +609,6 @@ class AlbumSettingsWidget(QWidget):
         return combo
 
     def _apply_defaults(self) -> None:
-        self._cover_scatter_seeds = [0]
-        self._cover_scatter_index = 0
-        self._cover_photo_count_spin.setValue(0)
-        self._update_cover_proposal_controls()
 
         self._caption_datetime_checkbox.setChecked(True)
         self._caption_location_checkbox.setChecked(True)
@@ -679,6 +684,13 @@ class AlbumSettingsWidget(QWidget):
         self._update_divider_controls()
 
     def reset_to_defaults(self) -> None:
+        # A new project must never inherit instance-specific
+        # state (scatter seeds/history, template options...).
+        self._cover_instances.clear()
+
+        self._front_matter_list.clear()
+        self._back_matter_list.clear()
+
         self._loading_settings = True
 
         try:
@@ -695,41 +707,31 @@ class AlbumSettingsWidget(QWidget):
     def settings(self) -> AlbumStructureSettings:
         return AlbumStructureSettings(
             covers={
-                CoverPosition.FRONT: CoverSettings(
-                    position=CoverPosition.FRONT,
-                    template_id=self._template_id(
-                        self._front_cover_combo
+                position: CoverSettings(
+                    position=position,
+                    page=self._cover_instance(
+                        position,
+                        combo,
                     ),
-                    scatter=CoverScatterSettings(
-                        photo_count=(
-                            self._cover_photo_count_spin.value()
-                        ),
-                        seeds=tuple(
-                            self._cover_scatter_seeds
-                        ),
-                        selected_seed_index=(
-                            self._cover_scatter_index
-                        ),
+                )
+                for position, combo in (
+                    (
+                        CoverPosition.FRONT,
+                        self._front_cover_combo,
                     ),
-                ),
-                CoverPosition.INSIDE_FRONT: CoverSettings(
-                    position=CoverPosition.INSIDE_FRONT,
-                    template_id=self._template_id(
-                        self._inside_front_cover_combo
+                    (
+                        CoverPosition.INSIDE_FRONT,
+                        self._inside_front_cover_combo,
                     ),
-                ),
-                CoverPosition.INSIDE_BACK: CoverSettings(
-                    position=CoverPosition.INSIDE_BACK,
-                    template_id=self._template_id(
-                        self._inside_back_cover_combo
+                    (
+                        CoverPosition.INSIDE_BACK,
+                        self._inside_back_cover_combo,
                     ),
-                ),
-                CoverPosition.BACK: CoverSettings(
-                    position=CoverPosition.BACK,
-                    template_id=self._template_id(
-                        self._back_cover_combo
+                    (
+                        CoverPosition.BACK,
+                        self._back_cover_combo,
                     ),
-                ),
+                )
             },
             month_dividers=DividerSettings(
                 enabled=(
@@ -796,27 +798,11 @@ class AlbumSettingsWidget(QWidget):
                 ].template_id,
             )
 
-            front_scatter = settings.covers[
-                CoverPosition.FRONT
-            ].scatter
-
-            self._cover_photo_count_spin.setValue(
-                front_scatter.photo_count
-            )
-
-            self._cover_scatter_seeds = list(
-                front_scatter.seeds
-            ) or [0]
-
-            self._cover_scatter_index = min(
-                max(
-                    front_scatter.selected_seed_index,
-                    0,
-                ),
-                len(self._cover_scatter_seeds) - 1,
-            )
-
-            self._update_cover_proposal_controls()
+            self._cover_instances = {
+                position: cover.page
+                for position, cover
+                in settings.covers.items()
+            }
 
             self._set_combo_template(
                 self._inside_front_cover_combo,
@@ -920,25 +906,183 @@ class AlbumSettingsWidget(QWidget):
             year_enabled
         )
 
+    def _install_special_page_row_widget(
+        self,
+        list_widget: QListWidget,
+        item: QListWidgetItem,
+        page: PageInstance,
+    ) -> None:
+        template = self._registry.get(
+            page.template_id
+        )
+
+        row_widget = QWidget(
+            list_widget
+        )
+
+        row_layout = QHBoxLayout(
+            row_widget
+        )
+
+        row_layout.setContentsMargins(
+            6,
+            2,
+            2,
+            2,
+        )
+
+        row_layout.setSpacing(
+            8
+        )
+
+        label = QLabel(
+            self._template_display_name(
+                template
+            )
+        )
+
+        row_layout.addWidget(
+            label,
+            1,
+        )
+
+        settings_button = QPushButton(
+            self._translator.tr(
+                "album.settings"
+            )
+        )
+
+        settings_button.clicked.connect(
+            lambda checked=False,
+            lw=list_widget,
+            current_item=item:
+            self._configure_special_page_item(
+                lw,
+                current_item,
+            )
+        )
+
+        row_layout.addWidget(
+            settings_button
+        )
+
+        item.setSizeHint(
+            row_widget.sizeHint()
+        )
+
+        list_widget.setItemWidget(
+            item,
+            row_widget,
+        )
+
+    def _configure_special_page_item(
+        self,
+        list_widget: QListWidget,
+        item: QListWidgetItem,
+    ) -> None:
+        value = item.data(
+            Qt.ItemDataRole.UserRole
+        )
+
+        if isinstance(
+            value,
+            str,
+        ):
+            value = PageInstance(
+                template_id=value
+            )
+
+            item.setData(
+                Qt.ItemDataRole.UserRole,
+                value,
+            )
+
+        if not isinstance(
+            value,
+            PageInstance,
+        ):
+            return
+
+        photos = (
+            self._photo_provider()
+            if self._photo_provider is not None
+            else []
+        )
+
+        dialog = PageInstanceDialog(
+            value,
+            photos,
+            translator=self._translator,
+            parent=self,
+        )
+
+        if not dialog.exec():
+            return
+
+        updated = dialog.instance()
+
+        item.setData(
+            Qt.ItemDataRole.UserRole,
+            updated,
+        )
+
+        self._install_special_page_row_widget(
+            list_widget,
+            item,
+            updated,
+        )
+
+        self._emit_settings_changed()
+
     def _add_special_page(
         self,
         list_widget: QListWidget,
         combo: QComboBox,
     ) -> None:
-        template_id = self._template_id(combo)
-
-        template = self._registry.get(template_id)
-
-        item = QListWidgetItem(
-            self._template_display_name(template)
+        template_id = self._template_id(
+            combo
         )
+
+        instance = PageInstance(
+            template_id=template_id
+        )
+
+        item = QListWidgetItem()
+
         item.setData(
             Qt.ItemDataRole.UserRole,
-            template_id,
+            instance,
         )
 
-        list_widget.addItem(item)
+        list_widget.addItem(
+            item
+        )
+
+        self._install_special_page_row_widget(
+            list_widget,
+            item,
+            instance,
+        )
+
+        list_widget.setCurrentItem(
+            item
+        )
+
         self._emit_settings_changed()
+
+    def _configure_special_page(
+        self,
+        list_widget: QListWidget,
+    ) -> None:
+        item = list_widget.currentItem()
+
+        if item is None:
+            return
+
+        self._configure_special_page_item(
+            list_widget,
+            item,
+        )
 
     def _remove_special_page(
         self,
@@ -946,9 +1090,16 @@ class AlbumSettingsWidget(QWidget):
     ) -> None:
         row = list_widget.currentRow()
 
-        if row >= 0:
-            list_widget.takeItem(row)
-            self._emit_settings_changed()
+        if row < 0:
+            return
+
+        item = list_widget.takeItem(
+            row
+        )
+
+        del item
+
+        self._emit_settings_changed()
 
     def _move_special_page(
         self,
@@ -965,46 +1116,114 @@ class AlbumSettingsWidget(QWidget):
         if not 0 <= target < list_widget.count():
             return
 
-        item = list_widget.takeItem(row)
-        list_widget.insertItem(target, item)
-        list_widget.setCurrentRow(target)
+        item = list_widget.takeItem(
+            row
+        )
+
+        page = item.data(
+            Qt.ItemDataRole.UserRole
+        )
+
+        list_widget.insertItem(
+            target,
+            item,
+        )
+
+        if isinstance(
+            page,
+            PageInstance,
+        ):
+            self._install_special_page_row_widget(
+                list_widget,
+                item,
+                page,
+            )
+
+        list_widget.setCurrentRow(
+            target
+        )
 
         self._emit_settings_changed()
 
     def _set_special_pages(
         self,
         list_widget: QListWidget,
-        pages: list[SpecialPage],
+        pages: list[PageInstance],
     ) -> None:
         list_widget.clear()
 
         for page in pages:
-            template = self._registry.get(
-                page.template_id
-            )
+            item = QListWidgetItem()
 
-            item = QListWidgetItem(
-                template.name
-            )
             item.setData(
                 Qt.ItemDataRole.UserRole,
-                page.template_id,
+                page,
             )
 
-            list_widget.addItem(item)
+            list_widget.addItem(
+                item
+            )
 
-    @staticmethod
+            self._install_special_page_row_widget(
+                list_widget,
+                item,
+                page,
+            )
+
     def _special_pages(
+        self,
         list_widget: QListWidget,
-    ) -> list[SpecialPage]:
-        return [
-            SpecialPage(
-                template_id=list_widget.item(index).data(
-                    Qt.ItemDataRole.UserRole
-                )
+    ) -> list[PageInstance]:
+        pages: list[
+            PageInstance
+        ] = []
+
+        for index in range(
+            list_widget.count()
+        ):
+            value = list_widget.item(
+                index
+            ).data(
+                Qt.ItemDataRole.UserRole
             )
-            for index in range(list_widget.count())
-        ]
+
+            if isinstance(
+                value,
+                PageInstance,
+            ):
+                pages.append(
+                    value
+                )
+                continue
+
+            # Defensive repair for list items created by the
+            # previous development version during this session.
+            if isinstance(
+                value,
+                str,
+            ):
+                instance = PageInstance(
+                    template_id=value
+                )
+
+                list_widget.item(
+                    index
+                ).setData(
+                    Qt.ItemDataRole.UserRole,
+                    instance,
+                )
+
+                pages.append(
+                    instance
+                )
+                continue
+
+            raise TypeError(
+                "Special page does not contain "
+                "a PageInstance."
+            )
+
+        return pages
 
     @staticmethod
     def _template_id(
