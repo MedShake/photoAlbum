@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from photoalbum.i18n import Translator
+
 from photoalbum.album import (
     AlbumStructureSettings,
     CoverPosition,
@@ -35,11 +37,13 @@ class AlbumSettingsWidget(QWidget):
     def __init__(
         self,
         registry: TemplateRegistry,
+        translator: Translator | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
 
         self._registry = registry
+        self._translator = translator or Translator("en")
         self._loading_settings = False
 
         self._create_content()
@@ -57,7 +61,7 @@ class AlbumSettingsWidget(QWidget):
 
         special_layout.addWidget(
             self._create_special_pages_group(
-                title="Pages after inside front cover",
+                title=self._translator.tr("album.front_matter"),
                 list_widget_name="_front_matter_list",
                 combo_name="_front_matter_combo",
             )
@@ -65,7 +69,7 @@ class AlbumSettingsWidget(QWidget):
 
         special_layout.addWidget(
             self._create_special_pages_group(
-                title="Pages before inside back cover",
+                title=self._translator.tr("album.back_matter"),
                 list_widget_name="_back_matter_list",
                 combo_name="_back_matter_combo",
             )
@@ -110,7 +114,7 @@ class AlbumSettingsWidget(QWidget):
         self.settings_changed.emit()
 
     def _create_covers_group(self) -> QGroupBox:
-        group = QGroupBox("Covers")
+        group = QGroupBox(self._translator.tr("album.covers"))
         form = QFormLayout(group)
 
         self._front_cover_combo = self._create_template_combo(
@@ -131,32 +135,32 @@ class AlbumSettingsWidget(QWidget):
         )
 
         form.addRow(
-            "Front cover:",
+            self._translator.tr("album.front_cover"),
             self._front_cover_combo,
         )
         form.addRow(
-            "Inside front cover:",
+            self._translator.tr("album.inside_front_cover"),
             self._inside_front_cover_combo,
         )
         form.addRow(
-            "Inside back cover:",
+            self._translator.tr("album.inside_back_cover"),
             self._inside_back_cover_combo,
         )
         form.addRow(
-            "Back cover:",
+            self._translator.tr("album.back_cover"),
             self._back_cover_combo,
         )
 
         return group
 
     def _create_dividers_group(self) -> QGroupBox:
-        group = QGroupBox("Dividers")
+        group = QGroupBox(self._translator.tr("album.dividers"))
         layout = QVBoxLayout(group)
 
         month_layout = QHBoxLayout()
 
         self._month_dividers_checkbox = QCheckBox(
-            "Month separators"
+            self._translator.tr("album.month_separators")
         )
         self._month_divider_combo = (
             self._create_template_combo(
@@ -183,7 +187,7 @@ class AlbumSettingsWidget(QWidget):
         year_layout = QHBoxLayout()
 
         self._year_dividers_checkbox = QCheckBox(
-            "Year separators"
+            self._translator.tr("album.year_separators")
         )
         self._year_divider_combo = (
             self._create_template_combo(
@@ -220,7 +224,7 @@ class AlbumSettingsWidget(QWidget):
         return group
 
     def _create_photo_pages_group(self) -> QGroupBox:
-        group = QGroupBox("Photo pages")
+        group = QGroupBox(self._translator.tr("album.photo_pages"))
         form = QFormLayout(group)
 
         self._photo_page_combo = self._create_template_combo(
@@ -228,7 +232,7 @@ class AlbumSettingsWidget(QWidget):
         )
 
         form.addRow(
-            "Template:",
+            self._translator.tr("album.template"),
             self._photo_page_combo,
         )
 
@@ -265,7 +269,7 @@ class AlbumSettingsWidget(QWidget):
         add_layout = QHBoxLayout()
         add_layout.addWidget(combo, 1)
 
-        add_button = QPushButton("Add")
+        add_button = QPushButton(self._translator.tr("album.add"))
         add_button.clicked.connect(
             lambda checked=False,
             lw=list_widget,
@@ -280,9 +284,9 @@ class AlbumSettingsWidget(QWidget):
 
         controls = QHBoxLayout()
 
-        up_button = QPushButton("Up")
-        down_button = QPushButton("Down")
-        remove_button = QPushButton("Remove")
+        up_button = QPushButton(self._translator.tr("album.up"))
+        down_button = QPushButton(self._translator.tr("album.down"))
+        remove_button = QPushButton(self._translator.tr("album.remove"))
 
         up_button.clicked.connect(
             lambda checked=False,
@@ -315,6 +319,15 @@ class AlbumSettingsWidget(QWidget):
 
         return group
 
+    def _template_display_name(self, template) -> str:
+        key = f"template.{template.template_id}"
+        translated = self._translator.tr(key)
+
+        if translated == key:
+            return template.name
+
+        return translated
+
     def _create_template_combo(
         self,
         kind: TemplateKind,
@@ -323,26 +336,25 @@ class AlbumSettingsWidget(QWidget):
 
         for template in self._registry.list_by_kind(kind):
             combo.addItem(
-                template.name,
+                self._template_display_name(template),
                 template.template_id,
             )
 
         return combo
 
-    @staticmethod
-    def _create_placement_combo() -> QComboBox:
+    def _create_placement_combo(self) -> QComboBox:
         combo = QComboBox()
 
         combo.addItem(
-            "Natural flow",
+            self._translator.tr("album.placement.natural"),
             DividerPlacement.NATURAL.value,
         )
         combo.addItem(
-            "Always on right page",
+            self._translator.tr("album.placement.right"),
             DividerPlacement.RIGHT_PAGE.value,
         )
         combo.addItem(
-            "Right page with blank facing page",
+            self._translator.tr("album.placement.right_blank"),
             DividerPlacement.RIGHT_PAGE_WITH_BLANK_FACING.value,
         )
 
@@ -395,18 +407,24 @@ class AlbumSettingsWidget(QWidget):
 
         if available:
             self._year_divider_hint.setText(
-                f"{len(years)} years detected."
+                self._translator.tr(
+                    "album.years_detected",
+                    count=len(years),
+                )
             )
         elif years:
             year = next(iter(years))
             self._year_divider_hint.setText(
-                f"Year separators are unavailable: "
-                f"all photos belong to {year}."
+                self._translator.tr(
+                    "album.year_unavailable",
+                    year=year,
+                )
             )
         else:
             self._year_divider_hint.setText(
-                "Year separators are unavailable until "
-                "dated photos are present."
+                self._translator.tr(
+                    "album.year_no_photos"
+                )
             )
 
         self._update_divider_controls()
@@ -597,7 +615,9 @@ class AlbumSettingsWidget(QWidget):
 
         template = self._registry.get(template_id)
 
-        item = QListWidgetItem(template.name)
+        item = QListWidgetItem(
+            self._template_display_name(template)
+        )
         item.setData(
             Qt.ItemDataRole.UserRole,
             template_id,

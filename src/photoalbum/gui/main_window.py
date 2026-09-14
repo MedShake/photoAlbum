@@ -45,11 +45,13 @@ from photoalbum.gui.widgets import (
     AlbumPlanWidget,
     AlbumSettingsWidget,
 )
+from photoalbum.i18n import Translator
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
 
         self._project_service = ProjectService()
+        self._translator = Translator("fr")
 
         self._template_registry = (
             create_builtin_template_registry()
@@ -249,11 +251,12 @@ class MainWindow(QMainWindow):
 
         self._tabs.addTab(
             photos_tab,
-            "Photos",
+            self._translator.tr("tab.photos"),
         )
 
         self._album_settings_widget = AlbumSettingsWidget(
             self._template_registry,
+            translator=self._translator,
             parent=self,
         )
 
@@ -263,16 +266,17 @@ class MainWindow(QMainWindow):
 
         self._tabs.addTab(
             self._album_settings_widget,
-            "Album",
+            self._translator.tr("tab.album"),
         )
 
         self._album_plan_widget = AlbumPlanWidget(
+            translator=self._translator,
             parent=self,
         )
 
         self._tabs.addTab(
             self._album_plan_widget,
-            "Plan",
+            self._translator.tr("tab.plan"),
         )
         self.setCentralWidget(central_widget)
 

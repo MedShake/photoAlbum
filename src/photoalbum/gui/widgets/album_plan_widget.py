@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import calendar
+from photoalbum.i18n import Translator
 
 from PySide6.QtWidgets import (
     QGroupBox,
@@ -22,10 +22,12 @@ from photoalbum.album import (
 class AlbumPlanWidget(QWidget):
     def __init__(
         self,
+        translator: Translator | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
 
+        self._translator = translator or Translator()
         self._summary_builder = AlbumSummaryBuilder()
 
         self._create_ui()
@@ -34,7 +36,9 @@ class AlbumPlanWidget(QWidget):
     def _create_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        summary_group = QGroupBox("Summary")
+        summary_group = QGroupBox(
+            self._translator.tr("plan.summary")
+        )
         summary_layout = QVBoxLayout(summary_group)
 
         self._summary_label = QLabel()
@@ -49,7 +53,7 @@ class AlbumPlanWidget(QWidget):
         layout.addWidget(summary_group)
 
         suggestions_group = QGroupBox(
-            "Possible optimizations"
+            self._translator.tr("plan.optimizations")
         )
         suggestions_layout = QVBoxLayout(
             suggestions_group
@@ -65,7 +69,7 @@ class AlbumPlanWidget(QWidget):
         layout.addWidget(suggestions_group)
 
         structure_group = QGroupBox(
-            "Document structure"
+            self._translator.tr("plan.structure")
         )
         structure_layout = QVBoxLayout(
             structure_group
@@ -87,11 +91,11 @@ class AlbumPlanWidget(QWidget):
 
     def clear(self) -> None:
         self._summary_label.setText(
-            "No album plan available."
+            self._translator.tr("plan.no_plan")
         )
         self._print_label.clear()
         self._suggestions_label.setText(
-            "No optimization available."
+            self._translator.tr("plan.no_optimization")
         )
         self._tree.clear()
 
@@ -162,17 +166,18 @@ class AlbumPlanWidget(QWidget):
 
         if not suggestions:
             self._suggestions_label.setText(
-                "No unused photo capacity detected "
-                "at the end of a month."
+                self._translator.tr(
+                    "plan.no_unused_capacity"
+                )
             )
             return
 
         lines = []
 
         for suggestion in suggestions:
-            month_name = calendar.month_name[
+            month_name = self._translator.month_name(
                 suggestion.month
-            ]
+            )
 
             slots = suggestion.available_photo_slots
 
@@ -235,9 +240,9 @@ class AlbumPlanWidget(QWidget):
                 if month_item is None:
                     month_item = QTreeWidgetItem(
                         [
-                            calendar.month_name[
+                            self._translator.month_name(
                                 page.month
-                            ],
+                            ),
                             "",
                             "",
                             "",

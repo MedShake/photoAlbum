@@ -1,5 +1,3 @@
-import calendar
-
 from PySide6.QtWidgets import QApplication
 
 from photoalbum.album import (
@@ -14,6 +12,7 @@ from photoalbum.album import (
     PrintDiagnostic,
 )
 from photoalbum.gui.widgets import AlbumPlanWidget
+from photoalbum.i18n import Translator
 
 
 def create_widget() -> AlbumPlanWidget:
@@ -22,7 +21,9 @@ def create_widget() -> AlbumPlanWidget:
     if application is None:
         QApplication([])
 
-    return AlbumPlanWidget()
+    return AlbumPlanWidget(
+        translator=Translator("en")
+    )
 
 
 def create_result() -> AlbumBuildResult:
@@ -165,9 +166,7 @@ def test_plan_widget_displays_period_suggestion():
 
     text = widget._suggestions_label.text()
 
-    month_name = calendar.month_name[3]
-
-    assert f"{month_name} 2025" in text
+    assert "March 2025" in text
     assert "3 additional photo(s)" in text
 
 
@@ -203,8 +202,6 @@ def test_month_group_contains_page_details():
         )
     )
 
-    month_name = calendar.month_name[3]
-
     march = next(
         year_item.child(index)
         for index in range(
@@ -212,7 +209,7 @@ def test_month_group_contains_page_details():
         )
         if (
             year_item.child(index).text(0)
-            == month_name
+            == "March"
         )
     )
 
