@@ -56,6 +56,12 @@ from .serialization import (
     album_settings_to_json,
 )
 
+from .summary import (
+    AlbumPlanSummary,
+    AlbumSummaryBuilder,
+    PeriodFillSuggestion,
+)
+
 __all__ = [
     "A4",
     "US_LETTER",
@@ -90,4 +96,7 @@ __all__ = [
     "create_builtin_template_registry",
     "album_settings_from_json",
     "album_settings_to_json",
+    "AlbumPlanSummary",
+    "AlbumSummaryBuilder",
+    "PeriodFillSuggestion",
 ]

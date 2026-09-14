@@ -97,11 +97,18 @@ class PaginationEngine:
                 )
                 continue
 
+            self._record_previous_month_capacity(
+                result
+            )
+
             self._append_single_page(
                 result,
                 item,
             )
-
+            
+        self._record_previous_month_capacity(
+            result
+        )    
         return result
 
     def _append_photo_pages(
@@ -162,7 +169,10 @@ class PaginationEngine:
         ):
             self._prepare_blank_facing_page(result)
 
-        if item.kind == PlanItemKind.MONTH_DIVIDER:
+        if item.kind in (
+            PlanItemKind.MONTH_DIVIDER,
+            PlanItemKind.YEAR_DIVIDER,
+        ):
             self._record_previous_month_capacity(
                 result
             )

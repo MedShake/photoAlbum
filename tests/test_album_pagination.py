@@ -635,3 +635,98 @@ def test_blank_facing_may_require_technical_and_editorial_blank():
     )
 
     assert march.unused_photo_slots == 2
+
+def test_last_month_capacity_is_recorded_at_end_of_album():
+    december_photos = (
+        photo("a.jpg", 1),
+        photo("b.jpg", 2),
+        photo("c.jpg", 3),
+    )
+
+    plan = AlbumPlan(
+        items=[
+            PlanItem(
+                kind=PlanItemKind.MONTH_DIVIDER,
+                template_id="month",
+                year=2025,
+                month=12,
+            ),
+            PlanItem(
+                kind=PlanItemKind.PHOTO_GROUP,
+                template_id="photo",
+                year=2025,
+                month=12,
+                photos=december_photos,
+            ),
+        ]
+    )
+
+    result = PaginationEngine(
+        registry(capacity=2)
+    ).paginate(
+        plan,
+        album_settings(
+            month_placement=DividerPlacement.RIGHT_PAGE
+        ),
+    )
+
+    december = next(
+        period
+        for period in result.period_end_capacities
+        if (
+            period.year == 2025
+            and period.month == 12
+        )
+    )
+
+    assert december.unused_photo_slots == 1
+
+def test_december_capacity_is_recorded_before_year_divider():
+    december_photos = (
+        photo("a.jpg", 1),
+        photo("b.jpg", 2),
+        photo("c.jpg", 3),
+    )
+
+    plan = AlbumPlan(
+        items=[
+            PlanItem(
+                kind=PlanItemKind.MONTH_DIVIDER,
+                template_id="month",
+                year=2025,
+                month=12,
+            ),
+            PlanItem(
+                kind=PlanItemKind.PHOTO_GROUP,
+                template_id="photo",
+                year=2025,
+                month=12,
+                photos=december_photos,
+            ),
+            PlanItem(
+                kind=PlanItemKind.YEAR_DIVIDER,
+                template_id="year",
+                year=2026,
+            ),
+        ]
+    )
+
+    result = PaginationEngine(
+        registry(capacity=2)
+    ).paginate(
+        plan,
+        album_settings(
+            month_placement=DividerPlacement.RIGHT_PAGE
+        ),
+    )
+
+    december = next(
+        period
+        for period in result.period_end_capacities
+        if (
+            period.year == 2025
+            and period.month == 12
+        )
+    )
+
+    assert december.unused_photo_slots == 3
