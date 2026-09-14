@@ -50,6 +50,19 @@ from photoalbum.album.composition import (
     PageComposition,
     PhotoSlotComposition,
 )
+from photoalbum.album.geographic_word_cloud import (
+    compose_geographic_word_cloud,
+)
+from photoalbum.gui.geographic_word_cloud_painter import (
+    paint_geographic_word_cloud,
+)
+from photoalbum.album.calendar_index import (
+    calendar_month_page_numbers,
+    compose_calendar_index,
+)
+from photoalbum.gui.calendar_index_painter import (
+    paint_calendar_index,
+)
 from photoalbum.i18n import Translator
 
 from photoalbum.gui.cover_render_worker import CoverRenderWorker
@@ -255,6 +268,21 @@ class AlbumCoverPreview(_PreviewPageBase):
             )
             return
 
+        if (
+            self._template_id
+            == "geographic-word-cloud"
+        ):
+            self._paint_geographic_word_cloud(
+                painter
+            )
+            return
+
+        if self._template_id == "calendar-index":
+            self._paint_calendar_index(
+                painter
+            )
+            return
+
         labels = {
             CoverPosition.FRONT: (
                 "preview.cover.front"
@@ -331,6 +359,128 @@ class AlbumCoverPreview(_PreviewPageBase):
                 | Qt.AlignmentFlag.AlignTop
             ),
             template_name,
+        )
+
+    def _paint_geographic_word_cloud(
+        self,
+        painter: QPainter,
+    ) -> None:
+        settings = (
+            self._cover_settings
+            .page
+            .settings
+            .get(
+                "geographic_word_cloud",
+                {},
+            )
+        )
+
+        if not isinstance(
+            settings,
+            dict,
+        ):
+            settings = {}
+
+        year = settings.get(
+            "year"
+        )
+
+        cloud = compose_geographic_word_cloud(
+            self._project_photos(),
+            year=year,
+            page_width_mm=(
+                self._page_format.width_mm
+            ),
+            page_height_mm=(
+                self._page_format.height_mm
+            ),
+        )
+
+        paint_geographic_word_cloud(
+            painter,
+            target_rect=self.rect(),
+            cloud=cloud,
+            page_width_mm=(
+                self._page_format.width_mm
+            ),
+        )
+
+        if not cloud.words:
+            painter.setPen(
+                Qt.GlobalColor.darkGray
+            )
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignmentFlag.AlignCenter,
+                self._translator.tr(
+                    "page_settings.no_geographic_data"
+                ),
+            )
+
+    def _paint_calendar_index(
+        self,
+        painter: QPainter,
+    ) -> None:
+        settings = (
+            self._cover_settings
+            .page
+            .settings
+            .get(
+                "calendar_index",
+                {},
+            )
+        )
+
+        if not isinstance(
+            settings,
+            dict,
+        ):
+            settings = {}
+
+        years = sorted(
+            {
+                photo.capture_datetime.year
+                for photo in self._project_photos()
+                if photo.capture_datetime
+                is not None
+            }
+        )
+
+        year = settings.get(
+            "year"
+        )
+
+        if year not in years:
+            year = (
+                years[0]
+                if years
+                else None
+            )
+
+        if year is None:
+            return
+
+        page_numbers = (
+            calendar_month_page_numbers(
+                self._result.pagination.pages,
+                year,
+            )
+        )
+
+        composition = compose_calendar_index(
+            self._project_photos(),
+            year=year,
+            month_page_numbers=page_numbers,
+        )
+
+        paint_calendar_index(
+            painter,
+            target_rect=self.rect(),
+            composition=composition,
+            translator=self._translator,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
         )
 
     def _project_photos(self):
@@ -575,6 +725,7 @@ class AlbumPagePreview(_PreviewPageBase):
         page_format: PageFormat = A4,
         translator: Translator | None = None,
         project_photos=None,
+        album_pages=None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(
@@ -591,6 +742,10 @@ class AlbumPagePreview(_PreviewPageBase):
 
         self._project_photos = tuple(
             project_photos or ()
+        )
+
+        self._album_pages = tuple(
+            album_pages or ()
         )
 
         # Async state for instantiated special-page scatter.
@@ -611,6 +766,25 @@ class AlbumPagePreview(_PreviewPageBase):
         page = self._composition.page
 
         if (
+            page.kind == PlanItemKind.SPECIAL_PAGE
+            and page.template_id == "calendar-index"
+            and page.page_instance is not None
+        ):
+            self._paint_special_calendar_index(
+                painter
+            )
+
+        elif (
+            page.kind == PlanItemKind.SPECIAL_PAGE
+            and page.template_id
+            == "geographic-word-cloud"
+            and page.page_instance is not None
+        ):
+            self._paint_special_geographic_word_cloud(
+                painter
+            )
+
+        elif (
             page.kind == PlanItemKind.SPECIAL_PAGE
             and page.template_id == "year-photo-scatter"
             and page.page_instance is not None
@@ -935,6 +1109,134 @@ class AlbumPagePreview(_PreviewPageBase):
             ),
             Qt.AlignmentFlag.AlignCenter,
             self._special_scatter_title,
+        )
+
+    def _paint_special_geographic_word_cloud(
+        self,
+        painter: QPainter,
+    ) -> None:
+        page = self._composition.page
+
+        instance = page.page_instance
+
+        if instance is None:
+            return
+
+        settings = instance.settings.get(
+            "geographic_word_cloud",
+            {},
+        )
+
+        if not isinstance(
+            settings,
+            dict,
+        ):
+            settings = {}
+
+        year = settings.get(
+            "year"
+        )
+
+        cloud = compose_geographic_word_cloud(
+            list(
+                self._project_photos
+            ),
+            year=year,
+            page_width_mm=(
+                self._page_format.width_mm
+            ),
+            page_height_mm=(
+                self._page_format.height_mm
+            ),
+        )
+
+        paint_geographic_word_cloud(
+            painter,
+            target_rect=self.rect(),
+            cloud=cloud,
+            page_width_mm=(
+                self._page_format.width_mm
+            ),
+        )
+
+        if not cloud.words:
+            painter.setPen(
+                Qt.GlobalColor.darkGray
+            )
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignmentFlag.AlignCenter,
+                self._translator.tr(
+                    "page_settings.no_geographic_data"
+                ),
+            )
+
+    def _paint_special_calendar_index(
+        self,
+        painter: QPainter,
+    ) -> None:
+        page = self._composition.page
+
+        instance = page.page_instance
+
+        if instance is None:
+            return
+
+        settings = instance.settings.get(
+            "calendar_index",
+            {},
+        )
+
+        if not isinstance(
+            settings,
+            dict,
+        ):
+            settings = {}
+
+        years = sorted(
+            {
+                photo.capture_datetime.year
+                for photo in self._project_photos
+                if photo.capture_datetime
+                is not None
+            }
+        )
+
+        year = settings.get(
+            "year"
+        )
+
+        if year not in years:
+            year = (
+                years[0]
+                if years
+                else None
+            )
+
+        if year is None:
+            return
+
+        page_numbers = (
+            calendar_month_page_numbers(
+                self._album_pages,
+                year,
+            )
+        )
+
+        composition = compose_calendar_index(
+            self._project_photos,
+            year=year,
+            month_page_numbers=page_numbers,
+        )
+
+        paint_calendar_index(
+            painter,
+            target_rect=self.rect(),
+            composition=composition,
+            translator=self._translator,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
         )
 
     def _paint_photo_page(
@@ -1446,6 +1748,7 @@ class AlbumPreviewWidget(QWidget):
                 page_format=page_format,
                 translator=self._translator,
                 project_photos=project_photos,
+                album_pages=result.pagination.pages,
             )
 
             # Interior spread row:
