@@ -900,20 +900,30 @@ class AlbumPagePreview(_PreviewPageBase):
         ):
             pass
 
-        elif page.kind == PlanItemKind.PHOTO_GROUP:
-            self._paint_photo_page(
+        elif (
+            page.kind == PlanItemKind.PHOTO_GROUP
+            and self._render_template_page(
                 painter
             )
+        ):
+            pass
 
         elif (
             page.kind
             == PlanItemKind.MONTH_DIVIDER
-            and page.template_id
-            == "month-divider-classic"
-        ):
-            self._paint_month_divider(
+            and self._render_template_page(
                 painter
             )
+        ):
+            pass
+
+        elif (
+            page.kind == PlanItemKind.YEAR_DIVIDER
+            and self._render_template_page(
+                painter
+            )
+        ):
+            pass
 
         else:
             self._paint_non_photo_page(
@@ -1414,6 +1424,56 @@ class AlbumPagePreview(_PreviewPageBase):
             page_width_mm=self._page_format.width_mm,
             page_height_mm=self._page_format.height_mm,
             album_pages=self._album_pages,
+        )
+
+        return True
+
+    def _render_template_page(
+        self,
+        painter: QPainter,
+    ) -> bool:
+        """
+        Generic rendering of a normal album page through its
+        registered template extension.
+
+        The core knows the page kind, never the concrete
+        template implementation.
+        """
+
+        page = self._composition.page
+
+        extension = (
+            template_extension_registry.get(
+                page.template_id
+            )
+        )
+
+        renderer = (
+            extension.widget_renderer
+            if extension is not None
+            else None
+        )
+
+        if renderer is None:
+            return False
+
+        renderer.paint(
+            painter=painter,
+            instance=page.page_instance,
+            photos=page.photos,
+            target_rect=self.rect(),
+            width=self.width(),
+            height=self.height(),
+            translator=self._translator,
+            render_service=self._render_service,
+            set_waiting_key=self._set_template_preview_key,
+            font_pixel_size=self._print_font_pixel_size,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+            album_pages=self._album_pages,
+            composition=self._composition,
+            thumbnail_cache=self._thumbnail_cache,
+            pixel_rect=self._pixel_rect,
         )
 
         return True

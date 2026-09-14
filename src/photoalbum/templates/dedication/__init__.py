@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+
+def register() -> None:
+    from photoalbum.templates.extensions import (
+        PageTemplateExtension,
+        register_template_extension,
+    )
+    from photoalbum.templates.simple_label import (
+        SimpleLabelWidgetRenderer,
+    )
+
+    register_template_extension(
+        PageTemplateExtension(
+            template_id="dedication",
+            widget_renderer=(
+                SimpleLabelWidgetRenderer(
+                    "preview.special_page"
+                )
+            ),
+        )
+    )
+
+
+__all__ = [
+    "register",
+]
