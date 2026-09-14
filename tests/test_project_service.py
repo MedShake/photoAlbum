@@ -4,6 +4,13 @@ import pytest
 
 from photoalbum.app import ProjectService
 
+from photoalbum.album import (
+    AlbumStructureSettings,
+    CoverPosition,
+    CoverSettings,
+    DividerSettings,
+    PhotoPageSettings,
+)
 
 def test_create_project(tmp_path: Path):
     project_path = tmp_path / "album.photoalbum"
@@ -84,3 +91,65 @@ def test_closed_project_rejects_metadata_access():
     with pytest.raises(RuntimeError):
         service.get_source_directory()
 
+def create_album_settings() -> AlbumStructureSettings:
+    return AlbumStructureSettings(
+        covers={
+            position: CoverSettings(
+                position=position,
+                template_id="cover",
+            )
+            for position in CoverPosition
+        },
+        month_dividers=DividerSettings(
+            enabled=True,
+            template_id="month",
+        ),
+        year_dividers=DividerSettings(
+            enabled=False,
+            template_id="year",
+        ),
+        photo_pages=PhotoPageSettings(
+            template_id="photo-page-2",
+        ),
+    )
+
+
+def test_album_settings_are_persisted(
+    tmp_path: Path,
+):
+    project_path = tmp_path / "album.photoalbum"
+
+    first = ProjectService()
+    first.create(project_path)
+
+    expected = create_album_settings()
+
+    first.set_album_structure_settings(
+        expected
+    )
+    first.close()
+
+    reopened = ProjectService()
+    reopened.open(project_path)
+
+    actual = reopened.get_album_structure_settings()
+
+    assert actual == expected
+
+    reopened.close()
+
+
+def test_missing_album_settings_return_none(
+    tmp_path: Path,
+):
+    project_path = tmp_path / "album.photoalbum"
+
+    service = ProjectService()
+    service.create(project_path)
+
+    assert (
+        service.get_album_structure_settings()
+        is None
+    )
+
+    service.close()

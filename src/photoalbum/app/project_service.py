@@ -5,10 +5,16 @@ from pathlib import Path
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import Photo
 
+from photoalbum.album import (
+    AlbumStructureSettings,
+    album_settings_from_json,
+    album_settings_to_json,
+)
 
 class ProjectService:
     SOURCE_DIRECTORY_KEY = "source_directory"
     RECURSIVE_SCAN_KEY = "recursive_scan"
+    ALBUM_STRUCTURE_SETTINGS_KEY = "album_structure_settings"
 
     def __init__(self) -> None:
         self._database: ProjectDatabase | None = None
@@ -107,6 +113,32 @@ class ProjectService:
         )
 
         return value == "1"
+
+
+    def set_album_structure_settings(
+        self,
+        settings: AlbumStructureSettings,
+    ) -> None:
+        database = self._require_database()
+
+        database.set_project_metadata(
+            self.ALBUM_STRUCTURE_SETTINGS_KEY,
+            album_settings_to_json(settings),
+        )
+
+    def get_album_structure_settings(
+        self,
+    ) -> AlbumStructureSettings | None:
+        database = self._require_database()
+
+        value = database.get_project_metadata(
+            self.ALBUM_STRUCTURE_SETTINGS_KEY
+        )
+
+        if value is None:
+            return None
+
+        return album_settings_from_json(value)
 
     def _require_database(self) -> ProjectDatabase:
         if self._database is None:

@@ -51,6 +51,11 @@ from .builtin_templates import (
     create_builtin_template_registry,
 )
 
+from .serialization import (
+    album_settings_from_json,
+    album_settings_to_json,
+)
+
 __all__ = [
     "A4",
     "US_LETTER",
@@ -83,4 +88,6 @@ __all__ = [
     "AlbumBuilder",
     "AlbumBuildResult",
     "create_builtin_template_registry",
+    "album_settings_from_json",
+    "album_settings_to_json",
 ]

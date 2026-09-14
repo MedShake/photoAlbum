@@ -412,10 +412,7 @@ class AlbumSettingsWidget(QWidget):
                 ),
             ),
             year_dividers=DividerSettings(
-                enabled=(
-                    self._year_dividers_checkbox.isEnabled()
-                    and self._year_dividers_checkbox.isChecked()
-                ),
+                enabled=self._year_dividers_checkbox.isChecked(),
                 template_id=self._template_id(
                     self._year_divider_combo
                 ),
@@ -435,6 +432,78 @@ class AlbumSettingsWidget(QWidget):
                 self._back_matter_list
             ),
         )
+
+    def set_settings(
+        self,
+        settings: AlbumStructureSettings,
+    ) -> None:
+        self._set_combo_template(
+            self._front_cover_combo,
+            settings.covers[
+                CoverPosition.FRONT
+            ].template_id,
+        )
+
+        self._set_combo_template(
+            self._inside_front_cover_combo,
+            settings.covers[
+                CoverPosition.INSIDE_FRONT
+            ].template_id,
+        )
+
+        self._set_combo_template(
+            self._inside_back_cover_combo,
+            settings.covers[
+                CoverPosition.INSIDE_BACK
+            ].template_id,
+        )
+
+        self._set_combo_template(
+            self._back_cover_combo,
+            settings.covers[
+                CoverPosition.BACK
+            ].template_id,
+        )
+
+        self._month_dividers_checkbox.setChecked(
+            settings.month_dividers.enabled
+        )
+        self._set_combo_template(
+            self._month_divider_combo,
+            settings.month_dividers.template_id,
+        )
+        self._set_placement(
+            self._month_placement_combo,
+            settings.month_dividers.placement,
+        )
+
+        self._year_dividers_checkbox.setChecked(
+            settings.year_dividers.enabled
+        )
+        self._set_combo_template(
+            self._year_divider_combo,
+            settings.year_dividers.template_id,
+        )
+        self._set_placement(
+            self._year_placement_combo,
+            settings.year_dividers.placement,
+        )
+
+        self._set_combo_template(
+            self._photo_page_combo,
+            settings.photo_pages.template_id,
+        )
+
+        self._set_special_pages(
+            self._front_matter_list,
+            settings.front_matter,
+        )
+        self._set_special_pages(
+            self._back_matter_list,
+            settings.back_matter,
+        )
+
+        self._update_divider_controls()
 
     def _update_divider_controls(self) -> None:
         month_enabled = (
@@ -504,6 +573,28 @@ class AlbumSettingsWidget(QWidget):
         item = list_widget.takeItem(row)
         list_widget.insertItem(target, item)
         list_widget.setCurrentRow(target)
+
+    def _set_special_pages(
+        self,
+        list_widget: QListWidget,
+        pages: list[SpecialPage],
+    ) -> None:
+        list_widget.clear()
+
+        for page in pages:
+            template = self._registry.get(
+                page.template_id
+            )
+
+            item = QListWidgetItem(
+                template.name
+            )
+            item.setData(
+                Qt.ItemDataRole.UserRole,
+                page.template_id,
+            )
+
+            list_widget.addItem(item)
 
     @staticmethod
     def _special_pages(
