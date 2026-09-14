@@ -73,6 +73,7 @@ class TemplateSettingsEditorRegistry:
         photos,
         *,
         translator: Translator,
+        render_service=None,
         parent: QWidget | None = None,
     ) -> PageTemplateSettingsWidget | None:
         editor_type = self.editor_type(
@@ -86,6 +87,7 @@ class TemplateSettingsEditorRegistry:
             instance,
             photos,
             translator=translator,
+            render_service=render_service,
             parent=parent,
         )
 
@@ -118,6 +120,7 @@ def create_template_settings_editor(
     photos,
     *,
     translator: Translator,
+    render_service=None,
     parent: QWidget | None = None,
 ) -> PageTemplateSettingsWidget | None:
     return _registry.create(
@@ -125,6 +128,7 @@ def create_template_settings_editor(
         instance,
         photos,
         translator=translator,
+        render_service=render_service,
         parent=parent,
     )
 

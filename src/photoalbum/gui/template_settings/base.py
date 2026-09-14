@@ -24,6 +24,7 @@ class PageTemplateSettingsWidget(QWidget):
         photos,
         *,
         translator: Translator,
+        render_service=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -33,6 +34,7 @@ class PageTemplateSettingsWidget(QWidget):
             photos
         )
         self._translator = translator
+        self._render_service = render_service
 
     def instance(
         self,

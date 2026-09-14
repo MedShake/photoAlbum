@@ -47,6 +47,11 @@ from photoalbum.gui.widgets import (
     AlbumPreviewWidget,
     AlbumSettingsWidget,
 )
+from photoalbum.gui.preview_render_service import (
+    PREVIEW_RENDER_HEIGHT,
+    PREVIEW_RENDER_WIDTH,
+    PreviewRenderService,
+)
 from photoalbum.i18n import Translator
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -54,6 +59,13 @@ class MainWindow(QMainWindow):
 
         self._project_service = ProjectService()
         self._translator = Translator("fr")
+
+        self._preview_render_service = (
+            PreviewRenderService(
+                self._translator,
+                self,
+            )
+        )
 
         self._template_registry = (
             create_builtin_template_registry()
@@ -281,6 +293,7 @@ class MainWindow(QMainWindow):
             self._template_registry,
             translator=self._translator,
             parent=self,
+            render_service=self._preview_render_service,
         )
 
         self._album_settings_widget.set_photo_provider(
@@ -306,6 +319,8 @@ class MainWindow(QMainWindow):
             self._template_registry,
             translator=self._translator,
             parent=self,
+            render_service=self._preview_render_service,
+
         )
 
         self._tabs.addTab(
@@ -324,6 +339,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(status_bar)
 
     def _new_project(self) -> None:
+        self._preview_render_service.clear()
         path, _ = QFileDialog.getSaveFileName(
             self,
             self._translator.tr(
@@ -404,6 +420,7 @@ class MainWindow(QMainWindow):
         self._update_project_state()
 
     def _open_project(self) -> None:
+        self._preview_render_service.clear()
         path, _ = QFileDialog.getOpenFileName(
             self,
             self._translator.tr("main.open_project_title"),
@@ -425,6 +442,7 @@ class MainWindow(QMainWindow):
         self._update_project_state()
 
     def _close_project(self) -> None:
+        self._preview_render_service.clear()
         self._project_service.close()
 
         self._analysis_completed = False
@@ -936,6 +954,89 @@ class MainWindow(QMainWindow):
             years
         )
 
+    def _prewarm_expensive_previews(
+        self,
+        result,
+        settings,
+        photos,
+    ) -> None:
+        """
+        Pre-render expensive templates using exactly the same
+        photo set as the album preview.
+
+        Do NOT use the raw repository photo list here: the album
+        plan may exclude undated/anomalous photos or otherwise
+        expose a different ordering.
+        """
+
+        project_photos = []
+        seen_paths = set()
+
+        for item in result.plan.items:
+            for photo in item.photos:
+                key = str(
+                    photo.path
+                )
+
+                if key in seen_paths:
+                    continue
+
+                seen_paths.add(
+                    key
+                )
+
+                project_photos.append(
+                    photo
+                )
+
+        instances = []
+
+        # Covers.
+        for cover in settings.covers.values():
+            page = cover.page
+
+            if (
+                page.template_id
+                == "year-photo-scatter"
+            ):
+                instances.append(
+                    page
+                )
+
+        # Special-page instances.
+        for page in (
+            list(settings.front_matter)
+            + list(settings.back_matter)
+        ):
+            if (
+                page.template_id
+                == "year-photo-scatter"
+            ):
+                instances.append(
+                    page
+                )
+
+        seen_instances = set()
+
+        for instance in instances:
+            if (
+                instance.instance_id
+                in seen_instances
+            ):
+                continue
+
+            seen_instances.add(
+                instance.instance_id
+            )
+
+            self._preview_render_service.request(
+                instance,
+                project_photos,
+                width=PREVIEW_RENDER_WIDTH,
+                height=PREVIEW_RENDER_HEIGHT,
+            )
+
+
     def _refresh_album_plan(self) -> None:
         if not self._project_service.is_open:
             self._album_plan_widget.clear()
@@ -964,6 +1065,10 @@ class MainWindow(QMainWindow):
                 print_constraints=print_constraints,
             )
 
+            # Expensive previews are prepared immediately in
+            # background so they are usually ready when the
+            # Preview tab is opened.
+
             self._album_plan_widget.set_result(
                 result,
                 settings,
@@ -973,6 +1078,22 @@ class MainWindow(QMainWindow):
                 result,
                 settings,
             )
+
+            # Preview prewarming is strictly optional.
+            #
+            # It must never prevent Plan or Preview from being
+            # displayed if the optimization itself fails.
+            try:
+                self._prewarm_expensive_previews(
+                    result,
+                    settings,
+                    photos,
+                )
+            except Exception as exc:
+                print(
+                    "[preview-prewarm] disabled for this refresh:",
+                    repr(exc),
+                )
 
         except Exception as exc:
             self._album_plan_widget.clear()

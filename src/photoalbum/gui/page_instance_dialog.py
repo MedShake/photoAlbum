@@ -29,6 +29,7 @@ class PageInstanceDialog(QDialog):
         photos,
         *,
         translator: Translator,
+        render_service=None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -40,6 +41,7 @@ class PageInstanceDialog(QDialog):
             photos
         )
         self._translator = translator
+        self._render_service = render_service
 
         self._editor = None
 
@@ -101,6 +103,7 @@ class PageInstanceDialog(QDialog):
                 self._instance,
                 self._photos,
                 translator=self._translator,
+                render_service=self._render_service,
                 parent=self,
             )
         )

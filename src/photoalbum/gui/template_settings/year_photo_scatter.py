@@ -31,6 +31,12 @@ from photoalbum.gui.cover_render_worker import (
     CoverRenderWorker,
 )
 
+from photoalbum.gui.preview_render_service import (
+    PREVIEW_RENDER_HEIGHT,
+    PREVIEW_RENDER_WIDTH,
+    PreviewRenderService,
+)
+
 from .base import PageTemplateSettingsWidget
 
 
@@ -48,16 +54,35 @@ class YearPhotoScatterSettingsWidget(
         photos,
         *,
         translator,
+        render_service=None,
         parent=None,
     ) -> None:
         super().__init__(
             instance,
             photos,
             translator=translator,
+            render_service=render_service,
             parent=parent,
         )
 
-        self._request_id: str | None = None
+        self._shared_render_service = (
+            render_service
+            or PreviewRenderService(
+                self._translator,
+                self,
+            )
+        )
+
+        self._shared_render_key = None
+
+        self._shared_render_service.preview_ready.connect(
+            self._shared_preview_ready
+        )
+
+        self._shared_render_service.preview_failed.connect(
+            self._shared_preview_failed
+        )
+
 
         self._base_pixmap = QPixmap()
         self._composition_title = ""
@@ -362,17 +387,6 @@ class YearPhotoScatterSettingsWidget(
     def _request_preview(
         self,
     ) -> None:
-        self._preview_label.clear()
-
-        self._preview_label.setText(
-            self._translator.tr(
-                "page_settings.calculating"
-            )
-        )
-
-        request_id = uuid4().hex
-        self._request_id = request_id
-
         composition = compose_cover_scatter(
             list(
                 self._photos
@@ -389,59 +403,76 @@ class YearPhotoScatterSettingsWidget(
             composition.title
         )
 
-        worker = CoverRenderWorker(
-            request_id=request_id,
-            width=self.PREVIEW_WIDTH,
-            height=self.PREVIEW_HEIGHT,
-            items=visible_cover_scatter_items(
-                composition.items
-            ),
+        key = (
+            self._shared_render_service.key_for(
+                self._instance,
+                self._photos,
+                width=PREVIEW_RENDER_WIDTH,
+                height=PREVIEW_RENDER_HEIGHT,
+            )
         )
 
-        worker.signals.finished.connect(
-            self._preview_ready
+        self._shared_render_key = key
+
+        pixmap = (
+            self._shared_render_service.cached(
+                key
+            )
         )
 
-        worker.signals.failed.connect(
-            self._preview_failed
-        )
-
-        QThreadPool.globalInstance().start(
-            worker
-        )
-
-    def _preview_ready(
-        self,
-        request_id: str,
-        data: bytes,
-    ) -> None:
-        # Ignore stale asynchronous results.
-        if request_id != self._request_id:
+        if pixmap is not None:
+            self._base_pixmap = pixmap
+            self._display_preview()
             return
 
-        pixmap = QPixmap()
+        self._preview_label.clear()
 
-        pixmap.loadFromData(
-            data
+        self._preview_label.setText(
+            self._translator.tr(
+                "page_settings.calculating"
+            )
         )
 
-        if pixmap.isNull():
-            self._preview_failed(
-                request_id,
-                "Invalid image",
+        self._shared_render_service.request(
+            self._instance,
+            self._photos,
+            width=PREVIEW_RENDER_WIDTH,
+            height=PREVIEW_RENDER_HEIGHT,
+        )
+
+
+    def _shared_preview_ready(
+        self,
+        key,
+    ) -> None:
+        if (
+            key
+            != self._shared_render_key
+        ):
+            return
+
+        pixmap = (
+            self._shared_render_service.cached(
+                key
             )
+        )
+
+        if pixmap is None:
             return
 
         self._base_pixmap = pixmap
 
         self._display_preview()
 
-    def _preview_failed(
+    def _shared_preview_failed(
         self,
-        request_id: str,
+        key,
         message: str,
     ) -> None:
-        if request_id != self._request_id:
+        if (
+            key
+            != self._shared_render_key
+        ):
             return
 
         self._preview_label.setText(

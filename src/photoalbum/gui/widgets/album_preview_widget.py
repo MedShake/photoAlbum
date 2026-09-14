@@ -63,6 +63,9 @@ from photoalbum.album.calendar_index import (
 from photoalbum.gui.calendar_index_painter import (
     paint_calendar_index,
 )
+from photoalbum.gui.preview_render_service import (
+    PreviewRenderService,
+)
 from photoalbum.i18n import Translator
 
 from photoalbum.gui.cover_render_worker import CoverRenderWorker
@@ -236,6 +239,7 @@ class AlbumCoverPreview(_PreviewPageBase):
         thumbnail_cache: PreviewThumbnailCache,
         page_format: PageFormat,
         translator: Translator,
+        render_service: PreviewRenderService,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(
@@ -250,6 +254,17 @@ class AlbumCoverPreview(_PreviewPageBase):
         self._cover_settings = cover_settings
         self._thumbnail_cache = thumbnail_cache
         self._translator = translator
+        self._render_service = render_service
+
+        self._shared_preview_key = None
+
+        self._render_service.preview_ready.connect(
+            self._shared_preview_ready
+        )
+
+        self._render_service.preview_failed.connect(
+            self._shared_preview_failed
+        )
 
         self._scatter_cache_key = None
         self._scatter_cache_pixmap = QPixmap()
@@ -483,54 +498,70 @@ class AlbumCoverPreview(_PreviewPageBase):
             page_height_mm=self._page_format.height_mm,
         )
 
-    def _project_photos(self):
+    def _project_photos(
+        self,
+    ):
         photos = []
         seen = set()
 
         for item in self._result.plan.items:
             for photo in item.photos:
-                key = str(photo.path)
+                key = str(
+                    photo.path
+                )
 
                 if key in seen:
                     continue
 
-                seen.add(key)
-                photos.append(photo)
+                seen.add(
+                    key
+                )
 
-        return photos
+                photos.append(
+                    photo
+                )
+
+        return sorted(
+            photos,
+            key=lambda photo: str(
+                photo.path
+            ),
+        )
+
 
     def _paint_year_photo_scatter(
         self,
         painter: QPainter,
     ) -> None:
-        scatter = self._cover_settings.scatter
+        instance = (
+            self._cover_settings.page
+        )
 
-        photos = self._project_photos()
+        photos = tuple(
+            self._project_photos()
+        )
 
-        composition = compose_cover_scatter(
+        key = self._render_service.key_for(
+            instance,
             photos,
-            seed=scatter.seed,
-            month_name=self._translator.month_name,
+            width=self.width(),
+            height=self.height(),
         )
 
-        cache_key = (
-            composition.seed,
-            composition.title,
-            len(composition.items),
-            self.width(),
-            self.height(),
+        pixmap = self._render_service.cached(
+            key
         )
 
-        if (
-            self._scatter_cache_key
-            != cache_key
-        ):
-            self._start_scatter_render(
-                cache_key,
-                composition,
+        self._shared_preview_key = key
+
+        if pixmap is None:
+            self._render_service.request(
+                instance,
+                photos,
+                width=self.width(),
+                height=self.height(),
             )
 
-        if self._scatter_cache_pixmap.isNull():
             painter.setPen(
                 Qt.GlobalColor.darkGray
             )
@@ -542,40 +573,104 @@ class AlbumCoverPreview(_PreviewPageBase):
                     "page_settings.calculating"
                 ),
             )
+
+            # Remember which asynchronous result concerns
+            # this widget. The connection itself is permanent.
+            self._shared_preview_key = key
+
             return
 
         painter.drawPixmap(
-            0,
-            0,
-            self._scatter_cache_pixmap,
+            self.rect(),
+            pixmap,
+            pixmap.rect(),
+        )
+
+        scatter = instance.settings.get(
+            "scatter",
+            {},
+        )
+
+        seeds = (
+            scatter.get(
+                "seeds",
+                [0],
+            )
+            if isinstance(
+                scatter,
+                dict,
+            )
+            else [0]
+        )
+
+        index = (
+            int(
+                scatter.get(
+                    "selected_seed_index",
+                    0,
+                )
+            )
+            if isinstance(
+                scatter,
+                dict,
+            )
+            else 0
+        )
+
+        seeds = list(
+            seeds
+        ) or [0]
+
+        index = min(
+            max(
+                index,
+                0,
+            ),
+            len(seeds) - 1,
+        )
+
+        composition = compose_cover_scatter(
+            photos,
+            seed=int(
+                seeds[index]
+            ),
+            month_name=(
+                self._translator.month_name
+            ),
+        )
+
+        self._scatter_title = (
+            composition.title
         )
 
         self._paint_scatter_title(
             painter
         )
 
-        if self._scatter_loading:
-            painter.fillRect(
-                self.rect(),
-                QColor(
-                    255,
-                    255,
-                    255,
-                    150,
-                ),
-            )
+    def _shared_preview_ready(
+        self,
+        key,
+    ) -> None:
+        if (
+            key
+            != self._shared_preview_key
+        ):
+            return
 
-            painter.setPen(
-                Qt.GlobalColor.darkGray
-            )
+        self.update()
 
-            painter.drawText(
-                self.rect(),
-                Qt.AlignmentFlag.AlignCenter,
-                self._translator.tr(
-                    "page_settings.calculating"
-                ),
-            )
+    def _shared_preview_failed(
+        self,
+        key,
+        message: str,
+    ) -> None:
+        if (
+            key
+            != self._shared_preview_key
+        ):
+            return
+
+        self.update()
 
     def _start_scatter_render(
         self,
@@ -1607,12 +1702,21 @@ class AlbumPreviewWidget(QWidget):
         self,
         registry: TemplateRegistry,
         translator: Translator | None = None,
+        render_service: PreviewRenderService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
 
         self._registry = registry
         self._translator = translator or Translator("en")
+        self._render_service = (
+            render_service
+            or PreviewRenderService(
+                self._translator,
+                self,
+            )
+        )
+
         self._composer = PageComposer()
         self._thumbnail_cache = PreviewThumbnailCache()
 
@@ -1673,6 +1777,7 @@ class AlbumPreviewWidget(QWidget):
             thumbnail_cache=self._thumbnail_cache,
             page_format=page_format,
             translator=self._translator,
+            render_service=self._render_service,
         )
 
     def set_result(

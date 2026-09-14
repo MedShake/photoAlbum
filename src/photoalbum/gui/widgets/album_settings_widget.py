@@ -48,9 +48,11 @@ class AlbumSettingsWidget(QWidget):
         self,
         registry: TemplateRegistry,
         translator: Translator | None = None,
+        render_service=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
+        self._render_service = render_service
 
         self._registry = registry
         self._translator = translator or Translator("en")
@@ -292,6 +294,7 @@ class AlbumSettingsWidget(QWidget):
             instance,
             photos,
             translator=self._translator,
+            render_service=self._render_service,
             parent=self,
         )
 
@@ -1013,6 +1016,7 @@ class AlbumSettingsWidget(QWidget):
             value,
             photos,
             translator=self._translator,
+            render_service=self._render_service,
             parent=self,
         )
 

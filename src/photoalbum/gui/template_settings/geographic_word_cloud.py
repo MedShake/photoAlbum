@@ -37,12 +37,14 @@ class GeographicWordCloudSettingsWidget(
         photos,
         *,
         translator,
+        render_service=None,
         parent=None,
     ) -> None:
         super().__init__(
             instance,
             photos,
             translator=translator,
+            render_service=render_service,
             parent=parent,
         )
 
