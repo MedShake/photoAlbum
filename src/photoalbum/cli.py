@@ -7,9 +7,8 @@ from pathlib import Path
 
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.geocoding import (
-    GeocodingCache,
-    LocationResolver,
     NominatimGeocoder,
+    create_nominatim_location_resolver,
 )
 from photoalbum.scanner import (
     LibraryScanner,
@@ -101,6 +100,75 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the .photoalbum project file.",
     )
 
+    set_location_parser = subparsers.add_parser(
+        "set-location",
+        help="Set manual geographic information for a project photo.",
+    )
+
+    set_location_parser.add_argument(
+        "photo",
+        type=Path,
+        help="Path to the photo.",
+    )
+
+    set_location_parser.add_argument(
+        "--project",
+        type=Path,
+        required=True,
+        help="Path to the .photoalbum project file.",
+    )
+
+    set_location_parser.add_argument(
+        "--place",
+        help="Manual place name.",
+    )
+
+    set_location_parser.add_argument(
+        "--city",
+        help="Manual city name.",
+    )
+
+    set_location_parser.add_argument(
+        "--address",
+        help="Manual address.",
+    )
+
+    refresh_location_parser = subparsers.add_parser(
+        "refresh-location",
+        help="Force reverse geocoding for a project photo.",
+    )
+
+    refresh_location_parser.add_argument(
+        "photo",
+        type=Path,
+        help="Path to the photo.",
+    )
+
+    refresh_location_parser.add_argument(
+        "--project",
+        type=Path,
+        required=True,
+        help="Path to the .photoalbum project file.",
+    )
+
+    refresh_location_parser.add_argument(
+        "--language",
+        default="fr",
+        help="Preferred language for geocoding results.",
+    )
+
+    refresh_location_parser.add_argument(
+        "--user-agent",
+        required=True,
+        help="User-Agent used for the geocoding service.",
+    )
+
+    refresh_location_parser.add_argument(
+        "--nominatim-endpoint",
+        default=NominatimGeocoder.DEFAULT_ENDPOINT,
+        help="Nominatim reverse-geocoding endpoint.",
+    )
+
     return parser
 
 
@@ -119,16 +187,15 @@ def create_photo_processor(
     if not args.geocode:
         return PhotoProcessor()
 
-    cache = GeocodingCache(database)
+    if not args.user_agent:
+        raise ValueError(
+            "--user-agent is required when --geocode is enabled."
+        )
 
-    geocoder = NominatimGeocoder(
+    resolver = create_nominatim_location_resolver(
+        database,
         user_agent=args.user_agent,
         endpoint=args.nominatim_endpoint,
-    )
-
-    resolver = LocationResolver(
-        cache,
-        geocoder,
     )
 
     return PhotoProcessor(
@@ -176,6 +243,26 @@ def parse_manual_datetime(value: str) -> datetime:
         ) from exc
 
 
+def normalize_optional_text(
+    value: str | None,
+) -> str | None:
+    if value is None:
+        return None
+
+    value = value.strip()
+
+    return value if value else None
+
+
+def open_project(
+    project_path: Path,
+) -> ProjectDatabase:
+    database = ProjectDatabase(project_path)
+    database.initialize()
+
+    return database
+
+
 def run_scan(args: argparse.Namespace) -> int:
     if args.geocode and not args.user_agent:
         print(
@@ -193,11 +280,9 @@ def run_scan(args: argparse.Namespace) -> int:
         exist_ok=True,
     )
 
-    database = ProjectDatabase(project_path)
+    database = open_project(project_path)
 
     try:
-        database.initialize()
-
         repository = PhotoRepository(database)
 
         processor = create_photo_processor(
@@ -254,11 +339,9 @@ def run_set_date(args: argparse.Namespace) -> int:
         )
         return 2
 
-    database = ProjectDatabase(project_path)
+    database = open_project(project_path)
 
     try:
-        database.initialize()
-
         repository = PhotoRepository(database)
 
         try:
@@ -274,14 +357,147 @@ def run_set_date(args: argparse.Namespace) -> int:
             )
             return 2
 
-        print(
-            "Manual capture date updated:"
-        )
+        print("Manual capture date updated:")
         print(f"Photo: {photo_path}")
         print(
             "Date:  "
             f"{capture_datetime.isoformat(sep=' ')}"
         )
+
+        return 0
+
+    finally:
+        database.close()
+
+
+def run_set_location(
+    args: argparse.Namespace,
+) -> int:
+    project_path = args.project.expanduser().resolve()
+    photo_path = args.photo.expanduser().resolve()
+
+    if not project_path.exists():
+        print(
+            f"Error: project does not exist: {project_path}",
+            file=sys.stderr,
+        )
+        return 2
+
+    place_name = normalize_optional_text(args.place)
+    city = normalize_optional_text(args.city)
+    address = normalize_optional_text(args.address)
+
+    if (
+        place_name is None
+        and city is None
+        and address is None
+    ):
+        print(
+            "Error: at least one of --place, --city or "
+            "--address must be provided.",
+            file=sys.stderr,
+        )
+        return 2
+
+    database = open_project(project_path)
+
+    try:
+        repository = PhotoRepository(database)
+
+        try:
+            repository.set_manual_location(
+                photo_path,
+                place_name=place_name,
+                city=city,
+                address=address,
+            )
+        except KeyError:
+            print(
+                "Error: photo is not registered in the project: "
+                f"{photo_path}",
+                file=sys.stderr,
+            )
+            return 2
+
+        print("Manual location updated:")
+        print(f"Photo:   {photo_path}")
+        print(f"Place:   {place_name or '-'}")
+        print(f"City:    {city or '-'}")
+        print(f"Address: {address or '-'}")
+
+        return 0
+
+    finally:
+        database.close()
+
+
+def run_refresh_location(
+    args: argparse.Namespace,
+) -> int:
+    project_path = args.project.expanduser().resolve()
+    photo_path = args.photo.expanduser().resolve()
+
+    if not project_path.exists():
+        print(
+            f"Error: project does not exist: {project_path}",
+            file=sys.stderr,
+        )
+        return 2
+
+    database = open_project(project_path)
+
+    try:
+        repository = PhotoRepository(database)
+
+        photo = repository.find_by_path(photo_path)
+
+        if photo is None:
+            print(
+                "Error: photo is not registered in the project: "
+                f"{photo_path}",
+                file=sys.stderr,
+            )
+            return 2
+
+        if not photo.has_gps:
+            print(
+                "Error: photo has no GPS coordinates.",
+                file=sys.stderr,
+            )
+            return 2
+
+        resolver = create_nominatim_location_resolver(
+            database,
+            user_agent=args.user_agent,
+            endpoint=args.nominatim_endpoint,
+        )
+
+        processor = PhotoProcessor(
+            location_resolver=resolver,
+        )
+
+        refreshed = processor.refresh_location(
+            photo,
+            language=args.language,
+            on_event=print_event,
+        )
+
+        if not refreshed:
+            print(
+                "Error: geographic information could not "
+                "be refreshed.",
+                file=sys.stderr,
+            )
+            return 1
+
+        repository.update_geocoded_location(photo)
+
+        print()
+        print("Geographic information refreshed:")
+        print(f"Photo:   {photo.path}")
+        print(f"Place:   {photo.place_name or '-'}")
+        print(f"City:    {photo.city or '-'}")
+        print(f"Address: {photo.address or '-'}")
 
         return 0
 
@@ -298,6 +514,12 @@ def main() -> int:
 
     if args.command == "set-date":
         return run_set_date(args)
+
+    if args.command == "set-location":
+        return run_set_location(args)
+
+    if args.command == "refresh-location":
+        return run_refresh_location(args)
 
     parser.error("Unknown command.")
     return 2

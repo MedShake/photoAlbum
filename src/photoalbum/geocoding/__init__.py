@@ -5,6 +5,7 @@ from .nominatim_geocoder import GeocodingError, NominatimGeocoder
 from .nominatim_parser import NominatimParser
 from .rate_limiter import RateLimiter
 from .reverse_geocoder import ReverseGeocoder
+from .factory import create_nominatim_location_resolver
 
 __all__ = [
     "GeocodingCache",
@@ -15,4 +16,5 @@ __all__ = [
     "RateLimiter",
     "ReverseGeocoder",
     "distance_in_meters",
+    "create_nominatim_location_resolver",
 ]
