@@ -19,13 +19,23 @@ class ScanError:
     path: Path
     message: str
 
+@dataclass
+class ScanStatistics:
+    discovered: int = 0
+    analyzed: int = 0
+    reused: int = 0
+    geocoded: int = 0
+    date_anomalies: int = 0
+    errors: int = 0
 
 @dataclass
 class LibraryScanResult:
     photos: list[Photo] = field(default_factory=list)
     date_anomalies: list[Photo] = field(default_factory=list)
     errors: list[ScanError] = field(default_factory=list)
-
+    statistics: ScanStatistics = field(
+        default_factory=ScanStatistics
+    )
     @property
     def total_photos(self) -> int:
         return len(self.photos) + len(self.date_anomalies)
@@ -63,6 +73,7 @@ class LibraryScanner:
             directory,
             recursive=recursive,
         )
+        result.statistics.discovered = len(image_paths)
 
         for path in image_paths:
             try:
@@ -70,6 +81,7 @@ class LibraryScanner:
                     path,
                     language=language,
                     on_event=on_event,
+                    statistics=result.statistics,
                 )
 
             except Exception as exc:
@@ -79,10 +91,12 @@ class LibraryScanner:
                         message=str(exc),
                     )
                 )
+                result.statistics.errors += 1
                 continue
 
             if photo.is_date_anomaly:
                 result.date_anomalies.append(photo)
+                result.statistics.date_anomalies += 1
             else:
                 result.photos.append(photo)
 
@@ -98,10 +112,13 @@ class LibraryScanner:
         *,
         language: str | None,
         on_event: EventCallback | None,
+        statistics: ScanStatistics,
     ) -> Photo:
         cached_photo = self._find_current_cached_photo(path)
 
         if cached_photo is not None:
+            statistics.reused += 1
+
             if self._needs_location_enrichment(cached_photo):
                 changed = self._photo_processor.enrich_location(
                     cached_photo,
@@ -109,11 +126,11 @@ class LibraryScanner:
                     on_event=on_event,
                 )
 
-                if (
-                    changed
-                    and self._photo_repository is not None
-                ):
-                    self._photo_repository.save(cached_photo)
+                if changed:
+                    statistics.geocoded += 1
+
+                    if self._photo_repository is not None:
+                        self._photo_repository.save(cached_photo)
 
             return cached_photo
 
@@ -122,6 +139,11 @@ class LibraryScanner:
             language=language,
             on_event=on_event,
         )
+
+        statistics.analyzed += 1
+
+        if photo.location_source == LocationSource.GEOCODING:
+            statistics.geocoded += 1
 
         if self._photo_repository is not None:
             self._photo_repository.save(photo)

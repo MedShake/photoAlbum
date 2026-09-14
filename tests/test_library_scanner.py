@@ -475,3 +475,117 @@ def test_cached_manual_location_is_preserved(
     )
 
     database.close()
+
+def test_scan_statistics_count_discovered_and_analyzed(
+    tmp_path: Path,
+):
+    create_image(tmp_path / "2025-01-01.jpg")
+    create_image(tmp_path / "2025-02-01.jpg")
+
+    scanner = LibraryScanner()
+
+    result = scanner.scan(tmp_path)
+
+    assert result.statistics.discovered == 2
+    assert result.statistics.analyzed == 2
+    assert result.statistics.reused == 0
+    assert result.statistics.errors == 0
+
+
+def test_scan_statistics_count_reused_photos(
+    tmp_path: Path,
+):
+    database, repository, scanner = create_cached_scanner(
+        tmp_path
+    )
+
+    image_path = tmp_path / "2025-01-01.jpg"
+    create_image(image_path)
+
+    first_result = scanner.scan(tmp_path)
+
+    assert first_result.statistics.analyzed == 1
+    assert first_result.statistics.reused == 0
+
+    second_result = scanner.scan(tmp_path)
+
+    assert second_result.statistics.analyzed == 0
+    assert second_result.statistics.reused == 1
+
+    database.close()
+
+
+def test_scan_statistics_count_date_anomalies(
+    tmp_path: Path,
+):
+    create_image(tmp_path / "holiday.jpg")
+
+    scanner = LibraryScanner()
+
+    result = scanner.scan(tmp_path)
+
+    assert result.statistics.discovered == 1
+    assert result.statistics.analyzed == 1
+    assert result.statistics.date_anomalies == 1
+
+
+def test_scan_statistics_count_errors(
+    tmp_path: Path,
+):
+    invalid_image = tmp_path / "2025-01-01.jpg"
+    invalid_image.write_text(
+        "Not an image.",
+        encoding="utf-8",
+    )
+
+    scanner = LibraryScanner()
+
+    result = scanner.scan(tmp_path)
+
+    assert result.statistics.discovered == 1
+    assert result.statistics.analyzed == 0
+    assert result.statistics.errors == 1
+
+
+def test_scan_statistics_count_cached_geocoding(
+    tmp_path: Path,
+):
+    database = Database(tmp_path / "library.sqlite3")
+    database.initialize()
+
+    repository = PhotoRepository(database)
+
+    image_path = tmp_path / "2025-01-01.jpg"
+    create_image(image_path)
+
+    file_stat = image_path.stat()
+
+    repository.save(
+        Photo(
+            path=image_path,
+            filename=image_path.name,
+            file_size=file_stat.st_size,
+            modified_time_ns=file_stat.st_mtime_ns,
+            capture_datetime=datetime(2025, 1, 1),
+            date_source=DateSource.FILENAME,
+            latitude=47.2184,
+            longitude=-1.5536,
+            location_source=LocationSource.UNKNOWN,
+        )
+    )
+
+    processor = FakePhotoProcessor()
+
+    scanner = LibraryScanner(
+        photo_repository=repository,
+        photo_processor=processor,
+    )
+
+    result = scanner.scan(tmp_path)
+
+    assert result.statistics.discovered == 1
+    assert result.statistics.reused == 1
+    assert result.statistics.analyzed == 0
+    assert result.statistics.geocoded == 1
+
+    database.close()
