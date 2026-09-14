@@ -52,6 +52,9 @@ from photoalbum.gui.preview_render_service import (
     PREVIEW_RENDER_WIDTH,
     PreviewRenderService,
 )
+from photoalbum.templates import (
+    register_builtin_template_extensions,
+)
 from photoalbum.i18n import Translator
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -70,6 +73,8 @@ class MainWindow(QMainWindow):
         self._template_registry = (
             create_builtin_template_registry()
         )
+
+        register_builtin_template_extensions()
         self._album_builder = AlbumBuilder(
             self._template_registry
         )
@@ -996,8 +1001,9 @@ class MainWindow(QMainWindow):
             page = cover.page
 
             if (
-                page.template_id
-                == "year-photo-scatter"
+                self._preview_render_service.supports(
+                    page.template_id
+                )
             ):
                 instances.append(
                     page
@@ -1009,8 +1015,9 @@ class MainWindow(QMainWindow):
             + list(settings.back_matter)
         ):
             if (
-                page.template_id
-                == "year-photo-scatter"
+                self._preview_render_service.supports(
+                    page.template_id
+                )
             ):
                 instances.append(
                     page

@@ -66,6 +66,9 @@ from photoalbum.gui.calendar_index_painter import (
 from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
+from photoalbum.templates import (
+    template_extension_registry,
+)
 from photoalbum.i18n import Translator
 
 from photoalbum.gui.cover_render_worker import CoverRenderWorker
@@ -277,26 +280,36 @@ class AlbumCoverPreview(_PreviewPageBase):
         painter = QPainter(self)
         self._paint_paper(painter)
 
-        if self._template_id == "year-photo-scatter":
-            self._paint_year_photo_scatter(
-                painter
+        extension = (
+            template_extension_registry.get(
+                self._template_id
+            )
+        )
+
+        template_renderer = (
+            extension.widget_renderer
+            if extension is not None
+            else None
+        )
+
+        if template_renderer is not None:
+            template_renderer.paint(
+                painter=painter,
+                instance=self._cover_settings.page,
+                photos=self._project_photos(),
+                target_rect=self.rect(),
+                width=self.width(),
+                height=self.height(),
+                translator=self._translator,
+                render_service=self._render_service,
+                set_waiting_key=self._set_template_preview_key,
+                font_pixel_size=self._print_font_pixel_size,
+                page_width_mm=self._page_format.width_mm,
+                page_height_mm=self._page_format.height_mm,
+                album_pages=self._result.pagination.pages,
             )
             return
 
-        if (
-            self._template_id
-            == "geographic-word-cloud"
-        ):
-            self._paint_geographic_word_cloud(
-                painter
-            )
-            return
-
-        if self._template_id == "calendar-index":
-            self._paint_calendar_index(
-                painter
-            )
-            return
 
         labels = {
             CoverPosition.FRONT: (
@@ -497,6 +510,12 @@ class AlbumCoverPreview(_PreviewPageBase):
             page_width_mm=self._page_format.width_mm,
             page_height_mm=self._page_format.height_mm,
         )
+
+    def _set_template_preview_key(
+        self,
+        key,
+    ) -> None:
+        self._shared_preview_key = key
 
     def _project_photos(
         self,
@@ -821,6 +840,7 @@ class AlbumPagePreview(_PreviewPageBase):
         translator: Translator | None = None,
         project_photos=None,
         album_pages=None,
+        render_service=None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(
@@ -849,6 +869,17 @@ class AlbumPagePreview(_PreviewPageBase):
         self._special_scatter_pixmap = QPixmap()
         self._special_scatter_loading = False
         self._special_scatter_title = ""
+        self._render_service = render_service
+        self._shared_preview_key = None
+
+        if self._render_service is not None:
+            self._render_service.preview_ready.connect(
+                self._shared_template_preview_ready
+            )
+            self._render_service.preview_failed.connect(
+                self._shared_template_preview_failed
+            )
+
 
     def paintEvent(
         self,
@@ -862,31 +893,12 @@ class AlbumPagePreview(_PreviewPageBase):
 
         if (
             page.kind == PlanItemKind.SPECIAL_PAGE
-            and page.template_id == "calendar-index"
             and page.page_instance is not None
-        ):
-            self._paint_special_calendar_index(
+            and self._render_template_special_page(
                 painter
             )
-
-        elif (
-            page.kind == PlanItemKind.SPECIAL_PAGE
-            and page.template_id
-            == "geographic-word-cloud"
-            and page.page_instance is not None
         ):
-            self._paint_special_geographic_word_cloud(
-                painter
-            )
-
-        elif (
-            page.kind == PlanItemKind.SPECIAL_PAGE
-            and page.template_id == "year-photo-scatter"
-            and page.page_instance is not None
-        ):
-            self._paint_special_scatter(
-                painter
-            )
+            pass
 
         elif page.kind == PlanItemKind.PHOTO_GROUP:
             self._paint_photo_page(
@@ -1333,6 +1345,78 @@ class AlbumPagePreview(_PreviewPageBase):
             page_width_mm=self._page_format.width_mm,
             page_height_mm=self._page_format.height_mm,
         )
+
+    def _set_template_preview_key(
+        self,
+        key,
+    ) -> None:
+        self._shared_preview_key = key
+
+    def _shared_template_preview_ready(
+        self,
+        key,
+    ) -> None:
+        if key != self._shared_preview_key:
+            return
+
+        self.update()
+
+    def _shared_template_preview_failed(
+        self,
+        key,
+        message: str,
+    ) -> None:
+        if key != self._shared_preview_key:
+            return
+
+        self.update()
+
+    def _render_template_special_page(
+        self,
+        painter: QPainter,
+    ) -> bool:
+        page = self._composition.page
+
+        instance = page.page_instance
+
+        if (
+            instance is None
+            or self._render_service is None
+        ):
+            return False
+
+        extension = (
+            template_extension_registry.get(
+                instance.template_id
+            )
+        )
+
+        renderer = (
+            extension.widget_renderer
+            if extension is not None
+            else None
+        )
+
+        if renderer is None:
+            return False
+
+        renderer.paint(
+            painter=painter,
+            instance=instance,
+            photos=self._project_photos,
+            target_rect=self.rect(),
+            width=self.width(),
+            height=self.height(),
+            translator=self._translator,
+            render_service=self._render_service,
+            set_waiting_key=self._set_template_preview_key,
+            font_pixel_size=self._print_font_pixel_size,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+            album_pages=self._album_pages,
+        )
+
+        return True
 
     def _paint_photo_page(
         self,
@@ -1852,6 +1936,7 @@ class AlbumPreviewWidget(QWidget):
                 thumbnail_cache=self._thumbnail_cache,
                 page_format=page_format,
                 translator=self._translator,
+                render_service=self._render_service,
                 project_photos=project_photos,
                 album_pages=result.pagination.pages,
             )

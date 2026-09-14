@@ -19,6 +19,12 @@ from photoalbum.album.cover_scatter import (
 from photoalbum.gui.cover_render_worker import (
     CoverRenderWorker,
 )
+from photoalbum.templates import (
+    template_extension_registry,
+)
+from photoalbum.templates.preview_backend import (
+    PreviewJob,
+)
 from photoalbum.i18n import Translator
 
 
@@ -84,6 +90,11 @@ class PreviewRenderService(QObject):
             PreviewRenderKey,
         ] = {}
 
+        self._request_jobs: dict[
+            str,
+            PreviewJob,
+        ] = {}
+
         self._thread_pool = (
             QThreadPool.globalInstance()
         )
@@ -104,56 +115,48 @@ class PreviewRenderService(QObject):
             )
         ).hexdigest()
 
-    @staticmethod
     def _effective_photos(
+        self,
         instance: PageInstance,
         photos,
     ) -> tuple:
-        """
-        Return only the photos that can actually influence
-        the rendered template.
-
-        Cache keys must depend on effective template input,
-        not on unrelated photos present in the library.
-        """
-
-        unique = {}
-
-        for photo in photos:
-            key = str(
-                photo.path
+        extension = (
+            template_extension_registry.get(
+                instance.template_id
             )
-
-            unique.setdefault(
-                key,
-                photo,
-            )
-
-        result = list(
-            unique.values()
         )
 
         if (
-            instance.template_id
-            == "year-photo-scatter"
+            extension is not None
+            and extension.preview_backend
+            is not None
         ):
-            # The scatter represents the dated period of the
-            # album. Undated anomalies cannot participate.
-            result = [
-                photo
-                for photo in result
-                if photo.capture_datetime
-                is not None
-            ]
+            return (
+                extension.preview_backend
+                .effective_photos(
+                    instance,
+                    photos,
+                )
+            )
+
+        # Generic fallback.
+        unique = {}
+
+        for photo in photos:
+            unique.setdefault(
+                str(photo.path),
+                photo,
+            )
 
         return tuple(
             sorted(
-                result,
+                unique.values(),
                 key=lambda photo: str(
                     photo.path
                 ),
             )
         )
+
 
     @staticmethod
     def _photos_signature(
@@ -207,6 +210,22 @@ class PreviewRenderService(QObject):
 
         return digest.hexdigest()
 
+
+    def supports(
+        self,
+        template_id: str,
+    ) -> bool:
+        extension = (
+            template_extension_registry.get(
+                template_id
+            )
+        )
+
+        return (
+            extension is not None
+            and extension.preview_backend
+            is not None
+        )
 
     def key_for(
         self,
@@ -275,6 +294,18 @@ class PreviewRenderService(QObject):
         width: int,
         height: int,
     ) -> PreviewRenderKey:
+        extension = (
+            template_extension_registry.get(
+                instance.template_id
+            )
+        )
+
+        backend = (
+            extension.preview_backend
+            if extension is not None
+            else None
+        )
+
         photos = self._effective_photos(
             instance,
             photos,
@@ -303,67 +334,25 @@ class PreviewRenderService(QObject):
             )
             return key
 
-        if (
-            instance.template_id
-            != "year-photo-scatter"
-        ):
+        # A template without an expensive preview backend simply
+        # has nothing to schedule here.
+        if backend is None:
             return key
 
-        scatter = instance.settings.get(
-            "scatter",
-            {},
-        )
-
-        if not isinstance(
-            scatter,
-            dict,
-        ):
-            scatter = {}
-
-        seeds = [
-            int(value)
-            for value in scatter.get(
-                "seeds",
-                [0],
-            )
-        ] or [0]
-
-        index = int(
-            scatter.get(
-                "selected_seed_index",
-                0,
-            )
-        )
-
-        index = min(
-            max(
-                index,
-                0,
-            ),
-            len(seeds) - 1,
-        )
-
-        composition = compose_cover_scatter(
-            list(
-                photos
-            ),
-            seed=seeds[index],
-            month_name=(
-                self._translator.month_name
-            ),
-        )
-
-        # Worker-facing ID MUST remain a simple string.
+        # Worker-facing identifiers remain plain strings because
+        # Qt signals must never carry PreviewRenderKey directly.
         request_id = uuid4().hex
 
-        worker = CoverRenderWorker(
+        job = backend.create_job(
             request_id=request_id,
+            instance=instance,
+            photos=photos,
             width=key.width,
             height=key.height,
-            items=visible_cover_scatter_items(
-                composition.items
-            ),
+            translator=self._translator,
         )
+
+        worker = job.worker
 
         worker.signals.finished.connect(
             self._render_finished
@@ -377,8 +366,10 @@ class PreviewRenderService(QObject):
             "[preview-cache] MISS -> RENDER",
             key.template_id,
             key.instance_id,
-            "settings=" + key.settings_signature[:10],
-            "photos=" + key.photos_signature[:10],
+            "settings="
+            + key.settings_signature[:10],
+            "photos="
+            + key.photos_signature[:10],
             f"size={key.width}x{key.height}",
             f"effective_count={len(photos)}",
         )
@@ -391,7 +382,11 @@ class PreviewRenderService(QObject):
             request_id
         ] = key
 
-        # Strong reference until completion.
+        self._request_jobs[
+            request_id
+        ] = job
+
+        # Strong reference until QRunnable completion.
         self._workers[
             request_id
         ] = worker
@@ -401,6 +396,7 @@ class PreviewRenderService(QObject):
         )
 
         return key
+
 
     def _render_finished(
         self,
@@ -412,21 +408,27 @@ class PreviewRenderService(QObject):
             None,
         )
 
+        job = self._request_jobs.pop(
+            request_id,
+            None,
+        )
+
         self._workers.pop(
             request_id,
             None,
         )
 
-        if key is None:
+        if (
+            key is None
+            or job is None
+        ):
             return
 
         self._pending.discard(
             key
         )
 
-        pixmap = QPixmap()
-
-        pixmap.loadFromData(
+        pixmap = job.finalize(
             data
         )
 
@@ -445,6 +447,7 @@ class PreviewRenderService(QObject):
             key
         )
 
+
     def _render_failed(
         self,
         request_id: str,
@@ -456,6 +459,11 @@ class PreviewRenderService(QObject):
         )
 
         self._workers.pop(
+            request_id,
+            None,
+        )
+
+        self._request_jobs.pop(
             request_id,
             None,
         )
@@ -496,3 +504,4 @@ class PreviewRenderService(QObject):
         # request mapping makes their eventual result harmless.
         self._pending.clear()
         self._request_keys.clear()
+        self._request_jobs.clear()
