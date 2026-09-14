@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -29,6 +29,9 @@ from photoalbum.album import (
 
 
 class AlbumSettingsWidget(QWidget):
+
+    settings_changed = Signal()
+
     def __init__(
         self,
         registry: TemplateRegistry,
@@ -37,6 +40,7 @@ class AlbumSettingsWidget(QWidget):
         super().__init__(parent)
 
         self._registry = registry
+        self._loading_settings = False
 
         self._create_content()
         self._apply_defaults()
@@ -68,7 +72,42 @@ class AlbumSettingsWidget(QWidget):
         )
 
         layout.addLayout(special_layout)
+        self._connect_settings_signals()
         layout.addStretch()
+
+    def _connect_settings_signals(self) -> None:
+        combos = [
+            self._front_cover_combo,
+            self._inside_front_cover_combo,
+            self._inside_back_cover_combo,
+            self._back_cover_combo,
+            self._month_divider_combo,
+            self._month_placement_combo,
+            self._year_divider_combo,
+            self._year_placement_combo,
+            self._photo_page_combo,
+        ]
+
+        for combo in combos:
+            combo.currentIndexChanged.connect(
+                self._emit_settings_changed
+            )
+
+        self._month_dividers_checkbox.toggled.connect(
+            self._emit_settings_changed
+        )
+        self._year_dividers_checkbox.toggled.connect(
+            self._emit_settings_changed
+        )
+
+    def _emit_settings_changed(
+        self,
+        *args,
+    ) -> None:
+        if self._loading_settings:
+            return
+
+        self.settings_changed.emit()
 
     def _create_covers_group(self) -> QGroupBox:
         group = QGroupBox("Covers")
@@ -372,6 +411,20 @@ class AlbumSettingsWidget(QWidget):
 
         self._update_divider_controls()
 
+    def reset_to_defaults(self) -> None:
+        self._loading_settings = True
+
+        try:
+            self._front_matter_list.clear()
+            self._back_matter_list.clear()
+
+            self._apply_defaults()
+            self._update_divider_controls()
+
+        finally:
+            self._loading_settings = False
+
+
     def settings(self) -> AlbumStructureSettings:
         return AlbumStructureSettings(
             covers={
@@ -437,73 +490,79 @@ class AlbumSettingsWidget(QWidget):
         self,
         settings: AlbumStructureSettings,
     ) -> None:
-        self._set_combo_template(
-            self._front_cover_combo,
-            settings.covers[
-                CoverPosition.FRONT
-            ].template_id,
-        )
+        self._loading_settings = True
 
-        self._set_combo_template(
-            self._inside_front_cover_combo,
-            settings.covers[
-                CoverPosition.INSIDE_FRONT
-            ].template_id,
-        )
+        try:
+            self._set_combo_template(
+                self._front_cover_combo,
+                settings.covers[
+                    CoverPosition.FRONT
+                ].template_id,
+            )
 
-        self._set_combo_template(
-            self._inside_back_cover_combo,
-            settings.covers[
-                CoverPosition.INSIDE_BACK
-            ].template_id,
-        )
+            self._set_combo_template(
+                self._inside_front_cover_combo,
+                settings.covers[
+                    CoverPosition.INSIDE_FRONT
+                ].template_id,
+            )
 
-        self._set_combo_template(
-            self._back_cover_combo,
-            settings.covers[
-                CoverPosition.BACK
-            ].template_id,
-        )
+            self._set_combo_template(
+                self._inside_back_cover_combo,
+                settings.covers[
+                    CoverPosition.INSIDE_BACK
+                ].template_id,
+            )
 
-        self._month_dividers_checkbox.setChecked(
-            settings.month_dividers.enabled
-        )
-        self._set_combo_template(
-            self._month_divider_combo,
-            settings.month_dividers.template_id,
-        )
-        self._set_placement(
-            self._month_placement_combo,
-            settings.month_dividers.placement,
-        )
+            self._set_combo_template(
+                self._back_cover_combo,
+                settings.covers[
+                    CoverPosition.BACK
+                ].template_id,
+            )
 
-        self._year_dividers_checkbox.setChecked(
-            settings.year_dividers.enabled
-        )
-        self._set_combo_template(
-            self._year_divider_combo,
-            settings.year_dividers.template_id,
-        )
-        self._set_placement(
-            self._year_placement_combo,
-            settings.year_dividers.placement,
-        )
+            self._month_dividers_checkbox.setChecked(
+                settings.month_dividers.enabled
+            )
+            self._set_combo_template(
+                self._month_divider_combo,
+                settings.month_dividers.template_id,
+            )
+            self._set_placement(
+                self._month_placement_combo,
+                settings.month_dividers.placement,
+            )
 
-        self._set_combo_template(
-            self._photo_page_combo,
-            settings.photo_pages.template_id,
-        )
+            self._year_dividers_checkbox.setChecked(
+                settings.year_dividers.enabled
+            )
+            self._set_combo_template(
+                self._year_divider_combo,
+                settings.year_dividers.template_id,
+            )
+            self._set_placement(
+                self._year_placement_combo,
+                settings.year_dividers.placement,
+            )
 
-        self._set_special_pages(
-            self._front_matter_list,
-            settings.front_matter,
-        )
-        self._set_special_pages(
-            self._back_matter_list,
-            settings.back_matter,
-        )
+            self._set_combo_template(
+                self._photo_page_combo,
+                settings.photo_pages.template_id,
+            )
 
-        self._update_divider_controls()
+            self._set_special_pages(
+                self._front_matter_list,
+                settings.front_matter,
+            )
+            self._set_special_pages(
+                self._back_matter_list,
+                settings.back_matter,
+            )
+
+            self._update_divider_controls()
+
+        finally:
+            self._loading_settings = False
 
     def _update_divider_controls(self) -> None:
         month_enabled = (
@@ -545,18 +604,20 @@ class AlbumSettingsWidget(QWidget):
         )
 
         list_widget.addItem(item)
+        self._emit_settings_changed()
 
-    @staticmethod
     def _remove_special_page(
+        self,
         list_widget: QListWidget,
     ) -> None:
         row = list_widget.currentRow()
 
         if row >= 0:
             list_widget.takeItem(row)
+            self._emit_settings_changed()
 
-    @staticmethod
     def _move_special_page(
+        self,
         list_widget: QListWidget,
         offset: int,
     ) -> None:
@@ -573,6 +634,8 @@ class AlbumSettingsWidget(QWidget):
         item = list_widget.takeItem(row)
         list_widget.insertItem(target, item)
         list_widget.setCurrentRow(target)
+
+        self._emit_settings_changed()
 
     def _set_special_pages(
         self,

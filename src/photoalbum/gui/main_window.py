@@ -252,6 +252,10 @@ class MainWindow(QMainWindow):
             parent=self,
         )
 
+        self._album_settings_widget.settings_changed.connect(
+            self._save_album_settings
+        )
+
         self._tabs.addTab(
             self._album_settings_widget,
             "Album",
@@ -325,6 +329,7 @@ class MainWindow(QMainWindow):
         self._album_settings_widget.set_available_years(
             set()
         )
+        self._album_settings_widget.reset_to_defaults()
         self._update_project_state()
 
     def _choose_source_directory(self) -> None:
@@ -370,6 +375,17 @@ class MainWindow(QMainWindow):
         self._recursive_checkbox.setChecked(
             self._project_service.get_recursive_scan()
         )
+        
+        album_settings = (
+            self._project_service.get_album_structure_settings()
+        )
+
+        if album_settings is None:
+            self._album_settings_widget.reset_to_defaults()
+        else:
+            self._album_settings_widget.set_settings(
+                album_settings
+            )
 
     def _start_scan(self) -> None:
         project_path = self._project_service.project_path
@@ -598,6 +614,21 @@ class MainWindow(QMainWindow):
         self._album_settings_widget.set_available_years(
             years
         )
+
+    def _save_album_settings(self) -> None:
+        if not self._project_service.is_open:
+            return
+
+        try:
+            settings = self._album_settings_widget.settings()
+
+            self._project_service.set_album_structure_settings(
+                settings
+            )
+        except Exception as exc:
+            self._show_error(
+                f"Could not save album settings: {exc}"
+            )
 
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(
