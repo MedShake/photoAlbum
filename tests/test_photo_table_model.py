@@ -42,7 +42,7 @@ def test_model_displays_photo_information():
     assert model.data(
         model.index(0, 0),
         Qt.ItemDataRole.DisplayRole,
-    ) == "example.jpg"
+    ) == "👁  example.jpg"
 
     assert model.data(
         model.index(0, 1),

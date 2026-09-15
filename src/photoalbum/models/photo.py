@@ -57,6 +57,7 @@ class Photo:
     # photo was taken.
     selected_location_components: tuple[LocationComponent, ...] = ()
     location_text: str | None = None
+    location_selection_edited: bool = False
 
     # Free editorial caption, independent from the geographic location.
     caption: str | None = None

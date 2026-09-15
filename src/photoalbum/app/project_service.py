@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from photoalbum.models import LocationComponent
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import Photo
 
@@ -117,6 +118,22 @@ class ProjectService:
 
         repository.restore_original_gps(
             photo_path
+        )
+
+    def set_editorial_location(
+        self,
+        photo_path: Path,
+        *,
+        components: tuple[LocationComponent, ...],
+        location_text: str | None,
+    ) -> None:
+        database = self._require_database()
+        repository = PhotoRepository(database)
+
+        repository.set_editorial_location(
+            photo_path,
+            components=components,
+            location_text=location_text,
         )
 
     def set_geocoded_location(

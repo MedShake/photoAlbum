@@ -435,3 +435,31 @@ def test_location_text_and_caption_are_independent(
     assert loaded.caption == "Vue sur le massif de la Vanoise"
 
     database.close()
+
+
+def test_repository_preserves_explicit_empty_location_selection(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    photo = Photo(
+        path=Path("/photos/empty-location-selection.jpg"),
+        filename="empty-location-selection.jpg",
+    )
+
+    repository.save(photo)
+
+    repository.set_editorial_location(
+        photo.path,
+        components=(),
+        location_text=None,
+    )
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.selected_location_components == ()
+    assert loaded.location_text is None
+    assert loaded.location_selection_edited is True
+
+    database.close()

@@ -3,6 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from PySide6.QtCore import QEvent
+from PySide6.QtCore import QPoint
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QFrame
 from PySide6.QtCore import (
     QSortFilterProxyModel,
     QThread,
@@ -65,6 +70,7 @@ from photoalbum.gui.widgets import (
     AlbumPlanWidget,
     AlbumPreviewWidget,
     AlbumSettingsWidget,
+    PhotoPlacesWidget,
 )
 from photoalbum.gui.preview_render_service import (
     PREVIEW_RENDER_HEIGHT,
@@ -222,6 +228,28 @@ class MainWindow(QMainWindow):
             photos_tab
         )
 
+        self._photos_tabs = QTabWidget()
+        self._photos_tabs.setStyleSheet(
+            "QTabWidget::pane {"
+            " border-left: 0px;"
+            " border-right: 0px;"
+            " border-bottom: 0px;"
+            "}"
+        )
+        photos_layout.addWidget(
+            self._photos_tabs,
+            1,
+        )
+
+        # ----------------------------------------------------
+        # Photos / Sources
+        # ----------------------------------------------------
+
+        self._photos_sources_tab = QWidget()
+        sources_layout = QVBoxLayout(
+            self._photos_sources_tab
+        )
+
         # Source folder.
         source_layout = QHBoxLayout()
 
@@ -257,7 +285,7 @@ class MainWindow(QMainWindow):
             self._browse_source_button
         )
 
-        photos_layout.addLayout(
+        sources_layout.addLayout(
             source_layout
         )
 
@@ -272,7 +300,7 @@ class MainWindow(QMainWindow):
             self._recursive_changed
         )
 
-        photos_layout.addWidget(
+        sources_layout.addWidget(
             self._recursive_checkbox
         )
 
@@ -303,7 +331,7 @@ class MainWindow(QMainWindow):
             1,
         )
 
-        photos_layout.addLayout(
+        sources_layout.addLayout(
             action_layout
         )
 
@@ -314,7 +342,7 @@ class MainWindow(QMainWindow):
             )
         )
 
-        photos_layout.addWidget(
+        sources_layout.addWidget(
             self._summary_label
         )
 
@@ -339,6 +367,20 @@ class MainWindow(QMainWindow):
         self._photo_table.setModel(
             self._photo_proxy_model
         )
+
+        self._source_preview = None
+        self._source_preview_row = None
+        self._source_preview_position = QPoint()
+
+        self._source_preview_timer = QTimer(self)
+        self._source_preview_timer.setSingleShot(True)
+        self._source_preview_timer.setInterval(350)
+        self._source_preview_timer.timeout.connect(
+            self._show_pending_source_photo_preview
+        )
+
+        self._photo_table.setMouseTracking(True)
+        self._photo_table.viewport().installEventFilter(self)
 
         self._photo_actions_delegate = (
             PhotoActionsDelegate(
@@ -417,10 +459,40 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)
 
-        photos_layout.addWidget(
+        sources_layout.addWidget(
             QLabel(self._translator.tr("main.photos"))
         )
-        photos_layout.addWidget(splitter, 1)
+        sources_layout.addWidget(splitter, 1)
+
+        self._photos_tabs.addTab(
+            self._photos_sources_tab,
+            self._translator.tr("photos.tab.sources"),
+        )
+
+        # ----------------------------------------------------
+        # Photos / Lieux
+        # ----------------------------------------------------
+
+        self._photos_places_widget = PhotoPlacesWidget(
+            translator=self._translator,
+            save_location=self._save_photo_editorial_location,
+            parent=self,
+        )
+
+        self._photos_places_index = (
+            self._photos_tabs.addTab(
+                self._photos_places_widget,
+                self._translator.tr(
+                    "photos.tab.places"
+                ),
+            )
+        )
+
+        # Lieux is only meaningful once an analysis exists.
+        self._photos_tabs.setTabEnabled(
+            self._photos_places_index,
+            False,
+        )
 
         self._tabs.addTab(
             photos_tab,
@@ -1310,6 +1382,7 @@ class MainWindow(QMainWindow):
         )
         self._log_view.clear()
         self._photo_model.clear()
+        self._photos_places_widget.clear()
         self._album_settings_widget.set_available_years(
             set()
         )
@@ -1649,6 +1722,7 @@ class MainWindow(QMainWindow):
         )
 
         self._photo_model.set_photos(all_photos)
+        self._photos_places_widget.set_photos(all_photos)
         self._update_album_years(all_photos)
         self._refresh_album_plan()
 
@@ -1825,6 +1899,14 @@ class MainWindow(QMainWindow):
             self._project_service.is_open
             and not running
             and source_available
+        )
+
+        # Lieux is a derived photo view too: keep Sources
+        # available during scans, but disable Lieux until
+        # the source is available and no scan is running.
+        self._photos_tabs.setTabEnabled(
+            self._photos_places_index,
+            derived_tabs_enabled,
         )
 
         # Photos is always available. It is the entry point
@@ -2620,6 +2702,138 @@ class MainWindow(QMainWindow):
                 )
             )
 
+    def _save_photo_editorial_location(
+        self,
+        photo: Photo,
+        components,
+        location_text: str | None,
+    ) -> None:
+        try:
+            self._project_service.set_editorial_location(
+                photo.path,
+                components=components,
+                location_text=location_text,
+            )
+        except Exception as exc:
+            self._show_error(str(exc))
+
+    def eventFilter(
+        self,
+        watched,
+        event,
+    ) -> bool:
+        if (
+            hasattr(self, "_photo_table")
+            and watched is self._photo_table.viewport()
+        ):
+            if event.type() == QEvent.Type.MouseMove:
+                position = event.position().toPoint()
+                index = self._photo_table.indexAt(position)
+
+                if (
+                    index.isValid()
+                    and index.column() == 0
+                ):
+                    row = index.row()
+
+                    if row != self._source_preview_row:
+                        self._cancel_source_photo_preview()
+                        self._source_preview_row = row
+
+                    self._source_preview_position = (
+                        event.globalPosition().toPoint()
+                    )
+
+                    if (
+                        self._source_preview is None
+                        and not self._source_preview_timer.isActive()
+                    ):
+                        self._source_preview_timer.start()
+                else:
+                    self._cancel_source_photo_preview()
+
+            elif event.type() in (
+                QEvent.Type.Leave,
+                QEvent.Type.MouseButtonPress,
+                QEvent.Type.Wheel,
+            ):
+                self._cancel_source_photo_preview()
+
+        return super().eventFilter(
+            watched,
+            event,
+        )
+
+    def _show_pending_source_photo_preview(self) -> None:
+        if self._source_preview_row is None:
+            return
+
+        proxy_index = self._photo_proxy_model.index(
+            self._source_preview_row,
+            0,
+        )
+
+        if not proxy_index.isValid():
+            return
+
+        source_index = self._photo_proxy_model.mapToSource(
+            proxy_index
+        )
+
+        photo = self._photo_model.photo_at(
+            source_index.row()
+        )
+
+        if photo is None:
+            return
+
+        pixmap = QPixmap(str(photo.path))
+
+        if pixmap.isNull():
+            return
+
+        pixmap = pixmap.scaled(
+            420,
+            320,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
+        preview = QLabel(
+            None,
+            Qt.WindowType.ToolTip,
+        )
+        preview.setPixmap(pixmap)
+        preview.setFrameShape(
+            QFrame.Shape.Box
+        )
+        preview.setContentsMargins(
+            4,
+            4,
+            4,
+            4,
+        )
+        preview.adjustSize()
+
+        preview.move(
+            self._source_preview_position
+            + QPoint(16, 20)
+        )
+        preview.show()
+
+        self._source_preview = preview
+
+    def _hide_source_photo_preview(self) -> None:
+        if self._source_preview is not None:
+            self._source_preview.close()
+            self._source_preview.deleteLater()
+            self._source_preview = None
+
+    def _cancel_source_photo_preview(self) -> None:
+        self._source_preview_timer.stop()
+        self._hide_source_photo_preview()
+        self._source_preview_row = None
+
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(
             self,
@@ -2635,6 +2849,7 @@ class MainWindow(QMainWindow):
         photos = self._project_service.list_photos()
 
         self._photo_model.set_photos(photos)
+        self._photos_places_widget.set_photos(photos)
         self._update_album_years(photos)
 
         total = len(photos)

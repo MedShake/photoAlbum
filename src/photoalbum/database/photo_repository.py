@@ -59,13 +59,14 @@ class PhotoRepository:
                 location_source,
                 selected_location_components,
                 location_text,
+                location_selection_edited,
                 caption,
                 is_missing
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?
             )
             ON CONFLICT(path) DO UPDATE SET
                 filename = excluded.filename,
@@ -92,6 +93,8 @@ class PhotoRepository:
                 selected_location_components =
                     excluded.selected_location_components,
                 location_text = excluded.location_text,
+                location_selection_edited =
+                    excluded.location_selection_edited,
                 caption = excluded.caption,
                 is_missing = 0
             """,
@@ -159,6 +162,7 @@ class PhotoRepository:
                     else None
                 ),
                 photo.location_text,
+                1 if photo.location_selection_edited else 0,
                 photo.caption,
                 0,
             ),
@@ -427,6 +431,56 @@ class PhotoRepository:
 
         self._database.connection.commit()
 
+    def set_editorial_location(
+        self,
+        path: Path,
+        *,
+        components: tuple[LocationComponent, ...],
+        location_text: str | None,
+    ) -> None:
+        normalized_path = str(
+            path.expanduser().resolve()
+        )
+
+        serialized_components = (
+            json.dumps(
+                [
+                    {
+                        "key": component.key,
+                        "value": component.value,
+                    }
+                    for component in components
+                ],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            if components
+            else None
+        )
+
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET
+                selected_location_components = ?,
+                location_text = ?,
+                location_selection_edited = 1
+            WHERE path = ?
+            """,
+            (
+                serialized_components,
+                location_text,
+                normalized_path,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo not found: {normalized_path}"
+            )
+
+        self._database.connection.commit()
+
     def set_manual_location(
         self,
         path: Path,
@@ -563,5 +617,8 @@ class PhotoRepository:
                 )
             ),
             location_text=row["location_text"],
+            location_selection_edited=bool(
+                row["location_selection_edited"]
+            ),
             caption=row["caption"],
         )

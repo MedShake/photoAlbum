@@ -26,12 +26,26 @@ CATALOGS: dict[str, dict[str, str]] = {
         "scan.event.date_anomaly": "Capture date missing",
         "scan.event.error": "Analysis error",
 
+        "photos.tab.sources": "Sources",
+        "photos.tab.places": "Places",
+        "photos.places.description": (
+            "Choose how the place where each photo was taken "
+            "will be described."
+        ),
+        "photos.places.column.number": "No.",
+        "photos.places.column.photo": "Photo",
+        "photos.places.column.location": "Place",
+        "photos.places.column.composition": "Composition",
+        "photos.places.tooltip.location": "Place: {value}",
+        "photos.places.free_location": "Free-form place",
+        "photos.places.free_location_prompt": "Place:",
+
         "photos.column.filename": "Filename",
         "photos.column.actions": "Actions",
         "photos.column.capture_date": "Capture date",
         "photos.column.date_source": "Date source",
         "photos.column.gps": "GPS",
-        "photos.column.city": "Location",
+        "photos.column.city": "City",
         "photos.column.location_source": "Location source",
         "photos.column.status": "Status",
         "photos.column.action": "Action",
@@ -434,12 +448,26 @@ CATALOGS: dict[str, dict[str, str]] = {
         "scan.event.date_anomaly": "Date de prise de vue manquante",
         "scan.event.error": "Erreur d’analyse",
 
+        "photos.tab.sources": "Sources",
+        "photos.tab.places": "Lieux",
+        "photos.places.description": (
+            "Choisissez comment décrire le lieu où chaque photo "
+            "a été prise."
+        ),
+        "photos.places.column.number": "N°",
+        "photos.places.column.photo": "Photo",
+        "photos.places.column.location": "Lieu",
+        "photos.places.column.composition": "Composition",
+        "photos.places.tooltip.location": "Lieu : {value}",
+        "photos.places.free_location": "Lieu libre",
+        "photos.places.free_location_prompt": "Lieu :",
+
         "photos.column.filename": "Nom du fichier",
         "photos.column.actions": "Actions",
         "photos.column.capture_date": "Date de prise de vue",
         "photos.column.date_source": "Source de la date",
         "photos.column.gps": "GPS",
-        "photos.column.city": "Localisation",
+        "photos.column.city": "Ville",
         "photos.column.location_source": "Source de localisation",
         "photos.column.status": "Statut",
         "photos.column.action": "Action",

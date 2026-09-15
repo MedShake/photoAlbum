@@ -135,6 +135,7 @@ class ProjectDatabase:
 
                 selected_location_components TEXT,
                 location_text TEXT,
+                location_selection_edited INTEGER NOT NULL DEFAULT 0,
                 caption TEXT,
 
                 is_missing INTEGER NOT NULL DEFAULT 0
