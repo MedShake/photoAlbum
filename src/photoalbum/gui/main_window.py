@@ -1771,15 +1771,8 @@ class MainWindow(QMainWindow):
                 settings,
             )
 
-            page_formats = {
-                "a4": A4,
-                "a5": A5,
-                "us-letter": US_LETTER,
-            }
-
-            page_format = page_formats.get(
-                settings.page_format,
-                A4,
+            page_format = page_format_from_id(
+                settings.page_format
             )
 
             self._album_preview_widget.set_result(

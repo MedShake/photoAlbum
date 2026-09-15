@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime
 from pathlib import Path
 
@@ -286,4 +287,55 @@ def test_png_is_not_used_as_opaque_occluder():
             items
         )
         == items
+    )
+
+
+def test_scatter_physical_sizes_follow_page_format():
+    photos = [
+        photo(
+            "landscape.jpg",
+            2025,
+            3,
+            1,
+        )
+    ]
+
+    a4 = compose_cover_scatter(
+        photos,
+        seed=123,
+        month_name=month_name,
+        page_width_mm=210.0,
+        page_height_mm=297.0,
+    )
+
+    letter = compose_cover_scatter(
+        photos,
+        seed=123,
+        month_name=month_name,
+        page_width_mm=215.9,
+        page_height_mm=279.4,
+    )
+
+    assert len(a4.items) == 1
+    assert len(letter.items) == 1
+
+    a4_rect = a4.items[0].rect
+    letter_rect = letter.items[0].rect
+
+    # The normalized geometry changes with the paper size,
+    # but the resulting physical dimensions remain constant.
+    assert a4_rect.width != letter_rect.width
+
+    assert (
+        a4_rect.width * 210.0
+        == pytest.approx(
+            letter_rect.width * 215.9
+        )
+    )
+
+    assert (
+        a4_rect.height * 297.0
+        == pytest.approx(
+            letter_rect.height * 279.4
+        )
     )

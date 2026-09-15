@@ -119,6 +119,9 @@ def _display_dimensions(
 def _photo_rect(
     rng: random.Random,
     photo: Photo,
+    *,
+    page_width_mm: float,
+    page_height_mm: float,
 ) -> NormalizedRect:
     """
     Historical PHP cover geometry:
@@ -142,24 +145,25 @@ def _photo_rect(
         else 1.0
     )
 
-    # Historical physical values normalized to A4.
-    margin_x = 8.0 / 210.0
-    margin_y = 8.0 / 297.0
-
-    max_landscape_width = (
-        32.0 / 210.0
-    )
-
-    max_portrait_height = (
-        42.0 / 297.0
-    )
+    # Historical physical values expressed in millimetres.
+    # Normalize them against the actual page format.
+    margin_x = 8.0 / page_width_mm
+    margin_y = 8.0 / page_height_mm
 
     if ratio >= 1.0:
-        width = max_landscape_width
-        height = width / ratio
+        # Determine the physical dimensions first, then
+        # normalize each axis against its own page dimension.
+        width_mm = 32.0
+        height_mm = width_mm / ratio
+
+        width = width_mm / page_width_mm
+        height = height_mm / page_height_mm
     else:
-        height = max_portrait_height
-        width = height * ratio
+        height_mm = 42.0
+        width_mm = height_mm * ratio
+
+        width = width_mm / page_width_mm
+        height = height_mm / page_height_mm
 
     maximum_x = (
         1.0
@@ -203,6 +207,8 @@ def compose_cover_scatter(
     seed: int,
     photo_count: int | None = None,
     month_name: Callable[[int], str],
+    page_width_mm: float = 210.0,
+    page_height_mm: float = 297.0,
 ) -> CoverScatterComposition:
     """
     Build the historical random stacked-photo cover.
@@ -243,6 +249,8 @@ def compose_cover_scatter(
             rect=_photo_rect(
                 rng,
                 photo,
+                page_width_mm=page_width_mm,
+                page_height_mm=page_height_mm,
             ),
         )
         for photo in shuffled

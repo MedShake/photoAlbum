@@ -214,6 +214,8 @@ class YearPhotoScatterWidgetRenderer:
             month_name=(
                 translator.month_name
             ),
+            page_width_mm=page_width_mm,
+            page_height_mm=page_height_mm,
         )
 
         if render_service is None:
