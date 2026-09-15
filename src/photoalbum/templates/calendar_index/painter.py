@@ -10,7 +10,7 @@ from PySide6.QtGui import (
     QPainter,
 )
 
-from photoalbum.album.calendar_index import (
+from photoalbum.templates.calendar_index.composition import (
     CalendarIndexComposition,
 )
 from photoalbum.i18n import Translator
