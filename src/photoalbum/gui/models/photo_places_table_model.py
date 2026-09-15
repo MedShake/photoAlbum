@@ -18,6 +18,7 @@ from photoalbum.models import LocationComponent, Photo
 class PhotoPlacesTableModel(QAbstractTableModel):
     HEADER_KEYS = (
         "photos.places.column.number",
+        "",
         "photos.places.column.photo",
         "photos.places.column.location",
         "photos.places.column.composition",
@@ -34,6 +35,13 @@ class PhotoPlacesTableModel(QAbstractTableModel):
 
         self._translator = translator or Translator("en")
         self._photos = list(photos or [])
+        self._photo_numbers = {
+            id(photo): number
+            for number, photo in enumerate(
+                self._photos,
+                start=1,
+            )
+        }
         self._caption_builder = LocationCaptionBuilder()
 
     def rowCount(
@@ -76,9 +84,17 @@ class PhotoPlacesTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.ToolTipRole:
             if index.column() == 1:
+                if photo.capture_datetime is None:
+                    return "—"
+
+                return photo.capture_datetime.strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                )
+
+            if index.column() == 2:
                 return str(photo.path)
 
-            if index.column() in (2, 3):
+            if index.column() in (3, 4):
                 return self._location_tooltip(photo)
 
         if role == Qt.ItemDataRole.UserRole:
@@ -113,6 +129,13 @@ class PhotoPlacesTableModel(QAbstractTableModel):
     ) -> None:
         self.beginResetModel()
         self._photos = list(photos)
+        self._photo_numbers = {
+            id(photo): number
+            for number, photo in enumerate(
+                self._photos,
+                start=1,
+            )
+        }
         self.endResetModel()
 
     def clear(self) -> None:
@@ -134,21 +157,97 @@ class PhotoPlacesTableModel(QAbstractTableModel):
         column: int,
     ) -> str:
         if column == 0:
-            return str(row + 1)
+            return str(
+                self._photo_numbers.get(
+                    id(photo),
+                    row + 1,
+                )
+            )
 
+        # Compact chronological marker. The complete date is
+        # available in the tooltip.
         if column == 1:
-            return f"👁  {photo.filename}"
+            return "◷" if photo.capture_datetime else "—"
 
         if column == 2:
-            return self._location_text(photo)
+            return f"👁  {photo.filename}"
 
         if column == 3:
-            return ""
+            return self._location_text(photo)
 
-        # Column 4 contains the free-location editor installed
-        # by the view.
         if column == 4:
             return ""
+
+        # Column 5 contains the free-location editor installed
+        # by the view.
+        if column == 5:
+            return ""
+
+        return ""
+
+    def sort(
+        self,
+        column: int,
+        order: Qt.SortOrder = Qt.SortOrder.AscendingOrder,
+    ) -> None:
+        if column not in (0, 1, 2, 3):
+            return
+
+        self.layoutAboutToBeChanged.emit()
+
+        reverse = (
+            order == Qt.SortOrder.DescendingOrder
+        )
+
+        if column == 1:
+            # Keep undated photos after dated photos in both
+            # directions while reversing only the dated group.
+            dated = [
+                photo
+                for photo in self._photos
+                if photo.capture_datetime is not None
+            ]
+            undated = [
+                photo
+                for photo in self._photos
+                if photo.capture_datetime is None
+            ]
+
+            dated.sort(
+                key=lambda photo: photo.capture_datetime,
+                reverse=reverse,
+            )
+
+            self._photos = dated + undated
+        else:
+            self._photos.sort(
+                key=lambda photo: self._sort_value(
+                    photo,
+                    column,
+                ),
+                reverse=reverse,
+            )
+
+        self.layoutChanged.emit()
+
+    def _sort_value(
+        self,
+        photo: Photo,
+        column: int,
+    ):
+        if column == 0:
+            return self._photo_numbers.get(
+                id(photo),
+                0,
+            )
+
+        if column == 2:
+            return photo.filename.casefold()
+
+        if column == 3:
+            return self._location_text(
+                photo
+            ).casefold()
 
         return ""
 
@@ -193,7 +292,7 @@ class PhotoPlacesTableModel(QAbstractTableModel):
         photo.location_text = location_text or None
         photo.location_selection_edited = True
 
-        index = self.index(row, 2)
+        index = self.index(row, 3)
         self.dataChanged.emit(
             index,
             index,
@@ -218,7 +317,7 @@ class PhotoPlacesTableModel(QAbstractTableModel):
         photo.location_text = location_text or None
         photo.location_selection_edited = True
 
-        index = self.index(row, 2)
+        index = self.index(row, 3)
         self.dataChanged.emit(
             index,
             index,

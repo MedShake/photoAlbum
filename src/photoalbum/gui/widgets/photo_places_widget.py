@@ -8,7 +8,10 @@ from PySide6.QtCore import (
     QTimer,
     Qt,
 )
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import (
+    QImageReader,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -19,6 +22,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QStyledItemDelegate,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -31,6 +35,43 @@ from photoalbum.i18n import Translator
 from photoalbum.models import LocationComponent, Photo
 
 from .flow_layout import FlowLayout
+from .photo_actions_delegate import PhotoActionsDelegate
+
+
+class _PhotoDateDelegate(QStyledItemDelegate):
+    """Paint the same calendar icon as the Sources table."""
+
+    def paint(
+        self,
+        painter,
+        option,
+        index,
+    ) -> None:
+        base_option = type(option)(option)
+        base_option.text = ""
+
+        from PySide6.QtWidgets import QApplication, QStyle
+
+        QApplication.style().drawControl(
+            QStyle.ControlElement.CE_ItemViewItem,
+            base_option,
+            painter,
+        )
+
+        photo = index.data(
+            Qt.ItemDataRole.UserRole
+        )
+
+        if not isinstance(photo, Photo):
+            return
+
+        PhotoActionsDelegate._paint_calendar(
+            painter,
+            option.rect,
+            missing=(
+                photo.capture_datetime is None
+            ),
+        )
 
 
 class PhotoPlacesWidget(QWidget):
@@ -95,6 +136,14 @@ class PhotoPlacesWidget(QWidget):
         self._table = QTableView()
         self._table.setModel(self._model)
 
+        self._date_delegate = _PhotoDateDelegate(
+            self._table
+        )
+        self._table.setItemDelegateForColumn(
+            1,
+            self._date_delegate,
+        )
+
         # Le numéro de photo est déjà une vraie colonne du modèle.
         # Masquer les numéros de lignes natifs de QTableView.
         self._table.verticalHeader().setVisible(False)
@@ -106,7 +155,11 @@ class PhotoPlacesWidget(QWidget):
         )
 
         self._table.setAlternatingRowColors(True)
-        self._table.setSortingEnabled(False)
+        self._table.setSortingEnabled(True)
+        self._table.sortByColumn(
+            1,
+            Qt.SortOrder.AscendingOrder,
+        )
         self._table.setMouseTracking(True)
 
         self._table.setTextElideMode(
@@ -125,7 +178,7 @@ class PhotoPlacesWidget(QWidget):
         )
         header.setSectionResizeMode(
             1,
-            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Fixed,
         )
         header.setSectionResizeMode(
             2,
@@ -133,14 +186,18 @@ class PhotoPlacesWidget(QWidget):
         )
         header.setSectionResizeMode(
             3,
-            QHeaderView.ResizeMode.Stretch,
+            QHeaderView.ResizeMode.Interactive,
         )
         header.setSectionResizeMode(
             4,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        header.setSectionResizeMode(
+            5,
             QHeaderView.ResizeMode.Fixed,
         )
 
-        self._table.setColumnWidth(4, 38)
+        self._table.setColumnWidth(5, 38)
 
         header.sectionResized.connect(
             self._section_resized
@@ -153,8 +210,9 @@ class PhotoPlacesWidget(QWidget):
             "QHeaderView::section { font-weight: normal; }"
         )
 
-        self._table.setColumnWidth(1, 240)
-        self._table.setColumnWidth(2, 280)
+        self._table.setColumnWidth(1, 42)
+        self._table.setColumnWidth(2, 240)
+        self._table.setColumnWidth(3, 280)
 
         layout.addWidget(self._table, 1)
 
@@ -258,7 +316,7 @@ class PhotoPlacesWidget(QWidget):
             flow.addWidget(empty)
 
         self._table.setIndexWidget(
-            self._model.index(row, 3),
+            self._model.index(row, 4),
             container,
         )
 
@@ -270,7 +328,7 @@ class PhotoPlacesWidget(QWidget):
         self,
         row: int,
     ) -> None:
-        index = self._model.index(row, 3)
+        index = self._model.index(row, 4)
         container = self._table.indexWidget(index)
 
         if container is None:
@@ -349,7 +407,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         self._table.setIndexWidget(
-            self._model.index(row, 4),
+            self._model.index(row, 5),
             button,
         )
 
@@ -368,7 +426,7 @@ class PhotoPlacesWidget(QWidget):
         if photo.location_selection_edited:
             initial_text = photo.location_text or ""
         else:
-            index = self._model.index(row, 2)
+            index = self._model.index(row, 3)
             displayed = self._model.data(
                 index,
                 Qt.ItemDataRole.DisplayRole,
@@ -470,7 +528,7 @@ class PhotoPlacesWidget(QWidget):
         self,
         row: int,
     ) -> None:
-        index = self._model.index(row, 3)
+        index = self._model.index(row, 4)
         widget = self._table.indexWidget(index)
 
         if widget is None or widget.layout() is None:
@@ -478,7 +536,7 @@ class PhotoPlacesWidget(QWidget):
 
         width = max(
             80,
-            self._table.columnWidth(3) - 8,
+            self._table.columnWidth(4) - 8,
         )
 
         height = widget.layout().heightForWidth(width)
@@ -510,7 +568,7 @@ class PhotoPlacesWidget(QWidget):
         _old_size: int,
         _new_size: int,
     ) -> None:
-        if logical_index != 3:
+        if logical_index != 4:
             return
 
         # Let QHeaderView finish applying the new section geometry
@@ -532,7 +590,7 @@ class PhotoPlacesWidget(QWidget):
 
                 if (
                     index.isValid()
-                    and index.column() == 1
+                    and index.column() == 2
                 ):
                     row = index.row()
 
@@ -576,12 +634,15 @@ class PhotoPlacesWidget(QWidget):
         if photo is None:
             return
 
-        pixmap = QPixmap(str(photo.path))
+        reader = QImageReader(str(photo.path))
+        reader.setAutoTransform(True)
 
-        if pixmap.isNull():
+        image = reader.read()
+
+        if image.isNull():
             return
 
-        pixmap = pixmap.scaled(
+        pixmap = QPixmap.fromImage(image).scaled(
             420,
             320,
             Qt.AspectRatioMode.KeepAspectRatio,

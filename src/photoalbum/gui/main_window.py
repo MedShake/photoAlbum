@@ -17,6 +17,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
+    QImageReader,
 )
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -2794,12 +2795,15 @@ class MainWindow(QMainWindow):
         if photo is None:
             return
 
-        pixmap = QPixmap(str(photo.path))
+        reader = QImageReader(str(photo.path))
+        reader.setAutoTransform(True)
 
-        if pixmap.isNull():
+        image = reader.read()
+
+        if image.isNull():
             return
 
-        pixmap = pixmap.scaled(
+        pixmap = QPixmap.fromImage(image).scaled(
             420,
             320,
             Qt.AspectRatioMode.KeepAspectRatio,
