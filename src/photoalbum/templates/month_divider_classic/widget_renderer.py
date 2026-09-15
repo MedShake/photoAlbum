@@ -7,6 +7,8 @@ from PySide6.QtGui import (
     QPainter,
 )
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 from photoalbum.album.month_divider_layout import (
     classic_month_divider_layout,
 )
@@ -90,7 +92,7 @@ class MonthDividerClassicWidgetRenderer:
         )
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
         )
 
         font.setBold(

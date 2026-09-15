@@ -7,6 +7,8 @@ from PySide6.QtGui import (
     QPen,
 )
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 
 class PhotoPageWidgetRenderer:
     """
@@ -204,7 +206,11 @@ class PhotoPageWidgetRenderer:
             )
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
+        )
+
+        font.setBold(
+            False
         )
 
         font.setPixelSize(

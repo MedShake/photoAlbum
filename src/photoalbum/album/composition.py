@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol
 
+from photoalbum.geocoding.location_caption_builder import LocationCaptionBuilder
 from photoalbum.models import Photo
 
 from .pagination import PageSide, PlannedPage
@@ -115,44 +116,27 @@ def photo_location_text(
     photo: Photo,
 ) -> str | None:
     """
-    Build the best available human-readable location.
+    Return the effective editorial location used in the album.
 
-    Prefer a named place, optionally complemented by the city.
-    Fall back to city, then address.
+    An explicit editorial choice always wins, including an
+    explicitly empty location. Otherwise use the same automatic
+    location composition as the Places editor.
     """
 
-    place = (
-        photo.place_name.strip()
-        if photo.place_name
-        else None
-    )
-    city = (
-        photo.city.strip()
-        if photo.city
-        else None
-    )
-    address = (
-        photo.address.strip()
-        if photo.address
-        else None
+    if photo.location_selection_edited:
+        if photo.location_text:
+            text = photo.location_text.strip()
+
+            if text:
+                return text
+
+        return None
+
+    result = LocationCaptionBuilder().build(
+        photo.raw_location_data
     )
 
-    if place and city:
-        if place.casefold() == city.casefold():
-            return place
-
-        return f"{place}, {city}"
-
-    if place:
-        return place
-
-    if city:
-        return city
-
-    if address:
-        return address
-
-    return None
+    return result.caption or None
 
 
 def build_photo_caption(

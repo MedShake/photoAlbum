@@ -22,9 +22,6 @@ def make_photo(
     name: str = "photo.jpg",
     *,
     with_date: bool = False,
-    place_name: str | None = None,
-    city: str | None = None,
-    address: str | None = None,
 ) -> Photo:
     return Photo(
         path=Path("/photos") / name,
@@ -34,9 +31,6 @@ def make_photo(
             if with_date
             else None
         ),
-        place_name=place_name,
-        city=city,
-        address=address,
     )
 
 
@@ -72,7 +66,7 @@ def settings(
 
 def test_no_caption_options_use_full_photo_cell():
     page = make_page(
-        (make_photo(with_date=True, city="Paris"),)
+        (make_photo(with_date=True),)
     )
 
     composition = PageComposer().compose(
@@ -129,8 +123,12 @@ def test_date_only_uses_one_caption_line():
 def test_date_and_location_use_two_lines():
     photo = make_photo(
         with_date=True,
-        city="Paris",
     )
+    photo.raw_location_data = {
+        "address": {
+            "city": "Paris",
+        }
+    }
 
     caption = build_photo_caption(
         photo,
@@ -143,12 +141,15 @@ def test_date_and_location_use_two_lines():
     assert caption.line_count == 2
 
 
-def test_location_prefers_place_and_city():
-    photo = make_photo(
-        place_name="Tour Eiffel",
-        city="Paris",
-        address="5 Avenue Anatole France",
-    )
+def test_location_uses_automatic_location_composition():
+    photo = make_photo()
+    photo.raw_location_data = {
+        "address": {
+            "tourism": "Tour Eiffel",
+            "city": "Paris",
+            "country": "France",
+        }
+    }
 
     assert (
         photo_location_text(photo)
@@ -156,23 +157,48 @@ def test_location_prefers_place_and_city():
     )
 
 
-def test_location_uses_address_as_last_fallback():
-    photo = make_photo(
-        address="5 Avenue Anatole France"
-    )
+def test_location_uses_editorial_text_when_edited():
+    photo = make_photo()
+    photo.raw_location_data = {
+        "address": {
+            "tourism": "Tour Eiffel",
+            "city": "Paris",
+        }
+    }
+    photo.location_selection_edited = True
+    photo.location_text = "Champ de Mars"
 
     assert (
         photo_location_text(photo)
-        == "5 Avenue Anatole France"
+        == "Champ de Mars"
     )
+
+
+def test_location_respects_explicit_empty_editorial_selection():
+    photo = make_photo()
+    photo.raw_location_data = {
+        "address": {
+            "tourism": "Tour Eiffel",
+            "city": "Paris",
+        }
+    }
+    photo.location_selection_edited = True
+    photo.location_text = None
+
+    assert photo_location_text(photo) is None
 
 
 def test_same_row_keeps_images_aligned():
     first = make_photo(
         "one.jpg",
         with_date=True,
-        city="Paris",
     )
+    first.raw_location_data = {
+        "address": {
+            "city": "Paris",
+        }
+    }
+
     second = make_photo(
         "two.jpg",
         with_date=True,

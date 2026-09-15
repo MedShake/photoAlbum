@@ -7,6 +7,8 @@ from PySide6.QtGui import (
     QPainter,
 )
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 from photoalbum.album import PageInstance
 
 
@@ -88,7 +90,7 @@ class YearDividerClassicWidgetRenderer:
                 year = str(value)
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
         )
         font.setBold(True)
         font.setPixelSize(

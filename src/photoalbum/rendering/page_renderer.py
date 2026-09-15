@@ -5,6 +5,8 @@ from collections.abc import Callable
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QFont, QPainter
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 from photoalbum.album.composition import PageComposition
 from photoalbum.album.planning import PlanItemKind
 from photoalbum.i18n import Translator
@@ -257,7 +259,11 @@ class PageRenderer:
             alignment = Qt.AlignmentFlag.AlignRight
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
+        )
+
+        font.setBold(
+            False
         )
 
         font.setPixelSize(

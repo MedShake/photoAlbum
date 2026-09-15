@@ -2714,6 +2714,13 @@ class MainWindow(QMainWindow):
                 components=components,
                 location_text=location_text,
             )
+
+            # The album composition and rendered previews depend on
+            # the effective editorial location. Rebuild them
+            # immediately after a location edit.
+            self._preview_render_service.clear()
+            self._refresh_album_plan()
+            self._update_pdf_summary()
         except Exception as exc:
             self._show_error(str(exc))
 
