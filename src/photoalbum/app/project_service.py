@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from photoalbum.database import PhotoRepository, ProjectDatabase
@@ -63,6 +64,20 @@ class ProjectService:
         repository = PhotoRepository(database)
 
         return repository.list_all()
+
+    def set_manual_capture_datetime(
+        self,
+        photo_path: Path,
+        capture_datetime: datetime,
+    ) -> None:
+        database = self._require_database()
+
+        repository = PhotoRepository(database)
+
+        repository.set_manual_capture_datetime(
+            photo_path,
+            capture_datetime,
+        )
 
     def close(self) -> None:
         if self._database is not None:

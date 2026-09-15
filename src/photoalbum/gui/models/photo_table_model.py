@@ -11,6 +11,7 @@ from photoalbum.models import Photo
 class PhotoTableModel(QAbstractTableModel):
     HEADER_KEYS = (
         "photos.column.filename",
+        "photos.column.actions",
         "photos.column.capture_date",
         "photos.column.date_source",
         "photos.column.gps",
@@ -135,7 +136,11 @@ class PhotoTableModel(QAbstractTableModel):
         if column == 0:
             return photo.filename
 
+        # Column 1 contains action widgets installed by the view.
         if column == 1:
+            return ""
+
+        if column == 2:
             if photo.capture_datetime is None:
                 return "—"
 
@@ -144,28 +149,28 @@ class PhotoTableModel(QAbstractTableModel):
                 timespec="seconds",
             )
 
-        if column == 2:
+        if column == 3:
             return self._translator.tr(
                 f"photos.date_source.{photo.date_source.value}"
             )
 
-        if column == 3:
+        if column == 4:
             return self._translator.tr(
                 "photos.value.yes"
                 if photo.has_gps
                 else "photos.value.no"
             )
 
-        if column == 4:
+        if column == 5:
             return photo.city or "—"
 
-        if column == 5:
+        if column == 6:
             return self._translator.tr(
                 "photos.location_source."
                 f"{photo.location_source.value}"
             )
 
-        if column == 6:
+        if column == 7:
             if photo.is_date_anomaly:
                 return self._translator.tr(
                     "photos.value.missing_date"
@@ -186,24 +191,27 @@ class PhotoTableModel(QAbstractTableModel):
             return photo.filename.lower()
 
         if column == 1:
+            return 1 if photo.capture_datetime is None else 0
+
+        if column == 2:
             if photo.capture_datetime is None:
                 return ""
 
             return photo.capture_datetime.isoformat()
 
-        if column == 2:
+        if column == 3:
             return photo.date_source.value
 
-        if column == 3:
+        if column == 4:
             return 1 if photo.has_gps else 0
 
-        if column == 4:
+        if column == 5:
             return (photo.city or "").lower()
 
-        if column == 5:
+        if column == 6:
             return photo.location_source.value
 
-        if column == 6:
+        if column == 7:
             return 1 if photo.is_date_anomaly else 0
 
         return ""

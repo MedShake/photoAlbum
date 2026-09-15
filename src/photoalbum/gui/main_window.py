@@ -7,11 +7,18 @@ from PySide6.QtCore import (
     QSortFilterProxyModel,
     QThread,
     Qt,
+    QUrl,
 )
-from PySide6.QtGui import QAction
+from PySide6.QtGui import (
+    QAction,
+    QDesktopServices,
+)
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDateTimeEdit,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -34,6 +41,9 @@ from PySide6.QtWidgets import (
 
 from photoalbum.app import ProjectService
 from photoalbum.gui.models import PhotoTableModel
+from photoalbum.gui.widgets.photo_actions_delegate import (
+    PhotoActionsDelegate,
+)
 from photoalbum.gui.workers import (
     PdfExportWorker,
     ScanWorker,
@@ -325,6 +335,24 @@ class MainWindow(QMainWindow):
             self._photo_proxy_model
         )
 
+        self._photo_actions_delegate = (
+            PhotoActionsDelegate(
+                self._photo_table
+            )
+        )
+
+        self._photo_actions_delegate.edit_datetime_requested.connect(
+            self._edit_photo_datetime
+        )
+        self._photo_actions_delegate.open_photo_requested.connect(
+            self._open_photo_in_os
+        )
+
+        self._photo_table.setItemDelegateForColumn(
+            1,
+            self._photo_actions_delegate,
+        )
+
         self._photo_table.setSelectionBehavior(
             QTableView.SelectionBehavior.SelectRows
         )
@@ -335,7 +363,7 @@ class MainWindow(QMainWindow):
         self._photo_table.setSortingEnabled(True)
 
         self._photo_table.sortByColumn(
-            1,
+            2,
             Qt.SortOrder.AscendingOrder,
         )
 
@@ -349,14 +377,24 @@ class MainWindow(QMainWindow):
         # Sensible initial widths. Long filenames must not force
         # the complete table to become excessively wide.
         self._photo_table.setColumnWidth(0, 260)
-        self._photo_table.setColumnWidth(1, 170)
-        self._photo_table.setColumnWidth(2, 130)
-        self._photo_table.setColumnWidth(3, 70)
-        self._photo_table.setColumnWidth(4, 150)
-        self._photo_table.setColumnWidth(5, 160)
-        self._photo_table.setColumnWidth(6, 120)
+        self._photo_table.setColumnWidth(1, 82)
+        self._photo_table.setColumnWidth(2, 170)
+        self._photo_table.setColumnWidth(3, 130)
+        self._photo_table.setColumnWidth(4, 70)
+        self._photo_table.setColumnWidth(5, 150)
+        self._photo_table.setColumnWidth(6, 160)
+        self._photo_table.setColumnWidth(7, 120)
 
         header.setStretchLastSection(False)
+
+        # Keep the sorted section visually consistent with the
+        # other column headers.
+        header_font = header.font()
+        header_font.setBold(False)
+        header.setFont(header_font)
+        header.setStyleSheet(
+            "QHeaderView::section { font-weight: normal; }"
+        )
 
         self._log_view = QPlainTextEdit()
         self._log_view.setReadOnly(True)
@@ -2056,6 +2094,156 @@ class MainWindow(QMainWindow):
                 self._translator.tr(
                     "main.save_album_error",
                     error=exc,
+                )
+            )
+
+    def _edit_photo_datetime(
+        self,
+        photo,
+    ) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(
+            self._translator.tr(
+                "photos.datetime.title"
+            )
+        )
+
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+
+        filename_label = QLabel(photo.filename)
+        filename_label.setWordWrap(True)
+
+        date_time_edit = QDateTimeEdit(dialog)
+        date_time_edit.setCalendarPopup(True)
+        date_time_edit.setDisplayFormat(
+            "dd/MM/yyyy HH:mm:ss"
+        )
+        date_time_edit.setDateTime(
+            photo.capture_datetime
+            or datetime.now()
+        )
+
+        form.addRow(
+            self._translator.tr(
+                "photos.datetime.photo"
+            ),
+            filename_label,
+        )
+        form.addRow(
+            self._translator.tr(
+                "photos.datetime.value"
+            ),
+            date_time_edit,
+        )
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel,
+            parent=dialog,
+        )
+
+        save_button = buttons.button(
+            QDialogButtonBox.StandardButton.Save
+        )
+        cancel_button = buttons.button(
+            QDialogButtonBox.StandardButton.Cancel
+        )
+
+        if save_button is not None:
+            save_button.setText(
+                self._translator.tr(
+                    "photos.datetime.save"
+                )
+            )
+
+        if cancel_button is not None:
+            cancel_button.setText(
+                self._translator.tr(
+                    "photos.datetime.cancel"
+                )
+            )
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+
+        layout.addWidget(buttons)
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        old_datetime = photo.capture_datetime
+        new_datetime = (
+            date_time_edit.dateTime().toPython()
+        )
+
+        try:
+            self._project_service.set_manual_capture_datetime(
+                photo.path,
+                new_datetime,
+            )
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+
+        datetime_format = "%d/%m/%Y %H:%M:%S"
+        new_date_text = new_datetime.strftime(
+            datetime_format
+        )
+
+        if old_datetime is None:
+            log_message = self._translator.tr(
+                "photos.datetime.log_added",
+                filename=photo.filename,
+                new_date=new_date_text,
+            )
+        else:
+            log_message = self._translator.tr(
+                "photos.datetime.log_changed",
+                filename=photo.filename,
+                old_date=old_datetime.strftime(
+                    datetime_format
+                ),
+                new_date=new_date_text,
+            )
+
+        self._log_view.appendPlainText(
+            log_message
+        )
+
+        self._load_project_photos()
+
+    def _open_photo_in_os(
+        self,
+        photo,
+    ) -> None:
+        path = Path(photo.path)
+
+        if not path.exists():
+            self._show_error(
+                self._translator.tr(
+                    "photos.open_image.not_found",
+                    path=path,
+                )
+            )
+            return
+
+        opened = QDesktopServices.openUrl(
+            QUrl.fromLocalFile(
+                str(path)
+            )
+        )
+
+        if not opened:
+            self._show_error(
+                self._translator.tr(
+                    "photos.open_image.error",
+                    path=path,
                 )
             )
 

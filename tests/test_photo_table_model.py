@@ -15,7 +15,7 @@ def test_empty_model_has_no_rows():
     model = PhotoTableModel()
 
     assert model.rowCount() == 0
-    assert model.columnCount() == 7
+    assert model.columnCount() == 8
 
 
 def test_model_displays_photo_information():
@@ -47,15 +47,20 @@ def test_model_displays_photo_information():
     assert model.data(
         model.index(0, 1),
         Qt.ItemDataRole.DisplayRole,
+    ) == ""
+
+    assert model.data(
+        model.index(0, 2),
+        Qt.ItemDataRole.DisplayRole,
     ) == "2025-02-18 14:40:49"
 
     assert model.data(
-        model.index(0, 3),
+        model.index(0, 4),
         Qt.ItemDataRole.DisplayRole,
     ) == "Yes"
 
     assert model.data(
-        model.index(0, 4),
+        model.index(0, 5),
         Qt.ItemDataRole.DisplayRole,
     ) == "Example City"
 
@@ -69,7 +74,7 @@ def test_model_displays_date_anomaly():
     model = PhotoTableModel([photo])
 
     assert model.data(
-        model.index(0, 6),
+        model.index(0, 7),
         Qt.ItemDataRole.DisplayRole,
     ) == "Missing date"
 
@@ -103,4 +108,3 @@ def test_set_photos_replaces_content():
 
     assert model.rowCount() == 1
     assert model.photo_at(0) is photo
-
