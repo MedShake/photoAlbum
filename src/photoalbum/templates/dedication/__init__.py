@@ -6,17 +6,22 @@ def register() -> None:
         PageTemplateExtension,
         register_template_extension,
     )
-    from photoalbum.templates.simple_label import (
-        SimpleLabelWidgetRenderer,
+
+    from .settings import (
+        DedicationSettingsWidget,
+    )
+    from .widget_renderer import (
+        DedicationWidgetRenderer,
     )
 
     register_template_extension(
         PageTemplateExtension(
             template_id="dedication",
+            settings_editor_type=(
+                DedicationSettingsWidget
+            ),
             widget_renderer=(
-                SimpleLabelWidgetRenderer(
-                    "preview.special_page"
-                )
+                DedicationWidgetRenderer()
             ),
         )
     )

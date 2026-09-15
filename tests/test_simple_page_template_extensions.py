@@ -33,6 +33,13 @@ def test_year_divider_owns_renderer():
 
 
 def test_dedication_owns_renderer():
+    from photoalbum.templates.dedication.settings import (
+        DedicationSettingsWidget,
+    )
+    from photoalbum.templates.dedication.widget_renderer import (
+        DedicationWidgetRenderer,
+    )
+
     register_builtin_template_extensions()
 
     extension = (
@@ -43,9 +50,14 @@ def test_dedication_owns_renderer():
 
     assert extension is not None
 
+    assert (
+        extension.settings_editor_type
+        is DedicationSettingsWidget
+    )
+
     assert isinstance(
         extension.widget_renderer,
-        SimpleLabelWidgetRenderer,
+        DedicationWidgetRenderer,
     )
 
 
