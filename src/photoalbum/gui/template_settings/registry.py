@@ -25,14 +25,6 @@ def create_template_settings_editor(
     page_format: PageFormat = A4,
     parent: QWidget | None = None,
 ) -> PageTemplateSettingsWidget | None:
-    # Safe and idempotent: templates overwrite their own
-    # registry entry rather than creating duplicates.
-    from photoalbum.templates import (
-        register_builtin_template_extensions,
-    )
-
-    register_builtin_template_extensions()
-
     editor_type = (
         template_extension_registry
         .settings_editor_type(
