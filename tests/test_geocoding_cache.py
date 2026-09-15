@@ -231,3 +231,38 @@ def test_replace_nearby_keeps_distant_locations(
     assert result.city == "Distant City"
 
     database.close()
+
+def test_cache_preserves_raw_data(tmp_path: Path):
+    database, cache = create_cache(tmp_path)
+
+    raw_data = {
+        "place_id": 123456,
+        "display_name": "Example Place, Nantes, France",
+        "address": {
+            "road": "Rue Example",
+            "city": "Nantes",
+            "state": "Pays de la Loire",
+            "country": "France",
+        },
+    }
+
+    location = Location(
+        latitude=47.2184,
+        longitude=-1.5536,
+        place_name="Example Place",
+        city="Nantes",
+        address="Example Place, Nantes, France",
+        raw_data=raw_data,
+    )
+
+    cache.save(location)
+
+    loaded = cache.find_nearby(
+        location.latitude,
+        location.longitude,
+    )
+
+    assert loaded is not None
+    assert loaded.raw_data == raw_data
+
+    database.close()

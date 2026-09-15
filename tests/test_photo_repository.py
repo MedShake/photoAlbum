@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from photoalbum.database import PhotoRepository, ProjectDatabase
-from photoalbum.models import DateSource, Photo
+from photoalbum.models import DateSource, LocationSource, Photo
 
 
 def create_repository(tmp_path: Path) -> tuple[ProjectDatabase, PhotoRepository]:
@@ -210,5 +210,137 @@ def test_manual_capture_datetime_requires_registered_photo(
         pass
     else:
         raise AssertionError("Expected KeyError")
+
+    database.close()
+
+def test_repository_preserves_raw_location_data(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    raw_location_data = {
+        "place_id": 123456,
+        "display_name": "Example Place, Nantes, France",
+        "address": {
+            "road": "Rue Example",
+            "city": "Nantes",
+            "county": "Loire-Atlantique",
+            "state": "Pays de la Loire",
+            "postcode": "44000",
+            "country": "France",
+        },
+    }
+
+    photo = Photo(
+        path=Path("/photos/geocoded.jpg"),
+        filename="geocoded.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+        place_name="Example Place",
+        city="Nantes",
+        address="Example Place, Nantes, France",
+        raw_location_data=raw_location_data,
+    )
+
+    repository.save(photo)
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.raw_location_data == raw_location_data
+
+    database.close()
+
+
+def test_manual_location_clears_raw_location_data(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    raw_location_data = {
+        "display_name": "Ancienne adresse géocodée",
+        "address": {
+            "city": "Nantes",
+            "country": "France",
+        },
+    }
+
+    photo = Photo(
+        path=Path("/photos/manual-location.jpg"),
+        filename="manual-location.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+        place_name="Ancien lieu",
+        city="Nantes",
+        address="Ancienne adresse géocodée",
+        raw_location_data=raw_location_data,
+    )
+
+    repository.save(photo)
+
+    repository.set_manual_location(
+        photo.path,
+        place_name="Lieu corrigé",
+        city="Rennes",
+        address="Adresse corrigée",
+    )
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.place_name == "Lieu corrigé"
+    assert loaded.city == "Rennes"
+    assert loaded.address == "Adresse corrigée"
+    assert loaded.raw_location_data is None
+    assert loaded.location_source == LocationSource.MANUAL
+
+    database.close()
+
+
+def test_update_geocoded_location_preserves_raw_data(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    photo = Photo(
+        path=Path("/photos/reverse-geocoded.jpg"),
+        filename="reverse-geocoded.jpg",
+        latitude=48.1173,
+        longitude=-1.6778,
+    )
+
+    repository.save(photo)
+
+    raw_location_data = {
+        "place_id": 123456,
+        "osm_type": "way",
+        "display_name": "Place du Parlement, Rennes, France",
+        "address": {
+            "road": "Place du Parlement de Bretagne",
+            "city": "Rennes",
+            "state": "Bretagne",
+            "postcode": "35000",
+            "country": "France",
+            "country_code": "fr",
+        },
+    }
+
+    photo.place_name = "Place du Parlement"
+    photo.city = "Rennes"
+    photo.address = "Place du Parlement, Rennes, France"
+    photo.raw_location_data = raw_location_data
+
+    repository.update_geocoded_location(photo)
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.place_name == "Place du Parlement"
+    assert loaded.city == "Rennes"
+    assert loaded.address == (
+        "Place du Parlement, Rennes, France"
+    )
+    assert loaded.raw_location_data == raw_location_data
+    assert loaded.location_source == LocationSource.GEOCODING
 
     database.close()

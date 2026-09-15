@@ -48,6 +48,7 @@ class Photo:
     place_name: str | None = None
     city: str | None = None
     address: str | None = None
+    raw_location_data: dict[str, object] | None = None
     location_source: LocationSource = LocationSource.UNKNOWN
 
     @property

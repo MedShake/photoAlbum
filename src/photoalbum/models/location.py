@@ -9,4 +9,5 @@ class Location:
     place_name: str | None = None
     city: str | None = None
     address: str | None = None
+    raw_data: dict[str, object] | None = None
 

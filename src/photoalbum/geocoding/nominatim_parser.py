@@ -64,6 +64,7 @@ class NominatimParser:
             place_name=place_name,
             city=city,
             address=display_name,
+            raw_data=dict(data),
         )
 
     @staticmethod

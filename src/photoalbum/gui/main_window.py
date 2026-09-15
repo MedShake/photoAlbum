@@ -2557,6 +2557,7 @@ class MainWindow(QMainWindow):
                 place_name=location.place_name,
                 city=location.city,
                 address=location.address,
+                raw_location_data=location.raw_data,
             )
         except Exception as exc:
             self._show_error(str(exc))

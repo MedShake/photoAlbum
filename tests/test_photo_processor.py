@@ -282,3 +282,42 @@ def test_geocoding_error_does_not_fail_photo_processing():
         events[-1].type
         == ProcessingEventType.ANALYSIS_COMPLETED
     )
+
+def test_geocoding_preserves_raw_location_data():
+    photo = Photo(
+        path=Path("/photos/example.jpg"),
+        filename="example.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+    )
+
+    raw_data = {
+        "place_id": 123456,
+        "display_name": "Example Place, Nantes, France",
+        "address": {
+            "road": "Rue Example",
+            "city": "Nantes",
+            "state": "Pays de la Loire",
+            "country": "France",
+        },
+    }
+
+    resolver = FakeLocationResolver(
+        Location(
+            latitude=47.2184,
+            longitude=-1.5536,
+            place_name="Example Place",
+            city="Nantes",
+            address="Example Place, Nantes, France",
+            raw_data=raw_data,
+        )
+    )
+
+    processor = PhotoProcessor(
+        photo_analyzer=FakeAnalyzer(photo),
+        location_resolver=resolver,
+    )
+
+    result = processor.process(photo.path)
+
+    assert result.raw_location_data == raw_data

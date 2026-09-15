@@ -148,3 +148,40 @@ def test_missing_address_information_is_allowed():
     assert result.place_name is None
     assert result.address == "Somewhere"
 
+
+def test_parser_preserves_raw_response():
+    parser = NominatimParser()
+
+    raw_data = {
+        "place_id": 123456,
+        "osm_type": "way",
+        "osm_id": 987654,
+        "display_name": (
+            "Example Museum, Rue Example, Nantes, France"
+        ),
+        "address": {
+            "tourism": "Example Museum",
+            "road": "Rue Example",
+            "city": "Nantes",
+            "county": "Loire-Atlantique",
+            "state": "Pays de la Loire",
+            "postcode": "44000",
+            "country": "France",
+            "country_code": "fr",
+        },
+        "boundingbox": [
+            "47.21",
+            "47.22",
+            "-1.56",
+            "-1.55",
+        ],
+    }
+
+    result = parser.parse(
+        raw_data,
+        latitude=47.2184,
+        longitude=-1.5536,
+    )
+
+    assert result is not None
+    assert result.raw_data == raw_data

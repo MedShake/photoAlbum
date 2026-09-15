@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from photoalbum.database import ProjectDatabase
 from photoalbum.models import Location
 
@@ -32,7 +34,8 @@ class GeocodingCache:
                 longitude,
                 place_name,
                 city,
-                address
+                address,
+                raw_data
             FROM geocoding_cache
             """
         ).fetchall()
@@ -62,6 +65,11 @@ class GeocodingCache:
                     place_name=row["place_name"],
                     city=row["city"],
                     address=row["address"],
+                    raw_data=(
+                        json.loads(row["raw_data"])
+                        if row["raw_data"] is not None
+                        else None
+                    ),
                 )
 
         return nearest_location
@@ -74,9 +82,10 @@ class GeocodingCache:
                 longitude,
                 place_name,
                 city,
-                address
+                address,
+                raw_data
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 location.latitude,
@@ -84,6 +93,15 @@ class GeocodingCache:
                 location.place_name,
                 location.city,
                 location.address,
+                (
+                    json.dumps(
+                        location.raw_data,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    if location.raw_data is not None
+                    else None
+                ),
             ),
         )
 
@@ -132,9 +150,10 @@ class GeocodingCache:
                 longitude,
                 place_name,
                 city,
-                address
+                address,
+                raw_data
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 location.latitude,
@@ -142,6 +161,15 @@ class GeocodingCache:
                 location.place_name,
                 location.city,
                 location.address,
+                (
+                    json.dumps(
+                        location.raw_data,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    if location.raw_data is not None
+                    else None
+                ),
             ),
         )
 

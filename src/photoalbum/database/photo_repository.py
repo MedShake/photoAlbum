@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from datetime import datetime
 from pathlib import Path
 
@@ -48,12 +50,13 @@ class PhotoRepository:
                 place_name,
                 city,
                 address,
+                raw_location_data,
                 location_source,
                 is_missing
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT(path) DO UPDATE SET
                 filename = excluded.filename,
@@ -75,6 +78,7 @@ class PhotoRepository:
                 place_name = excluded.place_name,
                 city = excluded.city,
                 address = excluded.address,
+                raw_location_data = excluded.raw_location_data,
                 location_source = excluded.location_source,
                 is_missing = 0
             """,
@@ -115,6 +119,15 @@ class PhotoRepository:
                 photo.place_name,
                 photo.city,
                 photo.address,
+                (
+                    json.dumps(
+                        photo.raw_location_data,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    if photo.raw_location_data is not None
+                    else None
+                ),
                 photo.location_source.value,
                 0,
             ),
@@ -341,6 +354,7 @@ class PhotoRepository:
         place_name: str | None,
         city: str | None,
         address: str | None,
+        raw_location_data: dict[str, object] | None = None,
     ) -> None:
         normalized_path = str(
             path.expanduser().resolve()
@@ -353,6 +367,7 @@ class PhotoRepository:
                 place_name = ?,
                 city = ?,
                 address = ?,
+                raw_location_data = ?,
                 location_source = ?
             WHERE path = ?
             """,
@@ -360,6 +375,15 @@ class PhotoRepository:
                 place_name,
                 city,
                 address,
+                (
+                    json.dumps(
+                        raw_location_data,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    if raw_location_data is not None
+                    else None
+                ),
                 LocationSource.GEOCODING.value,
                 normalized_path,
             ),
@@ -386,6 +410,7 @@ class PhotoRepository:
             SET place_name = ?,
                 city = ?,
                 address = ?,
+                raw_location_data = ?,
                 location_source = ?
             WHERE path = ?
             """,
@@ -393,6 +418,7 @@ class PhotoRepository:
                 place_name,
                 city,
                 address,
+                None,
                 LocationSource.MANUAL.value,
                 str(path),
             ),
@@ -415,6 +441,7 @@ class PhotoRepository:
             SET place_name = ?,
                 city = ?,
                 address = ?,
+                raw_location_data = ?,
                 location_source = ?
             WHERE path = ?
             """,
@@ -422,6 +449,15 @@ class PhotoRepository:
                 photo.place_name,
                 photo.city,
                 photo.address,
+                (
+                    json.dumps(
+                        photo.raw_location_data,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    if photo.raw_location_data is not None
+                    else None
+                ),
                 LocationSource.GEOCODING.value,
                 str(photo.path),
             ),
@@ -474,6 +510,11 @@ class PhotoRepository:
             place_name=row["place_name"],
             city=row["city"],
             address=row["address"],
+            raw_location_data=(
+                json.loads(row["raw_location_data"])
+                if row["raw_location_data"] is not None
+                else None
+            ),
             location_source=LocationSource(
                 row["location_source"]
             ),

@@ -167,6 +167,7 @@ class PhotoProcessor:
         photo.place_name = location.place_name
         photo.city = location.city
         photo.address = location.address
+        photo.raw_location_data = location.raw_data
         photo.location_source = LocationSource.GEOCODING
 
     @staticmethod

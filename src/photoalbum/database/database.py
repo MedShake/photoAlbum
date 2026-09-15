@@ -130,6 +130,7 @@ class ProjectDatabase:
                 place_name TEXT,
                 city TEXT,
                 address TEXT,
+                raw_location_data TEXT,
                 location_source TEXT NOT NULL DEFAULT 'unknown',
                 is_missing INTEGER NOT NULL DEFAULT 0
             )
@@ -175,7 +176,8 @@ class ProjectDatabase:
                 longitude REAL NOT NULL,
                 place_name TEXT,
                 city TEXT,
-                address TEXT
+                address TEXT,
+                raw_data TEXT
             )
             """
         )

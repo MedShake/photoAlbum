@@ -126,6 +126,7 @@ class ProjectService:
         place_name: str | None,
         city: str | None,
         address: str | None,
+        raw_location_data: dict[str, object] | None = None,
     ) -> None:
         database = self._require_database()
 
@@ -136,6 +137,7 @@ class ProjectService:
             place_name=place_name,
             city=city,
             address=address,
+            raw_location_data=raw_location_data,
         )
 
     def close(self) -> None:
