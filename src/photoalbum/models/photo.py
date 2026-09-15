@@ -3,6 +3,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from .location_component import LocationComponent
+
 
 class DateSource(str, Enum):
     EXIF = "exif"
@@ -50,6 +52,14 @@ class Photo:
     address: str | None = None
     raw_location_data: dict[str, object] | None = None
     location_source: LocationSource = LocationSource.UNKNOWN
+
+    # Editorial geographic information used to describe where the
+    # photo was taken.
+    selected_location_components: tuple[LocationComponent, ...] = ()
+    location_text: str | None = None
+
+    # Free editorial caption, independent from the geographic location.
+    caption: str | None = None
 
     @property
     def has_capture_datetime(self) -> bool:

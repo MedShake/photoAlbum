@@ -5,7 +5,12 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.models import DateSource, LocationSource, Photo
+from photoalbum.models import (
+    DateSource,
+    LocationComponent,
+    LocationSource,
+    Photo,
+)
 
 from .database import ProjectDatabase
 
@@ -52,11 +57,15 @@ class PhotoRepository:
                 address,
                 raw_location_data,
                 location_source,
+                selected_location_components,
+                location_text,
+                caption,
                 is_missing
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?
             )
             ON CONFLICT(path) DO UPDATE SET
                 filename = excluded.filename,
@@ -80,6 +89,10 @@ class PhotoRepository:
                 address = excluded.address,
                 raw_location_data = excluded.raw_location_data,
                 location_source = excluded.location_source,
+                selected_location_components =
+                    excluded.selected_location_components,
+                location_text = excluded.location_text,
+                caption = excluded.caption,
                 is_missing = 0
             """,
             (
@@ -129,6 +142,24 @@ class PhotoRepository:
                     else None
                 ),
                 photo.location_source.value,
+                (
+                    json.dumps(
+                        [
+                            {
+                                "key": component.key,
+                                "value": component.value,
+                            }
+                            for component
+                            in photo.selected_location_components
+                        ],
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    if photo.selected_location_components
+                    else None
+                ),
+                photo.location_text,
+                photo.caption,
                 0,
             ),
         )
@@ -518,4 +549,19 @@ class PhotoRepository:
             location_source=LocationSource(
                 row["location_source"]
             ),
+            selected_location_components=tuple(
+                LocationComponent(
+                    key=item["key"],
+                    value=item["value"],
+                )
+                for item in (
+                    json.loads(
+                        row["selected_location_components"]
+                    )
+                    if row["selected_location_components"] is not None
+                    else []
+                )
+            ),
+            location_text=row["location_text"],
+            caption=row["caption"],
         )

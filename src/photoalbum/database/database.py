@@ -132,6 +132,11 @@ class ProjectDatabase:
                 address TEXT,
                 raw_location_data TEXT,
                 location_source TEXT NOT NULL DEFAULT 'unknown',
+
+                selected_location_components TEXT,
+                location_text TEXT,
+                caption TEXT,
+
                 is_missing INTEGER NOT NULL DEFAULT 0
             )
             """

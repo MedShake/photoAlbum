@@ -2,7 +2,12 @@ from datetime import datetime
 from pathlib import Path
 
 from photoalbum.database import PhotoRepository, ProjectDatabase
-from photoalbum.models import DateSource, LocationSource, Photo
+from photoalbum.models import (
+    DateSource,
+    LocationComponent,
+    LocationSource,
+    Photo,
+)
 
 
 def create_repository(tmp_path: Path) -> tuple[ProjectDatabase, PhotoRepository]:
@@ -342,5 +347,91 @@ def test_update_geocoded_location_preserves_raw_data(
     )
     assert loaded.raw_location_data == raw_location_data
     assert loaded.location_source == LocationSource.GEOCODING
+
+    database.close()
+
+def test_repository_preserves_location_editorial_data(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    photo = Photo(
+        path=Path("/photos/location-editorial.jpg"),
+        filename="location-editorial.jpg",
+        selected_location_components=(
+            LocationComponent(
+                key="aerialway",
+                value="Biollaires",
+            ),
+            LocationComponent(
+                key="town",
+                value="Courchevel",
+            ),
+        ),
+        location_text="Biollaires, Courchevel",
+    )
+
+    repository.save(photo)
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.selected_location_components == (
+        LocationComponent(
+            key="aerialway",
+            value="Biollaires",
+        ),
+        LocationComponent(
+            key="town",
+            value="Courchevel",
+        ),
+    )
+    assert loaded.location_text == "Biollaires, Courchevel"
+
+    database.close()
+
+
+def test_repository_preserves_free_photo_caption(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    photo = Photo(
+        path=Path("/photos/caption.jpg"),
+        filename="caption.jpg",
+        caption="Première descente après la tempête",
+    )
+
+    repository.save(photo)
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.caption == (
+        "Première descente après la tempête"
+    )
+
+    database.close()
+
+
+def test_location_text_and_caption_are_independent(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+
+    photo = Photo(
+        path=Path("/photos/independent.jpg"),
+        filename="independent.jpg",
+        location_text="Sommet de la Saulire",
+        caption="Vue sur le massif de la Vanoise",
+    )
+
+    repository.save(photo)
+
+    loaded = repository.find_by_path(photo.path)
+
+    assert loaded is not None
+    assert loaded.location_text == "Sommet de la Saulire"
+    assert loaded.caption == "Vue sur le massif de la Vanoise"
 
     database.close()
