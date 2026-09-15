@@ -28,6 +28,7 @@ from photoalbum.album import (
     CoverPosition,
     PageFormat,
     PageSide,
+    page_format_from_id,
     PlanItemKind,
     TemplateRegistry,
 )
@@ -936,10 +937,15 @@ class AlbumPreviewWidget(QWidget):
         result: AlbumBuildResult,
         settings: AlbumStructureSettings,
         *,
-        page_format: PageFormat = A4,
+        page_format: PageFormat | None = None,
     ) -> None:
         self.clear()
         self._current_result = result
+
+        if page_format is None:
+            page_format = page_format_from_id(
+                settings.page_format
+            )
 
         # Row 0: outer front cover, right side.
         self._pages_grid.addWidget(
@@ -996,6 +1002,8 @@ class AlbumPreviewWidget(QWidget):
                 page,
                 settings.photo_pages,
                 settings.page_numbers,
+                page_width_mm=page_format.width_mm,
+                page_height_mm=page_format.height_mm,
             )
 
             preview = AlbumPagePreview(

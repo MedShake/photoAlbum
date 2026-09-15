@@ -18,7 +18,7 @@ from photoalbum.album import PageInstance
 from photoalbum.templates.geographic_word_cloud.composition import (
     compose_geographic_word_cloud,
 )
-from photoalbum.gui.geographic_word_cloud_painter import (
+from .painter import (
     paint_geographic_word_cloud,
 )
 

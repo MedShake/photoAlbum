@@ -10,9 +10,7 @@ from PySide6.QtGui import (
     QPainter,
 )
 
-from photoalbum.album.geographic_word_cloud import (
-    GeographicWordCloud,
-)
+from .composition import GeographicWordCloud
 
 
 def paint_geographic_word_cloud(

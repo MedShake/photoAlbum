@@ -39,6 +39,30 @@ US_LETTER = PageFormat(
 )
 
 
+PAGE_FORMATS: dict[str, PageFormat] = {
+    "a4": A4,
+    "a5": A5,
+    "us-letter": US_LETTER,
+}
+
+
+def page_format_from_id(
+    format_id: str,
+) -> PageFormat:
+    """
+    Return the canonical physical page format.
+
+    Project files store a stable lowercase identifier while
+    PageFormat contains the display name and physical dimensions.
+    """
+    try:
+        return PAGE_FORMATS[format_id]
+    except KeyError:
+        raise ValueError(
+            f"Unsupported page format: {format_id}"
+        ) from None
+
+
 @dataclass(frozen=True)
 class PrintProfile:
     name: str

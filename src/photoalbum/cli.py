@@ -23,6 +23,7 @@ from photoalbum.album import (
     AlbumBuilder,
     PrintConstraints,
     create_builtin_template_registry,
+    page_format_from_id,
 )
 from photoalbum.export import (
     PdfExportService,
@@ -657,32 +658,19 @@ def run_pdf(
             print_constraints=PrintConstraints(),
         )
 
-        formats = {
-            "a4": (
-                210.0,
-                297.0,
-            ),
-            "a5": (
-                148.0,
-                210.0,
-            ),
-            "us-letter": (
-                215.9,
-                279.4,
-            ),
-        }
-
-        if settings.page_format not in formats:
+        try:
+            page_format = page_format_from_id(
+                settings.page_format
+            )
+        except ValueError as exc:
             print(
-                "Error: unsupported page format: "
-                f"{settings.page_format}",
+                f"Error: {exc}",
                 file=sys.stderr,
             )
             return 2
 
-        width_mm, height_mm = formats[
-            settings.page_format
-        ]
+        width_mm = page_format.width_mm
+        height_mm = page_format.height_mm
 
         orientation = getattr(
             settings.orientation,

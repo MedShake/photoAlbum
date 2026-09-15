@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter
 
 from photoalbum.album import PageInstance
-from photoalbum.gui.geographic_word_cloud_painter import (
+from .painter import (
     paint_geographic_word_cloud,
 )
 

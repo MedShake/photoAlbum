@@ -41,10 +41,8 @@ from photoalbum.scanner import (
 )
 
 from photoalbum.album import (
-    A4,
-    A5,
-    US_LETTER,
     AlbumBuilder,
+    page_format_from_id,
     PrintConstraints,
     create_builtin_template_registry,
 )
@@ -684,30 +682,13 @@ class MainWindow(QMainWindow):
         except Exception:
             return
 
-        formats = {
-            "a4": (
-                "A4",
-                210.0,
-                297.0,
-            ),
-            "a5": (
-                "A5",
-                148.0,
-                210.0,
-            ),
-            "us-letter": (
-                "US Letter",
-                215.9,
-                279.4,
-            ),
-        }
-
-        format_name, width_mm, height_mm = (
-            formats.get(
-                settings.page_format,
-                formats["a4"],
-            )
+        page_format = page_format_from_id(
+            settings.page_format
         )
+
+        format_name = page_format.name
+        width_mm = page_format.width_mm
+        height_mm = page_format.height_mm
 
         orientation = (
             settings.orientation.value
@@ -787,7 +768,6 @@ class MainWindow(QMainWindow):
             self._pdf_pages_label.setText(
                 str(
                     result.total_page_count
-                    + 4
                 )
             )
 
@@ -834,25 +814,12 @@ class MainWindow(QMainWindow):
                 self._album_settings_widget.settings()
             )
 
-            formats = {
-                "a4": (
-                    210.0,
-                    297.0,
-                ),
-                "a5": (
-                    148.0,
-                    210.0,
-                ),
-                "us-letter": (
-                    215.9,
-                    279.4,
-                ),
-            }
-
-            width_mm, height_mm = formats.get(
-                settings.page_format,
-                formats["a4"],
+            page_format = page_format_from_id(
+                settings.page_format
             )
+
+            width_mm = page_format.width_mm
+            height_mm = page_format.height_mm
 
             if settings.orientation.value == "landscape":
                 width_mm, height_mm = (

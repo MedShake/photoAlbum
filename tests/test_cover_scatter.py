@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.album.cover_scatter import (
+from photoalbum.templates.year_photo_scatter.composition import (
     compose_cover_scatter,
     cover_period_title,
 )
@@ -160,7 +160,7 @@ def test_classic_cover_uses_all_dated_photos():
 
 def test_completely_hidden_photo_is_removed():
     from photoalbum.album.composition import NormalizedRect
-    from photoalbum.album.cover_scatter import (
+    from photoalbum.templates.year_photo_scatter.composition import (
         CoverScatterItem,
         visible_cover_scatter_items,
     )
@@ -201,7 +201,7 @@ def test_completely_hidden_photo_is_removed():
 
 def test_partially_visible_photo_is_kept():
     from photoalbum.album.composition import NormalizedRect
-    from photoalbum.album.cover_scatter import (
+    from photoalbum.templates.year_photo_scatter.composition import (
         CoverScatterItem,
         visible_cover_scatter_items,
     )
@@ -250,7 +250,7 @@ def test_partially_visible_photo_is_kept():
 
 def test_png_is_not_used_as_opaque_occluder():
     from photoalbum.album.composition import NormalizedRect
-    from photoalbum.album.cover_scatter import (
+    from photoalbum.templates.year_photo_scatter.composition import (
         CoverScatterItem,
         visible_cover_scatter_items,
     )

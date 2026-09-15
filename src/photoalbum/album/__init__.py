@@ -2,6 +2,8 @@ from .models import (
     A4,
     A5,
     US_LETTER,
+    PAGE_FORMATS,
+    page_format_from_id,
     CoverPosition,
     PageFormat,
     PrintProfile,
@@ -73,6 +75,8 @@ __all__ = [
     "A4",
     "A5",
     "US_LETTER",
+    "PAGE_FORMATS",
+    "page_format_from_id",
     "AlbumStructureSettings",
     "CoverPosition",
     "CoverScatterSettings",
@@ -114,12 +118,3 @@ __all__ = [
     "AlbumSummaryBuilder",
     "PeriodFillSuggestion",
 ]
-
-from .cover_scatter import (
-    CoverPeriod,
-    CoverScatterComposition,
-    CoverScatterItem,
-    compose_cover_scatter,
-    cover_period,
-    cover_period_title,
-)

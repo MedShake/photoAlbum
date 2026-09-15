@@ -282,6 +282,8 @@ class PdfExportService:
                     page,
                     settings.photo_pages,
                     settings.page_numbers,
+                    page_width_mm=page_width_mm,
+                    page_height_mm=page_height_mm,
                 )
 
                 begin_output_page()
