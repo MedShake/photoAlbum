@@ -14,12 +14,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from photoalbum.album import PageInstance
+from photoalbum.album import (
+    A4,
+    PageFormat,
+    PageInstance,
+)
 from photoalbum.templates.calendar_index.composition import (
     available_calendar_years,
     compose_calendar_index,
 )
-from photoalbum.gui.calendar_index_painter import (
+from photoalbum.templates.calendar_index.painter import (
     paint_calendar_index,
 )
 
@@ -41,6 +45,7 @@ class CalendarIndexSettingsWidget(
         *,
         translator,
         render_service=None,
+        page_format: PageFormat = A4,
         parent=None,
     ) -> None:
         super().__init__(
@@ -48,6 +53,7 @@ class CalendarIndexSettingsWidget(
             photos,
             translator=translator,
             render_service=render_service,
+            page_format=page_format,
             parent=parent,
         )
 
@@ -253,8 +259,8 @@ class CalendarIndexSettingsWidget(
                 target_rect=pixmap.rect(),
                 composition=composition,
                 translator=self._translator,
-                page_width_mm=210.0,
-                page_height_mm=297.0,
+                page_width_mm=self._page_format.width_mm,
+                page_height_mm=self._page_format.height_mm,
             )
 
         painter.end()

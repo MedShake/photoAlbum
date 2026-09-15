@@ -14,7 +14,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from photoalbum.album import PageInstance
+from photoalbum.album import (
+    A4,
+    PageFormat,
+    PageInstance,
+)
 from photoalbum.templates.geographic_word_cloud.composition import (
     compose_geographic_word_cloud,
 )
@@ -40,6 +44,7 @@ class GeographicWordCloudSettingsWidget(
         *,
         translator,
         render_service=None,
+        page_format: PageFormat = A4,
         parent=None,
     ) -> None:
         super().__init__(
@@ -47,6 +52,7 @@ class GeographicWordCloudSettingsWidget(
             photos,
             translator=translator,
             render_service=render_service,
+            page_format=page_format,
             parent=parent,
         )
 
@@ -78,10 +84,7 @@ class GeographicWordCloudSettingsWidget(
 
         self._preview_label = QLabel()
 
-        self._preview_label.setFixedSize(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
+        self._update_preview_size()
 
         self._preview_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
@@ -97,6 +100,22 @@ class GeographicWordCloudSettingsWidget(
             alignment=(
                 Qt.AlignmentFlag.AlignCenter
             ),
+        )
+
+    def _update_preview_size(
+        self,
+    ) -> None:
+        width = self.PREVIEW_WIDTH
+
+        height = round(
+            width
+            * self._page_format.height_mm
+            / self._page_format.width_mm
+        )
+
+        self._preview_label.setFixedSize(
+            width,
+            height,
         )
 
     def _load_state(
@@ -205,18 +224,24 @@ class GeographicWordCloudSettingsWidget(
     ) -> None:
         year = self._year_combo.currentData()
 
+        # The geographic cloud keeps the historical A4
+        # composition geometry on every supported page format.
+        # Wider formats such as US Letter therefore gain extra
+        # horizontal breathing room instead of stretching the
+        # cloud layout.
         cloud = compose_geographic_word_cloud(
             list(
                 self._photos
             ),
             year=year,
-            page_width_mm=210.0,
-            page_height_mm=297.0,
+            page_width_mm=A4.width_mm,
+            page_height_mm=A4.height_mm,
         )
 
+        self._update_preview_size()
+
         pixmap = QPixmap(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
+            self._preview_label.size()
         )
 
         pixmap.fill(
@@ -231,7 +256,7 @@ class GeographicWordCloudSettingsWidget(
             painter,
             target_rect=pixmap.rect(),
             cloud=cloud,
-            page_width_mm=210.0,
+            page_width_mm=self._page_format.width_mm,
         )
 
         if not cloud.words:

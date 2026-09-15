@@ -68,3 +68,51 @@ def test_unknown_page_format_is_rejected():
         match="Unsupported page format",
     ):
         page_format_from_id("unknown")
+
+
+def test_month_divider_layout_keeps_physical_margins():
+    from photoalbum.album.month_divider_layout import (
+        classic_month_divider_layout,
+    )
+
+    a4 = classic_month_divider_layout(
+        page_width_mm=A4.width_mm,
+        page_height_mm=A4.height_mm,
+    )
+
+    letter = classic_month_divider_layout(
+        page_width_mm=US_LETTER.width_mm,
+        page_height_mm=US_LETTER.height_mm,
+    )
+
+    # The normalized coordinates differ because the physical
+    # page dimensions differ.
+    assert a4.title_rect.x != letter.title_rect.x
+    assert a4.title_rect.y != letter.title_rect.y
+
+    # But converted back to millimetres, the intended physical
+    # geometry remains identical.
+    assert a4.title_rect.x * A4.width_mm == 10.0
+    assert a4.title_rect.y * A4.height_mm == 10.0
+
+    assert (
+        letter.title_rect.x
+        * US_LETTER.width_mm
+        == 10.0
+    )
+    assert (
+        letter.title_rect.y
+        * US_LETTER.height_mm
+        == 10.0
+    )
+
+    assert (
+        a4.cities_rect.y
+        * A4.height_mm
+        == 40.0
+    )
+    assert (
+        letter.cities_rect.y
+        * US_LETTER.height_mm
+        == 40.0
+    )

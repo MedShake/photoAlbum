@@ -9,7 +9,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from photoalbum.album import PageInstance
+from photoalbum.album import (
+    A4,
+    PageFormat,
+    PageInstance,
+)
 from photoalbum.gui.template_settings import (
     create_template_settings_editor,
 )
@@ -30,6 +34,7 @@ class PageInstanceDialog(QDialog):
         *,
         translator: Translator,
         render_service=None,
+        page_format: PageFormat = A4,
         parent=None,
     ) -> None:
         super().__init__(
@@ -42,6 +47,7 @@ class PageInstanceDialog(QDialog):
         )
         self._translator = translator
         self._render_service = render_service
+        self._page_format = page_format
 
         self._editor = None
 
@@ -104,6 +110,7 @@ class PageInstanceDialog(QDialog):
                 self._photos,
                 translator=self._translator,
                 render_service=self._render_service,
+                page_format=self._page_format,
                 parent=self,
             )
         )

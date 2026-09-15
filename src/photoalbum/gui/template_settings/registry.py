@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QWidget
 
-from photoalbum.album import PageInstance
+from photoalbum.album import (
+    A4,
+    PageFormat,
+    PageInstance,
+)
 from photoalbum.i18n import Translator
 from photoalbum.templates import (
     template_extension_registry,
@@ -48,6 +52,7 @@ class TemplateSettingsEditorRegistry:
         *,
         translator: Translator,
         render_service=None,
+        page_format: PageFormat = A4,
         parent: QWidget | None = None,
     ) -> PageTemplateSettingsWidget | None:
         return create_template_settings_editor(
@@ -56,6 +61,7 @@ class TemplateSettingsEditorRegistry:
             photos,
             translator=translator,
             render_service=render_service,
+            page_format=page_format,
             parent=parent,
         )
 
@@ -67,6 +73,7 @@ def create_template_settings_editor(
     *,
     translator: Translator,
     render_service=None,
+    page_format: PageFormat = A4,
     parent: QWidget | None = None,
 ) -> PageTemplateSettingsWidget | None:
     # Safe and idempotent: templates overwrite their own
@@ -92,6 +99,7 @@ def create_template_settings_editor(
         photos,
         translator=translator,
         render_service=render_service,
+        page_format=page_format,
         parent=parent,
     )
 

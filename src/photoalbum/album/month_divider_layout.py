@@ -45,20 +45,50 @@ MONTH_COLORS: dict[int, tuple[int, int, int]] = {
 }
 
 
-CLASSIC_MONTH_DIVIDER_LAYOUT = MonthDividerLayout(
-    # PHP: title starts around y=10 mm and spans the page width.
-    title_rect=NormalizedRect(
-        x=0.05,
-        y=10.0 / 297.0,
-        width=0.90,
-        height=20.0 / 297.0,
-    ),
+def classic_month_divider_layout(
+    *,
+    page_width_mm: float,
+    page_height_mm: float,
+) -> MonthDividerLayout:
+    """
+    Build the classic month-divider layout for a physical page.
 
-    # PHP: cities start around y=40 mm.
-    cities_rect=NormalizedRect(
-        x=10.0 / 210.0,
-        y=40.0 / 297.0,
-        width=190.0 / 210.0,
-        height=0.65,
-    ),
-)
+    The historical template uses physical millimetre dimensions.
+    They are normalized here so Preview and PDF share exactly
+    the same geometry on every supported page format.
+    """
+    if page_width_mm <= 0 or page_height_mm <= 0:
+        raise ValueError(
+            "Page dimensions must be positive."
+        )
+
+    horizontal_margin_mm = 10.0
+
+    return MonthDividerLayout(
+        # PHP: title starts around y=10 mm.
+        #
+        # The historical x=0.05 / width=0.90 proportions are
+        # equivalent to symmetric physical margins on A4, so
+        # use the intended 10 mm margins explicitly.
+        title_rect=NormalizedRect(
+            x=horizontal_margin_mm / page_width_mm,
+            y=10.0 / page_height_mm,
+            width=(
+                page_width_mm
+                - 2 * horizontal_margin_mm
+            ) / page_width_mm,
+            height=20.0 / page_height_mm,
+        ),
+
+        # PHP: cities start around y=40 mm and keep a
+        # 10 mm physical margin on each side.
+        cities_rect=NormalizedRect(
+            x=horizontal_margin_mm / page_width_mm,
+            y=40.0 / page_height_mm,
+            width=(
+                page_width_mm
+                - 2 * horizontal_margin_mm
+            ) / page_width_mm,
+            height=0.65,
+        ),
+    )

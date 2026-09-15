@@ -26,6 +26,7 @@ from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 
 from photoalbum.album import (
+    page_format_from_id,
     AlbumStructureSettings,
     CoverPosition,
     CoverScatterSettings,
@@ -393,6 +394,11 @@ class AlbumSettingsWidget(QWidget):
             photos,
             translator=self._translator,
             render_service=self._render_service,
+            page_format=page_format_from_id(
+                str(
+                    self._page_format_combo.currentData()
+                )
+            ),
             parent=self,
         )
 
@@ -1143,6 +1149,11 @@ class AlbumSettingsWidget(QWidget):
             photos,
             translator=self._translator,
             render_service=self._render_service,
+            page_format=page_format_from_id(
+                str(
+                    self._page_format_combo.currentData()
+                )
+            ),
             parent=self,
         )
 

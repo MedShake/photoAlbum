@@ -8,7 +8,7 @@ from PySide6.QtGui import (
 )
 
 from photoalbum.album.month_divider_layout import (
-    CLASSIC_MONTH_DIVIDER_LAYOUT,
+    classic_month_divider_layout,
 )
 
 
@@ -54,8 +54,9 @@ class MonthDividerClassicWidgetRenderer:
         ):
             return
 
-        layout = (
-            CLASSIC_MONTH_DIVIDER_LAYOUT
+        layout = classic_month_divider_layout(
+            page_width_mm=page_width_mm,
+            page_height_mm=page_height_mm,
         )
 
         month_name = (

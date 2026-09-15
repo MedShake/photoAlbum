@@ -3,7 +3,10 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter
 
-from photoalbum.album import PageInstance
+from photoalbum.album import (
+    A4,
+    PageInstance,
+)
 from .painter import (
     paint_geographic_word_cloud,
 )
@@ -49,11 +52,13 @@ class GeographicWordCloudWidgetRenderer:
             "year"
         )
 
+        # Keep the historical A4 cloud geometry even when the
+        # physical page is wider (for example US Letter).
         cloud = compose_geographic_word_cloud(
             list(photos),
             year=year,
-            page_width_mm=page_width_mm,
-            page_height_mm=page_height_mm,
+            page_width_mm=A4.width_mm,
+            page_height_mm=A4.height_mm,
         )
 
         paint_geographic_word_cloud(

@@ -22,7 +22,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from photoalbum.album import PageInstance
+from photoalbum.album import (
+    A4,
+    PageFormat,
+    PageInstance,
+)
 from photoalbum.templates.year_photo_scatter.composition import (
     compose_cover_scatter,
     visible_cover_scatter_items,
@@ -57,6 +61,7 @@ class YearPhotoScatterSettingsWidget(
         *,
         translator,
         render_service=None,
+        page_format: PageFormat = A4,
         parent=None,
     ) -> None:
         super().__init__(
@@ -64,6 +69,7 @@ class YearPhotoScatterSettingsWidget(
             photos,
             translator=translator,
             render_service=render_service,
+            page_format=page_format,
             parent=parent,
         )
 
