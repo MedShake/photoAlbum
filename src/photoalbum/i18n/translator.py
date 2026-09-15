@@ -86,6 +86,21 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.generate_development": (
             "PDF generation is in development."
         ),
+        "render.no_album": (
+            "No album is available to export."
+        ),
+        "render.output_required": (
+            "Choose an output PDF file first."
+        ),
+        "render.generate_error": (
+            "Could not generate the PDF: {error}"
+        ),
+        "render.generate_success_title": (
+            "PDF generated"
+        ),
+        "render.generate_success": (
+            "PDF generated successfully: {path}"
+        ),
         "page_settings.title": "Page settings",
         "calendar_index.title": "Index",
         "calendar_index.year": "Year",
@@ -199,6 +214,9 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "album.page_format": "Page format",
         "album.paper_format": "Format",
+        "album.paper_format_a5_development": (
+            "A5 — 148 × 210 mm — in development"
+        ),
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
         "album.orientation_landscape_development": (
@@ -417,6 +435,21 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.generate_development": (
             "La génération PDF est en développement."
         ),
+        "render.no_album": (
+            "Aucun album n’est disponible pour l’export."
+        ),
+        "render.output_required": (
+            "Choisissez d’abord le fichier PDF de destination."
+        ),
+        "render.generate_error": (
+            "Impossible de générer le PDF : {error}"
+        ),
+        "render.generate_success_title": (
+            "PDF généré"
+        ),
+        "render.generate_success": (
+            "PDF généré avec succès : {path}"
+        ),
         "page_settings.title": "Réglages de la page",
         "calendar_index.title": "Index",
         "calendar_index.year": "Année",
@@ -531,6 +564,9 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "album.page_format": "Format de page",
         "album.paper_format": "Format",
+        "album.paper_format_a5_development": (
+            "A5 — 148 × 210 mm — en développement"
+        ),
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
         "album.orientation_landscape_development": (

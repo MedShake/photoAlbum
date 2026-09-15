@@ -101,7 +101,9 @@ def test_plan_widget_displays_summary():
 
     text = widget._summary_label.text()
 
-    assert "Pages: 4" in text
+    # Summary displays the complete physical document:
+    # four interior pages + four cover pages.
+    assert "Pages: 8" in text
     assert "Photo pages: 1" in text
     assert "Dividers: 1" in text
     assert "Special pages: 1" in text

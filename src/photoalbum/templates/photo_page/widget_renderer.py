@@ -37,6 +37,7 @@ class PhotoPageWidgetRenderer:
         composition=None,
         thumbnail_cache=None,
         pixel_rect=None,
+        show_empty_slots: bool = True,
     ) -> None:
         if (
             composition is None
@@ -51,11 +52,12 @@ class PhotoPageWidgetRenderer:
             composition.photo_slots
         ):
             if index >= len(page.photos):
-                self._paint_empty_slot(
-                    painter,
-                    slot,
-                    pixel_rect,
-                )
+                if show_empty_slots:
+                    self._paint_empty_slot(
+                        painter,
+                        slot,
+                        pixel_rect,
+                    )
                 continue
 
             photo = page.photos[index]

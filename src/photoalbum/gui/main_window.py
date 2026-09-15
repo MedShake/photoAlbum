@@ -41,6 +41,9 @@ from photoalbum.scanner import (
 )
 
 from photoalbum.album import (
+    A4,
+    A5,
+    US_LETTER,
     AlbumBuilder,
     PrintConstraints,
     create_builtin_template_registry,
@@ -59,6 +62,10 @@ from photoalbum.templates import (
     register_builtin_template_extensions,
 )
 from photoalbum.i18n import Translator
+from photoalbum.export import (
+    PdfExportService,
+    PdfMetadata,
+)
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -78,6 +85,8 @@ class MainWindow(QMainWindow):
         )
 
         register_builtin_template_extensions()
+        self._album_build_result = None
+
         self._album_builder = AlbumBuilder(
             self._template_registry
         )
@@ -622,13 +631,8 @@ class MainWindow(QMainWindow):
             )
         )
 
-        # The UI is ready, but the final PDF renderer
-        # will be implemented separately.
-        self._generate_pdf_button.setEnabled(False)
-        self._generate_pdf_button.setToolTip(
-            self._translator.tr(
-                "render.generate_development"
-            )
+        self._generate_pdf_button.clicked.connect(
+            self._generate_pdf
         )
 
         action_layout.addWidget(
@@ -771,12 +775,159 @@ class MainWindow(QMainWindow):
             str(len(photos))
         )
 
-        # Page count will be connected to the built
-        # album plan in the next PDF-rendering step.
-        self._pdf_pages_label.setText(
-            self._translator.tr(
-                "render.page_count_pending"
+        result = self._album_build_result
+
+        if result is None:
+            self._pdf_pages_label.setText(
+                self._translator.tr(
+                    "render.page_count_pending"
+                )
             )
+        else:
+            self._pdf_pages_label.setText(
+                str(
+                    result.total_page_count
+                    + 4
+                )
+            )
+
+    def _generate_pdf(self) -> None:
+        if not self._project_service.is_open:
+            self._show_error(
+                self._translator.tr(
+                    "main.no_project_error"
+                )
+            )
+            return
+
+        result = self._album_build_result
+
+        if result is None:
+            self._show_error(
+                self._translator.tr(
+                    "render.no_album"
+                )
+            )
+            return
+
+        output_text = (
+            self._pdf_output_edit.text().strip()
+        )
+
+        if not output_text:
+            self._show_error(
+                self._translator.tr(
+                    "render.output_required"
+                )
+            )
+            return
+
+        output_path = Path(output_text)
+
+        if output_path.suffix.lower() != ".pdf":
+            output_path = output_path.with_suffix(
+                ".pdf"
+            )
+
+        try:
+            settings = (
+                self._album_settings_widget.settings()
+            )
+
+            formats = {
+                "a4": (
+                    210.0,
+                    297.0,
+                ),
+                "a5": (
+                    148.0,
+                    210.0,
+                ),
+                "us-letter": (
+                    215.9,
+                    279.4,
+                ),
+            }
+
+            width_mm, height_mm = formats.get(
+                settings.page_format,
+                formats["a4"],
+            )
+
+            if settings.orientation.value == "landscape":
+                width_mm, height_mm = (
+                    height_mm,
+                    width_mm,
+                )
+
+            dpi = int(
+                self._pdf_dpi_combo.currentData()
+            )
+
+            photos = (
+                self._project_service.list_photos()
+            )
+
+            metadata = PdfMetadata(
+                title=(
+                    self._pdf_title_edit.text().strip()
+                ),
+                author=(
+                    self._pdf_author_edit.text().strip()
+                ),
+                subject=(
+                    self._pdf_subject_edit.text().strip()
+                ),
+                keywords=(
+                    self._pdf_keywords_edit.text().strip()
+                ),
+            )
+
+            service = PdfExportService(
+                self._translator
+            )
+
+            service.export(
+                output_path=output_path,
+                result=result,
+                settings=settings,
+                photos=photos,
+                page_width_mm=width_mm,
+                page_height_mm=height_mm,
+                dpi=dpi,
+                metadata=metadata,
+            )
+
+        except Exception as exc:
+            self._show_error(
+                self._translator.tr(
+                    "render.generate_error",
+                    error=exc,
+                )
+            )
+            return
+
+        self._pdf_output_edit.setText(
+            str(output_path)
+        )
+
+        self.statusBar().showMessage(
+            self._translator.tr(
+                "render.generate_success",
+                path=output_path,
+            ),
+            10000,
+        )
+
+        QMessageBox.information(
+            self,
+            self._translator.tr(
+                "render.generate_success_title"
+            ),
+            self._translator.tr(
+                "render.generate_success",
+                path=output_path,
+            ),
         )
 
     def _create_status_bar(self) -> None:
@@ -895,6 +1046,7 @@ class MainWindow(QMainWindow):
 
     def _close_project(self) -> None:
         self._preview_render_service.clear()
+        self._album_build_result = None
         self._project_service.close()
 
         self._analysis_completed = False
@@ -1641,6 +1793,8 @@ class MainWindow(QMainWindow):
                 print_constraints=print_constraints,
             )
 
+            self._album_build_result = result
+
             # Expensive previews are prepared immediately in
             # background so they are usually ready when the
             # Preview tab is opened.
@@ -1650,9 +1804,21 @@ class MainWindow(QMainWindow):
                 settings,
             )
 
+            page_formats = {
+                "a4": A4,
+                "a5": A5,
+                "us-letter": US_LETTER,
+            }
+
+            page_format = page_formats.get(
+                settings.page_format,
+                A4,
+            )
+
             self._album_preview_widget.set_result(
                 result,
                 settings,
+                page_format=page_format,
             )
 
             # Preview prewarming is strictly optional.
@@ -1759,3 +1925,4 @@ class MainWindow(QMainWindow):
             )
         )
         self._refresh_album_plan()
+        self._update_pdf_summary()

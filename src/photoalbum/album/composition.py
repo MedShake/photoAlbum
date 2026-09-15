@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -206,6 +207,9 @@ class TemplateLayout(Protocol):
         page: PlannedPage,
         photo_settings: PhotoPageSettings,
         page_numbers: PageNumberSettings,
+        *,
+        page_width_mm: float = 210.0,
+        page_height_mm: float = 297.0,
     ) -> PageComposition:
         ...
 
@@ -247,7 +251,10 @@ class TemplateLayoutRegistry:
 
 @dataclass(frozen=True)
 class PhotoTemplateLayout:
-    cells: tuple[NormalizedRect, ...]
+    cells_factory: Callable[
+        [float, float],
+        tuple[NormalizedRect, ...],
+    ]
     # Classic built-in layout, inspired by the historical
     # PHP renderer:
     #
@@ -270,7 +277,15 @@ class PhotoTemplateLayout:
         page: PlannedPage,
         photo_settings: PhotoPageSettings,
         page_numbers: PageNumberSettings,
+        *,
+        page_width_mm: float = 210.0,
+        page_height_mm: float = 297.0,
     ) -> PageComposition:
+        cells = self.cells_factory(
+            page_width_mm,
+            page_height_mm,
+        )
+
         captions = tuple(
             build_photo_caption(
                 photo,
@@ -280,7 +295,8 @@ class PhotoTemplateLayout:
         )
 
         row_caption_lines = self._row_caption_lines(
-            captions
+            captions,
+            cells,
         )
 
         slots = tuple(
@@ -294,8 +310,9 @@ class PhotoTemplateLayout:
                 reserved_lines=row_caption_lines[
                     self._row_key(cell)
                 ],
+                page_height_mm=page_height_mm,
             )
-            for index, cell in enumerate(self.cells)
+            for index, cell in enumerate(cells)
         )
 
         page_number = None
@@ -312,10 +329,11 @@ class PhotoTemplateLayout:
     def _row_caption_lines(
         self,
         captions: tuple[PhotoCaptionContent, ...],
+        cells: tuple[NormalizedRect, ...],
     ) -> dict[float, int]:
         result: dict[float, int] = {}
 
-        for index, cell in enumerate(self.cells):
+        for index, cell in enumerate(cells):
             key = self._row_key(cell)
 
             lines = (
@@ -343,6 +361,7 @@ class PhotoTemplateLayout:
         cell: NormalizedRect,
         caption: PhotoCaptionContent,
         reserved_lines: int,
+        page_height_mm: float,
     ) -> PhotoSlotComposition:
         if reserved_lines <= 0:
             return PhotoSlotComposition(
@@ -353,14 +372,19 @@ class PhotoTemplateLayout:
             )
 
         caption_height = (
-            self.caption_line_height
+            4.0
             * reserved_lines
+            / page_height_mm
+        )
+
+        image_caption_gap = (
+            2.0 / page_height_mm
         )
 
         image_height = (
             cell.height
             - caption_height
-            - self.image_caption_gap
+            - image_caption_gap
         )
 
         if image_height <= 0:
@@ -380,7 +404,7 @@ class PhotoTemplateLayout:
             y=(
                 cell.y
                 + image_height
-                + self.image_caption_gap
+                + image_caption_gap
             ),
             width=cell.width,
             height=caption_height,
@@ -425,19 +449,32 @@ def _grid_cells(
     rows: int,
     columns: int,
     capacity: int,
-    margin: float,
-    horizontal_gap: float,
-    vertical_gap: float,
+    page_width_mm: float,
+    page_height_mm: float,
+    margin_mm: float = 10.0,
+    horizontal_gap_mm: float = 8.0,
+    vertical_gap_mm: float = 8.0,
 ) -> tuple[NormalizedRect, ...]:
+    margin_x = margin_mm / page_width_mm
+    margin_y = margin_mm / page_height_mm
+
+    horizontal_gap = (
+        horizontal_gap_mm / page_width_mm
+    )
+
+    vertical_gap = (
+        vertical_gap_mm / page_height_mm
+    )
+
     available_width = (
         1
-        - 2 * margin
+        - 2 * margin_x
         - (columns - 1) * horizontal_gap
     )
 
     available_height = (
         1
-        - 2 * margin
+        - 2 * margin_y
         - (rows - 1) * vertical_gap
     )
 
@@ -453,14 +490,20 @@ def _grid_cells(
         cells.append(
             NormalizedRect(
                 x=(
-                    margin
+                    margin_x
                     + column
-                    * (cell_width + horizontal_gap)
+                    * (
+                        cell_width
+                        + horizontal_gap
+                    )
                 ),
                 y=(
-                    margin
+                    margin_y
                     + row
-                    * (cell_height + vertical_gap)
+                    * (
+                        cell_height
+                        + vertical_gap
+                    )
                 ),
                 width=cell_width,
                 height=cell_height,
@@ -470,99 +513,145 @@ def _grid_cells(
     return tuple(cells)
 
 
+def _photo_page_1_cells(
+    page_width_mm: float,
+    page_height_mm: float,
+) -> tuple[NormalizedRect, ...]:
+    return _grid_cells(
+        rows=1,
+        columns=1,
+        capacity=1,
+        page_width_mm=page_width_mm,
+        page_height_mm=page_height_mm,
+    )
+
+
+def _photo_page_2_cells(
+    page_width_mm: float,
+    page_height_mm: float,
+) -> tuple[NormalizedRect, ...]:
+    return _grid_cells(
+        rows=2,
+        columns=1,
+        capacity=2,
+        page_width_mm=page_width_mm,
+        page_height_mm=page_height_mm,
+    )
+
+
+def _photo_page_3_cells(
+    page_width_mm: float,
+    page_height_mm: float,
+) -> tuple[NormalizedRect, ...]:
+    margin_x = 10.0 / page_width_mm
+    margin_y = 10.0 / page_height_mm
+
+    horizontal_gap = (
+        8.0 / page_width_mm
+    )
+
+    vertical_gap = (
+        8.0 / page_height_mm
+    )
+
+    available_height = (
+        1 - 2 * margin_y - vertical_gap
+    )
+
+    # Keep the historical visual hierarchy:
+    # one large photograph above two smaller ones.
+    top_height = (
+        available_height * 0.48
+    )
+
+    bottom_height = (
+        available_height - top_height
+    )
+
+    bottom_y = (
+        margin_y
+        + top_height
+        + vertical_gap
+    )
+
+    available_width = (
+        1
+        - 2 * margin_x
+        - horizontal_gap
+    )
+
+    bottom_width = (
+        available_width / 2
+    )
+
+    return (
+        NormalizedRect(
+            x=margin_x,
+            y=margin_y,
+            width=1 - 2 * margin_x,
+            height=top_height,
+        ),
+        NormalizedRect(
+            x=margin_x,
+            y=bottom_y,
+            width=bottom_width,
+            height=bottom_height,
+        ),
+        NormalizedRect(
+            x=(
+                margin_x
+                + bottom_width
+                + horizontal_gap
+            ),
+            y=bottom_y,
+            width=bottom_width,
+            height=bottom_height,
+        ),
+    )
+
+
+def _photo_page_4_cells(
+    page_width_mm: float,
+    page_height_mm: float,
+) -> tuple[NormalizedRect, ...]:
+    return _grid_cells(
+        rows=2,
+        columns=2,
+        capacity=4,
+        page_width_mm=page_width_mm,
+        page_height_mm=page_height_mm,
+    )
+
+
 def create_builtin_layout_registry(
 ) -> TemplateLayoutRegistry:
     registry = TemplateLayoutRegistry()
 
-    margin = 0.06
-    horizontal_gap = 0.04
-    vertical_gap = 0.04
-
     registry.register(
         "photo-page-1",
         PhotoTemplateLayout(
-            cells=(
-                NormalizedRect(
-                    x=margin,
-                    y=margin,
-                    width=1 - 2 * margin,
-                    height=1 - 2 * margin,
-                ),
-            )
+            cells_factory=_photo_page_1_cells,
         ),
     )
 
     registry.register(
         "photo-page-2",
         PhotoTemplateLayout(
-            cells=_grid_cells(
-                rows=2,
-                columns=1,
-                capacity=2,
-                margin=margin,
-                horizontal_gap=horizontal_gap,
-                vertical_gap=vertical_gap,
-            )
+            cells_factory=_photo_page_2_cells,
         ),
     )
-
-    three_top = NormalizedRect(
-        x=margin,
-        y=margin,
-        width=1 - 2 * margin,
-        height=0.40,
-    )
-
-    bottom_y = (
-        three_top.y
-        + three_top.height
-        + vertical_gap
-    )
-
-    bottom_height = 1 - margin - bottom_y
-
-    bottom_width = (
-        1
-        - 2 * margin
-        - horizontal_gap
-    ) / 2
 
     registry.register(
         "photo-page-3",
         PhotoTemplateLayout(
-            cells=(
-                three_top,
-                NormalizedRect(
-                    x=margin,
-                    y=bottom_y,
-                    width=bottom_width,
-                    height=bottom_height,
-                ),
-                NormalizedRect(
-                    x=(
-                        margin
-                        + bottom_width
-                        + horizontal_gap
-                    ),
-                    y=bottom_y,
-                    width=bottom_width,
-                    height=bottom_height,
-                ),
-            )
+            cells_factory=_photo_page_3_cells,
         ),
     )
 
     registry.register(
         "photo-page-4",
         PhotoTemplateLayout(
-            cells=_grid_cells(
-                rows=2,
-                columns=2,
-                capacity=4,
-                margin=margin,
-                horizontal_gap=horizontal_gap,
-                vertical_gap=vertical_gap,
-            )
+            cells_factory=_photo_page_4_cells,
         ),
     )
 
@@ -584,6 +673,9 @@ class PageComposer:
         page: PlannedPage,
         photo_settings: PhotoPageSettings | None = None,
         page_numbers: PageNumberSettings | None = None,
+        *,
+        page_width_mm: float = 210.0,
+        page_height_mm: float = 297.0,
     ) -> PageComposition:
         if (
             page.kind != PlanItemKind.PHOTO_GROUP
@@ -612,4 +704,6 @@ class PageComposer:
             page,
             photo_settings,
             page_numbers,
+            page_width_mm=page_width_mm,
+            page_height_mm=page_height_mm,
         )

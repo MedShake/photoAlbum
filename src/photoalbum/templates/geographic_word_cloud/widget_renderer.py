@@ -61,6 +61,7 @@ class GeographicWordCloudWidgetRenderer:
             target_rect=target_rect,
             cloud=cloud,
             page_width_mm=page_width_mm,
+            font_pixel_size=font_pixel_size,
         )
 
         if not cloud.words:

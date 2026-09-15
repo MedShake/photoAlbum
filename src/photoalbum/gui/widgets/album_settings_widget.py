@@ -179,13 +179,38 @@ class AlbumSettingsWidget(QWidget):
             "a4",
         )
         self._page_format_combo.addItem(
-            "A5 — 148 × 210 mm",
+            self._translator.tr(
+                "album.paper_format_a5_development"
+            ),
             "a5",
         )
         self._page_format_combo.addItem(
             "US Letter — 215,9 × 279,4 mm",
             "us-letter",
         )
+
+        # A5 remains part of the project model but is not
+        # selectable in V1. Some templates still require
+        # format-specific adaptation for this smaller page.
+        page_format_model = (
+            self._page_format_combo.model()
+        )
+
+        a5_index = (
+            self._page_format_combo.findData(
+                "a5"
+            )
+        )
+
+        if a5_index >= 0:
+            a5_item = page_format_model.item(
+                a5_index
+            )
+
+            if a5_item is not None:
+                a5_item.setEnabled(
+                    False
+                )
 
         form.addRow(
             self._translator.tr(

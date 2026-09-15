@@ -22,6 +22,22 @@ class AlbumBuildResult:
     pagination: PaginationResult
     print_diagnostic: PrintDiagnostic
 
+    # pagination.pages contains the physical interior pages
+    # of the album. Covers are rendered separately and are
+    # therefore not part of PaginationResult.
+    COVER_PAGE_COUNT = 4
+
+    @property
+    def interior_page_count(self) -> int:
+        return len(self.pagination.pages)
+
+    @property
+    def total_page_count(self) -> int:
+        return (
+            self.interior_page_count
+            + self.COVER_PAGE_COUNT
+        )
+
 
 class AlbumBuilder:
     def __init__(

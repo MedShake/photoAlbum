@@ -61,7 +61,8 @@ def test_summary_counts_pages():
 
     summary = AlbumSummaryBuilder().build(result)
 
-    assert summary.total_pages == 4
+    # Four interior pages + four physical cover pages.
+    assert summary.total_pages == 8
     assert summary.photo_pages == 1
     assert summary.divider_pages == 1
     assert summary.special_pages == 1

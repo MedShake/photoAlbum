@@ -5,6 +5,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from PySide6.QtGui import QGuiApplication
+
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.geocoding import (
     NominatimGeocoder,
@@ -14,6 +16,21 @@ from photoalbum.scanner import (
     LibraryScanner,
     PhotoProcessor,
     ProcessingEvent,
+)
+
+from photoalbum.app import ProjectService
+from photoalbum.album import (
+    AlbumBuilder,
+    PrintConstraints,
+    create_builtin_template_registry,
+)
+from photoalbum.export import (
+    PdfExportService,
+    PdfMetadata,
+)
+from photoalbum.i18n import Translator
+from photoalbum.templates import (
+    register_builtin_template_extensions,
 )
 
 
@@ -167,6 +184,65 @@ def build_parser() -> argparse.ArgumentParser:
         "--nominatim-endpoint",
         default=NominatimGeocoder.DEFAULT_ENDPOINT,
         help="Nominatim reverse-geocoding endpoint.",
+    )
+
+    pdf_parser = subparsers.add_parser(
+        "pdf",
+        help="Generate a PDF from an existing Photo Album project.",
+    )
+
+    pdf_parser.add_argument(
+        "--project",
+        type=Path,
+        required=True,
+        help="Path to the .photoalbum project file.",
+    )
+
+    pdf_parser.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        required=True,
+        help="Output PDF file.",
+    )
+
+    pdf_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=300,
+        choices=(150, 300, 600),
+        help="PDF rendering resolution (default: 300).",
+    )
+
+    pdf_parser.add_argument(
+        "--language",
+        default="fr",
+        choices=("fr", "en"),
+        help="Document language (default: fr).",
+    )
+
+    pdf_parser.add_argument(
+        "--title",
+        default="",
+        help="PDF title metadata.",
+    )
+
+    pdf_parser.add_argument(
+        "--author",
+        default="",
+        help="PDF author metadata.",
+    )
+
+    pdf_parser.add_argument(
+        "--subject",
+        default="",
+        help="PDF subject metadata.",
+    )
+
+    pdf_parser.add_argument(
+        "--keywords",
+        default="",
+        help="PDF keywords metadata.",
     )
 
     return parser
@@ -505,9 +581,182 @@ def run_refresh_location(
         database.close()
 
 
+def run_pdf(
+    args: argparse.Namespace,
+) -> int:
+    project_path = (
+        args.project.expanduser().resolve()
+    )
+
+    output_path = (
+        args.output.expanduser().resolve()
+    )
+
+    if not project_path.exists():
+        print(
+            f"Error: project does not exist: {project_path}",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.dpi <= 0:
+        print(
+            "Error: DPI must be greater than zero.",
+            file=sys.stderr,
+        )
+        return 2
+
+    # PDF rendering uses QPixmap internally. Even though this
+    # command has no GUI, Qt requires a QGuiApplication before
+    # any QPixmap can be created.
+    qt_app = QGuiApplication.instance()
+
+    if qt_app is None:
+        qt_app = QGuiApplication(
+            ["photo-album", "pdf"]
+        )
+
+    service = ProjectService()
+
+    try:
+        service.open(project_path)
+
+        settings = (
+            service.get_album_structure_settings()
+        )
+
+        if settings is None:
+            print(
+                "Error: the project has no saved album settings.",
+                file=sys.stderr,
+            )
+            return 2
+
+        photos = service.list_photos()
+
+        if not photos:
+            print(
+                "Error: the project contains no photos.",
+                file=sys.stderr,
+            )
+            return 2
+
+        register_builtin_template_extensions()
+
+        registry = (
+            create_builtin_template_registry()
+        )
+
+        builder = AlbumBuilder(
+            registry
+        )
+
+        result = builder.build(
+            photos,
+            settings,
+            print_constraints=PrintConstraints(),
+        )
+
+        formats = {
+            "a4": (
+                210.0,
+                297.0,
+            ),
+            "a5": (
+                148.0,
+                210.0,
+            ),
+            "us-letter": (
+                215.9,
+                279.4,
+            ),
+        }
+
+        if settings.page_format not in formats:
+            print(
+                "Error: unsupported page format: "
+                f"{settings.page_format}",
+                file=sys.stderr,
+            )
+            return 2
+
+        width_mm, height_mm = formats[
+            settings.page_format
+        ]
+
+        orientation = getattr(
+            settings.orientation,
+            "value",
+            settings.orientation,
+        )
+
+        if orientation == "landscape":
+            width_mm, height_mm = (
+                height_mm,
+                width_mm,
+            )
+
+        metadata = PdfMetadata(
+            title=args.title,
+            author=args.author,
+            subject=args.subject,
+            keywords=args.keywords,
+        )
+
+        exporter = PdfExportService(
+            Translator(args.language)
+        )
+
+        print(f"Project: {project_path}")
+        print(f"Output:  {output_path}")
+        print(
+            f"Format:  {settings.page_format} "
+            f"({width_mm:g} x {height_mm:g} mm)"
+        )
+        print(f"DPI:     {args.dpi}")
+        print(f"Photos:  {len(photos)}")
+        print(
+            "Pages:   "
+            f"{result.total_page_count} "
+            "(including covers)"
+        )
+        print()
+        print("Generating PDF...")
+
+        exporter.export(
+            output_path=output_path,
+            result=result,
+            settings=settings,
+            photos=photos,
+            page_width_mm=width_mm,
+            page_height_mm=height_mm,
+            dpi=args.dpi,
+            metadata=metadata,
+        )
+
+        print()
+        print("PDF generated successfully:")
+        print(output_path)
+
+        return 0
+
+    except Exception as exc:
+        print(
+            f"Error generating PDF: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    finally:
+        service.close()
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.command == "pdf":
+        return run_pdf(args)
 
     if args.command == "scan":
         return run_scan(args)

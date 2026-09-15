@@ -10,6 +10,7 @@ from PySide6.QtGui import (
 from photoalbum.album import PageInstance
 
 from .composition import compose_cover_scatter
+from .scatter_renderer import YearPhotoScatterRenderer
 
 
 class YearPhotoScatterWidgetRenderer:
@@ -126,55 +127,82 @@ class YearPhotoScatterWidgetRenderer:
             photos
         )
 
-        key = render_service.key_for(
-            instance,
-            photos,
-            width=width,
-            height=height,
-        )
+        if render_service is not None:
+            effective_photos = (
+                render_service.effective_photos(
+                    instance,
+                    photos,
+                )
+            )
 
-        set_waiting_key(
-            key
-        )
-
-        pixmap = render_service.cached(
-            key
-        )
-
-        if pixmap is None:
-            render_service.request(
+            key = render_service.key_for(
                 instance,
-                photos,
+                effective_photos,
                 width=width,
                 height=height,
             )
 
-            painter.setPen(
-                Qt.GlobalColor.darkGray
+            if set_waiting_key is not None:
+                set_waiting_key(
+                    key
+                )
+
+            pixmap = render_service.cached(
+                key
             )
 
-            painter.drawText(
+            if pixmap is None:
+                render_service.request(
+                    instance,
+                    effective_photos,
+                    width=width,
+                    height=height,
+                )
+
+                painter.setPen(
+                    Qt.GlobalColor.darkGray
+                )
+
+                painter.drawText(
+                    target_rect,
+                    Qt.AlignmentFlag.AlignCenter,
+                    translator.tr(
+                        "page_settings.calculating"
+                    ),
+                )
+
+                return
+
+            painter.drawPixmap(
                 target_rect,
-                Qt.AlignmentFlag.AlignCenter,
-                translator.tr(
-                    "page_settings.calculating"
-                ),
+                pixmap,
+                pixmap.rect(),
             )
 
-            return
+        else:
+            # Synchronous path used by final rendering.
+            #
+            # The business rule remains owned by this template:
+            # only dated photos participate in the scatter.
+            unique = {}
 
-        painter.drawPixmap(
-            target_rect,
-            pixmap,
-            pixmap.rect(),
-        )
+            for photo in photos:
+                if photo.capture_datetime is None:
+                    continue
 
-        effective_photos = (
-            render_service.effective_photos(
-                instance,
-                photos,
+                unique.setdefault(
+                    str(photo.path),
+                    photo,
+                )
+
+            effective_photos = tuple(
+                sorted(
+                    unique.values(),
+                    key=lambda photo: str(
+                        photo.path
+                    ),
+                )
             )
-        )
 
         composition = compose_cover_scatter(
             list(
@@ -188,6 +216,19 @@ class YearPhotoScatterWidgetRenderer:
             ),
         )
 
+        if render_service is None:
+            if thumbnail_cache is None:
+                raise RuntimeError(
+                    "Scatter rendering requires an image cache."
+                )
+
+            YearPhotoScatterRenderer().paint(
+                painter=painter,
+                composition=composition,
+                target_rect=target_rect,
+                image_cache=thumbnail_cache,
+            )
+
         font = QFont(
             painter.font()
         )
@@ -198,25 +239,29 @@ class YearPhotoScatterWidgetRenderer:
 
         title = composition.title.strip()
 
-        # Historical PHP cover used a very large 200 pt title
-        # for a single year.
+        # Physical print sizes.
+        #
+        # The historical implementation used very large
+        # screen-oriented values. Here the value is converted
+        # by font_pixel_size(), so it must represent a real
+        # typographic point size on paper.
         if (
             len(title) == 4
             and title.isdigit()
         ):
-            title_font_pt = 200
+            title_font_pt = 72
 
         elif (
             len(title) == 9
-            and title[4] == "-"
+            and title[4] in ("-", "–")
             and title[:4].isdigit()
             and title[5:].isdigit()
         ):
-            title_font_pt = 120
+            title_font_pt = 52
 
         else:
             # Typically "Mois ANNEE".
-            title_font_pt = 105
+            title_font_pt = 44
 
         font.setPixelSize(
             font_pixel_size(

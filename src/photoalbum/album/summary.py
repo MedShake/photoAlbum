@@ -100,9 +100,14 @@ class AlbumSummaryBuilder:
             if period.unused_photo_slots > 0
         )
 
+        # Use the canonical physical document page count.
+        # pagination.pages contains interior pages only;
+        # AlbumBuildResult also accounts for the four covers.
+        total_pages = result.total_page_count
+
         return AlbumPlanSummary(
             photo_count=photo_count,
-            total_pages=len(pages),
+            total_pages=total_pages,
             photo_pages=photo_pages,
             divider_pages=divider_pages,
             special_pages=special_pages,

@@ -10,8 +10,6 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QColor,
     QFont,
-    QImage,
-    QImageReader,
     QPainter,
     QPen,
     QPixmap,
@@ -48,79 +46,17 @@ from photoalbum.templates import (
     template_extension_registry,
 )
 from photoalbum.i18n import Translator
+from photoalbum.rendering import (
+    PageRenderer,
+    RenderImageCache,
+)
 
 
 
 PREVIEW_PAGE_WIDTH = 300
 
 
-class PreviewThumbnailCache:
-    """
-    Shared in-memory thumbnail cache.
-
-    Images are decoded near preview resolution rather than at
-    full camera resolution.
-
-    setAutoTransform(True) applies EXIF orientation before the
-    image reaches the preview.
-    """
-
-    def __init__(self) -> None:
-        self._cache: dict[
-            tuple[str, int, int],
-            QPixmap,
-        ] = {}
-
-    def clear(self) -> None:
-        self._cache.clear()
-
-    def load(
-        self,
-        path: str | Path,
-        target_size: QSize,
-    ) -> QPixmap:
-        path = str(path)
-
-        key = (
-            path,
-            target_size.width(),
-            target_size.height(),
-        )
-
-        cached = self._cache.get(key)
-
-        if cached is not None:
-            return cached
-
-        reader = QImageReader(path)
-        reader.setAutoTransform(True)
-
-        source_size = reader.size()
-
-        if source_size.isValid():
-            maximum = max(
-                target_size.width(),
-                target_size.height(),
-            )
-
-            decode_size = source_size.scaled(
-                QSize(maximum, maximum),
-                Qt.AspectRatioMode.KeepAspectRatio,
-            )
-
-            if decode_size.isValid():
-                reader.setScaledSize(decode_size)
-
-        image = reader.read()
-
-        if image.isNull():
-            pixmap = QPixmap()
-        else:
-            pixmap = QPixmap.fromImage(image)
-
-        self._cache[key] = pixmap
-
-        return pixmap
+PreviewThumbnailCache = RenderImageCache
 
 
 class _PreviewPageBase(QWidget):
@@ -592,6 +528,10 @@ class AlbumPagePreview(_PreviewPageBase):
             or Translator("en")
         )
 
+        self._page_renderer = PageRenderer(
+            translator=self._translator,
+        )
+
         self._project_photos = tuple(
             project_photos or ()
         )
@@ -624,52 +564,48 @@ class AlbumPagePreview(_PreviewPageBase):
     ) -> None:
         painter = QPainter(self)
 
-        self._paint_paper(painter)
-
-        page = self._composition.page
-
-        if (
-            page.kind == PlanItemKind.SPECIAL_PAGE
-            and page.page_instance is not None
-            and self._render_template_special_page(
-                painter
-            )
-        ):
-            pass
-
-        elif (
-            page.kind == PlanItemKind.PHOTO_GROUP
-            and self._render_template_page(
-                painter
-            )
-        ):
-            pass
-
-        elif (
-            page.kind
-            == PlanItemKind.MONTH_DIVIDER
-            and self._render_template_page(
-                painter
-            )
-        ):
-            pass
-
-        elif (
-            page.kind == PlanItemKind.YEAR_DIVIDER
-            and self._render_template_page(
-                painter
-            )
-        ):
-            pass
-
-        else:
-            self._paint_non_photo_page(
+        try:
+            self._paint_paper(
                 painter
             )
 
-        self._paint_page_number(
-            painter
-        )
+            self._page_renderer.paint(
+                painter=painter,
+                composition=self._composition,
+                target_rect=self.rect(),
+                width=self.width(),
+                height=self.height(),
+                page_width_mm=(
+                    self._page_format.width_mm
+                ),
+                page_height_mm=(
+                    self._page_format.height_mm
+                ),
+                font_pixel_size=(
+                    self._print_font_pixel_size
+                ),
+                pixel_rect=self._pixel_rect,
+                thumbnail_cache=(
+                    self._thumbnail_cache
+                ),
+                project_photos=(
+                    self._project_photos
+                ),
+                album_pages=(
+                    self._album_pages
+                ),
+                render_service=(
+                    self._render_service
+                ),
+                set_waiting_key=(
+                    self._set_template_preview_key
+                ),
+                paint_fallback=(
+                    self._paint_non_photo_page
+                ),
+            )
+        finally:
+            painter.end()
 
     def _set_template_preview_key(
         self,
