@@ -34,6 +34,7 @@ from photoalbum.album import (
     DividerSettings,
     PageInstance,
     PageNumberSettings,
+    PageOrientation,
     PhotoCaptionSettings,
     PhotoPageSettings,
     PrintSettings,
@@ -81,6 +82,9 @@ class AlbumSettingsWidget(QWidget):
     def _create_content(self) -> None:
         layout = QVBoxLayout(self)
 
+        layout.addWidget(
+            self._create_page_format_group()
+        )
         layout.addWidget(self._create_covers_group())
         layout.addWidget(self._create_dividers_group())
         layout.addWidget(self._create_photo_pages_group())
@@ -111,6 +115,8 @@ class AlbumSettingsWidget(QWidget):
 
     def _connect_settings_signals(self) -> None:
         combos = [
+            self._page_format_combo,
+            self._orientation_combo,
             self._front_cover_combo,
             self._inside_front_cover_combo,
             self._inside_back_cover_combo,
@@ -156,6 +162,70 @@ class AlbumSettingsWidget(QWidget):
             return
 
         self.settings_changed.emit()
+
+    def _create_page_format_group(self) -> QGroupBox:
+        group = QGroupBox(
+            self._translator.tr(
+                "album.page_format"
+            )
+        )
+
+        form = QFormLayout(group)
+
+        self._page_format_combo = QComboBox()
+
+        self._page_format_combo.addItem(
+            "A4 — 210 × 297 mm",
+            "a4",
+        )
+        self._page_format_combo.addItem(
+            "A5 — 148 × 210 mm",
+            "a5",
+        )
+        self._page_format_combo.addItem(
+            "US Letter — 215,9 × 279,4 mm",
+            "us-letter",
+        )
+
+        form.addRow(
+            self._translator.tr(
+                "album.paper_format"
+            ),
+            self._page_format_combo,
+        )
+
+        self._orientation_combo = QComboBox()
+
+        self._orientation_combo.addItem(
+            self._translator.tr(
+                "album.orientation_portrait"
+            ),
+            PageOrientation.PORTRAIT.value,
+        )
+
+        self._orientation_combo.addItem(
+            self._translator.tr(
+                "album.orientation_landscape_development"
+            ),
+            PageOrientation.LANDSCAPE.value,
+        )
+
+        # Landscape is deliberately visible but unavailable
+        # until every page template supports it correctly.
+        model = self._orientation_combo.model()
+        landscape_item = model.item(1)
+
+        if landscape_item is not None:
+            landscape_item.setEnabled(False)
+
+        form.addRow(
+            self._translator.tr(
+                "album.orientation"
+            ),
+            self._orientation_combo,
+        )
+
+        return group
 
     def _create_covers_group(self) -> QGroupBox:
         group = QGroupBox(
@@ -712,6 +782,12 @@ class AlbumSettingsWidget(QWidget):
 
     def settings(self) -> AlbumStructureSettings:
         return AlbumStructureSettings(
+            page_format=str(
+                self._page_format_combo.currentData()
+            ),
+            orientation=PageOrientation(
+                self._orientation_combo.currentData()
+            ),
             covers={
                 position: CoverSettings(
                     position=position,
@@ -797,6 +873,28 @@ class AlbumSettingsWidget(QWidget):
         self._loading_settings = True
 
         try:
+            page_format_index = (
+                self._page_format_combo.findData(
+                    settings.page_format
+                )
+            )
+
+            if page_format_index >= 0:
+                self._page_format_combo.setCurrentIndex(
+                    page_format_index
+                )
+
+            orientation_index = (
+                self._orientation_combo.findData(
+                    settings.orientation.value
+                )
+            )
+
+            if orientation_index >= 0:
+                self._orientation_combo.setCurrentIndex(
+                    orientation_index
+                )
+
             self._set_combo_template(
                 self._front_cover_combo,
                 settings.covers[

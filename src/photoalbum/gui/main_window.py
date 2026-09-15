@@ -11,7 +11,10 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFileDialog,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -160,61 +163,120 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._project_label)
 
+        # ----------------------------------------------------
+        # Main project workflow
+        # ----------------------------------------------------
+
+        self._tabs = QTabWidget()
+        layout.addWidget(
+            self._tabs,
+            1,
+        )
+
+        # ----------------------------------------------------
+        # Photos tab
+        # ----------------------------------------------------
+
+        photos_tab = QWidget()
+        photos_layout = QVBoxLayout(
+            photos_tab
+        )
+
+        # Source folder.
         source_layout = QHBoxLayout()
 
         self._source_edit = QLineEdit()
-        self._source_edit.setReadOnly(True)
+        self._source_edit.setReadOnly(
+            True
+        )
 
         self._browse_source_button = QPushButton(
-            self._translator.tr("main.choose_source")
+            self._translator.tr(
+                "main.choose_source"
+            )
         )
+
         self._browse_source_button.clicked.connect(
             self._choose_source_directory
         )
 
-        source_layout.addWidget(QLabel(self._translator.tr("main.source_folder")))
-        source_layout.addWidget(self._source_edit, 1)
-        source_layout.addWidget(self._browse_source_button)
-
-        layout.addLayout(source_layout)
-
-        self._recursive_checkbox = QCheckBox(
-            self._translator.tr("main.include_subdirectories")
+        source_layout.addWidget(
+            QLabel(
+                self._translator.tr(
+                    "main.source_folder"
+                )
+            )
         )
+
+        source_layout.addWidget(
+            self._source_edit,
+            1,
+        )
+
+        source_layout.addWidget(
+            self._browse_source_button
+        )
+
+        photos_layout.addLayout(
+            source_layout
+        )
+
+        # Recursive scan.
+        self._recursive_checkbox = QCheckBox(
+            self._translator.tr(
+                "main.include_subdirectories"
+            )
+        )
+
         self._recursive_checkbox.toggled.connect(
             self._recursive_changed
         )
 
-        layout.addWidget(self._recursive_checkbox)
+        photos_layout.addWidget(
+            self._recursive_checkbox
+        )
 
+        # Analysis controls.
         action_layout = QHBoxLayout()
 
         self._analyze_button = QPushButton(
-            self._translator.tr("main.analyze_photos")
+            self._translator.tr(
+                "main.analyze_photos"
+            )
         )
+
         self._analyze_button.clicked.connect(
             self._start_scan
         )
 
         self._progress_bar = QProgressBar()
-        self._progress_bar.setVisible(False)
-
-        action_layout.addWidget(self._analyze_button)
-        action_layout.addWidget(self._progress_bar, 1)
-
-        layout.addLayout(action_layout)
-
-        self._summary_label = QLabel(
-            self._translator.tr("main.no_analysis")
+        self._progress_bar.setVisible(
+            False
         )
-        layout.addWidget(self._summary_label)
 
-        self._tabs = QTabWidget()
-        layout.addWidget(self._tabs, 1)
+        action_layout.addWidget(
+            self._analyze_button
+        )
 
-        photos_tab = QWidget()
-        photos_layout = QVBoxLayout(photos_tab)
+        action_layout.addWidget(
+            self._progress_bar,
+            1,
+        )
 
+        photos_layout.addLayout(
+            action_layout
+        )
+
+        # Analysis summary.
+        self._summary_label = QLabel(
+            self._translator.tr(
+                "main.no_analysis"
+            )
+        )
+
+        photos_layout.addWidget(
+            self._summary_label
+        )
 
         self._photo_model = PhotoTableModel(
             translator=self._translator,
@@ -337,7 +399,385 @@ class MainWindow(QMainWindow):
             self._album_preview_widget,
             self._translator.tr("tab.preview"),
         )
+
+        # ----------------------------------------------------
+        # Final rendering / PDF tab
+        # ----------------------------------------------------
+
+        self._render_tab = QWidget()
+
+        render_layout = QVBoxLayout(
+            self._render_tab
+        )
+
+        render_title = QLabel(
+            self._translator.tr(
+                "render.title"
+            )
+        )
+        render_title.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+        render_layout.addWidget(render_title)
+
+        render_description = QLabel(
+            self._translator.tr(
+                "render.description"
+            )
+        )
+        render_description.setWordWrap(True)
+        render_layout.addWidget(
+            render_description
+        )
+
+        # Output file.
+        output_group = QGroupBox(
+            self._translator.tr(
+                "render.output_group"
+            )
+        )
+        output_layout = QHBoxLayout(
+            output_group
+        )
+
+        self._pdf_output_edit = QLineEdit()
+        self._pdf_output_edit.setPlaceholderText(
+            self._translator.tr(
+                "render.output_placeholder"
+            )
+        )
+
+        self._pdf_output_button = QPushButton(
+            self._translator.tr(
+                "render.browse"
+            )
+        )
+        self._pdf_output_button.clicked.connect(
+            self._choose_pdf_output
+        )
+
+        output_layout.addWidget(
+            self._pdf_output_edit,
+            1,
+        )
+        output_layout.addWidget(
+            self._pdf_output_button
+        )
+
+        render_layout.addWidget(output_group)
+
+        # Quality.
+        quality_group = QGroupBox(
+            self._translator.tr(
+                "render.quality_group"
+            )
+        )
+        quality_layout = QFormLayout(
+            quality_group
+        )
+
+        self._pdf_dpi_combo = QComboBox()
+
+        self._pdf_dpi_combo.addItem(
+            self._translator.tr(
+                "render.dpi_screen"
+            ),
+            96,
+        )
+        self._pdf_dpi_combo.addItem(
+            self._translator.tr(
+                "render.dpi_good"
+            ),
+            150,
+        )
+        self._pdf_dpi_combo.addItem(
+            self._translator.tr(
+                "render.dpi_print"
+            ),
+            300,
+        )
+        self._pdf_dpi_combo.addItem(
+            self._translator.tr(
+                "render.dpi_high"
+            ),
+            600,
+        )
+
+        self._pdf_dpi_combo.setCurrentIndex(2)
+        self._pdf_dpi_combo.currentIndexChanged.connect(
+            self._update_pdf_summary
+        )
+
+        quality_layout.addRow(
+            self._translator.tr(
+                "render.resolution"
+            ),
+            self._pdf_dpi_combo,
+        )
+
+        self._pdf_pixel_size_label = QLabel()
+        self._pdf_pixel_size_label.setWordWrap(True)
+
+        quality_layout.addRow(
+            self._translator.tr(
+                "render.pixel_size"
+            ),
+            self._pdf_pixel_size_label,
+        )
+
+        render_layout.addWidget(quality_group)
+
+        # PDF metadata.
+        metadata_group = QGroupBox(
+            self._translator.tr(
+                "render.metadata_group"
+            )
+        )
+        metadata_layout = QFormLayout(
+            metadata_group
+        )
+
+        self._pdf_title_edit = QLineEdit()
+        self._pdf_author_edit = QLineEdit()
+        self._pdf_subject_edit = QLineEdit()
+        self._pdf_keywords_edit = QLineEdit()
+
+        metadata_layout.addRow(
+            self._translator.tr(
+                "render.metadata_title"
+            ),
+            self._pdf_title_edit,
+        )
+        metadata_layout.addRow(
+            self._translator.tr(
+                "render.metadata_author"
+            ),
+            self._pdf_author_edit,
+        )
+        metadata_layout.addRow(
+            self._translator.tr(
+                "render.metadata_subject"
+            ),
+            self._pdf_subject_edit,
+        )
+        metadata_layout.addRow(
+            self._translator.tr(
+                "render.metadata_keywords"
+            ),
+            self._pdf_keywords_edit,
+        )
+
+        render_layout.addWidget(metadata_group)
+
+        # Document summary.
+        document_group = QGroupBox(
+            self._translator.tr(
+                "render.document_group"
+            )
+        )
+        document_layout = QFormLayout(
+            document_group
+        )
+
+        self._pdf_format_label = QLabel()
+        self._pdf_orientation_label = QLabel()
+        self._pdf_pages_label = QLabel()
+        self._pdf_photos_label = QLabel()
+
+        document_layout.addRow(
+            self._translator.tr(
+                "render.document_format"
+            ),
+            self._pdf_format_label,
+        )
+        document_layout.addRow(
+            self._translator.tr(
+                "render.document_orientation"
+            ),
+            self._pdf_orientation_label,
+        )
+        document_layout.addRow(
+            self._translator.tr(
+                "render.document_pages"
+            ),
+            self._pdf_pages_label,
+        )
+        document_layout.addRow(
+            self._translator.tr(
+                "render.document_photos"
+            ),
+            self._pdf_photos_label,
+        )
+
+        render_layout.addWidget(document_group)
+
+        render_layout.addStretch(1)
+
+        action_layout = QHBoxLayout()
+        action_layout.addStretch(1)
+
+        self._generate_pdf_button = QPushButton(
+            self._translator.tr(
+                "render.generate"
+            )
+        )
+
+        # The UI is ready, but the final PDF renderer
+        # will be implemented separately.
+        self._generate_pdf_button.setEnabled(False)
+        self._generate_pdf_button.setToolTip(
+            self._translator.tr(
+                "render.generate_development"
+            )
+        )
+
+        action_layout.addWidget(
+            self._generate_pdf_button
+        )
+
+        render_layout.addLayout(action_layout)
+
+        self._tabs.addTab(
+            self._render_tab,
+            self._translator.tr(
+                "tab.render"
+            ),
+        )
+
+        self._update_pdf_summary()
+
         self.setCentralWidget(central_widget)
+
+    def _choose_pdf_output(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            self._translator.tr(
+                "render.output_dialog"
+            ),
+            self._pdf_output_edit.text(),
+            "PDF (*.pdf)",
+        )
+
+        if not path:
+            return
+
+        if not path.lower().endswith(".pdf"):
+            path += ".pdf"
+
+        self._pdf_output_edit.setText(path)
+
+    def _update_pdf_summary(self) -> None:
+        if not hasattr(
+            self,
+            "_pdf_format_label",
+        ):
+            return
+
+        try:
+            settings = (
+                self._album_settings_widget.settings()
+            )
+        except Exception:
+            return
+
+        formats = {
+            "a4": (
+                "A4",
+                210.0,
+                297.0,
+            ),
+            "a5": (
+                "A5",
+                148.0,
+                210.0,
+            ),
+            "us-letter": (
+                "US Letter",
+                215.9,
+                279.4,
+            ),
+        }
+
+        format_name, width_mm, height_mm = (
+            formats.get(
+                settings.page_format,
+                formats["a4"],
+            )
+        )
+
+        orientation = (
+            settings.orientation.value
+        )
+
+        if orientation == "landscape":
+            width_mm, height_mm = (
+                height_mm,
+                width_mm,
+            )
+
+        dpi = int(
+            self._pdf_dpi_combo.currentData()
+        )
+
+        width_px = round(
+            width_mm / 25.4 * dpi
+        )
+        height_px = round(
+            height_mm / 25.4 * dpi
+        )
+
+        self._pdf_format_label.setText(
+            (
+                f"{format_name} — "
+                f"{width_mm:g} × "
+                f"{height_mm:g} mm"
+            )
+        )
+
+        if orientation == "landscape":
+            orientation_text = (
+                self._translator.tr(
+                    "render.landscape"
+                )
+            )
+        else:
+            orientation_text = (
+                self._translator.tr(
+                    "render.portrait"
+                )
+            )
+
+        self._pdf_orientation_label.setText(
+            orientation_text
+        )
+
+        self._pdf_pixel_size_label.setText(
+            self._translator.tr(
+                "render.pixel_dimensions",
+                width=width_px,
+                height=height_px,
+                dpi=dpi,
+            )
+        )
+
+        photos = []
+
+        if self._project_service.is_open:
+            photos = (
+                self._project_service.list_photos()
+            )
+
+        self._pdf_photos_label.setText(
+            str(len(photos))
+        )
+
+        # Page count will be connected to the built
+        # album plan in the next PDF-rendering step.
+        self._pdf_pages_label.setText(
+            self._translator.tr(
+                "render.page_count_pending"
+            )
+        )
 
     def _create_status_bar(self) -> None:
         status_bar = QStatusBar()
@@ -445,6 +885,13 @@ class MainWindow(QMainWindow):
         self._load_project_settings()
         self._load_project_photos()
         self._update_project_state()
+
+        # Opening an existing project also synchronizes it with
+        # its source directory. The scanner already reuses
+        # unchanged photos, so only new or changed files require
+        # actual analysis.
+        if self._source_edit.text().strip():
+            self._start_scan()
 
     def _close_project(self) -> None:
         self._preview_render_service.clear()
@@ -576,15 +1023,67 @@ class MainWindow(QMainWindow):
             return
 
         if not source_directory.exists():
-            self._show_error(
-                self._translator.tr(
-                    "main.source_missing_error",
-                    path=source_directory,
-                )
+            message = self._translator.tr(
+                "main.source_missing_error",
+                path=source_directory,
             )
+
+            if self._log_view.document().blockCount() > 1:
+                self._log_view.appendPlainText(
+                    ""
+                )
+
+            self._log_view.appendPlainText(
+                "────────────────────────────────────────"
+            )
+            self._log_view.appendPlainText(
+                f"⚠ {message}"
+            )
+            self._log_view.appendPlainText(
+                "────────────────────────────────────────"
+            )
+
+            self._summary_label.setText(
+                message
+            )
+
+            self._show_error(
+                message
+            )
+
+            # The source folder is unavailable: Photos is the
+            # only meaningful tab until the source is fixed.
+            self._set_scan_running(
+                False
+            )
+
+            self._tabs.setCurrentIndex(
+                0
+            )
+
             return
 
-        self._log_view.clear()
+        # Keep the analysis log for the whole project session.
+        # A new scan starts a new section instead of erasing
+        # previous events.
+        if self._log_view.document().blockCount() > 1:
+            self._log_view.appendPlainText(
+                ""
+            )
+
+        self._log_view.appendPlainText(
+            "────────────────────────────────────────"
+        )
+        self._log_view.appendPlainText(
+            self._translator.tr(
+                "main.analysis_log_header",
+                path=source_directory,
+            )
+        )
+        self._log_view.appendPlainText(
+            "────────────────────────────────────────"
+        )
+
         self._summary_label.setText(
             self._translator.tr("main.analysis_running")
         )
@@ -754,6 +1253,41 @@ class MainWindow(QMainWindow):
         self._update_album_years(all_photos)
         self._refresh_album_plan()
 
+        if result.missing_photos:
+            self._log_view.appendPlainText(
+                ""
+            )
+
+            self._log_view.appendPlainText(
+                self._translator.tr(
+                    "main.missing_photos_log_header",
+                    count=len(
+                        result.missing_photos
+                    ),
+                )
+            )
+
+            for photo in result.missing_photos:
+                self._log_view.appendPlainText(
+                    self._translator.tr(
+                        "main.missing_photo_log",
+                        path=photo.path,
+                    )
+                )
+
+            QMessageBox.warning(
+                self,
+                self._translator.tr(
+                    "main.missing_photos_title"
+                ),
+                self._translator.tr(
+                    "main.missing_photos_warning",
+                    count=len(
+                        result.missing_photos
+                    ),
+                ),
+            )
+
         self._summary_label.setText(
             " | ".join(
                 [
@@ -873,15 +1407,43 @@ class MainWindow(QMainWindow):
             )
         )
 
-        # Photos remains available for progress/logs.
-        # Every derived view is locked while scanning.
+        # Photos remains available for source selection,
+        # progress and logs.
+        #
+        # Every derived view requires a valid source folder.
+        source_directory = (
+            self._project_service.get_source_directory()
+            if self._project_service.is_open
+            else None
+        )
+
+        source_available = (
+            source_directory is not None
+            and source_directory.exists()
+        )
+
+        derived_tabs_enabled = (
+            self._project_service.is_open
+            and not running
+            and source_available
+        )
+
+        # Photos is always available. It is the entry point
+        # for creating/opening a project, selecting the source
+        # folder and reading the analysis log.
+        if self._tabs.count() > 0:
+            self._tabs.setTabEnabled(
+                0,
+                True,
+            )
+
         for index in range(
             1,
             self._tabs.count(),
         ):
             self._tabs.setTabEnabled(
                 index,
-                not running,
+                derived_tabs_enabled,
             )
 
         self._progress_bar.setVisible(
@@ -944,6 +1506,13 @@ class MainWindow(QMainWindow):
                 self._translator.tr("main.no_project")
             )
             self.statusBar().showMessage(self._translator.tr("main.ready"))
+
+        # Re-evaluate tab availability as part of every
+        # project-state refresh.
+        self._set_scan_running(
+            self._scan_thread is not None
+        )
+
 
     def _update_album_years(
         self,
@@ -1096,11 +1665,8 @@ class MainWindow(QMainWindow):
                     settings,
                     photos,
                 )
-            except Exception as exc:
-                print(
-                    "[preview-prewarm] disabled for this refresh:",
-                    repr(exc),
-                )
+            except Exception:
+                pass
 
         except Exception as exc:
             self._album_plan_widget.clear()
@@ -1124,6 +1690,7 @@ class MainWindow(QMainWindow):
                 settings
             )
             self._refresh_album_plan()
+            self._update_pdf_summary()
         except Exception as exc:
             self._show_error(
                 self._translator.tr(

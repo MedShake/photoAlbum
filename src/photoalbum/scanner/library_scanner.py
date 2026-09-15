@@ -27,12 +27,16 @@ class ScanStatistics:
     geocoded: int = 0
     date_anomalies: int = 0
     errors: int = 0
+    missing: int = 0
 
 @dataclass
 class LibraryScanResult:
     photos: list[Photo] = field(default_factory=list)
     date_anomalies: list[Photo] = field(default_factory=list)
     errors: list[ScanError] = field(default_factory=list)
+    missing_photos: list[Photo] = field(
+        default_factory=list
+    )
     statistics: ScanStatistics = field(
         default_factory=ScanStatistics
     )
@@ -100,11 +104,66 @@ class LibraryScanner:
             else:
                 result.photos.append(photo)
 
+        self._synchronize_missing_photos(
+            image_paths,
+            result,
+        )
+
         result.photos.sort(
             key=lambda photo: photo.capture_datetime
         )
 
         return result
+
+    def _synchronize_missing_photos(
+        self,
+        image_paths: list[Path],
+        result: LibraryScanResult,
+    ) -> None:
+        if self._photo_repository is None:
+            return
+
+        discovered_paths = {
+            str(path)
+            for path in image_paths
+        }
+
+        known_photos = (
+            self._photo_repository.list_all(
+                include_missing=True
+            )
+        )
+
+        for photo in known_photos:
+            path_key = str(photo.path)
+
+            if path_key in discovered_paths:
+                # Also reactivates a previously missing photo
+                # that has returned unchanged and was therefore
+                # reused from the cache.
+                self._photo_repository.set_missing(
+                    photo.path,
+                    False,
+                )
+                continue
+
+            # Do not report the same disappearance on every scan.
+            # list_all(include_missing=True) returns both states,
+            # so inspect the database state before changing it.
+            if self._photo_repository.is_missing(
+                photo.path
+            ):
+                continue
+
+            self._photo_repository.set_missing(
+                photo.path,
+                True,
+            )
+
+            result.missing_photos.append(
+                photo
+            )
+            result.statistics.missing += 1
 
     def _get_or_process_photo(
         self,

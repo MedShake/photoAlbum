@@ -122,7 +122,8 @@ class ProjectDatabase:
                 place_name TEXT,
                 city TEXT,
                 address TEXT,
-                location_source TEXT NOT NULL DEFAULT 'unknown'
+                location_source TEXT NOT NULL DEFAULT 'unknown',
+                is_missing INTEGER NOT NULL DEFAULT 0
             )
             """
         )

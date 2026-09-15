@@ -7,6 +7,11 @@ from uuid import uuid4
 from .models import CoverPosition
 
 
+class PageOrientation(str, Enum):
+    PORTRAIT = "portrait"
+    LANDSCAPE = "landscape"
+
+
 class DividerPlacement(str, Enum):
     NATURAL = "natural"
     RIGHT_PAGE = "right_page"
@@ -196,6 +201,9 @@ class AlbumStructureSettings:
     year_dividers: DividerSettings
 
     photo_pages: PhotoPageSettings
+
+    page_format: str = "a4"
+    orientation: PageOrientation = PageOrientation.PORTRAIT
 
     page_numbers: PageNumberSettings = field(
         default_factory=PageNumberSettings

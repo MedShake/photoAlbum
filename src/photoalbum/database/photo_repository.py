@@ -37,9 +37,10 @@ class PhotoRepository:
                 place_name,
                 city,
                 address,
-                location_source
+                location_source,
+                is_missing
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(path) DO UPDATE SET
                 filename = excluded.filename,
                 file_size = excluded.file_size,
@@ -55,7 +56,8 @@ class PhotoRepository:
                 place_name = excluded.place_name,
                 city = excluded.city,
                 address = excluded.address,
-                location_source = excluded.location_source
+                location_source = excluded.location_source,
+                is_missing = 0
             """,
             (
                 str(photo.path),
@@ -74,6 +76,7 @@ class PhotoRepository:
                 photo.city,
                 photo.address,
                 photo.location_source.value,
+                0,
             ),
         )
 
@@ -94,19 +97,70 @@ class PhotoRepository:
 
         return self._row_to_photo(row)
 
-    def list_all(self) -> list[Photo]:
-        rows = self._database.connection.execute(
-            """
-            SELECT *
-            FROM photos
-            ORDER BY capture_datetime, filename
-            """
-        ).fetchall()
+    def list_all(
+        self,
+        *,
+        include_missing: bool = False,
+    ) -> list[Photo]:
+        if include_missing:
+            rows = self._database.connection.execute(
+                """
+                SELECT *
+                FROM photos
+                ORDER BY capture_datetime, filename
+                """
+            ).fetchall()
+        else:
+            rows = self._database.connection.execute(
+                """
+                SELECT *
+                FROM photos
+                WHERE is_missing = 0
+                ORDER BY capture_datetime, filename
+                """
+            ).fetchall()
 
         return [
             self._row_to_photo(row)
             for row in rows
         ]
+
+    def is_missing(
+        self,
+        path: Path,
+    ) -> bool:
+        row = self._database.connection.execute(
+            """
+            SELECT is_missing
+            FROM photos
+            WHERE path = ?
+            """,
+            (str(path),),
+        ).fetchone()
+
+        if row is None:
+            return False
+
+        return bool(row["is_missing"])
+
+    def set_missing(
+        self,
+        path: Path,
+        missing: bool,
+    ) -> None:
+        self._database.connection.execute(
+            """
+            UPDATE photos
+            SET is_missing = ?
+            WHERE path = ?
+            """,
+            (
+                1 if missing else 0,
+                str(path),
+            ),
+        )
+
+        self._database.connection.commit()
 
     def set_manual_capture_datetime(
         self,

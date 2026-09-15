@@ -25,6 +25,13 @@ A4 = PageFormat(
 )
 
 
+A5 = PageFormat(
+    name="A5",
+    width_mm=148.0,
+    height_mm=210.0,
+)
+
+
 US_LETTER = PageFormat(
     name="US Letter",
     width_mm=215.9,

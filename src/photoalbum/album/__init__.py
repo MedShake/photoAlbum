@@ -1,5 +1,6 @@
 from .models import (
     A4,
+    A5,
     US_LETTER,
     CoverPosition,
     PageFormat,
@@ -14,6 +15,7 @@ from .settings import (
     DividerSettings,
     PageInstance,
     PageNumberSettings,
+    PageOrientation,
     PhotoCaptionSettings,
     PhotoPageSettings,
     PrintSettings,
@@ -69,6 +71,7 @@ from .summary import (
 
 __all__ = [
     "A4",
+    "A5",
     "US_LETTER",
     "AlbumStructureSettings",
     "CoverPosition",
@@ -79,6 +82,7 @@ __all__ = [
     "PageFormat",
     "PageInstance",
     "PageNumberSettings",
+    "PageOrientation",
     "PhotoCaptionSettings",
     "PhotoPageSettings",
     "PrintSettings",

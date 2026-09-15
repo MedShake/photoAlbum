@@ -50,6 +50,42 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.album": "Design",
         "tab.plan": "Plan",
         "tab.preview": "Preview",
+        "tab.render": "PDF",
+        "render.title": "PDF",
+        "render.description": (
+            "Configure the final PDF export."
+        ),
+        "render.output_group": "Output file",
+        "render.output_placeholder": "Choose the PDF file to create",
+        "render.browse": "Browse…",
+        "render.output_dialog": "Save PDF",
+        "render.quality_group": "Quality",
+        "render.resolution": "Resolution",
+        "render.pixel_size": "Page size",
+        "render.dpi_screen": "Screen — 96 DPI",
+        "render.dpi_good": "Good quality — 150 DPI",
+        "render.dpi_print": "Print — 300 DPI",
+        "render.dpi_high": "High resolution — 600 DPI",
+        "render.pixel_dimensions": (
+            "{width} × {height} pixels at {dpi} DPI"
+        ),
+        "render.metadata_group": "PDF metadata",
+        "render.metadata_title": "Title",
+        "render.metadata_author": "Author",
+        "render.metadata_subject": "Subject",
+        "render.metadata_keywords": "Keywords",
+        "render.document_group": "Document",
+        "render.document_format": "Format",
+        "render.document_orientation": "Orientation",
+        "render.document_pages": "Pages",
+        "render.document_photos": "Photos",
+        "render.portrait": "Portrait",
+        "render.landscape": "Landscape",
+        "render.page_count_pending": "Calculated during generation",
+        "render.generate": "Generate PDF",
+        "render.generate_development": (
+            "PDF generation is in development."
+        ),
         "page_settings.title": "Page settings",
         "calendar_index.title": "Index",
         "calendar_index.year": "Year",
@@ -120,6 +156,25 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.source_missing_error": (
             "Source folder does not exist: {path}"
         ),
+        "main.analysis_log_header": (
+            "Analysis of source folder: {path}"
+        ),
+        "main.missing_photos_title": (
+            "Missing files"
+        ),
+        "main.missing_photos_warning": (
+            "{count} file(s) belonging to this project "
+            "are no longer present in the source folder. "
+            "See the analysis log for details."
+        ),
+        "main.missing_photos_log_header": (
+            "⚠ {count} project file(s) are missing "
+            "from the source folder:"
+        ),
+        "main.missing_photo_log": (
+            "⚠ The file {path} belongs to the project "
+            "but is no longer present in the source folder."
+        ),
         "main.save_album_error": (
             "Could not save album settings: {error}"
         ),
@@ -142,6 +197,13 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Photos requiring a capture date:"
         ),
 
+        "album.page_format": "Page format",
+        "album.paper_format": "Format",
+        "album.orientation": "Orientation",
+        "album.orientation_portrait": "Portrait",
+        "album.orientation_landscape_development": (
+            "Landscape — in development"
+        ),
         "album.covers": "Covers",
         "album.settings": "Settings…",
         "album.cover_scatter": "Cover collage",
@@ -319,6 +381,42 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.album": "Conception",
         "tab.plan": "Plan",
         "tab.preview": "Aperçu",
+        "tab.render": "PDF",
+        "render.title": "PDF",
+        "render.description": (
+            "Configurez l’export du document PDF final."
+        ),
+        "render.output_group": "Fichier de sortie",
+        "render.output_placeholder": "Choisissez le fichier PDF à créer",
+        "render.browse": "Parcourir…",
+        "render.output_dialog": "Enregistrer le PDF",
+        "render.quality_group": "Qualité",
+        "render.resolution": "Résolution",
+        "render.pixel_size": "Taille de page",
+        "render.dpi_screen": "Écran — 96 DPI",
+        "render.dpi_good": "Bonne qualité — 150 DPI",
+        "render.dpi_print": "Impression — 300 DPI",
+        "render.dpi_high": "Haute résolution — 600 DPI",
+        "render.pixel_dimensions": (
+            "{width} × {height} pixels à {dpi} DPI"
+        ),
+        "render.metadata_group": "Métadonnées PDF",
+        "render.metadata_title": "Titre",
+        "render.metadata_author": "Auteur",
+        "render.metadata_subject": "Sujet",
+        "render.metadata_keywords": "Mots-clés",
+        "render.document_group": "Document",
+        "render.document_format": "Format",
+        "render.document_orientation": "Orientation",
+        "render.document_pages": "Pages",
+        "render.document_photos": "Photos",
+        "render.portrait": "Portrait",
+        "render.landscape": "Paysage",
+        "render.page_count_pending": "Calculé lors de la génération",
+        "render.generate": "Générer le PDF",
+        "render.generate_development": (
+            "La génération PDF est en développement."
+        ),
         "page_settings.title": "Réglages de la page",
         "calendar_index.title": "Index",
         "calendar_index.year": "Année",
@@ -389,6 +487,26 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.source_missing_error": (
             "Le dossier source n’existe pas : {path}"
         ),
+        "main.analysis_log_header": (
+            "Analyse du dossier source : {path}"
+        ),
+        "main.missing_photos_title": (
+            "Fichiers manquants"
+        ),
+        "main.missing_photos_warning": (
+            "{count} fichier(s) appartenant à ce projet "
+            "ne sont plus présents dans le dossier source. "
+            "Consultez le journal d’analyse pour connaître "
+            "les fichiers concernés."
+        ),
+        "main.missing_photos_log_header": (
+            "⚠ {count} fichier(s) du projet sont manquants "
+            "dans le dossier source :"
+        ),
+        "main.missing_photo_log": (
+            "⚠ Le fichier {path} appartient au projet "
+            "mais n’est plus présent dans le dossier source."
+        ),
         "main.save_album_error": (
             "Impossible d’enregistrer les réglages de l’album : {error}"
         ),
@@ -411,6 +529,13 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Photos nécessitant une date de prise de vue :"
         ),
 
+        "album.page_format": "Format de page",
+        "album.paper_format": "Format",
+        "album.orientation": "Orientation",
+        "album.orientation_portrait": "Portrait",
+        "album.orientation_landscape_development": (
+            "Paysage — en développement"
+        ),
         "album.covers": "Couvertures",
         "album.settings": "Réglages…",
         "album.cover_scatter": "Pêle-mêle de couverture",

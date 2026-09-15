@@ -10,6 +10,7 @@ from .settings import (
     DividerSettings,
     PageInstance,
     PageNumberSettings,
+    PageOrientation,
     PhotoCaptionSettings,
     PhotoPageSettings,
     PrintSettings,
@@ -87,6 +88,9 @@ def album_settings_to_json(
         "page_numbers": {
             "enabled": settings.page_numbers.enabled,
         },
+
+        "page_format": settings.page_format,
+        "orientation": settings.orientation.value,
 
         "print_settings": {
             "page_multiple": (
@@ -179,6 +183,13 @@ def album_settings_from_json(
             enabled=bool(
                 page_number_data["enabled"]
             ),
+        ),
+
+        page_format=str(
+            data["page_format"]
+        ),
+        orientation=PageOrientation(
+            data["orientation"]
         ),
 
         print_settings=PrintSettings(

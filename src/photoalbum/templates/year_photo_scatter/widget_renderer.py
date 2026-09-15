@@ -196,9 +196,31 @@ class YearPhotoScatterWidgetRenderer:
             True
         )
 
+        title = composition.title.strip()
+
+        # Historical PHP cover used a very large 200 pt title
+        # for a single year.
+        if (
+            len(title) == 4
+            and title.isdigit()
+        ):
+            title_font_pt = 200
+
+        elif (
+            len(title) == 9
+            and title[4] == "-"
+            and title[:4].isdigit()
+            and title[5:].isdigit()
+        ):
+            title_font_pt = 120
+
+        else:
+            # Typically "Mois ANNEE".
+            title_font_pt = 105
+
         font.setPixelSize(
             font_pixel_size(
-                72
+                title_font_pt
             )
         )
 

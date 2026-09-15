@@ -319,19 +319,11 @@ class PreviewRenderService(QObject):
         )
 
         if key in self._cache:
-            print(
-                "[preview-cache] HIT",
-                key.template_id,
-                key.instance_id,
-            )
+
             return key
 
         if key in self._pending:
-            print(
-                "[preview-cache] PENDING",
-                key.template_id,
-                key.instance_id,
-            )
+
             return key
 
         # A template without an expensive preview backend simply
@@ -362,17 +354,7 @@ class PreviewRenderService(QObject):
             self._render_failed
         )
 
-        print(
-            "[preview-cache] MISS -> RENDER",
-            key.template_id,
-            key.instance_id,
-            "settings="
-            + key.settings_signature[:10],
-            "photos="
-            + key.photos_signature[:10],
-            f"size={key.width}x{key.height}",
-            f"effective_count={len(photos)}",
-        )
+
 
         self._pending.add(
             key
