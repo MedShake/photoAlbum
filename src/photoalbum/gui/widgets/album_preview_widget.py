@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import (
+    QEvent,
     QRect,
     QSize,
+    QTimer,
     Qt,
 )
 from PySide6.QtGui import (
@@ -57,6 +59,7 @@ from photoalbum.rendering import (
 
 
 PREVIEW_PAGE_WIDTH = 300
+PREVIEW_PAGE_MAX_WIDTH = 550
 
 
 PreviewThumbnailCache = RenderImageCache
@@ -80,10 +83,31 @@ class _PreviewPageBase(QWidget):
             / page_format.width_mm
         )
 
-        self.setFixedSize(
-            self.PAGE_WIDTH,
-            round(self.PAGE_WIDTH * ratio),
+        self._page_ratio = ratio
+
+        self.set_page_width(
+            self.PAGE_WIDTH
         )
+
+    def set_page_width(
+        self,
+        width: int,
+    ) -> None:
+        width = max(
+            1,
+            int(width),
+        )
+
+        self.setFixedSize(
+            width,
+            round(
+                width * self._page_ratio
+            ),
+        )
+
+        # Font sizes and all other print-scaled elements depend
+        # on the current preview width. Repaint after resizing.
+        self.update()
 
     def _pixel_rect(
         self,
@@ -737,9 +761,17 @@ class AlbumPreviewWidget(QWidget):
 
         self._composer = PageComposer()
         self._thumbnail_cache = PreviewThumbnailCache()
+        self._page_widgets: list[_PreviewPageBase] = []
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
+
+        # The scroll viewport is the real source of the width
+        # available to a two-page spread. Its geometry may change
+        # without AlbumPreviewWidget itself receiving a resize.
+        self._scroll.viewport().installEventFilter(
+            self
+        )
 
         self._content = QWidget()
 
@@ -776,7 +808,25 @@ class AlbumPreviewWidget(QWidget):
             if widget is not None:
                 widget.deleteLater()
 
+        self._page_widgets.clear()
         self._thumbnail_cache.clear()
+
+    def _add_page_widget(
+        self,
+        widget: _PreviewPageBase,
+        row: int,
+        column: int,
+    ) -> None:
+        self._page_widgets.append(
+            widget
+        )
+
+        self._pages_grid.addWidget(
+            widget,
+            row,
+            column,
+            Qt.AlignmentFlag.AlignTop,
+        )
 
     def _cover_widget(
         self,
@@ -798,6 +848,63 @@ class AlbumPreviewWidget(QWidget):
             render_service=self._render_service,
         )
 
+    def _resize_page_widgets(
+        self,
+    ) -> None:
+        if not self._page_widgets:
+            return
+
+        viewport_width = (
+            self._scroll.viewport().width()
+        )
+
+        margins = (
+            self._pages_grid.contentsMargins()
+        )
+
+        available_width = (
+            viewport_width
+            - margins.left()
+            - margins.right()
+            - self.SPREAD_HORIZONTAL_GAP
+            - 8
+        )
+
+        page_width = min(
+            PREVIEW_PAGE_MAX_WIDTH,
+            max(
+                PREVIEW_PAGE_WIDTH,
+                available_width // 2,
+            ),
+        )
+
+        for widget in self._page_widgets:
+            widget.set_page_width(
+                page_width
+            )
+
+    def eventFilter(
+        self,
+        watched,
+        event,
+    ) -> bool:
+        if (
+            watched is self._scroll.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
+            # Let Qt finish the scroll-area layout first. In
+            # particular this matters when the Preview tab becomes
+            # visible for the first time.
+            QTimer.singleShot(
+                0,
+                self._resize_page_widgets,
+            )
+
+        return super().eventFilter(
+            watched,
+            event,
+        )
+
     def set_result(
         self,
         result: AlbumBuildResult,
@@ -814,7 +921,7 @@ class AlbumPreviewWidget(QWidget):
             )
 
         # Row 0: outer front cover, right side.
-        self._pages_grid.addWidget(
+        self._add_page_widget(
             self._cover_widget(
                 settings,
                 CoverPosition.FRONT,
@@ -822,11 +929,10 @@ class AlbumPreviewWidget(QWidget):
             ),
             0,
             1,
-            Qt.AlignmentFlag.AlignTop,
         )
 
         # Row 1: inside front cover on the left.
-        self._pages_grid.addWidget(
+        self._add_page_widget(
             self._cover_widget(
                 settings,
                 CoverPosition.INSIDE_FRONT,
@@ -834,7 +940,6 @@ class AlbumPreviewWidget(QWidget):
             ),
             1,
             0,
-            Qt.AlignmentFlag.AlignTop,
         )
 
         pages = result.pagination.pages
@@ -894,11 +999,10 @@ class AlbumPreviewWidget(QWidget):
                 else 1
             )
 
-            self._pages_grid.addWidget(
+            self._add_page_widget(
                 preview,
                 row,
                 column,
-                Qt.AlignmentFlag.AlignTop,
             )
 
         if pages:
@@ -916,7 +1020,7 @@ class AlbumPreviewWidget(QWidget):
             inside_back_row = 1
 
         # Inside back cover is a right-facing page.
-        self._pages_grid.addWidget(
+        self._add_page_widget(
             self._cover_widget(
                 settings,
                 CoverPosition.INSIDE_BACK,
@@ -924,11 +1028,10 @@ class AlbumPreviewWidget(QWidget):
             ),
             inside_back_row,
             1,
-            Qt.AlignmentFlag.AlignTop,
         )
 
         # Outside back cover is displayed alone on the left.
-        self._pages_grid.addWidget(
+        self._add_page_widget(
             self._cover_widget(
                 settings,
                 CoverPosition.BACK,
@@ -936,5 +1039,12 @@ class AlbumPreviewWidget(QWidget):
             ),
             inside_back_row + 1,
             0,
-            Qt.AlignmentFlag.AlignTop,
+        )
+
+        # The viewport can still have its old geometry while the
+        # preview tab is being populated. Resize once Qt has
+        # completed the current layout pass.
+        QTimer.singleShot(
+            0,
+            self._resize_page_widgets,
         )
