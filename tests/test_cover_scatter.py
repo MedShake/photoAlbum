@@ -94,14 +94,12 @@ def test_same_seed_is_reproducible():
     first = compose_cover_scatter(
         photos,
         seed=12345,
-        photo_count=6,
         month_name=month_name,
     )
 
     second = compose_cover_scatter(
         photos,
         seed=12345,
-        photo_count=6,
         month_name=month_name,
     )
 
@@ -122,14 +120,12 @@ def test_different_seed_changes_proposal():
     first = compose_cover_scatter(
         photos,
         seed=1,
-        photo_count=6,
         month_name=month_name,
     )
 
     second = compose_cover_scatter(
         photos,
         seed=2,
-        photo_count=6,
         month_name=month_name,
     )
 
@@ -150,7 +146,6 @@ def test_classic_cover_uses_all_dated_photos():
     composition = compose_cover_scatter(
         photos,
         seed=123,
-        photo_count=4,
         month_name=month_name,
     )
 

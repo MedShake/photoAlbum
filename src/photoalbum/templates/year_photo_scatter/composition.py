@@ -205,7 +205,6 @@ def compose_cover_scatter(
     photos: Iterable[Photo],
     *,
     seed: int,
-    photo_count: int | None = None,
     month_name: Callable[[int], str],
     page_width_mm: float = 210.0,
     page_height_mm: float = 297.0,
@@ -213,9 +212,8 @@ def compose_cover_scatter(
     """
     Build the historical random stacked-photo cover.
 
-    `photo_count` is retained for API/backward compatibility,
-    but the classic built-in template deliberately uses ALL
-    dated photos from the project.
+    The classic built-in template deliberately uses all dated
+    photos from the project.
     """
 
     eligible = [
