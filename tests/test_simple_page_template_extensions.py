@@ -5,6 +5,9 @@ from photoalbum.templates import (
 from photoalbum.templates.simple_label import (
     SimpleLabelWidgetRenderer,
 )
+from photoalbum.templates.year_divider_classic.widget_renderer import (
+    YearDividerClassicWidgetRenderer,
+)
 
 
 def test_year_divider_owns_renderer():
@@ -20,7 +23,12 @@ def test_year_divider_owns_renderer():
 
     assert isinstance(
         extension.widget_renderer,
-        SimpleLabelWidgetRenderer,
+        YearDividerClassicWidgetRenderer,
+    )
+
+    assert (
+        extension.settings_editor_type
+        is not None
     )
 
 

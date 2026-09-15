@@ -68,6 +68,11 @@ class AlbumSettingsWidget(QWidget):
             PageInstance,
         ] = {}
 
+        self._month_divider_instance: PageInstance | None = None
+        self._year_divider_instance: PageInstance | None = None
+
+        self._year_dividers_available = False
+
         self._photo_provider = None
 
         self._create_content()
@@ -435,6 +440,24 @@ class AlbumSettingsWidget(QWidget):
             self._month_divider_combo,
             1,
         )
+
+        self._month_divider_settings_button = QPushButton(
+            self._translator.tr(
+                "album.settings"
+            )
+        )
+
+        self._month_divider_settings_button.clicked.connect(
+            lambda checked=False:
+            self._configure_divider_instance(
+                "month"
+            )
+        )
+
+        month_layout.addWidget(
+            self._month_divider_settings_button
+        )
+
         month_layout.addWidget(
             self._month_placement_combo,
         )
@@ -462,6 +485,24 @@ class AlbumSettingsWidget(QWidget):
             self._year_divider_combo,
             1,
         )
+
+        self._year_divider_settings_button = QPushButton(
+            self._translator.tr(
+                "album.settings"
+            )
+        )
+
+        self._year_divider_settings_button.clicked.connect(
+            lambda checked=False:
+            self._configure_divider_instance(
+                "year"
+            )
+        )
+
+        year_layout.addWidget(
+            self._year_divider_settings_button
+        )
+
         year_layout.addWidget(
             self._year_placement_combo,
         )
@@ -479,6 +520,64 @@ class AlbumSettingsWidget(QWidget):
         )
 
         return group
+
+    def _configure_divider_instance(
+        self,
+        kind: str,
+    ) -> None:
+        if kind == "month":
+            combo = self._month_divider_combo
+            instance = self._month_divider_instance
+        elif kind == "year":
+            combo = self._year_divider_combo
+            instance = self._year_divider_instance
+        else:
+            raise ValueError(
+                f"Unknown divider kind: {kind}"
+            )
+
+        template_id = self._template_id(
+            combo
+        )
+
+        if (
+            instance is None
+            or instance.template_id != template_id
+        ):
+            instance = PageInstance(
+                template_id=template_id
+            )
+
+        photos = (
+            self._photo_provider()
+            if self._photo_provider is not None
+            else []
+        )
+
+        dialog = PageInstanceDialog(
+            instance,
+            photos,
+            translator=self._translator,
+            render_service=self._render_service,
+            page_format=page_format_from_id(
+                str(
+                    self._page_format_combo.currentData()
+                )
+            ),
+            parent=self,
+        )
+
+        if not dialog.exec():
+            return
+
+        instance = dialog.instance()
+
+        if kind == "month":
+            self._month_divider_instance = instance
+        else:
+            self._year_divider_instance = instance
+
+        self._emit_settings_changed()
 
     def _create_photo_pages_group(self) -> QGroupBox:
         group = QGroupBox(self._translator.tr("album.photo_pages"))
@@ -760,13 +859,15 @@ class AlbumSettingsWidget(QWidget):
         self,
         years: set[int],
     ) -> None:
-        available = len(years) > 1
-
-        self._year_dividers_checkbox.setEnabled(
-            available
+        self._year_dividers_available = (
+            len(years) > 1
         )
 
-        if available:
+        self._year_dividers_checkbox.setEnabled(
+            self._year_dividers_available
+        )
+
+        if self._year_dividers_available:
             self._year_divider_hint.setText(
                 self._translator.tr(
                     "album.years_detected",
@@ -811,6 +912,25 @@ class AlbumSettingsWidget(QWidget):
             self._loading_settings = False
 
 
+    def _divider_instance(
+        self,
+        current: PageInstance | None,
+        combo: QComboBox,
+    ) -> PageInstance:
+        template_id = self._template_id(
+            combo
+        )
+
+        if (
+            current is not None
+            and current.template_id == template_id
+        ):
+            return current
+
+        return PageInstance(
+            template_id=template_id,
+        )
+
     def settings(self) -> AlbumStructureSettings:
         return AlbumStructureSettings(
             page_format=str(
@@ -850,8 +970,9 @@ class AlbumSettingsWidget(QWidget):
                 enabled=(
                     self._month_dividers_checkbox.isChecked()
                 ),
-                template_id=self._template_id(
-                    self._month_divider_combo
+                page=self._divider_instance(
+                    self._month_divider_instance,
+                    self._month_divider_combo,
                 ),
                 placement=self._placement(
                     self._month_placement_combo
@@ -859,8 +980,9 @@ class AlbumSettingsWidget(QWidget):
             ),
             year_dividers=DividerSettings(
                 enabled=self._year_dividers_checkbox.isChecked(),
-                template_id=self._template_id(
-                    self._year_divider_combo
+                page=self._divider_instance(
+                    self._year_divider_instance,
+                    self._year_divider_combo,
                 ),
                 placement=self._placement(
                     self._year_placement_combo
@@ -963,6 +1085,11 @@ class AlbumSettingsWidget(QWidget):
             self._month_dividers_checkbox.setChecked(
                 settings.month_dividers.enabled
             )
+
+            self._month_divider_instance = (
+                settings.month_dividers.page
+            )
+
             self._set_combo_template(
                 self._month_divider_combo,
                 settings.month_dividers.template_id,
@@ -975,6 +1102,11 @@ class AlbumSettingsWidget(QWidget):
             self._year_dividers_checkbox.setChecked(
                 settings.year_dividers.enabled
             )
+
+            self._year_divider_instance = (
+                settings.year_dividers.page
+            )
+
             self._set_combo_template(
                 self._year_divider_combo,
                 settings.year_dividers.template_id,
@@ -1025,16 +1157,22 @@ class AlbumSettingsWidget(QWidget):
         self._month_divider_combo.setEnabled(
             month_enabled
         )
+        self._month_divider_settings_button.setEnabled(
+            month_enabled
+        )
         self._month_placement_combo.setEnabled(
             month_enabled
         )
 
         year_enabled = (
-            self._year_dividers_checkbox.isEnabled()
+            self._year_dividers_available
             and self._year_dividers_checkbox.isChecked()
         )
 
         self._year_divider_combo.setEnabled(
+            year_enabled
+        )
+        self._year_divider_settings_button.setEnabled(
             year_enabled
         )
         self._year_placement_combo.setEnabled(

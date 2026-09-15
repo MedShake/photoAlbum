@@ -161,11 +161,53 @@ class CoverSettings:
 SpecialPage = PageInstance
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class DividerSettings:
     enabled: bool
-    template_id: str
-    placement: DividerPlacement = DividerPlacement.RIGHT_PAGE
+    page: PageInstance
+    placement: DividerPlacement
+
+    def __init__(
+        self,
+        enabled: bool,
+        template_id: str | None = None,
+        placement: DividerPlacement = DividerPlacement.RIGHT_PAGE,
+        *,
+        page: PageInstance | None = None,
+    ) -> None:
+        if page is None:
+            if template_id is None:
+                raise ValueError(
+                    "template_id or page is required"
+                )
+
+            page = PageInstance(
+                template_id=template_id,
+            )
+
+        object.__setattr__(
+            self,
+            "enabled",
+            enabled,
+        )
+        object.__setattr__(
+            self,
+            "page",
+            page,
+        )
+        object.__setattr__(
+            self,
+            "placement",
+            placement,
+        )
+
+    @property
+    def template_id(self) -> str:
+        return self.page.template_id
+
+    @property
+    def instance_id(self) -> str:
+        return self.page.instance_id
 
 
 @dataclass(frozen=True)

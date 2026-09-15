@@ -101,6 +101,9 @@ class AlbumPlanner:
                                 settings.year_dividers.template_id
                             ),
                             year=year,
+                            page_instance=(
+                                settings.year_dividers.page
+                            ),
                         )
                     )
 

@@ -267,3 +267,32 @@ def test_undated_photos_are_not_planned():
         "dated.jpg",
     ]
 
+
+
+def test_year_divider_preserves_configured_page_instance():
+    album_settings = settings(years=True)
+
+    configured = album_settings.year_dividers.page
+    configured.settings["year_divider"] = {
+        "title_color": "#123456",
+    }
+
+    plan = AlbumPlanner().plan(
+        [
+            photo("a.jpg", datetime(2025, 12, 1)),
+            photo("b.jpg", datetime(2026, 1, 1)),
+        ],
+        album_settings,
+    )
+
+    dividers = [
+        item
+        for item in plan.items
+        if item.kind == PlanItemKind.YEAR_DIVIDER
+    ]
+
+    assert dividers
+    assert all(
+        item.page_instance == configured
+        for item in dividers
+    )

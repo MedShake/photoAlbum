@@ -39,6 +39,25 @@ def _instance_from_data(
     )
 
 
+def _divider_instance_from_data(
+    data: dict,
+) -> PageInstance:
+    page_data = data.get("page")
+
+    if isinstance(page_data, dict):
+        return _instance_from_data(
+            page_data
+        )
+
+    # Projects written before divider pages became
+    # independent PageInstance objects.
+    return PageInstance(
+        template_id=str(
+            data["template_id"]
+        )
+    )
+
+
 def album_settings_to_json(
     settings: AlbumStructureSettings,
 ) -> str:
@@ -53,8 +72,8 @@ def album_settings_to_json(
 
         "month_dividers": {
             "enabled": settings.month_dividers.enabled,
-            "template_id": (
-                settings.month_dividers.template_id
+            "page": _instance_to_data(
+                settings.month_dividers.page
             ),
             "placement": (
                 settings.month_dividers.placement.value
@@ -63,8 +82,8 @@ def album_settings_to_json(
 
         "year_dividers": {
             "enabled": settings.year_dividers.enabled,
-            "template_id": (
-                settings.year_dividers.template_id
+            "page": _instance_to_data(
+                settings.year_dividers.page
             ),
             "placement": (
                 settings.year_dividers.placement.value
@@ -145,8 +164,8 @@ def album_settings_from_json(
             enabled=bool(
                 month_data["enabled"]
             ),
-            template_id=str(
-                month_data["template_id"]
+            page=_divider_instance_from_data(
+                month_data
             ),
             placement=DividerPlacement(
                 month_data["placement"]
@@ -157,8 +176,8 @@ def album_settings_from_json(
             enabled=bool(
                 year_data["enabled"]
             ),
-            template_id=str(
-                year_data["template_id"]
+            page=_divider_instance_from_data(
+                year_data
             ),
             placement=DividerPlacement(
                 year_data["placement"]
