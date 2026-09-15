@@ -176,8 +176,9 @@ def _word_size_mm(
     text: str,
     font_size_pt: float,
 ) -> tuple[float, float]:
-    # Courier is monospaced. 0.60 em is a good approximation
-    # of FPDF Courier text width.
+    # The word cloud uses a controlled monospace font.
+    # 0.60 em is kept as the historical width approximation
+    # used by the placement algorithm.
     point_mm = 25.4 / 72.0
 
     height = (

@@ -10,6 +10,10 @@ from PySide6.QtGui import (
     QPainter,
 )
 
+from photoalbum.rendering.fonts import (
+    DEFAULT_SANS_FONT,
+    resolve_font_family,
+)
 from photoalbum.templates.calendar_index.composition import (
     CalendarIndexComposition,
 )
@@ -53,7 +57,9 @@ def paint_calendar_index(
         bold: bool = False,
     ) -> QFont:
         font = QFont(
-            "Arial"
+            resolve_font_family(
+                DEFAULT_SANS_FONT
+            )
         )
 
         font.setBold(

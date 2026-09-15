@@ -10,6 +10,11 @@ from PySide6.QtGui import (
     QPainter,
 )
 
+from photoalbum.rendering.fonts import (
+    DEFAULT_MONOSPACE_FONT,
+    resolve_font_family,
+)
+
 from .composition import GeographicWordCloud
 
 
@@ -43,7 +48,10 @@ def paint_geographic_word_cloud(
         )
 
         font = QFont(
-            "Courier"
+            resolve_font_family(
+                DEFAULT_MONOSPACE_FONT,
+                fallback=DEFAULT_MONOSPACE_FONT,
+            )
         )
 
         font.setBold(
