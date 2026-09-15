@@ -166,8 +166,6 @@ def test_locality_variants_are_classified():
                 "town": "Town",
                 "village": "Village",
                 "municipality": "Municipality",
-                "hamlet": "Hamlet",
-                "isolated_dwelling": "Isolated dwelling",
             }
         }
     )
@@ -220,3 +218,64 @@ def test_root_metadata_are_not_address_candidates():
         ("tourism", "Château de Chenonceau"),
         ("village", "Chenonceaux"),
     ]
+
+
+def test_aerialway_is_classified_as_place():
+    extractor = LocationCandidateExtractor()
+
+    candidates = extractor.extract(
+        {
+            "address": {
+                "aerialway": "Biollaires",
+                "road": "Connexion",
+                "village": "Example Village",
+            }
+        }
+    )
+
+    aerialway = next(
+        candidate
+        for candidate in candidates
+        if candidate.key == "aerialway"
+    )
+
+    assert (
+        aerialway.priority
+        == LocationCandidatePriority.PLACE
+    )
+
+
+def test_hamlet_is_classified_as_small_locality():
+    extractor = LocationCandidateExtractor()
+
+    candidates = extractor.extract(
+        {
+            "address": {
+                "hamlet": "Les Granges",
+            }
+        }
+    )
+
+    assert len(candidates) == 1
+    assert (
+        candidates[0].priority
+        == LocationCandidatePriority.SMALL_LOCALITY
+    )
+
+
+def test_isolated_dwelling_is_classified_as_small_locality():
+    extractor = LocationCandidateExtractor()
+
+    candidates = extractor.extract(
+        {
+            "address": {
+                "isolated_dwelling": "La Bergerie",
+            }
+        }
+    )
+
+    assert len(candidates) == 1
+    assert (
+        candidates[0].priority
+        == LocationCandidatePriority.SMALL_LOCALITY
+    )

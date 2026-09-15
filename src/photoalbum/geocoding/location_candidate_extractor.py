@@ -11,6 +11,7 @@ from .location_candidate import (
 
 class LocationCandidateExtractor:
     PLACE_KEYS = {
+        "aerialway",
         "tourism",
         "amenity",
         "historic",
@@ -38,13 +39,16 @@ class LocationCandidateExtractor:
         "city_district",
     }
 
+    SMALL_LOCALITY_KEYS = {
+        "hamlet",
+        "isolated_dwelling",
+    }
+
     LOCALITY_KEYS = {
         "city",
         "town",
         "village",
         "municipality",
-        "hamlet",
-        "isolated_dwelling",
     }
 
     ADMINISTRATIVE_KEYS = {
@@ -111,6 +115,9 @@ class LocationCandidateExtractor:
 
         if key in self.LOCAL_CONTEXT_KEYS:
             return LocationCandidatePriority.LOCAL_CONTEXT
+
+        if key in self.SMALL_LOCALITY_KEYS:
+            return LocationCandidatePriority.SMALL_LOCALITY
 
         if key in self.LOCALITY_KEYS:
             return LocationCandidatePriority.LOCALITY

@@ -4,6 +4,9 @@ from collections.abc import Sequence
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
+from photoalbum.geocoding.location_caption_builder import (
+    LocationCaptionBuilder,
+)
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 
@@ -32,6 +35,7 @@ class PhotoTableModel(QAbstractTableModel):
 
         self._translator = translator or Translator("en")
         self._photos = list(photos or [])
+        self._location_caption_builder = LocationCaptionBuilder()
 
     def rowCount(
         self,
@@ -165,7 +169,14 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         if column == 5:
-            return photo.city or "—"
+            caption_result = self._location_caption_result(photo)
+
+            if caption_result.caption:
+                return caption_result.caption
+
+            # Compatibility fallback for photos that have no preserved
+            # reverse-geocoding response.
+            return photo.place_name or photo.city or "—"
 
         if column == 6:
             return self._translator.tr(
@@ -191,23 +202,47 @@ class PhotoTableModel(QAbstractTableModel):
     ) -> str:
         lines = []
 
-        if photo.place_name:
+        caption_result = self._location_caption_result(photo)
+
+        if caption_result.caption:
             lines.append(
                 self._translator.tr(
-                    "photos.location_tooltip.place",
-                    value=photo.place_name,
+                    "photos.location_tooltip.caption",
+                    value=caption_result.caption,
                 )
             )
 
-        if photo.city:
+        if caption_result.candidates:
+            if lines:
+                lines.append("")
+
             lines.append(
                 self._translator.tr(
-                    "photos.location_tooltip.city",
-                    value=photo.city,
+                    "photos.location_tooltip.available"
                 )
             )
+
+            selected_keys = {
+                candidate.key
+                for candidate in caption_result.selected
+            }
+
+            for candidate in caption_result.candidates:
+                marker = (
+                    "✓"
+                    if candidate.key in selected_keys
+                    else " "
+                )
+
+                lines.append(
+                    f"{marker} {candidate.key}: "
+                    f"{candidate.value}"
+                )
 
         if photo.address:
+            if lines:
+                lines.append("")
+
             lines.append(
                 self._translator.tr(
                     "photos.location_tooltip.address",
@@ -238,6 +273,14 @@ class PhotoTableModel(QAbstractTableModel):
         )
 
         return "\n".join(lines)
+
+    def _location_caption_result(
+        self,
+        photo: Photo,
+    ):
+        return self._location_caption_builder.build(
+            photo.raw_location_data
+        )
 
     @staticmethod
     def _sort_value(

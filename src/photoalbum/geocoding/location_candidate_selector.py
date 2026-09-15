@@ -12,8 +12,9 @@ class LocationCandidateSelector:
     """
     Select a short, useful set of location candidates for a photo caption.
 
-    Candidates keep their original Nominatim keys. This class only decides
-    which values are useful enough to select automatically.
+    A caption can combine several geographic levels. In particular, a small
+    locality such as a hamlet is useful as local context but must never be
+    selected on its own.
     """
 
     def select(
@@ -39,6 +40,11 @@ class LocationCandidateSelector:
             LocationCandidatePriority.LOCAL_CONTEXT,
         )
 
+        small_locality = self._first_with_priority(
+            candidates,
+            LocationCandidatePriority.SMALL_LOCALITY,
+        )
+
         locality = self._first_with_priority(
             candidates,
             LocationCandidatePriority.LOCALITY,
@@ -60,21 +66,25 @@ class LocationCandidateSelector:
         elif road is not None:
             self._append_unique(selected, road)
 
-        # A neighbourhood/suburb can be meaningful in a photo album,
-        # especially in large cities.
+        # Neighbourhoods, quarters and suburbs provide useful local context.
         if local_context is not None:
             self._append_unique(selected, local_context)
+
+        # A hamlet or isolated dwelling is meaningful only when accompanied
+        # by a more significant locality. It must never stand alone.
+        if small_locality is not None and locality is not None:
+            self._append_unique(selected, small_locality)
 
         if locality is not None:
             self._append_unique(selected, locality)
 
         # Administrative information is primarily a fallback when no
-        # locality could be identified.
+        # locality could be identified. A small locality does not count as
+        # a sufficient locality for this purpose.
         if locality is None and administrative is not None:
             self._append_unique(selected, administrative)
 
-        # Country is a last-resort fallback. It is not automatically added
-        # to an otherwise useful caption.
+        # Country is the final fallback.
         if not selected and country is not None:
             self._append_unique(selected, country)
 

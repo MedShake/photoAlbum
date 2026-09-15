@@ -8,10 +8,11 @@ class LocationCandidatePriority(IntEnum):
     PLACE = 1
     ROAD = 2
     LOCAL_CONTEXT = 3
-    LOCALITY = 4
-    ADMINISTRATIVE = 5
-    POSTAL = 6
-    COUNTRY = 7
+    SMALL_LOCALITY = 4
+    LOCALITY = 5
+    ADMINISTRATIVE = 6
+    POSTAL = 7
+    COUNTRY = 8
     OTHER = 100
 
 

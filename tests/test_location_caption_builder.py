@@ -131,3 +131,139 @@ def test_postal_fields_remain_available_for_manual_selection():
     ]
 
     assert result.caption == "Rue Example, Nantes"
+
+
+def test_aerialway_is_preferred_to_road():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "aerialway": "Biollaires",
+                "road": "Connexion",
+                "village": "Example Village",
+            }
+        }
+    )
+
+    assert result.caption == (
+        "Biollaires, Example Village"
+    )
+
+    assert [c.key for c in result.selected] == [
+        "aerialway",
+        "village",
+    ]
+
+
+def test_hamlet_is_combined_with_town():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "hamlet": "Les Granges",
+                "town": "Bourg-Saint-Maurice",
+            }
+        }
+    )
+
+    assert result.caption == (
+        "Les Granges, Bourg-Saint-Maurice"
+    )
+
+    assert [c.key for c in result.selected] == [
+        "hamlet",
+        "town",
+    ]
+
+
+def test_hamlet_is_combined_with_city():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "hamlet": "Les Granges",
+                "city": "Example City",
+            }
+        }
+    )
+
+    assert result.caption == "Les Granges, Example City"
+
+    assert [c.key for c in result.selected] == [
+        "hamlet",
+        "city",
+    ]
+
+
+def test_hamlet_is_never_used_alone():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "hamlet": "Les Granges",
+            }
+        }
+    )
+
+    assert result.caption == ""
+    assert result.selected == ()
+
+
+def test_hamlet_is_not_used_with_country_only():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "hamlet": "Les Granges",
+                "country": "France",
+            }
+        }
+    )
+
+    assert result.caption == "France"
+    assert [c.key for c in result.selected] == [
+        "country",
+    ]
+
+
+def test_hamlet_is_not_used_with_state_only():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "hamlet": "Les Granges",
+                "state": "Auvergne-Rhône-Alpes",
+            }
+        }
+    )
+
+    assert result.caption == "Auvergne-Rhône-Alpes"
+    assert [c.key for c in result.selected] == [
+        "state",
+    ]
+
+
+def test_neighbourhood_is_combined_with_city():
+    builder = LocationCaptionBuilder()
+
+    result = builder.build(
+        {
+            "address": {
+                "neighbourhood": "Montmartre",
+                "city": "Paris",
+            }
+        }
+    )
+
+    assert result.caption == "Montmartre, Paris"
+
+    assert [c.key for c in result.selected] == [
+        "neighbourhood",
+        "city",
+    ]
