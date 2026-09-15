@@ -2,12 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from secrets import randbelow
-from uuid import uuid4
 
-from PySide6.QtCore import (
-    Qt,
-    QThreadPool,
-)
+from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -29,10 +25,6 @@ from photoalbum.album import (
 )
 from photoalbum.templates.year_photo_scatter.composition import (
     compose_cover_scatter,
-    visible_cover_scatter_items,
-)
-from photoalbum.gui.cover_render_worker import (
-    CoverRenderWorker,
 )
 
 from photoalbum.gui.preview_render_service import (

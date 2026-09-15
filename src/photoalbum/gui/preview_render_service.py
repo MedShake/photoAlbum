@@ -12,10 +12,6 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QPixmap
 
 from photoalbum.album import PageInstance
-from photoalbum.templates.year_photo_scatter.composition import (
-    compose_cover_scatter,
-    visible_cover_scatter_items,
-)
 from photoalbum.gui.cover_render_worker import (
     CoverRenderWorker,
 )
