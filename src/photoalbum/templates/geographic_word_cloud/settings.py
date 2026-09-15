@@ -19,6 +19,9 @@ from photoalbum.album import (
     PageFormat,
     PageInstance,
 )
+from photoalbum.rendering.page_geometry import (
+    PageRenderGeometry,
+)
 from photoalbum.templates.geographic_word_cloud.composition import (
     compose_geographic_word_cloud,
 )
@@ -252,11 +255,18 @@ class GeographicWordCloudSettingsWidget(
             pixmap
         )
 
+        geometry = PageRenderGeometry(
+            width=pixmap.width(),
+            height=pixmap.height(),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
+
         paint_geographic_word_cloud(
             painter,
             target_rect=pixmap.rect(),
             cloud=cloud,
-            page_width_mm=self._page_format.width_mm,
+            font_pixel_size=geometry.font_pixel_size,
         )
 
         if not cloud.words:
