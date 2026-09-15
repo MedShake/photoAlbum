@@ -60,3 +60,13 @@ def test_pdf_export_rejects_invalid_page_size(
             page_height_mm=297.0,
             dpi=300,
         )
+
+
+def test_pdf_export_accepts_progress_callback():
+    import inspect
+
+    parameters = inspect.signature(
+        PdfExportService.export
+    ).parameters
+
+    assert "progress_callback" in parameters

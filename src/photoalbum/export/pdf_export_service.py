@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from PySide6.QtCore import (
     QMarginsF,
@@ -67,6 +68,10 @@ class PdfExportService:
         page_height_mm: float,
         dpi: int,
         metadata: PdfMetadata | None = None,
+        progress_callback: (
+            Callable[[int, int, str], None]
+            | None
+        ) = None,
     ) -> None:
         if dpi <= 0:
             raise ValueError(
@@ -86,6 +91,25 @@ class PdfExportService:
             raise ValueError(
                 "The album contains no page to export."
             )
+
+        total_output_pages = (
+            len(pages) + 4
+        )
+        completed_output_pages = 0
+
+        def report_progress(
+            message: str,
+        ) -> None:
+            nonlocal completed_output_pages
+
+            completed_output_pages += 1
+
+            if progress_callback is not None:
+                progress_callback(
+                    completed_output_pages,
+                    total_output_pages,
+                    message,
+                )
 
         output_path = Path(
             output_path
@@ -268,6 +292,24 @@ class PdfExportService:
                     thumbnail_cache=image_cache,
                 )
 
+                cover_labels = {
+                    CoverPosition.FRONT:
+                        "Première de couverture",
+                    CoverPosition.INSIDE_FRONT:
+                        "Intérieur de couverture avant",
+                    CoverPosition.INSIDE_BACK:
+                        "Intérieur de couverture arrière",
+                    CoverPosition.BACK:
+                        "Quatrième de couverture",
+                }
+
+                report_progress(
+                    cover_labels.get(
+                        position,
+                        "Couverture",
+                    )
+                )
+
             # Physical document order, identical to Preview.
             paint_cover(
                 CoverPosition.FRONT
@@ -277,7 +319,10 @@ class PdfExportService:
                 CoverPosition.INSIDE_FRONT
             )
 
-            for page in pages:
+            for page_number, page in enumerate(
+                pages,
+                start=1,
+            ):
                 composition = self._page_composer.compose(
                     page,
                     settings.photo_pages,
@@ -309,6 +354,10 @@ class PdfExportService:
                     set_waiting_key=None,
                     paint_fallback=None,
                     show_empty_slots=False,
+                )
+
+                report_progress(
+                    f"Page {page_number}"
                 )
 
             paint_cover(

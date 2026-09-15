@@ -34,7 +34,10 @@ from PySide6.QtWidgets import (
 
 from photoalbum.app import ProjectService
 from photoalbum.gui.models import PhotoTableModel
-from photoalbum.gui.workers import ScanWorker
+from photoalbum.gui.workers import (
+    PdfExportWorker,
+    ScanWorker,
+)
 from photoalbum.scanner import (
     LibraryScanResult,
     ProcessingEvent,
@@ -90,6 +93,8 @@ class MainWindow(QMainWindow):
         )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
+        self._pdf_thread: QThread | None = None
+        self._pdf_worker: PdfExportWorker | None = None
         self._scan_total_files = 0
         self._scan_seen_paths: set[str] = set()
         self._analysis_completed = False
@@ -105,6 +110,19 @@ class MainWindow(QMainWindow):
         self._update_project_state()
 
     def closeEvent(self, event) -> None:
+        if self._pdf_thread is not None:
+            QMessageBox.warning(
+                self,
+                "Photo Album",
+                (
+                    "La génération du PDF est en cours. "
+                    "Attendez sa fin avant de fermer "
+                    "l'application."
+                ),
+            )
+            event.ignore()
+            return
+
         if self._scan_thread is not None:
             QMessageBox.warning(
                 self,
@@ -618,6 +636,38 @@ class MainWindow(QMainWindow):
 
         render_layout.addWidget(document_group)
 
+        self._pdf_progress_bar = QProgressBar()
+        self._pdf_progress_bar.setRange(
+            0,
+            1,
+        )
+        self._pdf_progress_bar.setValue(0)
+        self._pdf_progress_bar.setFormat(
+            "%v / %m pages — %p%"
+        )
+        self._pdf_progress_bar.setVisible(
+            False
+        )
+
+        render_layout.addWidget(
+            self._pdf_progress_bar
+        )
+
+        self._pdf_log_view = QPlainTextEdit()
+        self._pdf_log_view.setReadOnly(True)
+        self._pdf_log_view.setMaximumBlockCount(
+            2000
+        )
+        self._pdf_log_view.setVisible(
+            False
+        )
+
+        self._pdf_log_view.setMaximumHeight(280)
+
+        render_layout.addWidget(
+            self._pdf_log_view
+        )
+
         render_layout.addStretch(1)
 
         action_layout = QHBoxLayout()
@@ -772,6 +822,9 @@ class MainWindow(QMainWindow):
             )
 
     def _generate_pdf(self) -> None:
+        if self._pdf_thread is not None:
+            return
+
         if not self._project_service.is_open:
             self._show_error(
                 self._translator.tr(
@@ -802,7 +855,9 @@ class MainWindow(QMainWindow):
             )
             return
 
-        output_path = Path(output_text)
+        output_path = Path(
+            output_text
+        )
 
         if output_path.suffix.lower() != ".pdf":
             output_path = output_path.with_suffix(
@@ -821,7 +876,10 @@ class MainWindow(QMainWindow):
             width_mm = page_format.width_mm
             height_mm = page_format.height_mm
 
-            if settings.orientation.value == "landscape":
+            if (
+                settings.orientation.value
+                == "landscape"
+            ):
                 width_mm, height_mm = (
                     height_mm,
                     width_mm,
@@ -837,32 +895,25 @@ class MainWindow(QMainWindow):
 
             metadata = PdfMetadata(
                 title=(
-                    self._pdf_title_edit.text().strip()
+                    self._pdf_title_edit
+                    .text()
+                    .strip()
                 ),
                 author=(
-                    self._pdf_author_edit.text().strip()
+                    self._pdf_author_edit
+                    .text()
+                    .strip()
                 ),
                 subject=(
-                    self._pdf_subject_edit.text().strip()
+                    self._pdf_subject_edit
+                    .text()
+                    .strip()
                 ),
                 keywords=(
-                    self._pdf_keywords_edit.text().strip()
+                    self._pdf_keywords_edit
+                    .text()
+                    .strip()
                 ),
-            )
-
-            service = PdfExportService(
-                self._translator
-            )
-
-            service.export(
-                output_path=output_path,
-                result=result,
-                settings=settings,
-                photos=photos,
-                page_width_mm=width_mm,
-                page_height_mm=height_mm,
-                dpi=dpi,
-                metadata=metadata,
             )
 
         except Exception as exc:
@@ -874,8 +925,157 @@ class MainWindow(QMainWindow):
             )
             return
 
+        total_pages = (
+            len(result.pagination.pages)
+            + 4
+        )
+
         self._pdf_output_edit.setText(
             str(output_path)
+        )
+
+        self._pdf_log_view.clear()
+        self._pdf_log_view.setVisible(True)
+
+        self._pdf_progress_bar.setRange(
+            0,
+            total_pages,
+        )
+        self._pdf_progress_bar.setValue(0)
+        self._pdf_progress_bar.setVisible(
+            True
+        )
+
+        self._pdf_log_view.appendPlainText(
+            "────────────────────────────────────────"
+        )
+        self._pdf_log_view.appendPlainText(
+            "Génération du PDF"
+        )
+        self._pdf_log_view.appendPlainText(
+            str(output_path)
+        )
+        self._pdf_log_view.appendPlainText(
+            f"{dpi} DPI — {total_pages} pages"
+        )
+        self._pdf_log_view.appendPlainText(
+            "────────────────────────────────────────"
+        )
+
+        self._generate_pdf_button.setEnabled(
+            False
+        )
+        self._pdf_output_button.setEnabled(
+            False
+        )
+        self._pdf_dpi_combo.setEnabled(
+            False
+        )
+
+        service = PdfExportService(
+            self._translator
+        )
+
+        thread = QThread(
+            self
+        )
+
+        worker = PdfExportWorker(
+            service,
+            output_path=output_path,
+            result=result,
+            settings=settings,
+            photos=photos,
+            page_width_mm=width_mm,
+            page_height_mm=height_mm,
+            dpi=dpi,
+            metadata=metadata,
+        )
+
+        worker.moveToThread(
+            thread
+        )
+
+        thread.started.connect(
+            worker.run
+        )
+
+        worker.progress.connect(
+            self._pdf_export_progress
+        )
+
+        worker.finished.connect(
+            self._pdf_export_finished
+        )
+
+        worker.failed.connect(
+            self._pdf_export_failed
+        )
+
+        worker.finished.connect(
+            thread.quit
+        )
+
+        worker.failed.connect(
+            thread.quit
+        )
+
+        thread.finished.connect(
+            worker.deleteLater
+        )
+
+        thread.finished.connect(
+            thread.deleteLater
+        )
+
+        thread.finished.connect(
+            self._pdf_export_thread_finished
+        )
+
+        self._pdf_thread = thread
+        self._pdf_worker = worker
+
+        self._pdf_log_view.appendPlainText(
+            "Démarrage du moteur de rendu…"
+        )
+
+        thread.start()
+
+    def _pdf_export_progress(
+        self,
+        current: int,
+        total: int,
+        message: str,
+    ) -> None:
+        self._pdf_progress_bar.setRange(
+            0,
+            total,
+        )
+        self._pdf_progress_bar.setValue(
+            current
+        )
+
+        self._pdf_log_view.appendPlainText(
+            f"[{current}/{total}] {message}"
+        )
+
+        scrollbar = (
+            self._pdf_log_view.verticalScrollBar()
+        )
+
+        scrollbar.setValue(
+            scrollbar.maximum()
+        )
+
+    def _pdf_export_finished(
+        self,
+        output_path,
+    ) -> None:
+        self._pdf_log_view.appendPlainText(
+            "────────────────────────────────────────"
+        )
+        self._pdf_log_view.appendPlainText(
+            "PDF créé avec succès."
         )
 
         self.statusBar().showMessage(
@@ -895,6 +1095,40 @@ class MainWindow(QMainWindow):
                 "render.generate_success",
                 path=output_path,
             ),
+        )
+
+    def _pdf_export_failed(
+        self,
+        error: str,
+    ) -> None:
+        self._pdf_log_view.appendPlainText(
+            "────────────────────────────────────────"
+        )
+        self._pdf_log_view.appendPlainText(
+            f"ERREUR : {error}"
+        )
+
+        self._show_error(
+            self._translator.tr(
+                "render.generate_error",
+                error=error,
+            )
+        )
+
+    def _pdf_export_thread_finished(
+        self,
+    ) -> None:
+        self._pdf_thread = None
+        self._pdf_worker = None
+
+        self._generate_pdf_button.setEnabled(
+            True
+        )
+        self._pdf_output_button.setEnabled(
+            True
+        )
+        self._pdf_dpi_combo.setEnabled(
+            True
         )
 
     def _create_status_bar(self) -> None:
