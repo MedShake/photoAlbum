@@ -152,7 +152,7 @@ def test_invalid_image_is_reported_as_error(
     assert result.errors[0].path == invalid_image
     assert result.errors[0].message
 
-from photoalbum.database import Database, PhotoRepository
+from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import (
     DateSource,
     LocationSource,
@@ -162,8 +162,8 @@ from photoalbum.models import (
 
 def create_cached_scanner(
     tmp_path: Path,
-) -> tuple[Database, PhotoRepository, LibraryScanner]:
-    database = Database(tmp_path / "library.sqlite3")
+) -> tuple[ProjectDatabase, PhotoRepository, LibraryScanner]:
+    database = ProjectDatabase(tmp_path / "library.sqlite3")
     database.initialize()
 
     repository = PhotoRepository(database)
@@ -336,7 +336,7 @@ class FakePhotoProcessor:
 def test_cached_photo_with_unresolved_gps_is_enriched(
     tmp_path: Path,
 ):
-    database = Database(tmp_path / "library.sqlite3")
+    database = ProjectDatabase(tmp_path / "library.sqlite3")
     database.initialize()
 
     repository = PhotoRepository(database)
@@ -389,7 +389,7 @@ def test_cached_photo_with_unresolved_gps_is_enriched(
 def test_cached_geocoded_photo_is_not_enriched_again(
     tmp_path: Path,
 ):
-    database = Database(tmp_path / "library.sqlite3")
+    database = ProjectDatabase(tmp_path / "library.sqlite3")
     database.initialize()
 
     repository = PhotoRepository(database)
@@ -433,7 +433,7 @@ def test_cached_geocoded_photo_is_not_enriched_again(
 def test_cached_manual_location_is_preserved(
     tmp_path: Path,
 ):
-    database = Database(tmp_path / "library.sqlite3")
+    database = ProjectDatabase(tmp_path / "library.sqlite3")
     database.initialize()
 
     repository = PhotoRepository(database)
@@ -550,7 +550,7 @@ def test_scan_statistics_count_errors(
 def test_scan_statistics_count_cached_geocoding(
     tmp_path: Path,
 ):
-    database = Database(tmp_path / "library.sqlite3")
+    database = ProjectDatabase(tmp_path / "library.sqlite3")
     database.initialize()
 
     repository = PhotoRepository(database)

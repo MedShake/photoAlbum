@@ -5,11 +5,11 @@ from pathlib import Path
 
 from photoalbum.models import DateSource, LocationSource, Photo
 
-from .database import Database
+from .database import ProjectDatabase
 
 
 class PhotoRepository:
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: ProjectDatabase) -> None:
         self._database = database
 
     def save(self, photo: Photo) -> None:

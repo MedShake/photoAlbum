@@ -1,12 +1,12 @@
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.database import Database, PhotoRepository
+from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import DateSource, Photo
 
 
-def create_repository(tmp_path: Path) -> tuple[Database, PhotoRepository]:
-    database = Database(tmp_path / "test.sqlite3")
+def create_repository(tmp_path: Path) -> tuple[ProjectDatabase, PhotoRepository]:
+    database = ProjectDatabase(tmp_path / "test.sqlite3")
     database.initialize()
 
     repository = PhotoRepository(database)

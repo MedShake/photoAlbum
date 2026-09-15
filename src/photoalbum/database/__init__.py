@@ -1,8 +1,7 @@
-from .database import Database, ProjectDatabase
+from .database import ProjectDatabase
 from .photo_repository import PhotoRepository
 
 __all__ = [
-    "Database",
     "PhotoRepository",
     "ProjectDatabase",
 ]

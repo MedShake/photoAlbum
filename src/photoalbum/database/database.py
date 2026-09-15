@@ -171,7 +171,3 @@ class ProjectDatabase:
             )
             """
         )
-
-
-# Temporary compatibility alias.
-Database = ProjectDatabase
