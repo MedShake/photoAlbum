@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 from photoalbum.album import (
     A4,
     PageFormat,
@@ -495,7 +497,7 @@ class YearPhotoScatterSettingsWidget(
         )
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
         )
 
         font.setBold(

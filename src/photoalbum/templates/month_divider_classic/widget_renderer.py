@@ -128,7 +128,7 @@ class MonthDividerClassicWidgetRenderer:
         )
 
         font = QFont(
-            painter.font()
+            font
         )
 
         font.setBold(

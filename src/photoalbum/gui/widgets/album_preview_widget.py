@@ -40,6 +40,8 @@ from photoalbum.album.composition import (
     PageComposition,
     PhotoSlotComposition,
 )
+from photoalbum.rendering.fonts import resolve_font_family
+
 from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
@@ -253,7 +255,9 @@ class AlbumCoverPreview(_PreviewPageBase):
         if template_name == template_key:
             template_name = template.name
 
-        font = QFont(painter.font())
+        font = QFont(
+            resolve_font_family(None)
+        )
         font.setBold(True)
         font.setPixelSize(
             self._print_font_pixel_size(16)
@@ -610,7 +614,10 @@ class AlbumPagePreview(_PreviewPageBase):
         else:
             alignment = Qt.AlignmentFlag.AlignRight
 
-        font = QFont(painter.font())
+        font = QFont(
+            resolve_font_family(None)
+        )
+        font.setBold(False)
         font.setPixelSize(
             self._print_font_pixel_size(8)
         )
@@ -662,7 +669,9 @@ class AlbumPagePreview(_PreviewPageBase):
             Qt.GlobalColor.darkGray
         )
 
-        font = QFont(painter.font())
+        font = QFont(
+            resolve_font_family(None)
+        )
         font.setBold(True)
         font.setPixelSize(
             self._print_font_pixel_size(14)

@@ -6,6 +6,8 @@ from PySide6.QtGui import (
     QPainter,
 )
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 
 class SimpleLabelWidgetRenderer:
     """
@@ -49,7 +51,7 @@ class SimpleLabelWidgetRenderer:
         )
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
         )
 
         font.setBold(

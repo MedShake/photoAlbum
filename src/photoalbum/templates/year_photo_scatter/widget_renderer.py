@@ -7,6 +7,8 @@ from PySide6.QtGui import (
     QPainter,
 )
 
+from photoalbum.rendering.fonts import resolve_font_family
+
 from photoalbum.album import PageInstance
 
 from .composition import compose_cover_scatter
@@ -232,7 +234,7 @@ class YearPhotoScatterWidgetRenderer:
             )
 
         font = QFont(
-            painter.font()
+            resolve_font_family(None)
         )
 
         font.setBold(
