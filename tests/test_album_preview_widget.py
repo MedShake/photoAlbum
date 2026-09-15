@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 from PIL import Image
@@ -8,6 +9,7 @@ from photoalbum.album import (
     AlbumBuildResult,
     AlbumPlan,
     AlbumStructureSettings,
+    US_LETTER,
     CoverPosition,
     CoverSettings,
     DividerSettings,
@@ -312,3 +314,34 @@ def test_thumbnail_cache_applies_exif_orientation(
     # Original file is landscape.
     # EXIF orientation 6 displays it in portrait.
     assert pixmap.height() > pixmap.width()
+
+
+
+def test_preview_uses_page_format_from_settings():
+    widget = create_widget()
+
+    settings = replace(
+        make_settings(),
+        page_format="us-letter",
+    )
+
+    widget.set_result(
+        make_result(),
+        settings,
+    )
+
+    item = widget._pages_grid.itemAtPosition(
+        1,
+        1,
+    )
+
+    assert item is not None
+
+    preview = item.widget()
+
+    assert isinstance(
+        preview,
+        AlbumPagePreview,
+    )
+
+    assert preview._page_format == US_LETTER

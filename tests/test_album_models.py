@@ -1,7 +1,11 @@
+import pytest
+
 from photoalbum.album import (
     A4,
+    A5,
     US_LETTER,
     CoverPosition,
+    page_format_from_id,
     PrintProfile,
 )
 
@@ -50,3 +54,17 @@ def test_cover_positions_define_four_covers():
         CoverPosition.INSIDE_BACK,
         CoverPosition.BACK,
     }
+
+
+def test_page_format_from_id():
+    assert page_format_from_id("a4") == A4
+    assert page_format_from_id("a5") == A5
+    assert page_format_from_id("us-letter") == US_LETTER
+
+
+def test_unknown_page_format_is_rejected():
+    with pytest.raises(
+        ValueError,
+        match="Unsupported page format",
+    ):
+        page_format_from_id("unknown")
