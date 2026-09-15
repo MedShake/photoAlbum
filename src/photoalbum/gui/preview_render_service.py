@@ -12,7 +12,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QPixmap
 
 from photoalbum.album import PageInstance
-from photoalbum.gui.cover_render_worker import (
+from photoalbum.rendering.cover_render_worker import (
     CoverRenderWorker,
 )
 from photoalbum.templates import (
