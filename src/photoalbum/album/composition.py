@@ -249,6 +249,42 @@ class TemplateLayoutRegistry:
             ) from None
 
 
+def compose_page_number(
+    page: PlannedPage,
+    *,
+    page_number_height: float = 0.025,
+    page_number_width: float = 0.12,
+    page_number_y: float = 0.965,
+    page_number_outer_margin: float = 0.06,
+) -> PageNumberComposition:
+    """
+    Compose the common album page number.
+
+    Page numbering is independent from the page template.
+    """
+    if page.side == PageSide.LEFT:
+        x = page_number_outer_margin
+        alignment = HorizontalAlignment.LEFT
+    else:
+        x = (
+            1
+            - page_number_outer_margin
+            - page_number_width
+        )
+        alignment = HorizontalAlignment.RIGHT
+
+    return PageNumberComposition(
+        number=page.number,
+        rect=NormalizedRect(
+            x=x,
+            y=page_number_y,
+            width=page_number_width,
+            height=page_number_height,
+        ),
+        alignment=alignment,
+    )
+
+
 @dataclass(frozen=True)
 class PhotoTemplateLayout:
     cells_factory: Callable[
@@ -421,26 +457,14 @@ class PhotoTemplateLayout:
         self,
         page: PlannedPage,
     ) -> PageNumberComposition:
-        if page.side == PageSide.LEFT:
-            x = self.page_number_outer_margin
-            alignment = HorizontalAlignment.LEFT
-        else:
-            x = (
-                1
-                - self.page_number_outer_margin
-                - self.page_number_width
-            )
-            alignment = HorizontalAlignment.RIGHT
-
-        return PageNumberComposition(
-            number=page.number,
-            rect=NormalizedRect(
-                x=x,
-                y=self.page_number_y,
-                width=self.page_number_width,
-                height=self.page_number_height,
+        return compose_page_number(
+            page,
+            page_number_height=self.page_number_height,
+            page_number_width=self.page_number_width,
+            page_number_y=self.page_number_y,
+            page_number_outer_margin=(
+                self.page_number_outer_margin
             ),
-            alignment=alignment,
         )
 
 
@@ -677,23 +701,33 @@ class PageComposer:
         page_width_mm: float = 210.0,
         page_height_mm: float = 297.0,
     ) -> PageComposition:
+        page_numbers = (
+            page_numbers
+            or PageNumberSettings()
+        )
+
         if (
             page.kind != PlanItemKind.PHOTO_GROUP
             or page.photo_capacity <= 0
             or page.template_id is None
         ):
-            return PageComposition(page=page)
+            page_number = None
+
+            if page_numbers.enabled:
+                page_number = compose_page_number(
+                    page
+                )
+
+            return PageComposition(
+                page=page,
+                page_number=page_number,
+            )
 
         photo_settings = (
             photo_settings
             or PhotoPageSettings(
                 template_id=page.template_id
             )
-        )
-
-        page_numbers = (
-            page_numbers
-            or PageNumberSettings()
         )
 
         layout = self._registry.get(
