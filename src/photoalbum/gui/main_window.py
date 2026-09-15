@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QDateTimeEdit,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -45,6 +46,7 @@ from photoalbum.gui.widgets.photo_actions_delegate import (
     PhotoActionsDelegate,
 )
 from photoalbum.gui.workers import (
+    GpsGeocodingWorker,
     PdfExportWorker,
     ScanWorker,
 )
@@ -103,6 +105,9 @@ class MainWindow(QMainWindow):
         )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
+        self._gps_thread: QThread | None = None
+        self._gps_worker: GpsGeocodingWorker | None = None
+        self._gps_photo_path: Path | None = None
         self._pdf_thread: QThread | None = None
         self._pdf_worker: PdfExportWorker | None = None
         self._scan_total_files = 0
@@ -344,6 +349,9 @@ class MainWindow(QMainWindow):
         self._photo_actions_delegate.edit_datetime_requested.connect(
             self._edit_photo_datetime
         )
+        self._photo_actions_delegate.edit_gps_requested.connect(
+            self._edit_photo_gps
+        )
         self._photo_actions_delegate.open_photo_requested.connect(
             self._open_photo_in_os
         )
@@ -377,7 +385,7 @@ class MainWindow(QMainWindow):
         # Sensible initial widths. Long filenames must not force
         # the complete table to become excessively wide.
         self._photo_table.setColumnWidth(0, 260)
-        self._photo_table.setColumnWidth(1, 82)
+        self._photo_table.setColumnWidth(1, 116)
         self._photo_table.setColumnWidth(2, 170)
         self._photo_table.setColumnWidth(3, 130)
         self._photo_table.setColumnWidth(4, 70)
@@ -2145,6 +2153,23 @@ class MainWindow(QMainWindow):
             parent=dialog,
         )
 
+        restore_button = buttons.addButton(
+            self._translator.tr(
+                "photos.datetime.restore"
+            ),
+            QDialogButtonBox.ButtonRole.ResetRole,
+        )
+
+        original_datetime = (
+            photo.original_capture_datetime
+        )
+
+        restore_button.setEnabled(
+            original_datetime is not None
+            and photo.capture_datetime
+            != original_datetime
+        )
+
         save_button = buttons.button(
             QDialogButtonBox.StandardButton.Save
         )
@@ -2166,6 +2191,16 @@ class MainWindow(QMainWindow):
                 )
             )
 
+        restore_requested = False
+
+        def restore_original_datetime() -> None:
+            nonlocal restore_requested
+            restore_requested = True
+            dialog.accept()
+
+        restore_button.clicked.connect(
+            restore_original_datetime
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
 
@@ -2178,6 +2213,45 @@ class MainWindow(QMainWindow):
             return
 
         old_datetime = photo.capture_datetime
+
+        if restore_requested:
+            if original_datetime is None:
+                return
+
+            try:
+                self._project_service.\
+                    restore_original_capture_datetime(
+                        photo.path
+                    )
+            except Exception as exc:
+                self._show_error(str(exc))
+                return
+
+            datetime_format = "%d/%m/%Y %H:%M:%S"
+
+            old_date_text = (
+                old_datetime.strftime(datetime_format)
+                if old_datetime is not None
+                else self._translator.tr(
+                    "photos.datetime.no_date"
+                )
+            )
+
+            self._log_view.appendPlainText(
+                self._translator.tr(
+                    "photos.datetime.log_restored",
+                    filename=photo.filename,
+                    old_date=old_date_text,
+                    original_date=(
+                        original_datetime.strftime(
+                            datetime_format
+                        )
+                    ),
+                )
+            )
+
+            self._load_project_photos()
+            return
         new_datetime = (
             date_time_edit.dateTime().toPython()
         )
@@ -2217,6 +2291,304 @@ class MainWindow(QMainWindow):
         )
 
         self._load_project_photos()
+
+    def _edit_photo_gps(
+        self,
+        photo,
+    ) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(
+            self._translator.tr(
+                "photos.gps.title"
+            )
+        )
+
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+
+        filename_label = QLabel(photo.filename)
+        filename_label.setWordWrap(True)
+
+        latitude_edit = QDoubleSpinBox(dialog)
+        latitude_edit.setDecimals(7)
+        latitude_edit.setRange(-90.0, 90.0)
+        latitude_edit.setSingleStep(0.0001)
+
+        longitude_edit = QDoubleSpinBox(dialog)
+        longitude_edit.setDecimals(7)
+        longitude_edit.setRange(-180.0, 180.0)
+        longitude_edit.setSingleStep(0.0001)
+
+        if photo.latitude is not None:
+            latitude_edit.setValue(photo.latitude)
+
+        if photo.longitude is not None:
+            longitude_edit.setValue(photo.longitude)
+
+        form.addRow(
+            self._translator.tr(
+                "photos.gps.photo"
+            ),
+            filename_label,
+        )
+        form.addRow(
+            self._translator.tr(
+                "photos.gps.latitude"
+            ),
+            latitude_edit,
+        )
+        form.addRow(
+            self._translator.tr(
+                "photos.gps.longitude"
+            ),
+            longitude_edit,
+        )
+
+        layout.addLayout(form)
+
+        restore_button = QPushButton(
+            self._translator.tr(
+                "photos.gps.restore"
+            ),
+            dialog,
+        )
+
+        has_original_gps = (
+            photo.original_latitude is not None
+            and photo.original_longitude is not None
+        )
+
+        restore_button.setEnabled(
+            has_original_gps
+        )
+
+        if has_original_gps:
+            layout.addWidget(restore_button)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel,
+            parent=dialog,
+        )
+
+        save_button = buttons.button(
+            QDialogButtonBox.StandardButton.Save
+        )
+        cancel_button = buttons.button(
+            QDialogButtonBox.StandardButton.Cancel
+        )
+
+        if save_button is not None:
+            save_button.setText(
+                self._translator.tr(
+                    "photos.gps.save"
+                )
+            )
+
+        if cancel_button is not None:
+            cancel_button.setText(
+                self._translator.tr(
+                    "photos.gps.cancel"
+                )
+            )
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+
+        restore_requested = {"value": False}
+
+        def request_restore() -> None:
+            restore_requested["value"] = True
+            dialog.accept()
+
+        restore_button.clicked.connect(
+            request_restore
+        )
+
+        layout.addWidget(buttons)
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        old_latitude = photo.latitude
+        old_longitude = photo.longitude
+
+        try:
+            if restore_requested["value"]:
+                self._project_service.restore_original_gps(
+                    photo.path
+                )
+
+                latitude = photo.original_latitude
+                longitude = photo.original_longitude
+
+                action_key = "photos.gps.log_restored"
+            else:
+                latitude = latitude_edit.value()
+                longitude = longitude_edit.value()
+
+                self._project_service.set_manual_gps(
+                    photo.path,
+                    latitude,
+                    longitude,
+                )
+
+                action_key = "photos.gps.log_changed"
+
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+
+        self._log_view.appendPlainText(
+            self._translator.tr(
+                action_key,
+                filename=photo.filename,
+                old_latitude=(
+                    "—"
+                    if old_latitude is None
+                    else f"{old_latitude:.7f}"
+                ),
+                old_longitude=(
+                    "—"
+                    if old_longitude is None
+                    else f"{old_longitude:.7f}"
+                ),
+                latitude=f"{latitude:.7f}",
+                longitude=f"{longitude:.7f}",
+            )
+        )
+
+        self._load_project_photos()
+
+        self._start_gps_geocoding(
+            photo.path,
+            latitude,
+            longitude,
+        )
+
+    def _start_gps_geocoding(
+        self,
+        photo_path: Path,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        if self._gps_thread is not None:
+            self._log_view.appendPlainText(
+                self._translator.tr(
+                    "photos.gps.geocoding_busy"
+                )
+            )
+            return
+
+        project_path = (
+            self._project_service.project_path
+        )
+
+        if project_path is None:
+            return
+
+        thread = QThread(self)
+
+        worker = GpsGeocodingWorker(
+            project_path=project_path,
+            latitude=latitude,
+            longitude=longitude,
+            language="fr",
+            user_agent="PhotoAlbum/0.1 development",
+        )
+
+        worker.moveToThread(thread)
+
+        self._gps_photo_path = Path(photo_path)
+
+        thread.started.connect(worker.run)
+
+        worker.completed.connect(
+            self._gps_geocoding_completed
+        )
+        worker.failed.connect(
+            self._gps_geocoding_failed
+        )
+
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+
+        thread.finished.connect(
+            worker.deleteLater
+        )
+        thread.finished.connect(
+            self._gps_geocoding_thread_finished
+        )
+
+        self._gps_thread = thread
+        self._gps_worker = worker
+
+        self._log_view.appendPlainText(
+            self._translator.tr(
+                "photos.gps.geocoding_started"
+            )
+        )
+
+        thread.start()
+
+    def _gps_geocoding_completed(
+        self,
+        location,
+    ) -> None:
+        photo_path = self._gps_photo_path
+
+        if photo_path is None:
+            return
+
+        if location is None:
+            self._log_view.appendPlainText(
+                self._translator.tr(
+                    "photos.gps.geocoding_not_found"
+                )
+            )
+            return
+
+        try:
+            self._project_service.set_geocoded_location(
+                photo_path,
+                place_name=location.place_name,
+                city=location.city,
+                address=location.address,
+            )
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+
+        self._log_view.appendPlainText(
+            self._translator.tr(
+                "photos.gps.geocoding_completed",
+                city=location.city or "—",
+                address=location.address or "—",
+            )
+        )
+
+        self._load_project_photos()
+
+    def _gps_geocoding_failed(
+        self,
+        error: str,
+    ) -> None:
+        self._log_view.appendPlainText(
+            self._translator.tr(
+                "photos.gps.geocoding_failed",
+                error=error,
+            )
+        )
+
+    def _gps_geocoding_thread_finished(
+        self,
+    ) -> None:
+        self._gps_thread = None
+        self._gps_worker = None
+        self._gps_photo_path = None
 
     def _open_photo_in_os(
         self,

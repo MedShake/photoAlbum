@@ -19,6 +19,12 @@ class PhotoRepository:
             else None
         )
 
+        original_capture_datetime = (
+            photo.original_capture_datetime.isoformat()
+            if photo.original_capture_datetime is not None
+            else capture_datetime
+        )
+
         self._database.connection.execute(
             """
             INSERT INTO photos (
@@ -34,13 +40,21 @@ class PhotoRepository:
                 date_source,
                 latitude,
                 longitude,
+                original_orientation,
+                original_capture_datetime,
+                original_date_source,
+                original_latitude,
+                original_longitude,
                 place_name,
                 city,
                 address,
                 location_source,
                 is_missing
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             ON CONFLICT(path) DO UPDATE SET
                 filename = excluded.filename,
                 file_size = excluded.file_size,
@@ -53,6 +67,11 @@ class PhotoRepository:
                 date_source = excluded.date_source,
                 latitude = excluded.latitude,
                 longitude = excluded.longitude,
+                original_orientation = excluded.original_orientation,
+                original_capture_datetime = excluded.original_capture_datetime,
+                original_date_source = excluded.original_date_source,
+                original_latitude = excluded.original_latitude,
+                original_longitude = excluded.original_longitude,
                 place_name = excluded.place_name,
                 city = excluded.city,
                 address = excluded.address,
@@ -72,6 +91,27 @@ class PhotoRepository:
                 photo.date_source.value,
                 photo.latitude,
                 photo.longitude,
+                (
+                    photo.original_orientation
+                    if photo.original_orientation is not None
+                    else photo.orientation
+                ),
+                original_capture_datetime,
+                (
+                    photo.original_date_source.value
+                    if photo.original_date_source != DateSource.UNKNOWN
+                    else photo.date_source.value
+                ),
+                (
+                    photo.original_latitude
+                    if photo.original_latitude is not None
+                    else photo.latitude
+                ),
+                (
+                    photo.original_longitude
+                    if photo.original_longitude is not None
+                    else photo.longitude
+                ),
                 photo.place_name,
                 photo.city,
                 photo.address,
@@ -162,6 +202,32 @@ class PhotoRepository:
 
         self._database.connection.commit()
 
+    def restore_original_capture_datetime(
+        self,
+        path: Path,
+    ) -> None:
+        normalized_path = str(
+            path.expanduser().resolve()
+        )
+
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET
+                capture_datetime = original_capture_datetime,
+                date_source = original_date_source
+            WHERE path = ?
+            """,
+            (normalized_path,),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo not found: {normalized_path}"
+            )
+
+        self._database.connection.commit()
+
     def set_manual_capture_datetime(
         self,
         path: Path,
@@ -184,6 +250,124 @@ class PhotoRepository:
         if cursor.rowcount == 0:
             raise KeyError(
                 f"Photo is not registered in the project: {path}"
+            )
+
+        self._database.connection.commit()
+
+    def set_manual_gps(
+        self,
+        path: Path,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        if not -90.0 <= latitude <= 90.0:
+            raise ValueError(
+                "Latitude must be between -90 and 90."
+            )
+
+        if not -180.0 <= longitude <= 180.0:
+            raise ValueError(
+                "Longitude must be between -180 and 180."
+            )
+
+        normalized_path = str(
+            path.expanduser().resolve()
+        )
+
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET
+                latitude = ?,
+                longitude = ?,
+                place_name = NULL,
+                city = NULL,
+                address = NULL,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                latitude,
+                longitude,
+                LocationSource.MANUAL.value,
+                normalized_path,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo not found: {normalized_path}"
+            )
+
+        self._database.connection.commit()
+
+    def restore_original_gps(
+        self,
+        path: Path,
+    ) -> None:
+        normalized_path = str(
+            path.expanduser().resolve()
+        )
+
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET
+                latitude = original_latitude,
+                longitude = original_longitude,
+                place_name = NULL,
+                city = NULL,
+                address = NULL,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                LocationSource.UNKNOWN.value,
+                normalized_path,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo not found: {normalized_path}"
+            )
+
+        self._database.connection.commit()
+
+    def set_geocoded_location(
+        self,
+        path: Path,
+        *,
+        place_name: str | None,
+        city: str | None,
+        address: str | None,
+    ) -> None:
+        normalized_path = str(
+            path.expanduser().resolve()
+        )
+
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET
+                place_name = ?,
+                city = ?,
+                address = ?,
+                location_source = ?
+            WHERE path = ?
+            """,
+            (
+                place_name,
+                city,
+                address,
+                LocationSource.GEOCODING.value,
+                normalized_path,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo not found: {normalized_path}"
             )
 
         self._database.connection.commit()
@@ -259,6 +443,14 @@ class PhotoRepository:
             else None
         )
 
+        original_capture_datetime = (
+            datetime.fromisoformat(
+                row["original_capture_datetime"]
+            )
+            if row["original_capture_datetime"] is not None
+            else None
+        )
+
         return Photo(
             path=Path(row["path"]),
             filename=row["filename"],
@@ -272,6 +464,13 @@ class PhotoRepository:
             date_source=DateSource(row["date_source"]),
             latitude=row["latitude"],
             longitude=row["longitude"],
+            original_orientation=row["original_orientation"],
+            original_capture_datetime=original_capture_datetime,
+            original_date_source=DateSource(
+                row["original_date_source"]
+            ),
+            original_latitude=row["original_latitude"],
+            original_longitude=row["original_longitude"],
             place_name=row["place_name"],
             city=row["city"],
             address=row["address"],

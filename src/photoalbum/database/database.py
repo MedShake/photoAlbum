@@ -114,11 +114,19 @@ class ProjectDatabase:
                 content_hash TEXT,
                 width INTEGER,
                 height INTEGER,
+
                 orientation INTEGER,
                 capture_datetime TEXT,
                 date_source TEXT NOT NULL,
                 latitude REAL,
                 longitude REAL,
+
+                original_orientation INTEGER,
+                original_capture_datetime TEXT,
+                original_date_source TEXT NOT NULL,
+                original_latitude REAL,
+                original_longitude REAL,
+
                 place_name TEXT,
                 city TEXT,
                 address TEXT,

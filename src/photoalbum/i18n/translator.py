@@ -37,6 +37,38 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.column.action": "Action",
         "photos.action.set_datetime": "Set date and time…",
         "photos.action.open_image": "View photo",
+        "photos.gps.title": "Edit photo location",
+        "photos.gps.photo": "Photo:",
+        "photos.gps.latitude": "Latitude:",
+        "photos.gps.longitude": "Longitude:",
+        "photos.gps.save": "Save",
+        "photos.gps.cancel": "Cancel",
+        "photos.gps.restore": "Restore original coordinates",
+        "photos.gps.log_changed": (
+            "Photo {filename}: GPS changed from "
+            "{old_latitude}, {old_longitude} to "
+            "{latitude}, {longitude}"
+        ),
+        "photos.gps.log_restored": (
+            "Photo {filename}: original GPS restored from "
+            "{old_latitude}, {old_longitude} to "
+            "{latitude}, {longitude}"
+        ),
+        "photos.gps.geocoding_started": (
+            "Reverse geocoding location…"
+        ),
+        "photos.gps.geocoding_completed": (
+            "Location found: {city} — {address}"
+        ),
+        "photos.gps.geocoding_not_found": (
+            "No location found for these coordinates."
+        ),
+        "photos.gps.geocoding_failed": (
+            "Reverse geocoding failed: {error}"
+        ),
+        "photos.gps.geocoding_busy": (
+            "A reverse geocoding operation is already running."
+        ),
         "photos.action.date_missing": "Edit capture date and time",
         "photos.action.date_present": "Edit capture date and time",
         "photos.open_image.not_found": "Image file not found: {path}",
@@ -46,8 +78,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.datetime.value": "Date and time:",
         "photos.datetime.save": "Save",
         "photos.datetime.cancel": "Cancel",
+        "photos.datetime.restore": "Restore original date",
+        "photos.datetime.no_date": "no date",
         "photos.datetime.log_added": "Photo {filename}: capture date added: {new_date}",
         "photos.datetime.log_changed": "Photo {filename}: capture date changed from {old_date} to {new_date}",
+        "photos.datetime.log_restored": "Photo {filename}: capture date restored from {old_date} to {original_date}",
 
         "photos.value.yes": "Yes",
         "photos.value.no": "No",
@@ -62,6 +97,13 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.location_source.geocoding": "Geocoding",
         "photos.location_source.manual": "Manual",
         "photos.location_source.unknown": "Unknown",
+        "photos.location_tooltip.place": "Place: {value}",
+        "photos.location_tooltip.city": "City: {value}",
+        "photos.location_tooltip.address": "Address: {value}",
+        "photos.location_tooltip.gps": (
+            "GPS: {latitude}, {longitude}"
+        ),
+        "photos.location_tooltip.source": "Source: {value}",
         "tab.album": "Design",
         "tab.plan": "Plan",
         "tab.preview": "Preview",
@@ -401,6 +443,38 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.column.action": "Action",
         "photos.action.set_datetime": "Renseigner la date…",
         "photos.action.open_image": "Voir la photo",
+        "photos.gps.title": "Modifier la localisation",
+        "photos.gps.photo": "Photo :",
+        "photos.gps.latitude": "Latitude :",
+        "photos.gps.longitude": "Longitude :",
+        "photos.gps.save": "Enregistrer",
+        "photos.gps.cancel": "Annuler",
+        "photos.gps.restore": "Restaurer les coordonnées d’origine",
+        "photos.gps.log_changed": (
+            "Photo {filename} : modification du GPS de "
+            "{old_latitude}, {old_longitude} à "
+            "{latitude}, {longitude}"
+        ),
+        "photos.gps.log_restored": (
+            "Photo {filename} : restauration du GPS d’origine de "
+            "{old_latitude}, {old_longitude} à "
+            "{latitude}, {longitude}"
+        ),
+        "photos.gps.geocoding_started": (
+            "Recherche de la ville et de l’adresse…"
+        ),
+        "photos.gps.geocoding_completed": (
+            "Localisation trouvée : {city} — {address}"
+        ),
+        "photos.gps.geocoding_not_found": (
+            "Aucune localisation trouvée pour ces coordonnées."
+        ),
+        "photos.gps.geocoding_failed": (
+            "Échec du géocodage inverse : {error}"
+        ),
+        "photos.gps.geocoding_busy": (
+            "Un géocodage inverse est déjà en cours."
+        ),
         "photos.action.date_missing": "Modifier la date de prise de vue",
         "photos.action.date_present": "Modifier la date de prise de vue",
         "photos.open_image.not_found": "Fichier image introuvable : {path}",
@@ -410,6 +484,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.datetime.value": "Date et heure :",
         "photos.datetime.save": "Enregistrer",
         "photos.datetime.cancel": "Annuler",
+        "photos.datetime.restore": "Restaurer la date d’origine",
+        "photos.datetime.no_date": "aucune date",
+        "photos.datetime.log_restored": (
+            "Photo {filename} : restauration de la date de prise "
+            "de vue de {old_date} à {original_date}"
+        ),
         "photos.datetime.log_added": "Photo {filename} : ajout de la date {new_date}",
         "photos.datetime.log_changed": "Photo {filename} : modification de la date de {old_date} à {new_date}",
 
@@ -426,6 +506,13 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.location_source.geocoding": "Géocodage",
         "photos.location_source.manual": "Manuelle",
         "photos.location_source.unknown": "Inconnue",
+        "photos.location_tooltip.place": "Lieu : {value}",
+        "photos.location_tooltip.city": "Ville : {value}",
+        "photos.location_tooltip.address": "Adresse : {value}",
+        "photos.location_tooltip.gps": (
+            "GPS : {latitude}, {longitude}"
+        ),
+        "photos.location_tooltip.source": "Source : {value}",
         "tab.album": "Conception",
         "tab.plan": "Plan",
         "tab.preview": "Aperçu",

@@ -28,13 +28,22 @@ class Photo:
 
     width: int | None = None
     height: int | None = None
-    orientation: int | None = None
 
+    # Effective metadata used by the album.
+    orientation: int | None = None
     capture_datetime: datetime | None = None
     date_source: DateSource = DateSource.UNKNOWN
-
     latitude: float | None = None
     longitude: float | None = None
+
+    # Metadata originally detected from the source file.
+    # These values are preserved when the user applies
+    # manual corrections.
+    original_orientation: int | None = None
+    original_capture_datetime: datetime | None = None
+    original_date_source: DateSource = DateSource.UNKNOWN
+    original_latitude: float | None = None
+    original_longitude: float | None = None
 
     place_name: str | None = None
     city: str | None = None

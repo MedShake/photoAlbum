@@ -73,6 +73,9 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         if role == Qt.ItemDataRole.ToolTipRole:
+            if index.column() == 5:
+                return self._location_tooltip(photo)
+
             return str(photo.path)
 
         if role == self.SORT_ROLE:
@@ -181,6 +184,60 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         return ""
+
+    def _location_tooltip(
+        self,
+        photo: Photo,
+    ) -> str:
+        lines = []
+
+        if photo.place_name:
+            lines.append(
+                self._translator.tr(
+                    "photos.location_tooltip.place",
+                    value=photo.place_name,
+                )
+            )
+
+        if photo.city:
+            lines.append(
+                self._translator.tr(
+                    "photos.location_tooltip.city",
+                    value=photo.city,
+                )
+            )
+
+        if photo.address:
+            lines.append(
+                self._translator.tr(
+                    "photos.location_tooltip.address",
+                    value=photo.address,
+                )
+            )
+
+        if (
+            photo.latitude is not None
+            and photo.longitude is not None
+        ):
+            lines.append(
+                self._translator.tr(
+                    "photos.location_tooltip.gps",
+                    latitude=f"{photo.latitude:.7f}",
+                    longitude=f"{photo.longitude:.7f}",
+                )
+            )
+
+        lines.append(
+            self._translator.tr(
+                "photos.location_tooltip.source",
+                value=self._translator.tr(
+                    "photos.location_source."
+                    f"{photo.location_source.value}"
+                ),
+            )
+        )
+
+        return "\n".join(lines)
 
     @staticmethod
     def _sort_value(

@@ -65,6 +65,18 @@ class ProjectService:
 
         return repository.list_all()
 
+    def restore_original_capture_datetime(
+        self,
+        photo_path: Path,
+    ) -> None:
+        database = self._require_database()
+
+        repository = PhotoRepository(database)
+
+        repository.restore_original_capture_datetime(
+            photo_path
+        )
+
     def set_manual_capture_datetime(
         self,
         photo_path: Path,
@@ -77,6 +89,53 @@ class ProjectService:
         repository.set_manual_capture_datetime(
             photo_path,
             capture_datetime,
+        )
+
+    def set_manual_gps(
+        self,
+        photo_path: Path,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        database = self._require_database()
+
+        repository = PhotoRepository(database)
+
+        repository.set_manual_gps(
+            photo_path,
+            latitude,
+            longitude,
+        )
+
+    def restore_original_gps(
+        self,
+        photo_path: Path,
+    ) -> None:
+        database = self._require_database()
+
+        repository = PhotoRepository(database)
+
+        repository.restore_original_gps(
+            photo_path
+        )
+
+    def set_geocoded_location(
+        self,
+        photo_path: Path,
+        *,
+        place_name: str | None,
+        city: str | None,
+        address: str | None,
+    ) -> None:
+        database = self._require_database()
+
+        repository = PhotoRepository(database)
+
+        repository.set_geocoded_location(
+            photo_path,
+            place_name=place_name,
+            city=city,
+            address=address,
         )
 
     def close(self) -> None:
