@@ -110,16 +110,9 @@ jobs:
               throw "photoalbum.svg not found in Windows bundle"
           }
 
-      - name: Create Windows archive
-        shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path "packaging/pyinstaller/dist/photo-album/*" `
-            -DestinationPath "PhotoAlbum-windows-x86_64.zip"
-
       - name: Upload Windows application
         uses: actions/upload-artifact@v4
         with:
           name: PhotoAlbum-windows-x86_64
-          path: PhotoAlbum-windows-x86_64.zip
+          path: packaging/pyinstaller/dist/photo-album/
 
