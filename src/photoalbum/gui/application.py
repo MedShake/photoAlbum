@@ -2,11 +2,24 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QLocale
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .main_window import MainWindow
+
+
+def _application_icon() -> QIcon:
+    """Return the application icon bundled with the package."""
+    icon_path = (
+        Path(__file__).resolve().parent.parent
+        / "resources"
+        / "icons"
+        / "photoalbum.svg"
+    )
+    return QIcon(str(icon_path))
 
 
 def _system_language() -> str:
@@ -48,6 +61,7 @@ def main() -> int:
 
     application.setApplicationName("Photo Album")
     application.setOrganizationName("Photo Album")
+    application.setWindowIcon(_application_icon())
 
     language = (
         args.language
