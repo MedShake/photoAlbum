@@ -116,3 +116,40 @@ jobs:
           name: PhotoAlbum-windows-x86_64
           path: packaging/pyinstaller/dist/photo-album/
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          winget install --id JRSoftware.InnoSetup.7 -e --silent --accept-package-agreements --accept-source-agreements
+
+      - name: Add Inno Setup to PATH
+        shell: pwsh
+        run: |
+          $inno = "${env:ProgramFiles}\Inno Setup 7"
+          if (-not (Test-Path "$inno\ISCC.exe")) {
+              throw "ISCC.exe not found in $inno"
+          }
+          $inno | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          python packaging/windows/build_installer.py
+
+      - name: Verify Windows installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "dist-installer" -Filter "PhotoAlbum-*-Windows-x64-Setup.exe"
+
+          if (-not $installer) {
+              throw "Windows installer not found"
+          }
+
+          Write-Host "Installer:"
+          $installer | Format-Table Name, Length
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoAlbum-windows-installer
+          path: dist-installer/*.exe
+
