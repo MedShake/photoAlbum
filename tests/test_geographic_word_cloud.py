@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.templates.geographic_word_cloud.composition import (
+from photoalbum.templates.msb.geographic_word_cloud.composition import (
     compose_geographic_word_cloud,
 )
 from photoalbum.models import Photo

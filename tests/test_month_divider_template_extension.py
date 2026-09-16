@@ -1,14 +1,14 @@
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    register_discovered_template_extensions,
     template_extension_registry,
 )
-from photoalbum.templates.month_divider_classic.widget_renderer import (
+from photoalbum.templates.msb.month_divider_classic.widget_renderer import (
     MonthDividerClassicWidgetRenderer,
 )
 
 
 def test_classic_month_divider_owns_renderer():
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     extension = (
         template_extension_registry.get(

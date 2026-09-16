@@ -65,7 +65,6 @@ from photoalbum.album import (
     AlbumBuilder,
     page_format_from_id,
     PrintConstraints,
-    create_builtin_template_registry,
 )
 from photoalbum.gui.widgets import (
     AlbumPlanWidget,
@@ -79,7 +78,8 @@ from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    create_template_registry,
+    register_discovered_template_extensions,
 )
 from photoalbum.i18n import Translator
 from photoalbum.export import (
@@ -101,10 +101,10 @@ class MainWindow(QMainWindow):
         )
 
         self._template_registry = (
-            create_builtin_template_registry()
+            create_template_registry()
         )
 
-        register_builtin_template_extensions()
+        register_discovered_template_extensions()
         self._album_build_result = None
 
         self._album_builder = AlbumBuilder(

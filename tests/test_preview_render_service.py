@@ -10,7 +10,7 @@ from photoalbum.gui.preview_render_service import (
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    register_discovered_template_extensions,
 )
 
 
@@ -42,7 +42,7 @@ def photo(
 def test_scatter_effective_photos_ignore_undated():
     ensure_app()
 
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     service = PreviewRenderService(
         Translator("fr")

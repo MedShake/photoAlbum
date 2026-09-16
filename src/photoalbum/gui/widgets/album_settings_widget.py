@@ -26,6 +26,7 @@ from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 
 from photoalbum.album import (
+    PAGE_FORMATS,
     page_format_from_id,
     AlbumStructureSettings,
     CoverPosition,
@@ -42,6 +43,7 @@ from photoalbum.album import (
     SpecialPage,
     TemplateKind,
     TemplateRegistry,
+    TemplateTarget,
 )
 
 
@@ -175,80 +177,47 @@ class AlbumSettingsWidget(QWidget):
                 "album.page_format"
             )
         )
-
         form = QFormLayout(group)
 
         self._page_format_combo = QComboBox()
 
-        self._page_format_combo.addItem(
-            "A4 — 210 × 297 mm",
-            "a4",
-        )
-        self._page_format_combo.addItem(
-            self._translator.tr(
-                "album.paper_format_a5_development"
-            ),
-            "a5",
-        )
-        self._page_format_combo.addItem(
-            "US Letter — 215,9 × 279,4 mm",
-            "us-letter",
-        )
-
-        # A5 remains part of the project model but is not
-        # selectable in V1. Some templates still require
-        # format-specific adaptation for this smaller page.
-        page_format_model = (
-            self._page_format_combo.model()
-        )
-
-        a5_index = (
-            self._page_format_combo.findData(
-                "a5"
+        for format_id, page_format in PAGE_FORMATS.items():
+            self._page_format_combo.addItem(
+                (
+                    f"{page_format.name} — "
+                    f"{page_format.width_mm:g} × "
+                    f"{page_format.height_mm:g} mm"
+                ),
+                format_id,
             )
-        )
-
-        if a5_index >= 0:
-            a5_item = page_format_model.item(
-                a5_index
-            )
-
-            if a5_item is not None:
-                a5_item.setEnabled(
-                    False
-                )
-
-        form.addRow(
-            self._translator.tr(
-                "album.paper_format"
-            ),
-            self._page_format_combo,
-        )
 
         self._orientation_combo = QComboBox()
-
         self._orientation_combo.addItem(
             self._translator.tr(
                 "album.orientation_portrait"
             ),
             PageOrientation.PORTRAIT.value,
         )
-
         self._orientation_combo.addItem(
             self._translator.tr(
-                "album.orientation_landscape_development"
+                "album.orientation_landscape"
             ),
             PageOrientation.LANDSCAPE.value,
         )
 
-        # Landscape is deliberately visible but unavailable
-        # until every page template supports it correctly.
-        model = self._orientation_combo.model()
-        landscape_item = model.item(1)
+        self._page_format_combo.currentIndexChanged.connect(
+            self._refresh_format_availability
+        )
+        self._orientation_combo.currentIndexChanged.connect(
+            self._refresh_template_choices
+        )
 
-        if landscape_item is not None:
-            landscape_item.setEnabled(False)
-
+        form.addRow(
+            self._translator.tr(
+                "album.page_format"
+            ),
+            self._page_format_combo,
+        )
         form.addRow(
             self._translator.tr(
                 "album.orientation"
@@ -256,7 +225,167 @@ class AlbumSettingsWidget(QWidget):
             self._orientation_combo,
         )
 
+        self._refresh_format_availability()
+
         return group
+
+    def _target(
+        self,
+        format_id: str | None = None,
+        orientation: PageOrientation | None = None,
+    ) -> TemplateTarget:
+        if format_id is None:
+            format_id = str(
+                self._page_format_combo.currentData()
+            )
+
+        if orientation is None:
+            orientation = PageOrientation(
+                self._orientation_combo.currentData()
+            )
+
+        return TemplateTarget(
+            format_id=format_id,
+            orientation=orientation,
+        )
+
+    def _format_has_available_orientation(
+        self,
+        format_id: str,
+    ) -> bool:
+        return any(
+            self._registry.album_target_available(
+                self._target(
+                    format_id=format_id,
+                    orientation=orientation,
+                )
+            )
+            for orientation in PageOrientation
+        )
+
+    def _refresh_format_availability(self) -> None:
+        model = self._page_format_combo.model()
+
+        for index in range(
+            self._page_format_combo.count()
+        ):
+            format_id = str(
+                self._page_format_combo.itemData(index)
+            )
+            item = model.item(index)
+
+            if item is None:
+                continue
+
+            available = (
+                self._format_has_available_orientation(
+                    format_id
+                )
+            )
+
+            item.setEnabled(available)
+
+            page_format = PAGE_FORMATS[format_id]
+            base = (
+                f"{page_format.name} — "
+                f"{page_format.width_mm:g} × "
+                f"{page_format.height_mm:g} mm"
+            )
+
+            if available:
+                item.setText(base)
+                item.setToolTip("")
+            else:
+                item.setText(
+                    base
+                    + " — "
+                    + self._translator.tr(
+                        "album.templates_unavailable_format"
+                    )
+                )
+                item.setToolTip(
+                    self._translator.tr(
+                        "album.templates_unavailable_format"
+                    )
+                )
+
+        self._refresh_orientation_availability()
+
+    def _refresh_orientation_availability(self) -> None:
+        format_id = str(
+            self._page_format_combo.currentData()
+        )
+
+        model = self._orientation_combo.model()
+
+        for index in range(
+            self._orientation_combo.count()
+        ):
+            value = self._orientation_combo.itemData(
+                index
+            )
+            orientation = PageOrientation(value)
+            item = model.item(index)
+
+            if item is None:
+                continue
+
+            available = (
+                self._registry.album_target_available(
+                    self._target(
+                        format_id=format_id,
+                        orientation=orientation,
+                    )
+                )
+            )
+
+            item.setEnabled(available)
+
+            if orientation == PageOrientation.PORTRAIT:
+                base = self._translator.tr(
+                    "album.orientation_portrait"
+                )
+            else:
+                base = self._translator.tr(
+                    "album.orientation_landscape"
+                )
+
+            if available:
+                item.setText(base)
+                item.setToolTip("")
+            else:
+                item.setText(
+                    base
+                    + " — "
+                    + self._translator.tr(
+                        "album.templates_unavailable_orientation"
+                    )
+                )
+                item.setToolTip(
+                    self._translator.tr(
+                        "album.templates_unavailable_orientation"
+                    )
+                )
+
+        self._refresh_template_choices()
+
+    def _refresh_template_choices(self) -> None:
+        """
+        Refresh availability after a physical target change.
+
+        Existing template combos are rebuilt lazily by the same
+        helpers used by the widget.  The important invariant here
+        is that the selected album target itself can never become
+        a target for which no complete template set exists.
+        """
+        if not hasattr(
+            self,
+            "_photo_page_combo",
+        ):
+            return
+
+        self.settings_changed.emit()
+
 
     def _create_covers_group(self) -> QGroupBox:
         group = QGroupBox(

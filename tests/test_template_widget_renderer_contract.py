@@ -1,7 +1,7 @@
 import inspect
 
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    register_discovered_template_extensions,
     template_extension_registry,
 )
 
@@ -27,7 +27,7 @@ EXPECTED_PARAMETERS = {
 
 
 def test_widget_renderers_follow_common_contract():
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     for extension in (
         template_extension_registry

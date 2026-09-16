@@ -28,6 +28,7 @@ from .templates import (
     TemplateDefinition,
     TemplateKind,
     TemplateRegistry,
+    TemplateTarget,
 )
 
 from .validation import AlbumSettingsValidator
@@ -56,9 +57,6 @@ from .print_diagnostics import (
 
 from .builder import AlbumBuilder, AlbumBuildResult
 
-from .builtin_templates import (
-    create_builtin_template_registry,
-)
 
 from .serialization import (
     album_settings_from_json,
@@ -95,6 +93,7 @@ __all__ = [
     "TemplateDefinition",
     "TemplateKind",
     "TemplateRegistry",
+    "TemplateTarget",
     "AlbumSettingsValidator",
     "AlbumPlan",
     "AlbumPlanner",
@@ -111,7 +110,6 @@ __all__ = [
     "PrintDiagnostics",
     "AlbumBuilder",
     "AlbumBuildResult",
-    "create_builtin_template_registry",
     "album_settings_from_json",
     "album_settings_to_json",
     "AlbumPlanSummary",

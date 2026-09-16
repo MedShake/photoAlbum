@@ -21,8 +21,9 @@ from photoalbum.album import (
     PlanItemKind,
     PlannedPage,
     PrintDiagnostic,
-    create_builtin_template_registry,
 )
+from photoalbum.templates import create_template_registry
+
 from photoalbum.gui.widgets import AlbumPreviewWidget
 from photoalbum.gui.widgets.album_preview_widget import (
     AlbumCoverPreview,
@@ -37,7 +38,7 @@ def create_widget() -> AlbumPreviewWidget:
         QApplication([])
 
     return AlbumPreviewWidget(
-        create_builtin_template_registry()
+        create_template_registry()
     )
 
 

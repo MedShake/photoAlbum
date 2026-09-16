@@ -1,7 +1,6 @@
 from PySide6.QtWidgets import QApplication
 
 from photoalbum.album import (
-    create_builtin_template_registry,
     AlbumBuildResult,
     AlbumPlan,
     BlankPageReason,
@@ -12,6 +11,8 @@ from photoalbum.album import (
     PlannedPage,
     PrintDiagnostic,
 )
+from photoalbum.templates import create_template_registry
+
 from photoalbum.gui.widgets import AlbumPlanWidget
 from photoalbum.i18n import Translator
 
@@ -23,7 +24,7 @@ def create_widget() -> AlbumPlanWidget:
         QApplication([])
 
     return AlbumPlanWidget(
-        create_builtin_template_registry(),
+        create_template_registry(),
         translator=Translator("en"),
     )
 
@@ -243,3 +244,13 @@ def test_plan_widget_clear_removes_previous_result():
     )
 
     assert widget._tree.topLevelItemCount() == 0
+
+
+def test_plan_cover_template_name_includes_pack_name():
+    widget = create_widget()
+
+    name = widget._template_name(
+        "year-photo-scatter"
+    )
+
+    assert name.startswith("MSB — ")

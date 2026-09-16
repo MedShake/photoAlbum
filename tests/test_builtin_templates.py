@@ -1,11 +1,12 @@
 from photoalbum.album import (
     TemplateKind,
-    create_builtin_template_registry,
 )
+from photoalbum.templates import create_template_registry
+
 
 
 def test_builtin_registry_contains_photo_templates():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     templates = registry.list_by_kind(
         TemplateKind.PHOTO_PAGE
@@ -25,7 +26,7 @@ def test_builtin_registry_contains_photo_templates():
 
 
 def test_builtin_photo_templates_have_expected_capacities():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     assert registry.get(
         "photo-page-1"
@@ -41,7 +42,7 @@ def test_builtin_photo_templates_have_expected_capacities():
 
 
 def test_builtin_registry_contains_dividers():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     month_templates = registry.list_by_kind(
         TemplateKind.MONTH_DIVIDER
@@ -66,7 +67,7 @@ def test_builtin_registry_contains_dividers():
 
 
 def test_geographic_word_cloud_is_reusable():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     template = registry.get(
         "geographic-word-cloud"
@@ -81,7 +82,7 @@ def test_geographic_word_cloud_is_reusable():
 
 
 def test_calendar_index_is_reusable():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     template = registry.get(
         "calendar-index"
@@ -96,7 +97,7 @@ def test_calendar_index_is_reusable():
 
 
 def test_dedication_is_special_page_only():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     template = registry.get(
         "dedication"
@@ -111,7 +112,7 @@ def test_dedication_is_special_page_only():
 
 
 def test_builtin_template_ids_are_unique():
-    registry = create_builtin_template_registry()
+    registry = create_template_registry()
 
     templates = registry.list_all()
 

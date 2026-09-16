@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtGui import QPainter
 
 from photoalbum.album import PageInstance
-from photoalbum.templates.calendar_index.painter import (
+from photoalbum.templates.msb.calendar_index.painter import (
     paint_calendar_index,
 )
 

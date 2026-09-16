@@ -10,7 +10,7 @@ from photoalbum.gui.preview_render_service import (
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    register_discovered_template_extensions,
 )
 
 
@@ -21,7 +21,7 @@ def ensure_app():
 
 def test_service_detects_expensive_scatter_backend():
     ensure_app()
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     service = PreviewRenderService(
         Translator("fr")
@@ -34,7 +34,7 @@ def test_service_detects_expensive_scatter_backend():
 
 def test_service_does_not_require_backend_for_light_template():
     ensure_app()
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     service = PreviewRenderService(
         Translator("fr")
@@ -47,7 +47,7 @@ def test_service_does_not_require_backend_for_light_template():
 
 def test_effective_scatter_photos_are_owned_by_backend():
     ensure_app()
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     service = PreviewRenderService(
         Translator("fr")

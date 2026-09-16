@@ -4,7 +4,7 @@ from photoalbum.album import TemplateDefinition
 from photoalbum.i18n import Translator
 
 
-def template_display_name(
+def _base_template_display_name(
     template: TemplateDefinition,
     translator: Translator,
 ) -> str:
@@ -36,3 +36,18 @@ def template_display_name(
         return translated
 
     return template.name
+
+
+def template_display_name(
+    template: TemplateDefinition,
+    translator,
+) -> str:
+    name = _base_template_display_name(
+        template,
+        translator,
+    )
+
+    if template.pack_name:
+        return f"{template.pack_name} — {name}"
+
+    return name

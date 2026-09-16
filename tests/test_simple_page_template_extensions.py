@@ -1,17 +1,17 @@
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    register_discovered_template_extensions,
     template_extension_registry,
 )
 from photoalbum.templates.simple_label import (
     SimpleLabelWidgetRenderer,
 )
-from photoalbum.templates.year_divider_classic.widget_renderer import (
+from photoalbum.templates.msb.year_divider_classic.widget_renderer import (
     YearDividerClassicWidgetRenderer,
 )
 
 
 def test_year_divider_owns_renderer():
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     extension = (
         template_extension_registry.get(
@@ -33,14 +33,14 @@ def test_year_divider_owns_renderer():
 
 
 def test_dedication_owns_renderer():
-    from photoalbum.templates.dedication.settings import (
+    from photoalbum.templates.msb.dedication.settings import (
         DedicationSettingsWidget,
     )
-    from photoalbum.templates.dedication.widget_renderer import (
+    from photoalbum.templates.msb.dedication.widget_renderer import (
         DedicationWidgetRenderer,
     )
 
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     extension = (
         template_extension_registry.get(
@@ -62,7 +62,7 @@ def test_dedication_owns_renderer():
 
 
 def test_blank_template_owns_renderer():
-    register_builtin_template_extensions()
+    register_discovered_template_extensions()
 
     extension = (
         template_extension_registry.get(

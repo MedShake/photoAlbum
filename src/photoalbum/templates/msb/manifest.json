@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "id": "msb",
+  "name": "MSB",
+  "version": "1.0",
+  "authors": [
+    {
+      "name": "MSB"
+    }
+  ],
+  "description": "Templates historiques fournis avec Photo Album.",
+  "documentation": "README.md",
+  "templates": [
+    {
+      "id": "year-photo-scatter",
+      "name": "Year photo scatter",
+      "module": "year_photo_scatter",
+      "kinds": [
+        "cover",
+        "special_page"
+      ],
+      "cover_positions": [
+        "front",
+        "inside_front",
+        "inside_back",
+        "back"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "geographic-word-cloud",
+      "name": "Geographic word cloud",
+      "module": "geographic_word_cloud",
+      "kinds": [
+        "cover",
+        "special_page"
+      ],
+      "cover_positions": [
+        "front",
+        "inside_front",
+        "inside_back",
+        "back"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "calendar-index",
+      "name": "Calendar index",
+      "module": "calendar_index",
+      "kinds": [
+        "cover",
+        "special_page"
+      ],
+      "cover_positions": [
+        "front",
+        "inside_front",
+        "inside_back",
+        "back"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "year-divider-classic",
+      "name": "Classic year divider",
+      "module": "year_divider_classic",
+      "kinds": [
+        "year_divider"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "month-divider-classic",
+      "name": "Classic month divider",
+      "module": "month_divider_classic",
+      "kinds": [
+        "month_divider"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "photo-page-1",
+      "name": "One photo",
+      "module": "photo_page",
+      "kinds": [
+        "photo_page"
+      ],
+      "photo_capacity": 1,
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "photo-page-2",
+      "name": "Two photos",
+      "module": "photo_page",
+      "kinds": [
+        "photo_page"
+      ],
+      "photo_capacity": 2,
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "photo-page-3",
+      "name": "Three photos",
+      "module": "photo_page",
+      "kinds": [
+        "photo_page"
+      ],
+      "photo_capacity": 3,
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "photo-page-4",
+      "name": "Four photos",
+      "module": "photo_page",
+      "kinds": [
+        "photo_page"
+      ],
+      "photo_capacity": 4,
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "dedication",
+      "name": "Dedication",
+      "module": "dedication",
+      "kinds": [
+        "special_page"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "blank",
+      "name": "Blank page",
+      "module": "blank",
+      "kinds": [
+        "special_page"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    }
+  ]
+}

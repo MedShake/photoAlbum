@@ -723,25 +723,14 @@ class AlbumPlanWidget(QWidget):
         self,
         template_id: str,
     ) -> str:
-        key = (
-            f"template.{template_id}"
-        )
-
-        translated = (
-            self._translator.tr(
-                key
-            )
-        )
-
-        if translated != key:
-            return translated
-
         if self._registry is not None:
             try:
-                return (
-                    self._registry
-                    .get(template_id)
-                    .name
+                template = self._registry.get(
+                    template_id
+                )
+                return template_display_name(
+                    template,
+                    self._translator,
                 )
             except KeyError:
                 pass

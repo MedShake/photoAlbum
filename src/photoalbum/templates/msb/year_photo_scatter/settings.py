@@ -25,7 +25,7 @@ from photoalbum.album import (
     PageFormat,
     PageInstance,
 )
-from photoalbum.templates.year_photo_scatter.composition import (
+from photoalbum.templates.msb.year_photo_scatter.composition import (
     compose_cover_scatter,
 )
 

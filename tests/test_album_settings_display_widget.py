@@ -5,8 +5,9 @@ from PySide6.QtWidgets import QApplication
 from photoalbum.album import (
     PageNumberSettings,
     PhotoCaptionSettings,
-    create_builtin_template_registry,
 )
+from photoalbum.templates import create_template_registry
+
 from photoalbum.gui.widgets import AlbumSettingsWidget
 from photoalbum.i18n import Translator
 
@@ -18,7 +19,7 @@ def create_widget() -> AlbumSettingsWidget:
         QApplication([])
 
     return AlbumSettingsWidget(
-        create_builtin_template_registry(),
+        create_template_registry(),
         translator=Translator("en"),
     )
 

@@ -14,7 +14,7 @@ from photoalbum.rendering.fonts import (
     DEFAULT_SANS_FONT,
     resolve_font_family,
 )
-from photoalbum.templates.calendar_index.composition import (
+from photoalbum.templates.msb.calendar_index.composition import (
     CalendarIndexComposition,
 )
 from photoalbum.i18n import Translator

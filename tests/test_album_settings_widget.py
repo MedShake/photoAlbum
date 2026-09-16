@@ -8,8 +8,9 @@ from photoalbum.album import (
     DividerSettings,
     PhotoPageSettings,
     SpecialPage,
-    create_builtin_template_registry,
 )
+from photoalbum.templates import create_template_registry
+
 from photoalbum.gui.widgets import AlbumSettingsWidget
 
 
@@ -20,7 +21,7 @@ def create_widget() -> AlbumSettingsWidget:
         QApplication([])
 
     return AlbumSettingsWidget(
-        create_builtin_template_registry()
+        create_template_registry()
     )
 
 
@@ -77,6 +78,21 @@ def test_year_dividers_are_available_for_multiple_years():
     settings = widget.settings()
 
     assert settings.year_dividers.enabled
+
+
+def test_landscape_unavailable_label_is_translated():
+    widget = create_widget()
+
+    widget._refresh_orientation_availability()
+
+    model = widget._orientation_combo.model()
+    item = model.item(1)
+
+    assert item.text() == (
+        "Landscape — templates unavailable for this orientation"
+    )
+
+
 
 def test_settings_can_be_restored():
     widget = create_widget()

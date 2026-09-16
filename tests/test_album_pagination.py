@@ -2,7 +2,6 @@ from datetime import datetime
 from pathlib import Path
 
 from photoalbum.album import (
-    create_builtin_template_registry,
     AlbumPlanner,
     AlbumPlan,
     PageSide,
@@ -20,6 +19,8 @@ from photoalbum.album import (
     DividerSettings,
     PhotoPageSettings,
 )
+from photoalbum.templates import create_template_registry
+
 from photoalbum.models import DateSource, Photo
 
 def photo(
@@ -795,7 +796,7 @@ def test_month_divider_collects_unique_cities():
     )
 
     result = PaginationEngine(
-        create_builtin_template_registry()
+        create_template_registry()
     ).paginate(plan)
 
     divider = next(
@@ -837,7 +838,7 @@ def test_month_divider_accepts_month_without_city():
     )
 
     result = PaginationEngine(
-        create_builtin_template_registry()
+        create_template_registry()
     ).paginate(plan)
 
     divider = next(

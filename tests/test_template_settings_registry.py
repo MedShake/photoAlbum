@@ -6,10 +6,10 @@ from photoalbum.album import PageInstance
 from photoalbum.gui.template_settings import (
     create_template_settings_editor,
 )
-from photoalbum.templates.geographic_word_cloud.settings import (
+from photoalbum.templates.msb.geographic_word_cloud.settings import (
     GeographicWordCloudSettingsWidget,
 )
-from photoalbum.templates.year_photo_scatter.settings import (
+from photoalbum.templates.msb.year_photo_scatter.settings import (
     YearPhotoScatterSettingsWidget,
 )
 from photoalbum.i18n import Translator

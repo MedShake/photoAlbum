@@ -31,6 +31,14 @@ pythonpath = ["src"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+
+[tool.setuptools.package-data]
+"photoalbum.templates.msb" = [
+    "manifest.json",
+    "README.md",
+    "screenshots/*",
+]
+
 [project.scripts]
 photo-album = "photoalbum.cli:main"
 photo-album-gui = "photoalbum.gui.application:main"

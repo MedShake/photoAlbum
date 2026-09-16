@@ -19,12 +19,14 @@ from photoalbum.album import (
     PageFormat,
     PageInstance,
 )
-from photoalbum.templates.calendar_index.composition import (
-    available_calendar_years,
-    compose_calendar_index,
+from photoalbum.rendering.page_geometry import (
+    PageRenderGeometry,
 )
-from photoalbum.templates.calendar_index.painter import (
-    paint_calendar_index,
+from photoalbum.templates.msb.geographic_word_cloud.composition import (
+    compose_geographic_word_cloud,
+)
+from .painter import (
+    paint_geographic_word_cloud,
 )
 
 from photoalbum.gui.template_settings.base import (
@@ -32,7 +34,7 @@ from photoalbum.gui.template_settings.base import (
 )
 
 
-class CalendarIndexSettingsWidget(
+class GeographicWordCloudSettingsWidget(
     PageTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
@@ -74,7 +76,7 @@ class CalendarIndexSettingsWidget(
 
         form.addRow(
             self._translator.tr(
-                "calendar_index.year"
+                "page_settings.geographic_photos"
             ),
             self._year_combo,
         )
@@ -85,10 +87,7 @@ class CalendarIndexSettingsWidget(
 
         self._preview_label = QLabel()
 
-        self._preview_label.setFixedSize(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
+        self._update_preview_size()
 
         self._preview_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
@@ -106,15 +105,57 @@ class CalendarIndexSettingsWidget(
             ),
         )
 
+    def _update_preview_size(
+        self,
+    ) -> None:
+        width = self.PREVIEW_WIDTH
+
+        height = round(
+            width
+            * self._page_format.height_mm
+            / self._page_format.width_mm
+        )
+
+        self._preview_label.setFixedSize(
+            width,
+            height,
+        )
+
     def _load_state(
         self,
     ) -> None:
-        years = available_calendar_years(
-            self._photos
+        self._year_combo.blockSignals(
+            True
         )
 
+        self._year_combo.clear()
+
+        self._year_combo.addItem(
+            self._translator.tr(
+                "page_settings.all_photos"
+            ),
+            None,
+        )
+
+        years = sorted(
+            {
+                photo.capture_datetime.year
+                for photo in self._photos
+                if (
+                    photo.capture_datetime
+                    is not None
+                )
+            }
+        )
+
+        for year in years:
+            self._year_combo.addItem(
+                str(year),
+                year,
+            )
+
         settings = self._instance.settings.get(
-            "calendar_index",
+            "geographic_word_cloud",
             {},
         )
 
@@ -128,91 +169,56 @@ class CalendarIndexSettingsWidget(
             "year"
         )
 
-        self._year_combo.blockSignals(
-            True
+        index = self._year_combo.findData(
+            selected_year
         )
 
-        self._year_combo.clear()
+        if index < 0:
+            index = 0
 
-        for year in years:
-            self._year_combo.addItem(
-                str(year),
-                year,
-            )
-
-        if years:
-            if selected_year not in years:
-                selected_year = years[0]
-
-            index = self._year_combo.findData(
-                selected_year
-            )
-
-            self._year_combo.setCurrentIndex(
-                max(
-                    index,
-                    0,
-                )
-            )
-
-            # Persist even the automatically selected year.
-            self._save_year(
-                selected_year,
-                emit=False,
-            )
+        self._year_combo.setCurrentIndex(
+            index
+        )
 
         self._year_combo.blockSignals(
             False
         )
 
         self._year_combo.currentIndexChanged.connect(
-            self._year_changed
+            self._scope_changed
         )
 
-    def _save_year(
+    def _scope_changed(
         self,
-        year,
-        *,
-        emit: bool = True,
+        index: int,
     ) -> None:
         settings = dict(
             self._instance.settings
         )
 
-        calendar_settings = dict(
+        geo_settings = dict(
             settings.get(
-                "calendar_index",
+                "geographic_word_cloud",
                 {},
             )
         )
 
-        calendar_settings[
-            "year"
-        ] = year
+        geo_settings["year"] = (
+            self._year_combo.itemData(
+                index
+            )
+        )
 
         settings[
-            "calendar_index"
-        ] = calendar_settings
+            "geographic_word_cloud"
+        ] = geo_settings
 
         self._instance = replace(
             self._instance,
             settings=settings,
         )
 
-        if emit:
-            self.instance_changed.emit()
-
-    def _year_changed(
-        self,
-        index: int,
-    ) -> None:
-        year = self._year_combo.itemData(
-            index
-        )
-
-        self._save_year(
-            year
-        )
+        self.instance_changed.emit()
 
         self._render_preview()
 
@@ -221,9 +227,24 @@ class CalendarIndexSettingsWidget(
     ) -> None:
         year = self._year_combo.currentData()
 
+        # The geographic cloud keeps the historical A4
+        # composition geometry on every supported page format.
+        # Wider formats such as US Letter therefore gain extra
+        # horizontal breathing room instead of stretching the
+        # cloud layout.
+        cloud = compose_geographic_word_cloud(
+            list(
+                self._photos
+            ),
+            year=year,
+            page_width_mm=A4.width_mm,
+            page_height_mm=A4.height_mm,
+        )
+
+        self._update_preview_size()
+
         pixmap = QPixmap(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
+            self._preview_label.size()
         )
 
         pixmap.fill(
@@ -234,7 +255,21 @@ class CalendarIndexSettingsWidget(
             pixmap
         )
 
-        if year is None:
+        geometry = PageRenderGeometry(
+            width=pixmap.width(),
+            height=pixmap.height(),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
+
+        paint_geographic_word_cloud(
+            painter,
+            target_rect=pixmap.rect(),
+            cloud=cloud,
+            font_pixel_size=geometry.font_pixel_size,
+        )
+
+        if not cloud.words:
             painter.setPen(
                 Qt.GlobalColor.darkGray
             )
@@ -243,24 +278,8 @@ class CalendarIndexSettingsWidget(
                 pixmap.rect(),
                 Qt.AlignmentFlag.AlignCenter,
                 self._translator.tr(
-                    "calendar_index.no_year"
+                    "page_settings.no_geographic_data"
                 ),
-            )
-        else:
-            # In the settings dialog there is intentionally no
-            # pagination context yet, so Page N is omitted.
-            composition = compose_calendar_index(
-                self._photos,
-                year=year,
-            )
-
-            paint_calendar_index(
-                painter,
-                target_rect=pixmap.rect(),
-                composition=composition,
-                translator=self._translator,
-                page_width_mm=self._page_format.width_mm,
-                page_height_mm=self._page_format.height_mm,
             )
 
         painter.end()

@@ -50,7 +50,7 @@ def __getattr__(
 
     This preserves convenient imports such as:
 
-        from photoalbum.templates.year_photo_scatter import (
+        from photoalbum.templates.msb.year_photo_scatter import (
             YearPhotoScatterPreviewBackend,
         )
 

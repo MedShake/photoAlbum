@@ -22,7 +22,6 @@ from photoalbum.app import ProjectService
 from photoalbum.album import (
     AlbumBuilder,
     PrintConstraints,
-    create_builtin_template_registry,
     page_format_from_id,
 )
 from photoalbum.export import (
@@ -31,7 +30,8 @@ from photoalbum.export import (
 )
 from photoalbum.i18n import Translator
 from photoalbum.templates import (
-    register_builtin_template_extensions,
+    create_template_registry,
+    register_discovered_template_extensions,
 )
 
 
@@ -642,10 +642,10 @@ def run_pdf(
             )
             return 2
 
-        register_builtin_template_extensions()
+        register_discovered_template_extensions()
 
         registry = (
-            create_builtin_template_registry()
+            create_template_registry()
         )
 
         builder = AlbumBuilder(

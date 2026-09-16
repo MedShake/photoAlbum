@@ -292,6 +292,13 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
+        "album.orientation_landscape": "Landscape",
+        "album.templates_unavailable_format": (
+            "templates unavailable for this format"
+        ),
+        "album.templates_unavailable_orientation": (
+            "templates unavailable for this orientation"
+        ),
         "album.orientation_landscape_development": (
             "Landscape — in development"
         ),
@@ -718,8 +725,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
-        "album.orientation_landscape_development": (
-            "Paysage — en développement"
+        "album.orientation_landscape": "Paysage",
+        "album.templates_unavailable_format": (
+            "templates indisponibles dans ce format"
+        ),
+        "album.templates_unavailable_orientation": (
+            "templates indisponibles dans cette orientation"
         ),
         "album.covers": "Couvertures",
         "album.settings": "Réglages…",

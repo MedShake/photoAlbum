@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.templates.calendar_index.composition import (
+from photoalbum.templates.msb.calendar_index.composition import (
     available_calendar_years,
     compose_calendar_index,
 )
