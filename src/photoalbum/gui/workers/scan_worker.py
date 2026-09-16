@@ -9,7 +9,11 @@ from photoalbum.scanner import ProcessingEvent
 
 
 class ScanWorker(QObject):
+    """Run a project photo scan outside the GUI thread."""
+
     event_received = Signal(object)
+    discovered = Signal(int)
+    progress = Signal(int, int)
     completed = Signal(object)
     failed = Signal(str)
 
@@ -31,6 +35,7 @@ class ScanWorker(QObject):
         self._language = language
         self._geocode = geocode
         self._user_agent = user_agent
+        self._cancel_requested = False
 
     @Slot()
     def run(self) -> None:
@@ -45,6 +50,9 @@ class ScanWorker(QObject):
                 geocode=self._geocode,
                 user_agent=self._user_agent,
                 on_event=self._handle_event,
+                on_discovered=self._handle_discovered,
+                on_progress=self._handle_progress,
+                should_cancel=self._should_cancel,
             )
 
         except Exception as exc:
@@ -58,3 +66,24 @@ class ScanWorker(QObject):
         event: ProcessingEvent,
     ) -> None:
         self.event_received.emit(event)
+
+    def _handle_discovered(
+        self,
+        total: int,
+    ) -> None:
+        self.discovered.emit(total)
+
+    def _handle_progress(
+        self,
+        current: int,
+        total: int,
+    ) -> None:
+        self.progress.emit(current, total)
+
+    def request_cancel(self) -> None:
+        """Request a cooperative scan cancellation."""
+        self._cancel_requested = True
+
+    def _should_cancel(self) -> bool:
+        """Return whether scan cancellation was requested."""
+        return self._cancel_requested

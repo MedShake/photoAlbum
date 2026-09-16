@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +41,7 @@ class LibraryScanResult:
     statistics: ScanStatistics = field(
         default_factory=ScanStatistics
     )
+    cancelled: bool = False
     @property
     def total_photos(self) -> int:
         return len(self.photos) + len(self.date_anomalies)
@@ -70,6 +72,9 @@ class LibraryScanner:
         *,
         language: str | None = None,
         on_event: EventCallback | None = None,
+        on_discovered: Callable[[int], None] | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
     ) -> LibraryScanResult:
         result = LibraryScanResult()
 
@@ -79,7 +84,17 @@ class LibraryScanner:
         )
         result.statistics.discovered = len(image_paths)
 
+        total = len(image_paths)
+
+        if on_discovered is not None:
+            on_discovered(total)
+
+        completed = 0
+
         for path in image_paths:
+            if should_cancel is not None and should_cancel():
+                break
+
             try:
                 photo = self._get_or_process_photo(
                     path,
@@ -96,6 +111,11 @@ class LibraryScanner:
                     )
                 )
                 result.statistics.errors += 1
+                completed += 1
+
+                if on_progress is not None:
+                    on_progress(completed, total)
+
                 continue
 
             if photo.is_date_anomaly:
@@ -104,10 +124,21 @@ class LibraryScanner:
             else:
                 result.photos.append(photo)
 
-        self._synchronize_missing_photos(
-            image_paths,
-            result,
-        )
+            completed += 1
+
+            if on_progress is not None:
+                on_progress(completed, total)
+
+        # Synchronizing missing photos is only valid after a complete
+        # traversal.  A cancelled scan must not mark every unvisited
+        # photo as missing.
+        result.cancelled = completed < total
+
+        if not result.cancelled:
+            self._synchronize_missing_photos(
+                image_paths,
+                result,
+            )
 
         result.photos.sort(
             key=lambda photo: photo.capture_datetime

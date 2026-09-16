@@ -2,6 +2,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from photoalbum.geocoding import GeocodingError, LocationResolver
+from photoalbum.geocoding.location_resolver import (
+    LocationResolutionSource,
+)
 from photoalbum.metadata import PhotoAnalyzer
 from photoalbum.models import (
     DateSource,
@@ -104,7 +107,7 @@ class PhotoProcessor:
         )
 
         try:
-            location = self._location_resolver.resolve(
+            resolution = self._location_resolver.resolve_with_source(
                 photo.latitude,
                 photo.longitude,
                 language=language,
@@ -119,6 +122,8 @@ class PhotoProcessor:
             )
             return False
 
+        location = resolution.location
+
         if location is None:
             self._emit(
                 on_event,
@@ -130,15 +135,26 @@ class PhotoProcessor:
 
         self._apply_location(photo, location)
 
-        message = (
-            "Geographic information refreshed."
-            if force_refresh
-            else "Geographic information resolved."
-        )
+        if resolution.source == LocationResolutionSource.CACHE:
+            event_type = (
+                ProcessingEventType.LOCATION_FROM_CACHE
+            )
+            message = (
+                "Geographic information reused from "
+                "a nearby cached position."
+            )
+        else:
+            event_type = (
+                ProcessingEventType.LOCATION_FROM_REVERSE
+            )
+            message = (
+                "Geographic information obtained by "
+                "reverse geocoding."
+            )
 
         self._emit(
             on_event,
-            ProcessingEventType.LOCATION_RESOLVED,
+            event_type,
             photo.path,
             message,
         )

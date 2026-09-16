@@ -66,6 +66,7 @@ from photoalbum.gui.workers import (
 from photoalbum.scanner import (
     LibraryScanResult,
     ProcessingEvent,
+    ProcessingEventType,
 )
 
 from photoalbum.album import (
@@ -433,7 +434,7 @@ class MainWindow(QMainWindow):
         )
 
         self._analyze_button.clicked.connect(
-            self._start_scan
+            self._toggle_scan
         )
 
         self._progress_bar = QProgressBar()
@@ -1581,6 +1582,42 @@ class MainWindow(QMainWindow):
                 album_settings
             )
 
+    def _toggle_scan(self) -> None:
+        """Start a scan or request cancellation of the running scan."""
+        if self._scan_thread is None:
+            self._start_scan()
+            return
+
+        self._cancel_scan()
+
+    def _cancel_scan(self) -> None:
+        """Request cooperative cancellation of the current scan."""
+        worker = self._scan_worker
+
+        if worker is None:
+            return
+
+        worker.request_cancel()
+
+        self._analyze_button.setEnabled(False)
+        self._analyze_button.setText(
+            self._translator.tr(
+                "main.analysis_stopping_button"
+            )
+        )
+
+        self._summary_label.setText(
+            self._translator.tr(
+                "main.analysis_stopping"
+            )
+        )
+
+        self.statusBar().showMessage(
+            self._translator.tr(
+                "main.analysis_stopping"
+            )
+        )
+
     def _start_scan(self) -> None:
         if self._scan_thread is not None:
             return
@@ -1692,6 +1729,12 @@ class MainWindow(QMainWindow):
         worker.event_received.connect(
             self._handle_processing_event
         )
+        worker.discovered.connect(
+            self._scan_discovered
+        )
+        worker.progress.connect(
+            self._scan_progress
+        )
         worker.completed.connect(
             self._scan_completed
         )
@@ -1711,6 +1754,23 @@ class MainWindow(QMainWindow):
         self._scan_worker = worker
 
         thread.start()
+
+    def _scan_discovered(
+        self,
+        total: int,
+    ) -> None:
+        """Initialize scan progress after file discovery."""
+        self._scan_total_files = max(total, 0)
+        self._update_scan_progress(0)
+
+    def _scan_progress(
+        self,
+        current: int,
+        total: int,
+    ) -> None:
+        """Update scan progress from the scanner."""
+        self._scan_total_files = max(total, 0)
+        self._update_scan_progress(current)
 
     def _update_scan_progress(
         self,
@@ -1768,36 +1828,8 @@ class MainWindow(QMainWindow):
         self,
         event: ProcessingEvent,
     ) -> None:
-        path_key = str(
-            event.path
-        )
-
-        # Several events may concern the same photo
-        # (EXIF, GPS, geocoding...). Count the photo once.
-        if (
-            path_key
-            and path_key
-            not in self._scan_seen_paths
-        ):
-            self._scan_seen_paths.add(
-                path_key
-            )
-
-            self._update_scan_progress(
-                len(
-                    self._scan_seen_paths
-                )
-            )
-
-        message = (
-            self._translated_processing_event(
-                event
-            )
-            if hasattr(
-                self,
-                "_translated_processing_event"
-            )
-            else event.message
+        message = self._translated_processing_event(
+            event
         )
 
         self._log_view.appendPlainText(
@@ -1806,16 +1838,79 @@ class MainWindow(QMainWindow):
             f"{message}"
         )
 
+    def _translated_processing_event(
+        self,
+        event: ProcessingEvent,
+    ) -> str:
+        keys = {
+            ProcessingEventType.ANALYSIS_STARTED:
+                "processing.event.analysis_started",
+            ProcessingEventType.DATE_FROM_EXIF:
+                "processing.event.date_from_exif",
+            ProcessingEventType.DATE_FROM_FILENAME:
+                "processing.event.date_from_filename",
+            ProcessingEventType.DATE_MISSING:
+                "processing.event.date_missing",
+            ProcessingEventType.GPS_FOUND:
+                "processing.event.gps_found",
+            ProcessingEventType.GPS_MISSING:
+                "processing.event.gps_missing",
+            ProcessingEventType.GEOCODING_STARTED:
+                "processing.event.geocoding_started",
+            ProcessingEventType.LOCATION_FROM_CACHE:
+                "processing.event.location_from_cache",
+            ProcessingEventType.LOCATION_FROM_REVERSE:
+                "processing.event.location_from_reverse",
+            ProcessingEventType.LOCATION_NOT_FOUND:
+                "processing.event.location_not_found",
+            ProcessingEventType.ANALYSIS_COMPLETED:
+                "processing.event.analysis_completed",
+        }
+
+        if event.type == ProcessingEventType.GEOCODING_ERROR:
+            detail = event.message
+
+            prefix = "Geocoding failed:"
+            if detail.startswith(prefix):
+                detail = detail[len(prefix):].strip()
+
+            return self._translator.tr(
+                "processing.event.geocoding_error",
+                error=detail,
+            )
+
+        key = keys.get(event.type)
+
+        if key is None:
+            return event.message
+
+        return self._translator.tr(key)
+
     def _scan_completed(
         self,
         result: LibraryScanResult,
     ) -> None:
         statistics = result.statistics
 
-        self._update_scan_progress(
-            self._scan_total_files
-        )
-        self._analysis_completed = True
+        if result.cancelled:
+            self._analysis_completed = False
+
+            self._summary_label.setText(
+                self._translator.tr(
+                    "main.analysis_cancelled"
+                )
+            )
+
+            self.statusBar().showMessage(
+                self._translator.tr(
+                    "main.analysis_cancelled"
+                )
+            )
+        else:
+            self._update_scan_progress(
+                self._scan_total_files
+            )
+            self._analysis_completed = True
 
         all_photos = [
             *result.photos,
@@ -1871,36 +1966,47 @@ class MainWindow(QMainWindow):
                 ),
             )
 
-        self._summary_label.setText(
-            " | ".join(
-                [
-                    self._translator.tr(
-                        "main.discovered",
-                        count=statistics.discovered,
-                    ),
-                    self._translator.tr(
-                        "main.analyzed",
-                        count=statistics.analyzed,
-                    ),
-                    self._translator.tr(
-                        "main.reused",
-                        count=statistics.reused,
-                    ),
-                    self._translator.tr(
-                        "main.geocoded",
-                        count=statistics.geocoded,
-                    ),
-                    self._translator.tr(
-                        "main.date_anomalies",
-                        count=statistics.date_anomalies,
-                    ),
-                    self._translator.tr(
-                        "main.errors",
-                        count=statistics.errors,
-                    ),
-                ]
-            )
+        statistics_text = " | ".join(
+            [
+                self._translator.tr(
+                    "main.discovered",
+                    count=statistics.discovered,
+                ),
+                self._translator.tr(
+                    "main.analyzed",
+                    count=statistics.analyzed,
+                ),
+                self._translator.tr(
+                    "main.reused",
+                    count=statistics.reused,
+                ),
+                self._translator.tr(
+                    "main.geocoded",
+                    count=statistics.geocoded,
+                ),
+                self._translator.tr(
+                    "main.date_anomalies",
+                    count=statistics.date_anomalies,
+                ),
+                self._translator.tr(
+                    "main.errors",
+                    count=statistics.errors,
+                ),
+            ]
         )
+
+        if result.cancelled:
+            self._summary_label.setText(
+                self._translator.tr(
+                    "main.analysis_cancelled"
+                )
+                + " "
+                + statistics_text
+            )
+        else:
+            self._summary_label.setText(
+                statistics_text
+            )
 
         if result.date_anomalies:
             self._log_view.appendPlainText("")
@@ -1915,9 +2021,12 @@ class MainWindow(QMainWindow):
                     str(photo.path)
                 )
 
-        self.statusBar().showMessage(
-            self._translator.tr("main.analysis_completed")
-        )
+        if not result.cancelled:
+            self.statusBar().showMessage(
+                self._translator.tr(
+                    "main.analysis_completed"
+                )
+            )
 
     def _scan_failed(
         self,
@@ -1982,10 +2091,12 @@ class MainWindow(QMainWindow):
 
         self._analyze_button.setEnabled(
             (
-                not running
-                and self._project_service.is_open
-                and bool(
-                    self._source_edit.text()
+                running
+                or (
+                    self._project_service.is_open
+                    and bool(
+                        self._source_edit.text()
+                    )
                 )
             )
         )
@@ -2047,7 +2158,7 @@ class MainWindow(QMainWindow):
         if running:
             self._analyze_button.setText(
                 self._translator.tr(
-                    "main.analysis_running_button"
+                    "main.stop_analysis"
                 )
             )
 

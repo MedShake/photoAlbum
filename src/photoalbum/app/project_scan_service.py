@@ -27,6 +27,9 @@ class ProjectScanService:
         geocode: bool = False,
         user_agent: str | None = None,
         on_event: EventCallback | None = None,
+        on_discovered: Callable[[int], None] | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
     ) -> LibraryScanResult:
         database = ProjectDatabase(project_path)
 
@@ -62,6 +65,9 @@ class ProjectScanService:
                 recursive=recursive,
                 language=language,
                 on_event=on_event,
+                on_discovered=on_discovered,
+                on_progress=on_progress,
+                should_cancel=should_cancel,
             )
 
         finally:

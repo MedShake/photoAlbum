@@ -27,6 +27,43 @@ CATALOGS: dict[str, dict[str, str]] = {
         "scan.event.date_anomaly": "Capture date missing",
         "scan.event.error": "Analysis error",
 
+        "processing.event.analysis_started": (
+            "Photo processing started."
+        ),
+        "processing.event.date_from_exif": (
+            "Capture date found in EXIF metadata."
+        ),
+        "processing.event.date_from_filename": (
+            "Capture date found in filename."
+        ),
+        "processing.event.date_missing": (
+            "No capture date could be determined."
+        ),
+        "processing.event.gps_found": (
+            "GPS coordinates found in metadata."
+        ),
+        "processing.event.gps_missing": (
+            "No GPS coordinates found."
+        ),
+        "processing.event.geocoding_started": (
+            "Searching for geographic information..."
+        ),
+        "processing.event.location_from_cache": (
+            "Location reused from a nearby cached position."
+        ),
+        "processing.event.location_from_reverse": (
+            "Location obtained by reverse geocoding."
+        ),
+        "processing.event.location_not_found": (
+            "No geographic information found."
+        ),
+        "processing.event.geocoding_error": (
+            "Geocoding failed: {error}"
+        ),
+        "processing.event.analysis_completed": (
+            "Photo processing completed."
+        ),
+
         "photos.tab.sources": "Sources",
         "photos.tab.places": "Places",
         "photos.places.description": (
@@ -392,6 +429,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_running": "Analysis in progress...",
         "main.analysis_failed": "Analysis failed.",
         "main.analysis_completed": "Photo analysis completed.",
+        "main.stop_analysis": "Stop",
+        "main.analysis_stopping": "Stopping analysis...",
+        "main.analysis_stopping_button": "Stopping...",
+        "main.analysis_cancelled": "Photo analysis stopped.",
         "main.analyzing": "Analyzing photos...",
 
         "main.no_project": "No project open",
@@ -623,6 +664,44 @@ CATALOGS: dict[str, dict[str, str]] = {
         "scan.event.geocoded": "Lieu trouvé",
         "scan.event.date_anomaly": "Date de prise de vue manquante",
         "scan.event.error": "Erreur d’analyse",
+
+        "processing.event.analysis_started": (
+            "Traitement de la photo démarré."
+        ),
+        "processing.event.date_from_exif": (
+            "Date de prise de vue trouvée dans les métadonnées EXIF."
+        ),
+        "processing.event.date_from_filename": (
+            "Date de prise de vue trouvée dans le nom du fichier."
+        ),
+        "processing.event.date_missing": (
+            "Aucune date de prise de vue n’a pu être déterminée."
+        ),
+        "processing.event.gps_found": (
+            "Coordonnées GPS trouvées dans les métadonnées."
+        ),
+        "processing.event.gps_missing": (
+            "Aucune coordonnée GPS trouvée."
+        ),
+        "processing.event.geocoding_started": (
+            "Recherche des informations géographiques..."
+        ),
+        "processing.event.location_from_cache": (
+            "Localisation réutilisée depuis une position voisine "
+            "déjà en cache."
+        ),
+        "processing.event.location_from_reverse": (
+            "Localisation obtenue par géocodage inverse."
+        ),
+        "processing.event.location_not_found": (
+            "Aucune information géographique trouvée."
+        ),
+        "processing.event.geocoding_error": (
+            "Échec du géocodage : {error}"
+        ),
+        "processing.event.analysis_completed": (
+            "Traitement de la photo terminé."
+        ),
 
         "photos.tab.sources": "Sources",
         "photos.tab.places": "Lieux",
@@ -997,6 +1076,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_running": "Analyse en cours...",
         "main.analysis_failed": "Échec de l’analyse.",
         "main.analysis_completed": "Analyse des photos terminée.",
+        "main.stop_analysis": "Arrêter",
+        "main.analysis_stopping": "Arrêt de l’analyse en cours...",
+        "main.analysis_stopping_button": "Arrêt en cours...",
+        "main.analysis_cancelled": "Analyse des photos arrêtée.",
         "main.analyzing": "Analyse des photos en cours...",
 
         "main.no_project": "Aucun projet ouvert",

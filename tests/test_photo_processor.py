@@ -1,6 +1,10 @@
 from datetime import datetime
 from pathlib import Path
 
+from photoalbum.geocoding.location_resolver import (
+    LocationResolution,
+    LocationResolutionSource,
+)
 from photoalbum.models import (
     DateSource,
     Location,
@@ -32,17 +36,21 @@ class FakeLocationResolver:
         self.calls = 0
         self.force_refresh_values: list[bool] = []
 
-    def resolve(
+    def resolve_with_source(
         self,
         latitude: float,
         longitude: float,
         *,
         language: str | None = None,
         force_refresh: bool = False,
-    ) -> Location | None:
+    ) -> LocationResolution:
         self.calls += 1
         self.force_refresh_values.append(force_refresh)
-        return self.location
+
+        return LocationResolution(
+            location=self.location,
+            source=LocationResolutionSource.REVERSE,
+        )
 
 
 def test_photo_without_gps_does_not_use_resolver():
@@ -248,7 +256,7 @@ def test_geocoding_error_does_not_fail_photo_processing():
     )
 
     class FailingResolver:
-        def resolve(
+        def resolve_with_source(
             self,
             latitude: float,
             longitude: float,
@@ -321,3 +329,98 @@ def test_geocoding_preserves_raw_location_data():
     result = processor.process(photo.path)
 
     assert result.raw_location_data == raw_data
+
+
+def test_location_from_reverse_emits_reverse_event():
+    photo = Photo(
+        path=Path("/photos/reverse.jpg"),
+        filename="reverse.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+    )
+
+    resolver = FakeLocationResolver(
+        Location(
+            latitude=47.2184,
+            longitude=-1.5536,
+            city="Nantes",
+        )
+    )
+
+    events = []
+
+    processor = PhotoProcessor(
+        photo_analyzer=FakeAnalyzer(photo),
+        location_resolver=resolver,
+    )
+
+    processor.process(
+        photo.path,
+        on_event=events.append,
+    )
+
+    assert (
+        ProcessingEventType.LOCATION_FROM_REVERSE
+        in [event.type for event in events]
+    )
+
+    assert (
+        ProcessingEventType.LOCATION_FROM_CACHE
+        not in [event.type for event in events]
+    )
+
+
+def test_location_from_cache_emits_cache_event():
+    photo = Photo(
+        path=Path("/photos/cache.jpg"),
+        filename="cache.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+    )
+
+    class CachedLocationResolver(FakeLocationResolver):
+        def resolve_with_source(
+            self,
+            latitude: float,
+            longitude: float,
+            *,
+            language: str | None = None,
+            force_refresh: bool = False,
+        ) -> LocationResolution:
+            self.calls += 1
+            self.force_refresh_values.append(force_refresh)
+
+            return LocationResolution(
+                location=self.location,
+                source=LocationResolutionSource.CACHE,
+            )
+
+    resolver = CachedLocationResolver(
+        Location(
+            latitude=47.2184,
+            longitude=-1.5536,
+            city="Nantes",
+        )
+    )
+
+    events = []
+
+    processor = PhotoProcessor(
+        photo_analyzer=FakeAnalyzer(photo),
+        location_resolver=resolver,
+    )
+
+    processor.process(
+        photo.path,
+        on_event=events.append,
+    )
+
+    assert (
+        ProcessingEventType.LOCATION_FROM_CACHE
+        in [event.type for event in events]
+    )
+
+    assert (
+        ProcessingEventType.LOCATION_FROM_REVERSE
+        not in [event.type for event in events]
+    )
