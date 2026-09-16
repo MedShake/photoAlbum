@@ -4,6 +4,9 @@ from collections.abc import Sequence
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
+from photoalbum.i18n.date_formatter import (
+    format_datetime,
+)
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 
@@ -150,9 +153,9 @@ class PhotoTableModel(QAbstractTableModel):
             if photo.capture_datetime is None:
                 return "—"
 
-            return photo.capture_datetime.isoformat(
-                sep=" ",
-                timespec="seconds",
+            return format_datetime(
+                photo.capture_datetime,
+                include_seconds=True,
             )
 
         if column == 3:

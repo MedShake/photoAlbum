@@ -47,6 +47,9 @@ from photoalbum.geocoding.location_caption_builder import (
     LocationCaptionBuilder,
 )
 from photoalbum.i18n import Translator
+from photoalbum.i18n.date_formatter import (
+    format_datetime,
+)
 from photoalbum.models import LocationComponent, Photo
 
 
@@ -1602,8 +1605,9 @@ class PhotoPlacesWidget(QWidget):
         )
         item.setToolTip(
             1,
-            photo.capture_datetime.strftime(
-                "%d/%m/%Y %H:%M:%S"
+            format_datetime(
+                photo.capture_datetime,
+                include_seconds=True,
             ),
         )
 
@@ -3558,11 +3562,8 @@ class PhotoPlacesWidget(QWidget):
                         photo.capture_datetime
                         is not None
                     ):
-                        date_text = (
+                        date_text = format_datetime(
                             photo.capture_datetime
-                            .strftime(
-                                "%d/%m/%Y %H:%M"
-                            )
                         )
 
                     table.setItem(

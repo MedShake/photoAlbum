@@ -7,6 +7,9 @@ from PySide6.QtGui import (
     QPen,
 )
 
+from photoalbum.i18n.date_formatter import (
+    format_datetime,
+)
 from photoalbum.rendering.fonts import resolve_font_family
 
 
@@ -202,8 +205,8 @@ class PhotoPageWidgetRenderer:
             is not None
         ):
             first_line_parts.append(
-                slot.caption.capture_datetime.strftime(
-                    "%d/%m/%Y %H:%M"
+                format_datetime(
+                    slot.caption.capture_datetime
                 )
             )
 

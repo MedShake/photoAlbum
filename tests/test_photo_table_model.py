@@ -4,6 +4,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 
 from photoalbum.gui.models import PhotoTableModel
+from photoalbum.i18n.date_formatter import format_datetime
 from photoalbum.models import (
     DateSource,
     LocationSource,
@@ -52,7 +53,10 @@ def test_model_displays_photo_information():
     assert model.data(
         model.index(0, 2),
         Qt.ItemDataRole.DisplayRole,
-    ) == "2025-02-18 14:40:49"
+    ) == format_datetime(
+        photo.capture_datetime,
+        include_seconds=True,
+    )
 
     assert model.data(
         model.index(0, 4),

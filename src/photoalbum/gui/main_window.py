@@ -48,6 +48,10 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum import __version__
+from photoalbum.i18n.date_formatter import (
+    datetime_edit_format,
+    format_datetime,
+)
 from photoalbum.app import ProjectService
 from photoalbum.gui.models import PhotoTableModel
 from photoalbum.gui.widgets.photo_actions_delegate import (
@@ -89,11 +93,18 @@ from photoalbum.export import (
     PdfMetadata,
 )
 class MainWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        language: str = "en",
+    ) -> None:
         super().__init__()
 
+        self._language = language
         self._project_service = ProjectService()
-        self._translator = Translator("fr")
+        self._translator = Translator(
+            self._language
+        )
 
         self._preview_render_service = (
             PreviewRenderService(
@@ -1648,7 +1659,7 @@ class MainWindow(QMainWindow):
             recursive=(
                 self._project_service.get_recursive_scan()
             ),
-            language="fr",
+            language=self._language,
             geocode=True,
             user_agent="PhotoAlbum/0.1 development",
         )
@@ -2288,7 +2299,7 @@ class MainWindow(QMainWindow):
         date_time_edit = QDateTimeEdit(dialog)
         date_time_edit.setCalendarPopup(True)
         date_time_edit.setDisplayFormat(
-            "dd/MM/yyyy HH:mm:ss"
+            datetime_edit_format()
         )
         date_time_edit.setDateTime(
             photo.capture_datetime
@@ -2390,10 +2401,11 @@ class MainWindow(QMainWindow):
                 self._show_error(str(exc))
                 return
 
-            datetime_format = "%d/%m/%Y %H:%M:%S"
-
             old_date_text = (
-                old_datetime.strftime(datetime_format)
+                format_datetime(
+                    old_datetime,
+                    include_seconds=True,
+                )
                 if old_datetime is not None
                 else self._translator.tr(
                     "photos.datetime.no_date"
@@ -2406,8 +2418,9 @@ class MainWindow(QMainWindow):
                     filename=photo.filename,
                     old_date=old_date_text,
                     original_date=(
-                        original_datetime.strftime(
-                            datetime_format
+                        format_datetime(
+                            original_datetime,
+                            include_seconds=True,
                         )
                     ),
                 )
@@ -2428,9 +2441,9 @@ class MainWindow(QMainWindow):
             self._show_error(str(exc))
             return
 
-        datetime_format = "%d/%m/%Y %H:%M:%S"
-        new_date_text = new_datetime.strftime(
-            datetime_format
+        new_date_text = format_datetime(
+            new_datetime,
+            include_seconds=True,
         )
 
         if old_datetime is None:
@@ -2443,8 +2456,9 @@ class MainWindow(QMainWindow):
             log_message = self._translator.tr(
                 "photos.datetime.log_changed",
                 filename=photo.filename,
-                old_date=old_datetime.strftime(
-                    datetime_format
+                old_date=format_datetime(
+                    old_datetime,
+                    include_seconds=True,
                 ),
                 new_date=new_date_text,
             )
@@ -2659,7 +2673,7 @@ class MainWindow(QMainWindow):
             project_path=project_path,
             latitude=latitude,
             longitude=longitude,
-            language="fr",
+            language=self._language,
             user_agent="PhotoAlbum/0.1 development",
         )
 
