@@ -14,6 +14,18 @@ After a few decades of building things for the Web, perhaps it was time to turn 
 
 ---
 
+## Quickly put Photo Album to the test!
+
+The best way to see what Photo Album can really do is to try it with **a representative collection of your own photographs**.
+
+Don't hesitate to gather **a few hundred original photos covering one or two years** in a folder, ideally with their **EXIF capture dates** and **GPS coordinates** intact. Then simply use that folder as the source in Photo Album and start the analysis.
+
+With a collection like this, the application can make meaningful use of the chronology of your photographs, their geographic distribution, and the way locations change over time. This is where reverse geocoding and automatic album construction really start to show their value.
+
+By contrast, a test with fewer than fifty photographs, taken on widely scattered dates or in unrelated locations, will naturally produce a less representative — and probably less compelling — demonstration of what the application can do.
+
+For your first test, **use plenty of real photographs rather than a small, carefully selected sample**: Photo Album is specifically designed to do the work from a substantial collection.
+
 ## Why Photo Album?
 
 Making a photo album sounds simple until you actually have to sort the pictures, check their dates, figure out where they were taken, write captions, choose layouts, and keep the presentation consistent across dozens of pages.

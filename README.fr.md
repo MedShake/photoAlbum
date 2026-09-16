@@ -14,6 +14,18 @@ Après quelques décennies à faire du Web, il était peut-être temps d’en fa
 
 ---
 
+## Testez rapidement les capacités du logiciel !
+
+Pour découvrir ce que Photo Album peut réellement apporter, le mieux est de l’essayer directement avec **un ensemble représentatif de vos propres photos**.
+
+N’hésitez pas à rassembler dans un dossier **quelques centaines de photos originales couvrant une ou deux années**, idéalement incluant leurs **dates de prise de vue EXIF** et leurs **coordonnées GPS**. Utilisez ensuite simplement ce dossier comme source dans Photo Album et lancez l’analyse.
+
+Avec un tel ensemble, l’application peut réellement exploiter la chronologie des photos, leur répartition géographique et les changements de lieux au fil du temps. La géolocalisation inverse et la construction automatique de l’album prennent alors tout leur sens.
+
+À l’inverse, un essai avec moins d’une cinquantaine de photos, prises à des dates très éparses ou dans des lieux sans véritable continuité entre eux, donnera naturellement un résultat moins représentatif — et probablement moins séduisant — des possibilités du logiciel.
+
+Pour un premier essai, **prenez donc beaucoup de vraies photos plutôt qu’un petit échantillon soigneusement sélectionné** : Photo Album est justement conçu pour faire le travail à partir d’une collection conséquente.
+
 ## Pourquoi Photo Album ?
 
 Faire un album photo paraît simple jusqu’au moment où il faut réellement trier les images, vérifier leurs dates, retrouver où elles ont été prises, écrire les légendes, choisir leur disposition et maintenir une présentation cohérente sur plusieurs dizaines de pages.
