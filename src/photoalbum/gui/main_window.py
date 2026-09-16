@@ -1822,7 +1822,7 @@ class MainWindow(QMainWindow):
             ),
             language=self._language,
             geocode=True,
-            user_agent="PhotoAlbum/0.1 development",
+            user_agent=f"PhotoAlbum/{__version__}",
         )
 
         worker.moveToThread(thread)
@@ -2909,7 +2909,7 @@ class MainWindow(QMainWindow):
             latitude=latitude,
             longitude=longitude,
             language=self._language,
-            user_agent="PhotoAlbum/0.1 development",
+            user_agent=f"PhotoAlbum/{__version__}",
         )
 
         worker.moveToThread(thread)
