@@ -47,7 +47,7 @@ from photoalbum.rendering.fonts import resolve_font_family
 from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     template_extension_registry,
 )
 from photoalbum.i18n import Translator

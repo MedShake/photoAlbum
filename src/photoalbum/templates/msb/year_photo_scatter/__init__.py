@@ -11,7 +11,7 @@ def register() -> None:
     dependencies into album core.
     """
 
-    from photoalbum.templates.extensions import (
+    from photoalbum.template_engine.extensions import (
         PageTemplateExtension,
         register_template_extension,
     )

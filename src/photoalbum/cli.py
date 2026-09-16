@@ -29,7 +29,7 @@ from photoalbum.export import (
     PdfMetadata,
 )
 from photoalbum.i18n import Translator
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     create_template_registry,
     register_discovered_template_extensions,
 )

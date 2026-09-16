@@ -33,7 +33,7 @@ where = ["src"]
 
 
 [tool.setuptools.package-data]
-"photoalbum.templates.msb" = [
+"photoalbum.templates.*" = [
     "manifest.json",
     "README.md",
     "screenshots/*",

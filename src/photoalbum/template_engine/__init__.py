@@ -1,10 +1,10 @@
-from photoalbum.templates.extensions import (
+from photoalbum.template_engine.extensions import (
     PageTemplateExtension,
     PageTemplateExtensionRegistry,
     register_template_extension,
     template_extension_registry,
 )
-from photoalbum.templates.discovery import (
+from photoalbum.template_engine.discovery import (
     DiscoveredTemplates,
     TemplatePack,
     create_template_registry,

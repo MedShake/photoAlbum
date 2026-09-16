@@ -20,7 +20,7 @@ from photoalbum.album.builder import AlbumBuildResult
 from photoalbum.album.composition import PageComposer
 from photoalbum.album.models import CoverPosition
 from photoalbum.album.settings import AlbumStructureSettings
-from photoalbum.templates import template_extension_registry
+from photoalbum.template_engine import template_extension_registry
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 from photoalbum.rendering import (

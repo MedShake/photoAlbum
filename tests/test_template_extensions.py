@@ -1,4 +1,4 @@
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     register_discovered_template_extensions,
     template_extension_registry,
 )

@@ -10,7 +10,7 @@ from photoalbum.rendering.fonts import resolve_font_family
 from photoalbum.album.composition import PageComposition
 from photoalbum.album.planning import PlanItemKind
 from photoalbum.i18n import Translator
-from photoalbum.templates import template_extension_registry
+from photoalbum.template_engine import template_extension_registry
 
 
 class PageRenderer:

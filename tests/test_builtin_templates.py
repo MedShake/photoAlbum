@@ -1,7 +1,7 @@
 from photoalbum.album import (
     TemplateKind,
 )
-from photoalbum.templates import create_template_registry
+from photoalbum.template_engine import create_template_registry
 
 
 

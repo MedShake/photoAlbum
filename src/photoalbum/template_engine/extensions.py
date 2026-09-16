@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from photoalbum.templates.preview_backend import (
+from photoalbum.template_engine.preview_backend import (
     TemplatePreviewBackend,
 )
 

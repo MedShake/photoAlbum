@@ -9,7 +9,7 @@ from photoalbum.gui.preview_render_service import (
 )
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     register_discovered_template_extensions,
 )
 

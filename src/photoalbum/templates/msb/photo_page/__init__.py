@@ -10,7 +10,7 @@ PHOTO_PAGE_TEMPLATE_IDS = (
 
 
 def register() -> None:
-    from photoalbum.templates.extensions import (
+    from photoalbum.template_engine.extensions import (
         PageTemplateExtension,
         register_template_extension,
     )

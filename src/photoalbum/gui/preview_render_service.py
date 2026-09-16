@@ -15,10 +15,10 @@ from photoalbum.album import PageInstance
 from photoalbum.rendering.cover_render_worker import (
     CoverRenderWorker,
 )
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     template_extension_registry,
 )
-from photoalbum.templates.preview_backend import (
+from photoalbum.template_engine.preview_backend import (
     PreviewJob,
 )
 from photoalbum.i18n import Translator

@@ -77,7 +77,7 @@ from photoalbum.gui.preview_render_service import (
     PREVIEW_RENDER_WIDTH,
     PreviewRenderService,
 )
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     create_template_registry,
     register_discovered_template_extensions,
 )

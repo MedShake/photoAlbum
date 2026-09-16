@@ -7,7 +7,7 @@ from photoalbum.rendering.cover_render_worker import (
     CoverRenderWorker,
 )
 from photoalbum.i18n import Translator
-from photoalbum.templates.preview_backend import (
+from photoalbum.template_engine.preview_backend import (
     PreviewJob,
     TemplatePreviewBackend,
 )

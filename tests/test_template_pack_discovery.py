@@ -4,7 +4,7 @@ from photoalbum.album import (
     TemplateKind,
     TemplateTarget,
 )
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     create_template_registry,
     discover_template_packs,
 )
@@ -132,3 +132,79 @@ def test_msb_has_photo_page_for_supported_target():
         TemplateKind.PHOTO_PAGE,
         target,
     )
+
+def test_third_party_pack_is_discovered_from_directory(
+    tmp_path,
+):
+    pack_dir = tmp_path / "example"
+    pack_dir.mkdir()
+
+    (pack_dir / "manifest.json").write_text(
+        """
+{
+    "schema_version": 1,
+    "id": "example",
+    "name": "Example",
+    "version": "1.0",
+    "authors": [
+        {
+            "name": "Example Author"
+        }
+    ],
+    "description": "Example template pack.",
+    "templates": []
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    packs = discover_template_packs(tmp_path)
+
+    assert len(packs) == 1
+
+    pack = packs[0]
+
+    assert pack.pack_id == "example"
+    assert pack.name == "Example"
+    assert pack.version == "1.0"
+    assert pack.authors == ("Example Author",)
+    assert pack.description == "Example template pack."
+    assert pack.templates == ()
+
+def test_third_party_pack_is_discovered_from_directory(
+    tmp_path,
+):
+    pack_dir = tmp_path / "example"
+    pack_dir.mkdir()
+
+    (pack_dir / "manifest.json").write_text(
+        """
+{
+    "schema_version": 1,
+    "id": "example",
+    "name": "Example",
+    "version": "1.0",
+    "authors": [
+        {
+            "name": "Example Author"
+        }
+    ],
+    "description": "Example template pack.",
+    "templates": []
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    packs = discover_template_packs(tmp_path)
+
+    assert len(packs) == 1
+
+    pack = packs[0]
+
+    assert pack.pack_id == "example"
+    assert pack.name == "Example"
+    assert pack.version == "1.0"
+    assert pack.authors == ("Example Author",)
+    assert pack.description == "Example template pack."
+    assert pack.templates == ()

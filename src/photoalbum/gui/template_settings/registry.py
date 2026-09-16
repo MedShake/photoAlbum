@@ -8,7 +8,7 @@ from photoalbum.album import (
     PageInstance,
 )
 from photoalbum.i18n import Translator
-from photoalbum.templates import (
+from photoalbum.template_engine import (
     template_extension_registry,
 )
 

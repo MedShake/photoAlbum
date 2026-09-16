@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from photoalbum.templates.defaults import (
+from photoalbum.template_engine.defaults import (
     DEFAULT_TEMPLATES,
 )
 from photoalbum.i18n import Translator

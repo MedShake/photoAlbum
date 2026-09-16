@@ -19,7 +19,7 @@ from photoalbum.album import (
     DividerSettings,
     PhotoPageSettings,
 )
-from photoalbum.templates import create_template_registry
+from photoalbum.template_engine import create_template_registry
 
 from photoalbum.models import DateSource, Photo
 

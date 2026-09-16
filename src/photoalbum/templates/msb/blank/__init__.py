@@ -2,11 +2,11 @@ from __future__ import annotations
 
 
 def register() -> None:
-    from photoalbum.templates.extensions import (
+    from photoalbum.template_engine.extensions import (
         PageTemplateExtension,
         register_template_extension,
     )
-    from photoalbum.templates.renderers import (
+    from photoalbum.template_engine.renderers import (
         SimpleLabelWidgetRenderer,
     )
 

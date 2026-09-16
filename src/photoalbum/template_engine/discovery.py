@@ -277,10 +277,17 @@ def load_template_pack(
     )
 
 
+def _builtin_templates_root() -> Path:
+    return (
+        Path(__file__).resolve().parent.parent
+        / "templates"
+    )
+
+
 def discover_template_packs(
     root: Path | None = None,
 ) -> tuple[TemplatePack, ...]:
-    root = root or Path(__file__).resolve().parent
+    root = root or _builtin_templates_root()
 
     return tuple(
         load_template_pack(path)

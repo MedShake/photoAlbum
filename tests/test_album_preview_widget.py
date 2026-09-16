@@ -22,7 +22,7 @@ from photoalbum.album import (
     PlannedPage,
     PrintDiagnostic,
 )
-from photoalbum.templates import create_template_registry
+from photoalbum.template_engine import create_template_registry
 
 from photoalbum.gui.widgets import AlbumPreviewWidget
 from photoalbum.gui.widgets.album_preview_widget import (

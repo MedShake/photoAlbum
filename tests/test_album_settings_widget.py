@@ -9,7 +9,7 @@ from photoalbum.album import (
     PhotoPageSettings,
     SpecialPage,
 )
-from photoalbum.templates import create_template_registry
+from photoalbum.template_engine import create_template_registry
 
 from photoalbum.gui.widgets import AlbumSettingsWidget
 
