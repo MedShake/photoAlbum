@@ -116,19 +116,40 @@ jobs:
           name: PhotoAlbum-windows-x86_64
           path: packaging/pyinstaller/dist/photo-album/
 
-      - name: Install Inno Setup
+      - name: Ensure Inno Setup is available
         shell: pwsh
         run: |
-          winget install --id JRSoftware.InnoSetup.7 -e --silent --accept-package-agreements --accept-source-agreements
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
 
-      - name: Add Inno Setup to PATH
-        shell: pwsh
-        run: |
-          $inno = "${env:ProgramFiles}\Inno Setup 7"
-          if (-not (Test-Path "$inno\ISCC.exe")) {
-              throw "ISCC.exe not found in $inno"
+          if (-not $iscc) {
+              Write-Host "ISCC.exe not found; installing Inno Setup..."
+              choco install innosetup --no-progress --yes
+              $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
           }
-          $inno | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          if (-not $iscc) {
+              $candidates = @(
+                  "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+                  "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
+                  "${env:ProgramFiles}\Inno Setup 7\ISCC.exe",
+                  "${env:LOCALAPPDATA}\Programs\Inno Setup 7\ISCC.exe"
+              )
+
+              $found = $candidates |
+                  Where-Object { Test-Path $_ } |
+                  Select-Object -First 1
+
+              if (-not $found) {
+                  throw "ISCC.exe not found after Inno Setup installation"
+              }
+
+              $inno = Split-Path $found
+              $inno | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              Write-Host "Added Inno Setup to PATH: $inno"
+          }
+          else {
+              Write-Host "ISCC.exe available at: $($iscc.Source)"
+          }
 
       - name: Build Windows installer
         shell: pwsh
