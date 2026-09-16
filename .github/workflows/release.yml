@@ -1,0 +1,49 @@
+name: Release builds
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0
+
+      - name: Install Photo Album and packaging tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[packaging]"
+
+      - name: Build Linux application
+        working-directory: packaging/pyinstaller
+        run: |
+          pyinstaller --clean --noconfirm photo-album.spec
+
+      - name: Verify application bundle
+        run: |
+          test -x packaging/pyinstaller/dist/photo-album/photo-album
+          find packaging/pyinstaller/dist/photo-album -name photoalbum.svg -print -quit | grep -q .
+
+      - name: Create Linux archive
+        run: |
+          tar -C packaging/pyinstaller/dist -czf PhotoAlbum-linux-x86_64.tar.gz photo-album
+
+      - name: Upload Linux application
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoAlbum-linux-x86_64
+          path: PhotoAlbum-linux-x86_64.tar.gz
