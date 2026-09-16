@@ -2,8 +2,49 @@ name: Release builds
 
 on:
   workflow_dispatch:
+  release:
+    types:
+      - published
 
 jobs:
+  validate-release:
+    name: Validate release version
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Check tag matches project version
+        shell: python
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          import os
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as handle:
+              version = tomllib.load(handle)["project"]["version"]
+
+          expected_tag = f"v{version}"
+          actual_tag = os.environ["RELEASE_TAG"]
+
+          print(f"Project version : {version}")
+          print(f"Release tag     : {actual_tag}")
+          print(f"Expected tag    : {expected_tag}")
+
+          if actual_tag != expected_tag:
+              raise SystemExit(
+                  f"Release tag {actual_tag!r} does not match "
+                  f"project version {version!r}"
+              )
+
+          print("OK: release tag matches project version")
+
   linux:
     name: Linux application
     runs-on: ubuntu-latest
@@ -11,6 +52,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -69,6 +112,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -173,4 +218,42 @@ jobs:
         with:
           name: PhotoAlbum-windows-installer
           path: dist-installer/*.exe
+
+  publish:
+    name: Publish release assets
+    if: github.event_name == 'release'
+    needs:
+      - validate-release
+      - linux
+      - windows
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Debian package
+        uses: actions/download-artifact@v4
+        with:
+          name: PhotoAlbum-debian-amd64
+          path: release-assets
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: PhotoAlbum-windows-installer
+          path: release-assets
+
+      - name: Show release assets
+        run: |
+          find release-assets -maxdepth 2 -type f -print
+
+      - name: Upload files to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            release-assets/*.deb \
+            release-assets/*.exe \
+            --clobber
 
