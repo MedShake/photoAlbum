@@ -54,6 +54,7 @@ from photoalbum.i18n.date_formatter import (
 )
 from photoalbum.app import ProjectService
 from photoalbum.gui.models import PhotoTableModel
+from photoalbum.gui.help_dialog import HelpDialog
 from photoalbum.gui.widgets.photo_actions_delegate import (
     PhotoActionsDelegate,
 )
@@ -203,6 +204,14 @@ class MainWindow(QMainWindow):
         )
         self._quit_action.triggered.connect(self.close)
 
+        self._help_action = QAction(
+            self._translator.tr("main.quick_help"),
+            self,
+        )
+        self._help_action.triggered.connect(
+            self._show_help_dialog
+        )
+
         self._about_action = QAction(
             self._translator.tr("main.about"),
             self,
@@ -224,8 +233,20 @@ class MainWindow(QMainWindow):
             self._translator.tr("main.help")
         )
         help_menu.addAction(
+            self._help_action
+        )
+        help_menu.addSeparator()
+        help_menu.addAction(
             self._about_action
         )
+
+    def _show_help_dialog(self) -> None:
+        """Display the localized quick help dialog."""
+        dialog = HelpDialog(
+            self._translator,
+            self,
+        )
+        dialog.exec()
 
     def _show_about_dialog(self) -> None:
         """Display information about Photo Album."""

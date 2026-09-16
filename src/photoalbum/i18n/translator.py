@@ -273,7 +273,76 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "main.file": "File",
         "main.help": "Help",
+        "main.quick_help": "Photo Album Help…",
         "main.about": "About Photo Album…",
+        "help.window_title": "Photo Album — Quick Help",
+        "help.content": (
+            "<h2>Photo Album — Quick Help</h2>"
+            "<p>Photo Album helps you build an album from your "
+            "photographs, use their dates and geographic information, "
+            "prepare captions and layouts, and finally generate the "
+            "result as a PDF.</p>"
+
+            "<h3>1. Photos</h3>"
+            "<p>Create or open a project, select the folder containing "
+            "your photographs, and start the analysis.</p>"
+            "<p>Photo Album reads the available metadata, including "
+            "capture dates and GPS coordinates. This screen also helps "
+            "identify missing or incorrect information and, when "
+            "necessary, correct some of the photo data.</p>"
+
+            "<h3>2. Places &amp; Captions</h3>"
+            "<p>When photographs contain GPS coordinates, Photo Album "
+            "uses reverse geocoding to determine the corresponding "
+            "locations.</p>"
+            "<p>Individual location components can be enabled or "
+            "disabled to build a description appropriate for the album. "
+            "Changes can be made to individual photographs or applied "
+            "in batches when several photos share the same geographic "
+            "context.</p>"
+            "<p>This is also where photo captions can be prepared "
+            "and edited.</p>"
+            "<p><b>Tip — Ctrl+click:</b> hold down <b>Ctrl</b> and "
+            "click multiple groups or items to select them at the same "
+            "time. You can then apply the same action to the entire "
+            "selection. This is particularly useful for quickly "
+            "correcting a group of photographs or locations.</p>"
+
+            "<h3>3. Album</h3>"
+            "<p>Choose the album's general characteristics: paper size "
+            "and orientation, along with the templates used for covers, "
+            "month or year transitions, photo pages, and special-purpose "
+            "pages.</p>"
+            "<p>You can also request that the total page count be "
+            "adjusted to a multiple of four when required for "
+            "printing.</p>"
+
+            "<h3>4. Plan</h3>"
+            "<p>The plan displays the complete album structure as "
+            "calculated by Photo Album.</p>"
+            "<p>It can highlight unused photo slots and provide "
+            "suggestions for pages that may be useful to add. Use it "
+            "as a structural review before moving on to the preview.</p>"
+
+            "<h3>5. Preview</h3>"
+            "<p>The preview displays the album in <b>WYSIWYG</b> mode: "
+            "pages appear as they will be produced in the final "
+            "document.</p>"
+            "<p>Browse through the album to check photographs, captions, "
+            "locations, and page layouts before exporting it.</p>"
+
+            "<h3>6. PDF Export</h3>"
+            "<p>Once you are satisfied with the result, generate the "
+            "final PDF. Several quality levels are available to adapt "
+            "the file to its intended use.</p>"
+
+            "<h3>Typical workflow</h3>"
+            "<p><b>Photos → Places &amp; Captions → Album → Plan → "
+            "Preview → PDF Export</b></p>"
+            "<p>You can return to previous stages at any time to make "
+            "corrections before generating a new version of the "
+            "album.</p>"
+        ),
         "about.window_title": "About Photo Album",
         "about.version": "Version {version}",
         "about.slogan": (
@@ -805,7 +874,79 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "main.file": "Fichier",
         "main.help": "Aide",
+        "main.quick_help": "Aide de Photo Album…",
         "main.about": "À propos de Photo Album…",
+        "help.window_title": "Photo Album — Aide rapide",
+        "help.content": (
+            "<h2>Photo Album — Aide rapide</h2>"
+            "<p>Photo Album permet de construire un album à partir de "
+            "vos photos, d’en exploiter les dates et les informations "
+            "géographiques, de préparer les légendes et la mise en page, "
+            "puis de générer le résultat en PDF.</p>"
+
+            "<h3>1. Photos</h3>"
+            "<p>Créez ou ouvrez un projet, puis choisissez le dossier "
+            "contenant vos photos et lancez leur analyse.</p>"
+            "<p>Photo Album lit les métadonnées disponibles, notamment "
+            "la date de prise de vue et les coordonnées GPS. Cet écran "
+            "permet également de repérer les informations manquantes ou "
+            "incorrectes et, si nécessaire, de corriger certaines "
+            "données.</p>"
+
+            "<h3>2. Lieux et légendes</h3>"
+            "<p>Lorsque les photos contiennent des coordonnées GPS, "
+            "Photo Album utilise la géolocalisation inverse pour "
+            "retrouver les lieux correspondants.</p>"
+            "<p>Les différents éléments d’un lieu peuvent être activés "
+            "ou désactivés afin de construire une indication adaptée à "
+            "l’album. Les modifications peuvent être effectuées photo "
+            "par photo ou, lorsque plusieurs photos partagent le même "
+            "contexte, de manière groupée.</p>"
+            "<p>C’est également ici que vous pouvez préparer et modifier "
+            "les légendes des photos.</p>"
+            "<p><b>Astuce — Ctrl+clic :</b> maintenez la touche "
+            "<b>Ctrl</b> enfoncée et cliquez sur plusieurs groupes ou "
+            "éléments pour les sélectionner simultanément. Vous pouvez "
+            "ensuite leur appliquer une même action en une seule fois. "
+            "Cette fonction est particulièrement pratique pour corriger "
+            "rapidement un ensemble de photos ou de lieux.</p>"
+
+            "<h3>3. Album</h3>"
+            "<p>Choisissez les caractéristiques générales de l’album : "
+            "format et orientation du papier, ainsi que les templates "
+            "utilisés pour les couvertures, les transitions entre mois "
+            "ou années, les pages de photos et les pages spécifiques.</p>"
+            "<p>Vous pouvez également demander que le nombre total de "
+            "pages soit ajusté à un multiple de quatre lorsque cela est "
+            "nécessaire pour l’impression.</p>"
+
+            "<h3>4. Plan</h3>"
+            "<p>Le plan présente la structure complète de l’album telle "
+            "qu’elle a été calculée.</p>"
+            "<p>Il permet notamment de repérer les emplacements photo "
+            "restés libres et fournit des conseils sur les pages qu’il "
+            "peut être utile d’ajouter. Utilisez-le comme une vue de "
+            "contrôle avant de passer à l’aperçu.</p>"
+
+            "<h3>5. Aperçu</h3>"
+            "<p>L’aperçu affiche l’album en mode <b>WYSIWYG</b> : les "
+            "pages y apparaissent telles qu’elles seront produites dans "
+            "le document final.</p>"
+            "<p>Parcourez l’album pour contrôler les photos, les "
+            "légendes, les lieux et la mise en page avant l’export.</p>"
+
+            "<h3>6. Export PDF</h3>"
+            "<p>Lorsque le résultat vous convient, générez le PDF final. "
+            "Plusieurs niveaux de qualité permettent d’adapter le "
+            "fichier à son utilisation.</p>"
+
+            "<h3>Parcours habituel</h3>"
+            "<p><b>Photos → Lieux et légendes → Album → Plan → "
+            "Aperçu → Export PDF</b></p>"
+            "<p>Vous pouvez revenir aux étapes précédentes à tout moment "
+            "pour effectuer des corrections avant de générer une "
+            "nouvelle version de l’album.</p>"
+        ),
         "about.window_title": "À propos de Photo Album",
         "about.version": "Version {version}",
         "about.slogan": (
