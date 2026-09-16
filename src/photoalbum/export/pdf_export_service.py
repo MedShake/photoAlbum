@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Callable
+
+from pypdf import PdfReader, PdfWriter
 
 from PySide6.QtCore import (
     QMarginsF,
@@ -28,6 +31,12 @@ from photoalbum.rendering import (
     PageRenderer,
     RenderImageCache,
 )
+
+
+class PdfExportContent(str, Enum):
+    COMPLETE = "complete"
+    COVERS = "covers"
+    BODY = "body"
 
 
 @dataclass(frozen=True)
@@ -68,6 +77,7 @@ class PdfExportService:
         page_height_mm: float,
         dpi: int,
         metadata: PdfMetadata | None = None,
+        content: PdfExportContent = PdfExportContent.COMPLETE,
         progress_callback: (
             Callable[[int, int, str], None]
             | None
@@ -92,9 +102,17 @@ class PdfExportService:
                 "The album contains no page to export."
             )
 
-        total_output_pages = (
-            len(pages) + 4
-        )
+        if content == PdfExportContent.COMPLETE:
+            total_output_pages = len(pages) + 4
+        elif content == PdfExportContent.COVERS:
+            total_output_pages = 4
+        elif content == PdfExportContent.BODY:
+            total_output_pages = len(pages)
+        else:
+            raise ValueError(
+                f"Unsupported PDF export content: {content}"
+            )
+
         completed_output_pages = 0
 
         def report_progress(
@@ -161,17 +179,12 @@ class PdfExportService:
                 metadata.title
             )
 
-        if metadata.author:
-            writer.setCreator(
-                metadata.author
-            )
-
-        # QPdfWriter does not expose the complete PDF metadata
-        # dictionary uniformly across supported Qt versions.
-        #
-        # Subject and keywords remain part of our public export
-        # model so they can be written when the backend supports
-        # them without changing the GUI contract.
+        # Creator identifies the application which produced the
+        # document. Author, subject and keywords are finalized
+        # below with pypdf.
+        writer.setCreator(
+            "Photo Album"
+        )
 
         image_cache = RenderImageCache()
 
@@ -311,16 +324,28 @@ class PdfExportService:
                 )
 
             # Physical document order, identical to Preview.
-            paint_cover(
-                CoverPosition.FRONT
-            )
+            if content in (
+                PdfExportContent.COMPLETE,
+                PdfExportContent.COVERS,
+            ):
+                paint_cover(
+                    CoverPosition.FRONT
+                )
 
-            paint_cover(
-                CoverPosition.INSIDE_FRONT
-            )
+                paint_cover(
+                    CoverPosition.INSIDE_FRONT
+                )
+
+            if content in (
+                PdfExportContent.COMPLETE,
+                PdfExportContent.BODY,
+            ):
+                body_pages = pages
+            else:
+                body_pages = ()
 
             for page_number, page in enumerate(
-                pages,
+                body_pages,
                 start=1,
             ):
                 composition = self._page_composer.compose(
@@ -360,13 +385,17 @@ class PdfExportService:
                     f"Page {page_number}"
                 )
 
-            paint_cover(
-                CoverPosition.INSIDE_BACK
-            )
+            if content in (
+                PdfExportContent.COMPLETE,
+                PdfExportContent.COVERS,
+            ):
+                paint_cover(
+                    CoverPosition.INSIDE_BACK
+                )
 
-            paint_cover(
-                CoverPosition.BACK
-            )
+                paint_cover(
+                    CoverPosition.BACK
+                )
 
         finally:
             painter.end()
@@ -378,3 +407,69 @@ class PdfExportService:
             raise RuntimeError(
                 f"PDF was not created: {output_path}"
             )
+
+        self._write_pdf_metadata(
+            output_path,
+            metadata,
+        )
+
+        if (
+            not output_path.exists()
+            or output_path.stat().st_size == 0
+        ):
+            raise RuntimeError(
+                f"PDF was not created: {output_path}"
+            )
+
+    @staticmethod
+    def _write_pdf_metadata(
+        output_path: Path,
+        metadata: PdfMetadata,
+    ) -> None:
+        """Finalize the metadata dictionary of a generated PDF."""
+        reader = PdfReader(str(output_path))
+        writer = PdfWriter()
+
+        writer.append_pages_from_reader(reader)
+
+        existing_metadata = reader.metadata or {}
+
+        pdf_metadata = {
+            str(key): str(value)
+            for key, value in existing_metadata.items()
+            if value is not None
+        }
+
+        pdf_metadata["/Creator"] = "Photo Album"
+
+        values = {
+            "/Title": metadata.title,
+            "/Author": metadata.author,
+            "/Subject": metadata.subject,
+            "/Keywords": metadata.keywords,
+        }
+
+        for key, value in values.items():
+            if value:
+                pdf_metadata[key] = value
+            else:
+                pdf_metadata.pop(key, None)
+
+        writer.add_metadata(
+            pdf_metadata
+        )
+
+        temporary_path = output_path.with_name(
+            output_path.name + ".metadata.tmp"
+        )
+
+        try:
+            with temporary_path.open("wb") as stream:
+                writer.write(stream)
+
+            temporary_path.replace(
+                output_path
+            )
+        finally:
+            if temporary_path.exists():
+                temporary_path.unlink()

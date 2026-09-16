@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QPlainTextEdit,
+    QRadioButton,
     QSplitter,
     QStatusBar,
     QTableView,
@@ -91,6 +92,7 @@ from photoalbum.template_engine import (
 )
 from photoalbum.i18n import Translator
 from photoalbum.export import (
+    PdfExportContent,
     PdfExportService,
     PdfMetadata,
 )
@@ -720,6 +722,52 @@ class MainWindow(QMainWindow):
 
         render_layout.addWidget(output_group)
 
+        # Export content.
+        content_group = QGroupBox(
+            self._translator.tr(
+                "render.content_group"
+            )
+        )
+        content_layout = QVBoxLayout(
+            content_group
+        )
+
+        self._pdf_content_complete_radio = QRadioButton(
+            self._translator.tr(
+                "render.content_complete"
+            )
+        )
+        self._pdf_content_covers_radio = QRadioButton(
+            self._translator.tr(
+                "render.content_covers"
+            )
+        )
+        self._pdf_content_body_radio = QRadioButton(
+            self._translator.tr(
+                "render.content_body"
+            )
+        )
+
+        self._pdf_content_complete_radio.setChecked(
+            True
+        )
+
+        for radio in (
+            self._pdf_content_complete_radio,
+            self._pdf_content_covers_radio,
+            self._pdf_content_body_radio,
+        ):
+            radio.toggled.connect(
+                self._update_pdf_summary
+            )
+            content_layout.addWidget(
+                radio
+            )
+
+        render_layout.addWidget(
+            content_group
+        )
+
         # Quality.
         quality_group = QGroupBox(
             self._translator.tr(
@@ -1122,6 +1170,13 @@ class MainWindow(QMainWindow):
                 self._project_service.list_photos()
             )
 
+            if self._pdf_content_covers_radio.isChecked():
+                export_content = PdfExportContent.COVERS
+            elif self._pdf_content_body_radio.isChecked():
+                export_content = PdfExportContent.BODY
+            else:
+                export_content = PdfExportContent.COMPLETE
+
             metadata = PdfMetadata(
                 title=(
                     self._pdf_title_edit
@@ -1154,10 +1209,57 @@ class MainWindow(QMainWindow):
             )
             return
 
-        total_pages = (
-            len(result.pagination.pages)
-            + 4
+        body_page_count = len(
+            result.pagination.pages
         )
+
+        if export_content == PdfExportContent.COVERS:
+            total_pages = 4
+        elif export_content == PdfExportContent.BODY:
+            total_pages = body_page_count
+        else:
+            total_pages = body_page_count + 4
+
+        print_settings = (
+            self._album_settings_widget
+            .settings()
+            .print_settings
+        )
+
+        if (
+            print_settings.page_multiple is not None
+            and total_pages
+            % print_settings.page_multiple
+            != 0
+        ):
+            page_multiple = (
+                print_settings.page_multiple
+            )
+            pages_to_add = (
+                page_multiple
+                - total_pages % page_multiple
+            )
+
+            answer = QMessageBox.warning(
+                self,
+                self._translator.tr(
+                    "render.page_multiple_warning_title"
+                ),
+                self._translator.tr(
+                    "render.page_multiple_warning",
+                    count=total_pages,
+                    multiple=page_multiple,
+                    pages_to_add=pages_to_add,
+                ),
+                (
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.Cancel
+                ),
+                QMessageBox.StandardButton.Cancel,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                return
 
         self._pdf_output_edit.setText(
             str(output_path)
@@ -1219,6 +1321,7 @@ class MainWindow(QMainWindow):
             page_height_mm=height_mm,
             dpi=dpi,
             metadata=metadata,
+            content=export_content,
         )
 
         worker.moveToThread(

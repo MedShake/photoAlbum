@@ -37,6 +37,7 @@ class PdfExportWorker(QObject):
         page_height_mm: float,
         dpi: int,
         metadata,
+        content,
     ) -> None:
         super().__init__()
 
@@ -53,6 +54,7 @@ class PdfExportWorker(QObject):
             "page_height_mm": page_height_mm,
             "dpi": dpi,
             "metadata": metadata,
+            "content": content,
         }
 
     @Slot()

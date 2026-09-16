@@ -435,6 +435,27 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_cancelled": "Photo analysis stopped.",
         "main.analyzing": "Analyzing photos...",
 
+        "render.content_group": "Content to export",
+        "render.content_complete": (
+            "Complete album — covers and album body"
+        ),
+        "render.content_covers": (
+            "Covers only — four cover pages"
+        ),
+        "render.content_body": (
+            "Album body only — without covers"
+        ),
+        "render.page_multiple_warning_title": (
+            "Print page count"
+        ),
+        "render.page_multiple_warning": (
+            "The selected export contains {count} pages. "
+            "This is not a multiple of {multiple}.\n\n"
+            "{pages_to_add} additional page(s) would be needed "
+            "to meet the selected print constraint.\n\n"
+            "Do you want to generate the PDF anyway?"
+        ),
+
         "main.no_project": "No project open",
         "main.ready": "Ready",
         "main.project": "Project: {name}",
@@ -1081,6 +1102,27 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_stopping_button": "Arrêt en cours...",
         "main.analysis_cancelled": "Analyse des photos arrêtée.",
         "main.analyzing": "Analyse des photos en cours...",
+
+        "render.content_group": "Contenu à exporter",
+        "render.content_complete": (
+            "Album complet — couvertures et corps de l’album"
+        ),
+        "render.content_covers": (
+            "Couvertures uniquement — les quatre pages de couverture"
+        ),
+        "render.content_body": (
+            "Corps de l’album uniquement — sans les couvertures"
+        ),
+        "render.page_multiple_warning_title": (
+            "Nombre de pages pour l’impression"
+        ),
+        "render.page_multiple_warning": (
+            "L’export sélectionné contient {count} pages. "
+            "Ce nombre n’est pas un multiple de {multiple}.\n\n"
+            "Il faudrait ajouter {pages_to_add} page(s) pour "
+            "respecter la contrainte d’impression choisie.\n\n"
+            "Voulez-vous tout de même générer le PDF ?"
+        ),
 
         "main.no_project": "Aucun projet ouvert",
         "main.ready": "Prêt",
