@@ -6,7 +6,7 @@ def register() -> None:
         PageTemplateExtension,
         register_template_extension,
     )
-    from photoalbum.templates.simple_label import (
+    from photoalbum.templates.renderers import (
         SimpleLabelWidgetRenderer,
     )
 

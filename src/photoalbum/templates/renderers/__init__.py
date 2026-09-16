@@ -1,4 +1,4 @@
-from .widget_renderer import (
+from .simple_label import (
     SimpleLabelWidgetRenderer,
 )
 

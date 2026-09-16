@@ -2,7 +2,7 @@ from photoalbum.templates import (
     register_discovered_template_extensions,
     template_extension_registry,
 )
-from photoalbum.templates.simple_label import (
+from photoalbum.templates.renderers import (
     SimpleLabelWidgetRenderer,
 )
 from photoalbum.templates.msb.year_divider_classic.widget_renderer import (
