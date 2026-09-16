@@ -1,9 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 datas = collect_data_files("photoalbum")
+
+icon = None
+if sys.platform == "win32":
+    icon = "../../src/photoalbum/resources/icons/photoalbum.svg"
 
 
 a = Analysis(
@@ -32,6 +38,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    icon=icon,
 )
 
 coll = COLLECT(

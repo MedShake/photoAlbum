@@ -61,3 +61,60 @@ jobs:
         with:
           name: PhotoAlbum-linux-x86_64
           path: PhotoAlbum-linux-x86_64.tar.gz
+
+  windows:
+    name: Windows application
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Photo Album and packaging tools
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[packaging]"
+
+      - name: Build Windows application
+        shell: pwsh
+        working-directory: packaging/pyinstaller
+        run: |
+          python -m PyInstaller --clean --noconfirm photo-album.spec
+
+      - name: Verify Windows application bundle
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "packaging/pyinstaller/dist/photo-album/photo-album.exe")) {
+              throw "photo-album.exe not found"
+          }
+
+          $icon = Get-ChildItem `
+              "packaging/pyinstaller/dist/photo-album" `
+              -Recurse `
+              -Filter "photoalbum.svg" `
+              | Select-Object -First 1
+
+          if (-not $icon) {
+              throw "photoalbum.svg not found in Windows bundle"
+          }
+
+      - name: Create Windows archive
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "packaging/pyinstaller/dist/photo-album/*" `
+            -DestinationPath "PhotoAlbum-windows-x86_64.zip"
+
+      - name: Upload Windows application
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoAlbum-windows-x86_64
+          path: PhotoAlbum-windows-x86_64.zip
+
