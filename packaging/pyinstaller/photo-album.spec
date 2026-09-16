@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 datas = collect_data_files("photoalbum")
@@ -11,7 +11,7 @@ a = Analysis(
     pathex=["../../src"],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=collect_submodules("photoalbum.templates"),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
