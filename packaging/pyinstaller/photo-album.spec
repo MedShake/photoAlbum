@@ -9,7 +9,7 @@ datas = collect_data_files("photoalbum")
 
 icon = None
 if sys.platform == "win32":
-    icon = "../../src/photoalbum/resources/icons/photoalbum.svg"
+    icon = "photoalbum.ico"
 
 
 a = Analysis(

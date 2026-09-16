@@ -82,6 +82,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[packaging]"
 
+      - name: Generate Windows icon
+        shell: pwsh
+        run: |
+          python packaging/pyinstaller/build_windows_icon.py
+
       - name: Build Windows application
         shell: pwsh
         working-directory: packaging/pyinstaller

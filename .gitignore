@@ -7,3 +7,5 @@ htmlcov/
 *.egg-info/
 dist/
 build/
+# Generated Windows packaging icon
+packaging/pyinstaller/photoalbum.ico
