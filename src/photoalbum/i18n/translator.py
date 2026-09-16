@@ -30,8 +30,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.tab.sources": "Sources",
         "photos.tab.places": "Places",
         "photos.places.description": (
-            "Choose how the place where each photo was taken "
-            "will be described."
+            "Choose how to describe the place where each photo was "
+            "taken and, if you wish, add a caption for each one."
         ),
         "photos.places.search": "Search:",
         "photos.places.search_button": "Search",
@@ -42,7 +42,37 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.location_caption": (
             "Place and caption"
         ),
-        "photos.places.column.edit": "Edit",
+        "photos.places.column.edit": (
+            "Edit (Ctrl+click for batch editing)"
+        ),
+        "photos.places.group.title": "Batch location editing",
+        "photos.places.group.source": (
+            "Source component: {value} ({component_key})"
+        ),
+        "photos.places.group.replace": "Replace:",
+        "photos.places.group.context": "In context:",
+        "photos.places.group.current_location": "Current location",
+        "photos.places.group.future_location": "Future location",
+        "photos.places.group.select_all": (
+            "Select / deselect all photos"
+        ),
+        "photos.places.group.action": "Action:",
+        "photos.places.group.activate": "Activate",
+        "photos.places.group.deactivate": "Deactivate",
+        "photos.places.group.replace_by": "Replace with:",
+        "photos.places.group.no_target": (
+            "No broader geographic component is available "
+            "for this photo."
+        ),
+        "photos.places.group.compatible": (
+            "{count} compatible photos. Uncheck any photos you "
+            "do not want to modify."
+        ),
+        "photos.places.group.photo": "Photo",
+        "photos.places.group.date": "Date",
+        "photos.places.group.current": "Current value",
+        "photos.places.group.replacement": "Replacement",
+        "photos.places.group.apply": "Apply to {count} photos",
         "photos.places.caption": "Caption:",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
@@ -492,8 +522,9 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.tab.sources": "Sources",
         "photos.tab.places": "Lieux",
         "photos.places.description": (
-            "Choisissez comment décrire le lieu où chaque photo "
-            "a été prise."
+            "Choisissez comment décrire le lieu où chaque photo a "
+            "été prise et ajoutez, si vous le souhaitez, une légende "
+            "pour chacune."
         ),
         "photos.places.search": "Rechercher :",
         "photos.places.search_button": "Rechercher",
@@ -504,7 +535,37 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.location_caption": (
             "Lieu et légende"
         ),
-        "photos.places.column.edit": "Édition",
+        "photos.places.column.edit": (
+            "Édition (Ctrl+clic pour modification groupée)"
+        ),
+        "photos.places.group.title": "Modification groupée des lieux",
+        "photos.places.group.source": (
+            "Composant d’origine : {value} ({component_key})"
+        ),
+        "photos.places.group.replace": "Remplacer :",
+        "photos.places.group.context": "Dans le contexte :",
+        "photos.places.group.current_location": "Lieu actuel",
+        "photos.places.group.future_location": "Lieu futur",
+        "photos.places.group.select_all": (
+            "Sélectionner / désélectionner toutes les photos"
+        ),
+        "photos.places.group.action": "Action :",
+        "photos.places.group.activate": "Activer",
+        "photos.places.group.deactivate": "Désactiver",
+        "photos.places.group.replace_by": "Remplacer par :",
+        "photos.places.group.no_target": (
+            "Aucun composant géographique plus large n’est "
+            "disponible pour cette photo."
+        ),
+        "photos.places.group.compatible": (
+            "{count} photos compatibles. Décochez celles que vous "
+            "ne souhaitez pas modifier."
+        ),
+        "photos.places.group.photo": "Photo",
+        "photos.places.group.date": "Date",
+        "photos.places.group.current": "Valeur actuelle",
+        "photos.places.group.replacement": "Remplacement",
+        "photos.places.group.apply": "Appliquer à {count} photos",
         "photos.places.caption": "Légende :",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (

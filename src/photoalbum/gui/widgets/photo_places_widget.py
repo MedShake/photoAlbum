@@ -20,17 +20,23 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QComboBox,
+    QRadioButton,
     QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLayout,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -206,6 +212,53 @@ class PhotoPlacesWidget(QWidget):
     to the user.
     """
 
+    GROUP_LOCATION_PRIORITIES = {
+        # Named places.
+        "aerialway": 1,
+        "tourism": 1,
+        "amenity": 1,
+        "historic": 1,
+        "leisure": 1,
+        "shop": 1,
+        "building": 1,
+        "office": 1,
+        "attraction": 1,
+
+        # Roads.
+        "road": 2,
+        "pedestrian": 2,
+        "square": 2,
+        "residential": 2,
+        "footway": 2,
+        "path": 2,
+
+        # Local context.
+        "neighbourhood": 3,
+        "quarter": 3,
+        "suburb": 3,
+        "borough": 3,
+        "city_district": 3,
+
+        # Small localities.
+        "hamlet": 4,
+        "isolated_dwelling": 4,
+
+        # Localities.
+        "city": 5,
+        "town": 5,
+        "village": 5,
+        "municipality": 5,
+
+        # Administrative context.
+        "county": 6,
+        "state_district": 6,
+        "state": 6,
+        "region": 6,
+
+        # Country.
+        "country": 8,
+    }
+
     HIDDEN_COMPONENT_KEYS = {
         "country_code",
         "house_number",
@@ -256,6 +309,12 @@ class PhotoPlacesWidget(QWidget):
         self._photo_items: dict[str, QTreeWidgetItem] = {}
         self._caption_editors: dict[str, QLineEdit] = {}
         self._thumbnail_labels: dict[QLabel, Photo] = {}
+
+        # Pixmaps already decoded by the normal lazy thumbnail loader.
+        # The batch-edit dialog may reuse them, but must never trigger
+        # an additional JPEG decode itself.
+        self._thumbnail_cache: dict[str, QPixmap] = {}
+
         self._editor_rows: dict[
             str,
             tuple[QTreeWidgetItem, QWidget, FlowLayout],
@@ -330,6 +389,7 @@ class PhotoPlacesWidget(QWidget):
         self._photo_items.clear()
         self._caption_editors.clear()
         self._thumbnail_labels.clear()
+        self._thumbnail_cache.clear()
         self._editor_rows.clear()
         self._truth_labels.clear()
         self._pencil_buttons.clear()
@@ -1677,6 +1737,12 @@ class PhotoPlacesWidget(QWidget):
             )
 
             if pixmap is not None:
+                # Keep the already-decoded pixmap available for other
+                # lightweight views such as the batch-edit dialog.
+                self._thumbnail_cache[
+                    str(photo.path)
+                ] = pixmap
+
                 label.setText("")
                 label.setPixmap(pixmap)
             else:
@@ -2115,13 +2181,30 @@ class PhotoPlacesWidget(QWidget):
                 candidate.value,
             )
 
+            checkbox.setProperty(
+                "group_edit_pending",
+                False,
+            )
+
+            checkbox.pressed.connect(
+                lambda cb=checkbox,
+                p=photo:
+                    self._location_checkbox_pressed(
+                        p,
+                        cb,
+                    )
+            )
+
             checkbox.toggled.connect(
-                lambda _checked,
+                lambda checked,
                 p=photo,
-                row_widget=location_widget:
-                    self._composition_changed(
+                row_widget=location_widget,
+                cb=checkbox:
+                    self._location_checkbox_toggled(
                         p,
                         row_widget,
+                        cb,
+                        checked,
                     )
             )
 
@@ -2369,6 +2452,1426 @@ class PhotoPlacesWidget(QWidget):
                 " padding: 0px;"
                 "}"
             )
+
+    def _location_checkbox_pressed(
+        self,
+        photo: Photo,
+        checkbox: QCheckBox,
+    ) -> None:
+        if not (
+            Qt.KeyboardModifier.ControlModifier
+            & QApplication.keyboardModifiers()
+        ):
+            checkbox.setProperty(
+                "group_edit_pending",
+                False,
+            )
+            return
+
+        checkbox.setProperty(
+            "group_edit_pending",
+            True,
+        )
+
+        # Opening the dialog after the current mouse event prevents
+        # the Ctrl+click itself from becoming a normal checkbox edit.
+        QTimer.singleShot(
+            0,
+            lambda p=photo, cb=checkbox:
+                self._open_group_location_dialog(
+                    p,
+                    cb,
+                ),
+        )
+
+    def _location_checkbox_toggled(
+        self,
+        photo: Photo,
+        location_widget: QWidget,
+        checkbox: QCheckBox,
+        checked: bool,
+    ) -> None:
+        if checkbox.property(
+            "group_edit_pending"
+        ):
+            checkbox.blockSignals(True)
+            checkbox.setChecked(
+                not checked
+            )
+            checkbox.blockSignals(False)
+            return
+
+        self._composition_changed(
+            photo,
+            location_widget,
+        )
+
+    def _location_candidates_by_key(
+        self,
+        photo: Photo,
+    ) -> dict[str, str]:
+        result = self._caption_result(photo)
+
+        values: dict[str, str] = {}
+
+        for candidate in result.candidates:
+            key = candidate.key.casefold()
+            value = candidate.value.strip()
+
+            if (
+                not value
+                or not self._component_is_visible(key)
+            ):
+                continue
+
+            values.setdefault(
+                key,
+                value,
+            )
+
+        return values
+
+    def _location_priority(
+        self,
+        key: str,
+    ) -> int | None:
+        return self.GROUP_LOCATION_PRIORITIES.get(
+            key.casefold()
+        )
+
+    @staticmethod
+    def _same_location_value(
+        left: str,
+        right: str,
+    ) -> bool:
+        return (
+            left.strip().casefold()
+            == right.strip().casefold()
+        )
+
+    def _group_target_options(
+        self,
+        photo: Photo,
+        source_key: str,
+    ) -> list[tuple[str, str]]:
+        source_priority = self._location_priority(
+            source_key
+        )
+
+        if source_priority is None:
+            return []
+
+        candidates = self._location_candidates_by_key(
+            photo
+        )
+
+        options: list[tuple[int, str, str]] = []
+
+        for key, value in candidates.items():
+            priority = self._location_priority(
+                key
+            )
+
+            if (
+                priority is None
+                or priority <= source_priority
+            ):
+                continue
+
+            options.append(
+                (priority, key, value)
+            )
+
+        options.sort(
+            key=lambda value: (
+                value[0],
+                value[1],
+            )
+        )
+
+        return [
+            (key, value)
+            for _priority, key, value in options
+        ]
+
+    def _location_component_is_selected(
+        self,
+        photo: Photo,
+        key: str,
+    ) -> bool:
+        key = key.casefold()
+
+        return any(
+            component.key.casefold() == key
+            for component in self._effective_components(
+                photo
+            )
+        )
+
+    def _group_candidate_is_compatible(
+        self,
+        reference: Photo,
+        candidate: Photo,
+        target_key: str,
+    ) -> bool:
+        reference_values = (
+            self._location_candidates_by_key(
+                reference
+            )
+        )
+        candidate_values = (
+            self._location_candidates_by_key(
+                candidate
+            )
+        )
+
+        target_priority = self._location_priority(
+            target_key
+        )
+
+        if target_priority is None:
+            return False
+
+        reference_target = reference_values.get(
+            target_key
+        )
+        candidate_target = candidate_values.get(
+            target_key
+        )
+
+        # The replacement level itself is our geographic anchor.
+        if (
+            reference_target is None
+            or candidate_target is None
+            or not self._same_location_value(
+                reference_target,
+                candidate_target,
+            )
+        ):
+            return False
+
+        # Safety rule:
+        # every broader component available on BOTH photos must agree.
+        # Missing information on either side is neutral.
+        for key, reference_value in (
+            reference_values.items()
+        ):
+            priority = self._location_priority(
+                key
+            )
+
+            if (
+                priority is None
+                or priority <= target_priority
+            ):
+                continue
+
+            candidate_value = candidate_values.get(
+                key
+            )
+
+            if candidate_value is None:
+                continue
+
+            if not self._same_location_value(
+                reference_value,
+                candidate_value,
+            ):
+                return False
+
+        return True
+
+    def _group_location_candidates(
+        self,
+        reference: Photo,
+        source_key: str,
+        target_key: str | None,
+    ) -> list[Photo]:
+        result: list[Photo] = []
+
+        reference_values = (
+            self._location_candidates_by_key(
+                reference
+            )
+        )
+
+        reference_source_value = (
+            reference_values.get(source_key)
+        )
+
+        if reference_source_value is None:
+            return result
+
+        reference_selected = (
+            self._location_component_is_selected(
+                reference,
+                source_key,
+            )
+        )
+
+        source_priority = self._location_priority(
+            source_key
+        )
+
+        for photo in self._photos:
+            values = (
+                self._location_candidates_by_key(
+                    photo
+                )
+            )
+
+            candidate_source_value = (
+                values.get(source_key)
+            )
+
+            if candidate_source_value is None:
+                continue
+
+            # The batch operation is about THIS component value.
+            # Ctrl+click on "Connexion (shop)" must never include
+            # another shop/place value.
+            if not self._same_location_value(
+                reference_source_value,
+                candidate_source_value,
+            ):
+                continue
+
+            # Fundamental batch-editing rule:
+            # only photos where the clicked component has exactly
+            # the same selected/unselected status are eligible.
+            if (
+                self._location_component_is_selected(
+                    photo,
+                    source_key,
+                )
+                != reference_selected
+            ):
+                continue
+
+            if target_key is not None:
+                # Normal replacement:
+                # the target value is the geographic anchor.
+                if not self._group_candidate_is_compatible(
+                    reference,
+                    photo,
+                    target_key,
+                ):
+                    continue
+
+            else:
+                # "Replace by nothing":
+                # the source itself becomes the anchor.
+                if not self._same_location_value(
+                    reference_source_value,
+                    candidate_source_value,
+                ):
+                    continue
+
+                # Broader geographic components shared by both
+                # photos must not contradict one another.
+                if source_priority is not None:
+                    compatible = True
+
+                    for (
+                        key,
+                        reference_value,
+                    ) in reference_values.items():
+                        priority = (
+                            self._location_priority(
+                                key
+                            )
+                        )
+
+                        if (
+                            priority is None
+                            or priority
+                            <= source_priority
+                        ):
+                            continue
+
+                        candidate_value = (
+                            values.get(key)
+                        )
+
+                        # Missing on one side is neutral.
+                        if candidate_value is None:
+                            continue
+
+                        if not self._same_location_value(
+                            reference_value,
+                            candidate_value,
+                        ):
+                            compatible = False
+                            break
+
+                    if not compatible:
+                        continue
+
+            result.append(photo)
+
+        return result
+
+    def _group_future_location(
+        self,
+        photo: Photo,
+        source_key: str,
+        action: str,
+        target_key: str | None,
+    ) -> str:
+        """
+        Preview a grouped activation, deactivation or replacement.
+
+        This is deliberately side-effect free: the Photo is not modified
+        until the dialog is accepted.
+        """
+        values = self._location_candidates_by_key(
+            photo
+        )
+
+        source_value = values.get(source_key)
+
+        target_value = (
+            values.get(target_key)
+            if target_key is not None
+            else None
+        )
+
+        current = list(
+            self._effective_components(photo)
+        )
+
+        if action in ("deactivate", "replace"):
+            current = [
+                component
+                for component in current
+                if component.key.casefold()
+                != source_key
+            ]
+
+        if (
+            action == "activate"
+            and source_value is not None
+            and not any(
+                component.key.casefold()
+                == source_key
+                for component in current
+            )
+        ):
+            current.append(
+                LocationComponent(
+                    key=source_key,
+                    value=source_value,
+                )
+            )
+
+        if (
+            action == "replace"
+            and target_key is not None
+            and target_value is not None
+            and not any(
+                component.key.casefold()
+                == target_key
+                for component in current
+            )
+        ):
+            current.append(
+                LocationComponent(
+                    key=target_key,
+                    value=target_value,
+                )
+            )
+
+        current.sort(
+            key=lambda component:
+            self._location_priority(
+                component.key
+            )
+            or 100
+        )
+
+        return (
+            self._components_text(current)
+            or "—"
+        )
+
+    def _group_context_text(
+        self,
+        reference: Photo,
+        target_key: str,
+    ) -> str:
+        """
+        Human-readable geographic safety context.
+
+        Only components broader than the replacement component are shown.
+        """
+        values = self._location_candidates_by_key(
+            reference
+        )
+
+        target_priority = self._location_priority(
+            target_key
+        )
+
+        if target_priority is None:
+            return "—"
+
+        labels = {
+            "neighbourhood": "Quartier",
+            "quarter": "Quartier",
+            "suburb": "Quartier",
+            "borough": "Arrondissement",
+            "city_district": "District",
+            "hamlet": "Hameau",
+            "isolated_dwelling": "Lieu-dit",
+            "city": "Ville",
+            "town": "Ville",
+            "village": "Village",
+            "municipality": "Commune",
+            "county": "Département",
+            "state_district": "District",
+            "state": "Région",
+            "region": "Région",
+            "country": "Pays",
+        }
+
+        context: list[
+            tuple[int, str, str]
+        ] = []
+
+        for key, value in values.items():
+            priority = self._location_priority(
+                key
+            )
+
+            if (
+                priority is None
+                or priority <= target_priority
+            ):
+                continue
+
+            label = labels.get(
+                key,
+                key.replace("_", " ").capitalize(),
+            )
+
+            context.append(
+                (
+                    priority,
+                    label,
+                    value,
+                )
+            )
+
+        context.sort(
+            key=lambda item: (
+                item[0],
+                item[1],
+            )
+        )
+
+        if not context:
+            return "—"
+
+        return " • ".join(
+            f"{label} : {value}"
+            for _priority, label, value
+            in context
+        )
+
+    def _open_group_location_dialog(
+        self,
+        reference: Photo,
+        checkbox: QCheckBox,
+    ) -> None:
+        # Keep the Ctrl+click from becoming a normal checkbox edit.
+        checkbox.setProperty(
+            "group_edit_pending",
+            True,
+        )
+
+        source_key = checkbox.property(
+            "location_key"
+        )
+        source_value = checkbox.property(
+            "location_value"
+        )
+
+        if (
+            not isinstance(source_key, str)
+            or not isinstance(source_value, str)
+        ):
+            checkbox.setProperty(
+                "group_edit_pending",
+                False,
+            )
+            return
+
+        source_key = source_key.casefold()
+
+        options = self._group_target_options(
+            reference,
+            source_key,
+        )
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(
+            self._translator.tr(
+                "photos.places.group.title"
+            )
+        )
+        dialog.resize(1050, 620)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(
+            16, 16, 16, 16
+        )
+        layout.setSpacing(10)
+
+        # ----------------------------------------------------
+        # Replacement summary
+        # ----------------------------------------------------
+
+        replace_title = QLabel(
+            self._translator.tr(
+                "photos.places.group.replace"
+            )
+        )
+        replace_font = replace_title.font()
+        replace_font.setBold(True)
+        replace_title.setFont(replace_font)
+
+        source_label = QLabel(
+            f"{source_value} ({source_key})"
+        )
+        source_label.setWordWrap(True)
+
+        layout.addWidget(replace_title)
+        layout.addWidget(source_label)
+
+        action_title = QLabel(
+            self._translator.tr(
+                "photos.places.group.action"
+            )
+        )
+        action_font = action_title.font()
+        action_font.setBold(True)
+        action_title.setFont(action_font)
+
+        layout.addWidget(action_title)
+
+        activate_radio = QRadioButton(
+            self._translator.tr(
+                "photos.places.group.activate"
+            )
+        )
+
+        deactivate_radio = QRadioButton(
+            self._translator.tr(
+                "photos.places.group.deactivate"
+            )
+        )
+
+        replace_radio = QRadioButton(
+            self._translator.tr(
+                "photos.places.group.replace_by"
+            )
+        )
+
+        layout.addWidget(activate_radio)
+        layout.addWidget(deactivate_radio)
+        layout.addWidget(replace_radio)
+
+        target_combo = QComboBox()
+
+        for key, value in options:
+            target_combo.addItem(
+                f"{value} ({key})",
+                key,
+            )
+
+        target_combo.setEnabled(False)
+        layout.addWidget(target_combo)
+
+        source_is_selected = (
+            self._location_component_is_selected(
+                reference,
+                source_key,
+            )
+        )
+
+        # Only offer actions that can actually change the source.
+        #
+        # All batch candidates have the same initial source state as
+        # the reference photo, so:
+        #   selected   -> activation would be a no-op
+        #   unselected -> deactivation would be a no-op
+        if source_is_selected:
+            activate_radio.setVisible(False)
+            deactivate_radio.setChecked(True)
+        else:
+            deactivate_radio.setVisible(False)
+            activate_radio.setChecked(True)
+
+        # Replacement is unavailable when no broader component exists,
+        # but activation/deactivation remain perfectly valid.
+        replace_radio.setEnabled(
+            bool(options)
+        )
+
+        context_title = QLabel(
+            self._translator.tr(
+                "photos.places.group.context"
+            )
+        )
+        context_font = context_title.font()
+        context_font.setBold(True)
+        context_title.setFont(context_font)
+
+        context_label = QLabel()
+        context_label.setWordWrap(True)
+
+        layout.addWidget(context_title)
+        layout.addWidget(context_label)
+
+        info_label = QLabel()
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
+        # ----------------------------------------------------
+        # Preview table
+        # ----------------------------------------------------
+
+        table = QTableWidget()
+        table.setColumnCount(5)
+
+        table.setHorizontalHeaderLabels(
+            [
+                "",
+                self._translator.tr(
+                    "photos.places.group.photo"
+                ),
+                self._translator.tr(
+                    "photos.places.group.date"
+                ),
+                self._translator.tr(
+                    "photos.places.group.current_location"
+                ),
+                self._translator.tr(
+                    "photos.places.group.future_location"
+                ),
+            ]
+        )
+
+        table.verticalHeader().setVisible(False)
+
+        table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        table.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
+        table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.Fixed,
+        )
+        table.setColumnWidth(0, 34)
+
+        header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.Interactive,
+        )
+        table.setColumnWidth(
+            1,
+            max(
+                self.THUMBNAIL_WIDTH + 28,
+                155,
+            ),
+        )
+
+        header.setSectionResizeMode(
+            2,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            3,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        header.setSectionResizeMode(
+            4,
+            QHeaderView.ResizeMode.Stretch,
+        )
+
+        # Header checkbox. Using a real QCheckBox here gives us
+        # checked / unchecked / partially checked states.
+        select_all = QCheckBox()
+        select_all.setTristate(True)
+        select_all.setToolTip(
+            self._translator.tr(
+                "photos.places.group.select_all"
+            )
+        )
+
+        header_container = QWidget()
+        header_layout = QHBoxLayout(
+            header_container
+        )
+        header_layout.setContentsMargins(
+            0, 0, 0, 0
+        )
+        header_layout.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        header_layout.addWidget(
+            select_all
+        )
+
+        layout.addWidget(
+            table,
+            1,
+        )
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.Ok
+        )
+
+        apply_button = buttons.button(
+            QDialogButtonBox.StandardButton.Ok
+        )
+
+        buttons.rejected.connect(
+            dialog.reject
+        )
+        buttons.accepted.connect(
+            dialog.accept
+        )
+
+        layout.addWidget(buttons)
+
+        state: dict[str, object] = {
+            "photos": [],
+            "updating_checks": False,
+        }
+
+        # Qt does not provide a native checkable QHeaderView section.
+        # Overlay the checkbox on the first header section.
+        select_all.setParent(
+            table.horizontalHeader()
+        )
+        select_all.show()
+
+        def position_header_checkbox() -> None:
+            section_x = header.sectionViewportPosition(
+                0
+            )
+            section_width = header.sectionSize(
+                0
+            )
+
+            size = select_all.sizeHint()
+
+            select_all.move(
+                section_x
+                + (section_width - size.width()) // 2,
+                (
+                    header.height()
+                    - size.height()
+                )
+                // 2,
+            )
+
+        header.sectionResized.connect(
+            lambda *_:
+            position_header_checkbox()
+        )
+        header.geometriesChanged.connect(
+            position_header_checkbox
+        )
+
+        def checked_count() -> int:
+            count = 0
+
+            for row in range(
+                table.rowCount()
+            ):
+                item = table.item(
+                    row,
+                    0,
+                )
+
+                if (
+                    item is not None
+                    and item.checkState()
+                    == Qt.CheckState.Checked
+                ):
+                    count += 1
+
+            return count
+
+        def update_header_check() -> None:
+            if state["updating_checks"]:
+                return
+
+            count = checked_count()
+            total = table.rowCount()
+
+            state["updating_checks"] = True
+
+            select_all.blockSignals(True)
+
+            if total == 0 or count == 0:
+                select_all.setCheckState(
+                    Qt.CheckState.Unchecked
+                )
+            elif count == total:
+                select_all.setCheckState(
+                    Qt.CheckState.Checked
+                )
+            else:
+                select_all.setCheckState(
+                    Qt.CheckState.PartiallyChecked
+                )
+
+            select_all.blockSignals(False)
+
+            state["updating_checks"] = False
+
+        def update_apply_text() -> None:
+            count = checked_count()
+
+            apply_button.setText(
+                self._translator.tr(
+                    "photos.places.group.apply",
+                    count=count,
+                )
+            )
+            apply_button.setEnabled(
+                count > 0
+            )
+
+            update_header_check()
+
+        def set_all_checked(
+            state_value: int,
+        ) -> None:
+            if state["updating_checks"]:
+                return
+
+            # Clicking the partial state means "select all".
+            checked = (
+                state_value
+                != Qt.CheckState.Unchecked.value
+            )
+
+            state["updating_checks"] = True
+            table.blockSignals(True)
+
+            try:
+                for row in range(
+                    table.rowCount()
+                ):
+                    item = table.item(
+                        row,
+                        0,
+                    )
+
+                    if item is None:
+                        continue
+
+                    item.setCheckState(
+                        Qt.CheckState.Checked
+                        if checked
+                        else Qt.CheckState.Unchecked
+                    )
+            finally:
+                table.blockSignals(False)
+                state["updating_checks"] = False
+
+            update_apply_text()
+
+        select_all.stateChanged.connect(
+            set_all_checked
+        )
+
+        def current_action() -> str:
+            if activate_radio.isChecked():
+                return "activate"
+
+            if deactivate_radio.isChecked():
+                return "deactivate"
+
+            return "replace"
+
+        def rebuild_candidates() -> None:
+            action = current_action()
+
+            target_key = (
+                target_combo.currentData()
+                if action == "replace"
+                else None
+            )
+
+            if (
+                target_key is not None
+                and not isinstance(
+                    target_key,
+                    str,
+                )
+            ):
+                return
+
+            context_key = (
+                target_key
+                if action == "replace"
+                and target_key is not None
+                else source_key
+            )
+
+            context_label.setText(
+                self._group_context_text(
+                    reference,
+                    context_key,
+                )
+            )
+
+            candidates = (
+                self._group_location_candidates(
+                    reference,
+                    source_key,
+                    target_key,
+                )
+            )
+
+            state["photos"] = candidates
+
+            state["updating_checks"] = True
+            table.blockSignals(True)
+
+            try:
+                table.clearContents()
+                table.setRowCount(
+                    len(candidates)
+                )
+
+                for row, photo in enumerate(
+                    candidates
+                ):
+                    check_item = QTableWidgetItem()
+                    check_item.setFlags(
+                        Qt.ItemFlag.ItemIsEnabled
+                        | Qt.ItemFlag.ItemIsUserCheckable
+                    )
+                    check_item.setCheckState(
+                        Qt.CheckState.Checked
+                    )
+                    check_item.setTextAlignment(
+                        Qt.AlignmentFlag.AlignCenter
+                    )
+
+                    table.setItem(
+                        row,
+                        0,
+                        check_item,
+                    )
+
+                    # Photo cell: reuse an already-decoded thumbnail.
+                    #
+                    # IMPORTANT: do not call _thumbnail_pixmap() here.
+                    # Opening the batch dialog must not start JPEG
+                    # decoding for every candidate.
+                    photo_widget = QWidget()
+                    photo_layout = QVBoxLayout(
+                        photo_widget
+                    )
+                    photo_layout.setContentsMargins(
+                        4, 4, 4, 4
+                    )
+                    photo_layout.setSpacing(3)
+
+                    thumbnail = QLabel()
+                    thumbnail.setAlignment(
+                        Qt.AlignmentFlag.AlignCenter
+                    )
+                    thumbnail.setFixedSize(
+                        self.THUMBNAIL_WIDTH,
+                        self.THUMBNAIL_HEIGHT,
+                    )
+
+                    cached_pixmap = (
+                        self._thumbnail_cache.get(
+                            str(photo.path)
+                        )
+                    )
+
+                    if cached_pixmap is not None:
+                        thumbnail.setPixmap(
+                            cached_pixmap
+                        )
+                        photo_layout.addWidget(
+                            thumbnail,
+                            0,
+                            Qt.AlignmentFlag.AlignHCenter,
+                        )
+
+                    filename = QLabel(
+                        photo.filename
+                    )
+                    filename.setAlignment(
+                        Qt.AlignmentFlag.AlignCenter
+                    )
+                    filename.setWordWrap(True)
+                    filename.setToolTip(
+                        photo.filename
+                    )
+
+                    photo_layout.addWidget(
+                        filename
+                    )
+
+                    table.setCellWidget(
+                        row,
+                        1,
+                        photo_widget,
+                    )
+
+                    if cached_pixmap is not None:
+                        table.setRowHeight(
+                            row,
+                            self.THUMBNAIL_HEIGHT + 42,
+                        )
+                    else:
+                        table.setRowHeight(
+                            row,
+                            34,
+                        )
+
+                    date_text = ""
+
+                    if (
+                        photo.capture_datetime
+                        is not None
+                    ):
+                        date_text = (
+                            photo.capture_datetime
+                            .strftime(
+                                "%d/%m/%Y %H:%M"
+                            )
+                        )
+
+                    table.setItem(
+                        row,
+                        2,
+                        QTableWidgetItem(
+                            date_text
+                        ),
+                    )
+
+                    current_location = (
+                        self._effective_location(
+                            photo
+                        )
+                    )
+
+                    future_location = (
+                        self._group_future_location(
+                            photo,
+                            source_key,
+                            action,
+                            target_key,
+                        )
+                    )
+
+                    current_item = (
+                        QTableWidgetItem(
+                            current_location
+                        )
+                    )
+                    current_item.setToolTip(
+                        current_location
+                    )
+
+                    future_item = (
+                        QTableWidgetItem(
+                            future_location
+                        )
+                    )
+                    future_item.setToolTip(
+                        future_location
+                    )
+
+                    table.setItem(
+                        row,
+                        3,
+                        current_item,
+                    )
+                    table.setItem(
+                        row,
+                        4,
+                        future_item,
+                    )
+
+            finally:
+                table.blockSignals(False)
+                state["updating_checks"] = False
+
+            info_label.setText(
+                self._translator.tr(
+                    "photos.places.group.compatible",
+                    count=len(candidates),
+                )
+            )
+
+            update_apply_text()
+
+            QTimer.singleShot(
+                0,
+                position_header_checkbox,
+            )
+
+        def action_changed() -> None:
+            replacing = (
+                replace_radio.isChecked()
+            )
+
+            target_combo.setEnabled(
+                replacing and bool(options)
+            )
+
+            rebuild_candidates()
+
+        activate_radio.toggled.connect(
+            lambda checked:
+            action_changed()
+            if checked
+            else None
+        )
+
+        deactivate_radio.toggled.connect(
+            lambda checked:
+            action_changed()
+            if checked
+            else None
+        )
+
+        replace_radio.toggled.connect(
+            lambda checked:
+            action_changed()
+            if checked
+            else None
+        )
+
+        target_combo.currentIndexChanged.connect(
+            lambda _index:
+            rebuild_candidates()
+            if replace_radio.isChecked()
+            else None
+        )
+
+        table.itemChanged.connect(
+            lambda _item:
+            update_apply_text()
+        )
+
+        rebuild_candidates()
+
+        QTimer.singleShot(
+            0,
+            position_header_checkbox,
+        )
+
+        result = dialog.exec()
+
+        checkbox.setProperty(
+            "group_edit_pending",
+            False,
+        )
+
+        if (
+            result
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        action = current_action()
+
+        target_key = (
+            target_combo.currentData()
+            if action == "replace"
+            else None
+        )
+
+        if (
+            target_key is not None
+            and not isinstance(
+                target_key,
+                str,
+            )
+        ):
+            return
+
+        photos = state["photos"]
+
+        if not isinstance(
+            photos,
+            list,
+        ):
+            return
+
+        selected_photos: list[Photo] = []
+
+        for row, photo in enumerate(
+            photos
+        ):
+            item = table.item(
+                row,
+                0,
+            )
+
+            if (
+                item is not None
+                and item.checkState()
+                == Qt.CheckState.Checked
+            ):
+                selected_photos.append(
+                    photo
+                )
+
+        if not selected_photos:
+            return
+
+        self._apply_group_location_change(
+            selected_photos,
+            source_key,
+            action,
+            target_key,
+        )
+
+    def _apply_group_location_change(
+        self,
+        photos: list[Photo],
+        source_key: str,
+        action: str,
+        target_key: str | None,
+    ) -> None:
+        for photo in photos:
+            values = self._location_candidates_by_key(
+                photo
+            )
+
+            source_value = values.get(
+                source_key
+            )
+
+            target_value = (
+                values.get(target_key)
+                if target_key is not None
+                else None
+            )
+
+            if (
+                action == "activate"
+                and source_value is None
+            ):
+                continue
+
+            if (
+                action == "replace"
+                and (
+                    target_key is None
+                    or target_value is None
+                )
+            ):
+                continue
+
+            current = list(
+                self._effective_components(
+                    photo
+                )
+            )
+
+            if action in (
+                "deactivate",
+                "replace",
+            ):
+                current = [
+                    component
+                    for component in current
+                    if component.key.casefold()
+                    != source_key
+                ]
+
+            if (
+                action == "activate"
+                and source_value is not None
+                and not any(
+                    component.key.casefold()
+                    == source_key
+                    for component in current
+                )
+            ):
+                current.append(
+                    LocationComponent(
+                        key=source_key,
+                        value=source_value,
+                    )
+                )
+
+            if (
+                action == "replace"
+                and target_key is not None
+                and target_value is not None
+                and not any(
+                    component.key.casefold()
+                    == target_key
+                    for component in current
+                )
+            ):
+                current.append(
+                    LocationComponent(
+                        key=target_key,
+                        value=target_value,
+                    )
+                )
+
+            # Preserve the geographic ordering used by the builder.
+            current.sort(
+                key=lambda component:
+                    self._location_priority(
+                        component.key
+                    )
+                    or 100
+            )
+
+            selected = tuple(current)
+            location_text = (
+                self._components_text(
+                    selected
+                )
+            )
+
+            photo.selected_location_components = (
+                selected
+            )
+            photo.location_text = location_text
+            photo.location_selection_edited = True
+
+            if self._save_location is not None:
+                self._save_location(
+                    photo,
+                    selected,
+                    location_text,
+                )
+
+        # One refresh after the complete atomic-looking operation,
+        # never one rebuild per modified photo.
+        self._rebuild_tree()
 
     def _composition_changed(
         self,
