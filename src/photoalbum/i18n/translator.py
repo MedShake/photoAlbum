@@ -34,6 +34,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "will be described."
         ),
         "photos.places.search": "Search:",
+        "photos.places.search_button": "Search",
         "photos.places.search_placeholder": (
             "Filename, place or caption"
         ),
@@ -495,6 +496,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "a été prise."
         ),
         "photos.places.search": "Rechercher :",
+        "photos.places.search_button": "Rechercher",
         "photos.places.search_placeholder": (
             "Nom de fichier, lieu ou légende"
         ),

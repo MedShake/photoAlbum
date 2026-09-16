@@ -190,24 +190,31 @@ class PhotoPageWidgetRenderer:
 
         lines: list[str] = []
 
+        first_line_parts: list[str] = []
+
+        if slot.caption.caption_text:
+            first_line_parts.append(
+                slot.caption.caption_text
+            )
+
         if (
             slot.caption.capture_datetime
             is not None
         ):
-            lines.append(
+            first_line_parts.append(
                 slot.caption.capture_datetime.strftime(
                     "%d/%m/%Y %H:%M"
                 )
             )
 
+        if first_line_parts:
+            lines.append(
+                " — ".join(first_line_parts)
+            )
+
         if slot.caption.location_text:
             lines.append(
                 slot.caption.location_text
-            )
-
-        if slot.caption.caption_text:
-            lines.append(
-                slot.caption.caption_text
             )
 
         font = QFont(

@@ -271,6 +271,24 @@ class PhotoPlacesWidget(QWidget):
 
         self._filter_text = ""
 
+        # Photos belonging to a month are kept as plain data until
+        # that month is expanded. Closed months therefore cost only
+        # one lightweight QTreeWidgetItem.
+        self._month_photos: dict[
+            tuple[int, int],
+            tuple[Photo, ...],
+        ] = {}
+        self._materialized_months: set[
+            tuple[int, int]
+        ] = set()
+        self._initial_expansion_pending = True
+
+        self._thumbnail_queue: list[
+            tuple[QLabel, Photo]
+        ] = []
+        self._thumbnail_loading = False
+        self._thumbnail_generation = 0
+
         self._preview = None
         self._preview_photo: Photo | None = None
         self._preview_position = QPoint()
@@ -300,6 +318,10 @@ class PhotoPlacesWidget(QWidget):
                 photo.filename.casefold(),
             ),
         )
+        self._initial_expansion_pending = True
+        self._thumbnail_generation += 1
+        self._thumbnail_queue.clear()
+        self._thumbnail_loading = False
         self._rebuild_tree()
 
     def clear(self) -> None:
@@ -311,6 +333,11 @@ class PhotoPlacesWidget(QWidget):
         self._editor_rows.clear()
         self._truth_labels.clear()
         self._pencil_buttons.clear()
+        self._month_photos.clear()
+        self._materialized_months.clear()
+        self._thumbnail_generation += 1
+        self._thumbnail_queue.clear()
+        self._thumbnail_loading = False
         self._tree.clear()
         self._clear_undated_panel()
         self._update_counter(0)
@@ -347,14 +374,30 @@ class PhotoPlacesWidget(QWidget):
                 "photos.places.search_placeholder"
             )
         )
+        # Searching is deliberately explicit. Rebuilding the lazy
+        # result hierarchy can be relatively expensive on large
+        # albums, so typing must never trigger a rebuild per key.
+        self._search_edit.returnPressed.connect(
+            self._apply_search
+        )
         self._search_edit.textChanged.connect(
-            self._filter_changed
+            self._search_text_changed
+        )
+
+        self._search_button = QPushButton(
+            self._translator.tr(
+                "photos.places.search_button"
+            )
+        )
+        self._search_button.clicked.connect(
+            self._apply_search
         )
 
         self._counter_label = QLabel()
 
         search_row.addWidget(search_label)
         search_row.addWidget(self._search_edit, 1)
+        search_row.addWidget(self._search_button)
         search_row.addWidget(self._counter_label)
 
         layout.addLayout(search_row)
@@ -525,6 +568,13 @@ class PhotoPlacesWidget(QWidget):
             self._selection_changed
         )
 
+        self._tree.itemExpanded.connect(
+            self._group_expanded
+        )
+        self._tree.itemClicked.connect(
+            self._group_clicked
+        )
+
         dated_layout.addWidget(
             self._tree,
             1,
@@ -637,11 +687,37 @@ class PhotoPlacesWidget(QWidget):
     # Filtering / state
     # --------------------------------------------------------
 
-    def _filter_changed(
+    def _apply_search(
+        self,
+    ) -> None:
+        text = (
+            self._search_edit.text()
+            .strip()
+            .casefold()
+        )
+
+        # Avoid rebuilding when Enter/the button is pressed again
+        # without changing the effective query.
+        if text == self._filter_text:
+            return
+
+        self._filter_text = text
+        self._rebuild_tree()
+
+    def _search_text_changed(
         self,
         text: str,
     ) -> None:
-        self._filter_text = text.strip().casefold()
+        # Typing only edits the pending query. The sole exception is
+        # clearing the field: the clear button should restore the
+        # complete chronology immediately.
+        if text:
+            return
+
+        if not self._filter_text:
+            return
+
+        self._filter_text = ""
         self._rebuild_tree()
 
     def _matches_filter(
@@ -743,8 +819,6 @@ class PhotoPlacesWidget(QWidget):
     # --------------------------------------------------------
 
     def _rebuild_tree(self) -> None:
-        first_build = self._tree.topLevelItemCount() == 0
-
         (
             expanded,
             selected_path,
@@ -754,134 +828,380 @@ class PhotoPlacesWidget(QWidget):
         self._cancel_photo_preview()
 
         self._tree.setUpdatesEnabled(False)
-        self._tree.clear()
-        self._clear_undated_panel()
 
-        self._photo_items.clear()
-        self._caption_editors.clear()
-        self._thumbnail_labels.clear()
-        self._editor_rows.clear()
-        self._truth_labels.clear()
-        self._pencil_buttons.clear()
+        try:
+            self._tree.clear()
+            self._clear_undated_panel()
 
-        undated = [
-            photo
-            for photo in self._photos
-            if photo.capture_datetime is None
-        ]
+            self._photo_items.clear()
+            self._caption_editors.clear()
+            self._thumbnail_labels.clear()
+            self._editor_rows.clear()
+            self._truth_labels.clear()
+            self._pencil_buttons.clear()
 
-        dated = [
-            photo
-            for photo in self._photos
-            if photo.capture_datetime is not None
-            and self._matches_filter(photo)
-        ]
+            self._month_photos.clear()
+            self._materialized_months.clear()
 
-        # Undated photos are deliberately independent from the
-        # search filter: missing dates must never become invisible.
-        self._populate_undated_panel(
-            undated
-        )
+            undated = [
+                photo
+                for photo in self._photos
+                if photo.capture_datetime is None
+            ]
 
-        grouped: dict[
-            int,
-            dict[int, list[Photo]],
-        ] = defaultdict(
-            lambda: defaultdict(list)
-        )
+            dated = [
+                photo
+                for photo in self._photos
+                if photo.capture_datetime is not None
+                and self._matches_filter(photo)
+            ]
 
-        for photo in dated:
-            assert photo.capture_datetime is not None
-
-            grouped[
-                photo.capture_datetime.year
-            ][
-                photo.capture_datetime.month
-            ].append(photo)
-
-        for year in sorted(grouped):
-            months = grouped[year]
-            year_count = sum(
-                len(photos)
-                for photos in months.values()
+            # Missing-date photos remain deliberately independent
+            # from the search filter.
+            self._populate_undated_panel(
+                undated
             )
 
-            year_item = self._group_item(
-                self._translator.tr(
+            grouped: dict[
+                int,
+                dict[int, list[Photo]],
+            ] = defaultdict(
+                lambda: defaultdict(list)
+            )
+
+            for photo in dated:
+                assert photo.capture_datetime is not None
+                grouped[
+                    photo.capture_datetime.year
+                ][
+                    photo.capture_datetime.month
+                ].append(photo)
+
+            for year in sorted(grouped):
+                months = grouped[year]
+
+                year_count = sum(
+                    len(photos)
+                    for photos in months.values()
+                )
+
+                year_text = self._translator.tr(
                     "photos.places.year_group",
                     year=year,
                     count=year_count,
-                ),
-                ("year", year),
-            )
-            self._tree.addTopLevelItem(
-                year_item
-            )
-            self._install_group_banner(
-                year_item,
-                self._translator.tr(
-                    "photos.places.year_group",
-                    year=year,
-                    count=year_count,
-                ),
-                kind="year",
-            )
-
-            for month in sorted(months):
-                photos = months[month]
-
-                month_name = (
-                    self._translator.month_name(month)
-                )
-                if month_name:
-                    month_name = (
-                        month_name[0].upper()
-                        + month_name[1:]
-                    )
-
-                month_item = self._group_item(
-                    self._translator.tr(
-                        "photos.places.month_group",
-                        month=month_name,
-                        count=len(photos),
-                    ),
-                    ("month", year, month),
                 )
 
-                year_item.addChild(
-                    month_item
+                year_item = self._group_item(
+                    year_text,
+                    ("year", year),
+                )
+                self._tree.addTopLevelItem(
+                    year_item
                 )
                 self._install_group_banner(
-                    month_item,
-                    self._translator.tr(
+                    year_item,
+                    year_text,
+                    kind="year",
+                )
+
+                for month in sorted(months):
+                    photos = months[month]
+
+                    month_name = (
+                        self._translator.month_name(month)
+                    )
+                    if month_name:
+                        month_name = (
+                            month_name[0].upper()
+                            + month_name[1:]
+                        )
+
+                    month_text = self._translator.tr(
                         "photos.places.month_group",
                         month=month_name,
                         count=len(photos),
-                    ),
-                    kind="month",
-                )
-
-                for photo in photos:
-                    self._add_photo_item(
-                        month_item,
-                        photo,
                     )
 
-        self._apply_photo_row_backgrounds()
-        self._style_group_separators()
+                    month_item = self._group_item(
+                        month_text,
+                        ("month", year, month),
+                    )
+                    year_item.addChild(
+                        month_item
+                    )
+                    self._install_group_banner(
+                        month_item,
+                        month_text,
+                        kind="month",
+                    )
 
-        self._tree.setUpdatesEnabled(True)
+                    key = (year, month)
+                    self._month_photos[key] = tuple(
+                        photos
+                    )
 
-        self._restore_view_state(
-            expanded,
-            selected_path,
-            scroll,
-            first_build=first_build,
+                    # A dummy child gives Qt a disclosure arrow while
+                    # avoiding creation of the actual photo rows.
+                    placeholder = QTreeWidgetItem(
+                        ["", "", "", ""]
+                    )
+                    placeholder.setData(
+                        0,
+                        self.GROUP_ROLE,
+                        ("placeholder", year, month),
+                    )
+                    month_item.addChild(
+                        placeholder
+                    )
+
+            self._update_counter(
+                len(dated)
+            )
+
+            # Search is intentionally different: matching results
+            # must be immediately visible, so matching months are
+            # materialized. A normal album opening materializes none.
+            if self._filter_text:
+                for year_index in range(
+                    self._tree.topLevelItemCount()
+                ):
+                    year_item = self._tree.topLevelItem(
+                        year_index
+                    )
+                    year_item.setExpanded(True)
+
+                    for month_index in range(
+                        year_item.childCount()
+                    ):
+                        month_item = year_item.child(
+                            month_index
+                        )
+                        self._materialize_month(
+                            month_item
+                        )
+                        month_item.setExpanded(True)
+
+            elif self._initial_expansion_pending:
+                # First year visible, but its months remain cheap and
+                # closed. No photo row is constructed here.
+                if self._tree.topLevelItemCount():
+                    self._tree.topLevelItem(
+                        0
+                    ).setExpanded(True)
+
+                self._initial_expansion_pending = False
+
+            else:
+                # Restore only group state. Expanding a month below
+                # automatically materializes it on demand.
+                iterator = QTreeWidgetItemIteratorCompat(
+                    self._tree
+                )
+
+                for item in iterator:
+                    group_key = item.data(
+                        0,
+                        self.GROUP_ROLE,
+                    )
+                    if group_key is None:
+                        continue
+
+                    key = tuple(group_key)
+
+                    if key in expanded:
+                        if (
+                            key
+                            and key[0] == "month"
+                        ):
+                            self._materialize_month(
+                                item
+                            )
+
+                        item.setExpanded(True)
+
+        finally:
+            self._tree.setUpdatesEnabled(True)
+
+        if selected_path:
+            item = self._photo_items.get(
+                selected_path
+            )
+            if item is not None:
+                self._tree.setCurrentItem(item)
+
+        QTimer.singleShot(
+            0,
+            lambda value=scroll:
+            self._tree.verticalScrollBar().setValue(
+                value
+            ),
         )
 
-        self._update_counter(
-            len(dated)
+    def _group_clicked(
+        self,
+        item: QTreeWidgetItem,
+        column: int,
+    ) -> None:
+        group_key = item.data(
+            0,
+            self.GROUP_ROLE,
         )
+
+        if group_key is None:
+            return
+
+        key = tuple(group_key)
+
+        if (
+            not key
+            or key[0] not in ("year", "month")
+        ):
+            return
+
+        # A click on Qt's native disclosure indicator already toggles
+        # the item before itemClicked is emitted. Do not toggle it a
+        # second time.
+        viewport_pos = self._tree.viewport().mapFromGlobal(
+            self._tree.cursor().pos()
+        )
+        item_rect = self._tree.visualItemRect(
+            item
+        )
+
+        indicator_width = max(
+            24,
+            self._tree.indentation(),
+        )
+
+        if (
+            viewport_pos.x()
+            < item_rect.left() + indicator_width
+        ):
+            return
+
+        item.setExpanded(
+            not item.isExpanded()
+        )
+
+    def _group_expanded(
+        self,
+        item: QTreeWidgetItem,
+    ) -> None:
+        group_key = item.data(
+            0,
+            self.GROUP_ROLE,
+        )
+
+        if group_key is None:
+            return
+
+        key = tuple(group_key)
+
+        if (
+            len(key) == 3
+            and key[0] == "month"
+        ):
+            self._materialize_month(
+                item
+            )
+
+    def _materialize_month(
+        self,
+        month_item: QTreeWidgetItem,
+    ) -> None:
+        group_key = month_item.data(
+            0,
+            self.GROUP_ROLE,
+        )
+
+        if group_key is None:
+            return
+
+        group_key = tuple(group_key)
+
+        if (
+            len(group_key) != 3
+            or group_key[0] != "month"
+        ):
+            return
+
+        key = (
+            int(group_key[1]),
+            int(group_key[2]),
+        )
+
+        if key in self._materialized_months:
+            return
+
+        photos = self._month_photos.get(
+            key,
+            ()
+        )
+
+        self._materialized_months.add(
+            key
+        )
+
+        # Remove the lightweight disclosure placeholder.
+        while month_item.childCount():
+            month_item.takeChild(0)
+
+        self._tree.setUpdatesEnabled(False)
+
+        try:
+            for photo in photos:
+                self._add_photo_item(
+                    month_item,
+                    photo,
+                )
+
+            self._apply_photo_row_backgrounds()
+            self._style_group_separators()
+
+        finally:
+            self._tree.setUpdatesEnabled(True)
+
+        # Newly inserted editor widgets do not yet have their
+        # definitive geometry here. In particular, FlowLayout may
+        # wrap differently once QTreeWidget has assigned the real
+        # width of column 3.
+        #
+        # First let Qt complete insertion/layout, then compute row
+        # heights. A second event-loop turn catches geometry changes
+        # caused by the first height update.
+        QTimer.singleShot(
+            0,
+            self._stabilize_materialized_rows,
+        )
+
+
+    def _stabilize_materialized_rows(
+        self,
+    ) -> None:
+        # Pass 1: force the freshly inserted widgets/layouts to use
+        # the actual tree-column geometry.
+        self._tree.doItemsLayout()
+        self._tree.viewport().updateGeometry()
+
+        self._update_all_editor_heights()
+
+        QTimer.singleShot(
+            0,
+            self._finish_materialized_rows_layout,
+        )
+
+    def _finish_materialized_rows_layout(
+        self,
+    ) -> None:
+        # Pass 2: row heights may themselves have changed the
+        # viewport geometry, so recompute wrapping once more.
+        self._tree.doItemsLayout()
+        self._tree.viewport().updateGeometry()
+
+        self._update_all_editor_heights()
+
+        self._tree.doItemsLayout()
+        self._tree.viewport().update()
 
     def _group_item(
         self,
@@ -1093,6 +1413,14 @@ class PhotoPlacesWidget(QWidget):
         outer = QWidget()
         outer.setAutoFillBackground(False)
 
+        # The banner is purely visual. Let mouse events pass through
+        # to the underlying QTreeWidget item so the whole coloured
+        # separator behaves like an expand/collapse target.
+        outer.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents,
+            True,
+        )
+
         outer_layout = QVBoxLayout(outer)
         outer_layout.setContentsMargins(
             0,
@@ -1259,20 +1587,20 @@ class PhotoPlacesWidget(QWidget):
             self.THUMBNAIL_HEIGHT,
         )
 
-        pixmap = self._thumbnail_pixmap(
-            photo.path
-        )
-
-        if pixmap is not None:
-            label.setPixmap(pixmap)
-        else:
-            label.setText("—")
+        # Reserve the final geometry immediately. Image decoding is
+        # deliberately deferred so expanding a month never waits for
+        # every JPEG to be read before the rows become visible.
+        label.setText("…")
 
         label.setToolTip(photo.filename)
         label.setMouseTracking(True)
         label.installEventFilter(self)
 
         self._thumbnail_labels[label] = photo
+        self._queue_thumbnail(
+            label,
+            photo,
+        )
         return label
 
     def _install_thumbnail(
@@ -1304,6 +1632,63 @@ class PhotoPlacesWidget(QWidget):
             QSize(
                 self.THUMBNAIL_WIDTH + 8,
                 self.NATURAL_ROW_HEIGHT,
+            ),
+        )
+
+    def _queue_thumbnail(
+        self,
+        label: QLabel,
+        photo: Photo,
+    ) -> None:
+        self._thumbnail_queue.append(
+            (label, photo)
+        )
+
+        if self._thumbnail_loading:
+            return
+
+        self._thumbnail_loading = True
+        generation = self._thumbnail_generation
+
+        QTimer.singleShot(
+            0,
+            lambda: self._load_next_thumbnail(
+                generation
+            ),
+        )
+
+    def _load_next_thumbnail(
+        self,
+        generation: int,
+    ) -> None:
+        if generation != self._thumbnail_generation:
+            return
+
+        if not self._thumbnail_queue:
+            self._thumbnail_loading = False
+            return
+
+        label, photo = self._thumbnail_queue.pop(0)
+
+        # The row may have disappeared after a filter/project change.
+        if label in self._thumbnail_labels:
+            pixmap = self._thumbnail_pixmap(
+                photo.path
+            )
+
+            if pixmap is not None:
+                label.setText("")
+                label.setPixmap(pixmap)
+            else:
+                label.setPixmap(QPixmap())
+                label.setText("—")
+
+        # Exactly one decode per event-loop turn. This keeps painting,
+        # scrolling and input responsive while thumbnails arrive.
+        QTimer.singleShot(
+            0,
+            lambda: self._load_next_thumbnail(
+                generation
             ),
         )
 

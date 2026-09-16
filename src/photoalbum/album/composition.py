@@ -68,10 +68,15 @@ class PhotoCaptionContent:
 
     @property
     def line_count(self) -> int:
+        # Caption and date share the first display line.
+        first_line = (
+            self.capture_datetime is not None
+            or bool(self.caption_text)
+        )
+
         return (
-            int(self.capture_datetime is not None)
+            int(first_line)
             + int(bool(self.location_text))
-            + int(bool(self.caption_text))
         )
 
     @property

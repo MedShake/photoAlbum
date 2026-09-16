@@ -81,3 +81,55 @@ def test_editorial_caption_is_part_of_album_caption():
 
     assert content.caption_text == "Départ du port"
     assert content.line_count >= 1
+
+def test_caption_and_datetime_share_one_display_line():
+    from photoalbum.album.composition import (
+        PhotoCaptionContent,
+    )
+
+    content = PhotoCaptionContent(
+        capture_datetime=datetime(
+            2025,
+            7,
+            14,
+            12,
+            30,
+        ),
+        location_text="Saint-Malo",
+        caption_text="Départ du port",
+    )
+
+    assert content.line_count == 2
+
+
+def test_caption_without_location_uses_one_display_line():
+    from photoalbum.album.composition import (
+        PhotoCaptionContent,
+    )
+
+    content = PhotoCaptionContent(
+        capture_datetime=datetime(
+            2025,
+            7,
+            14,
+            12,
+            30,
+        ),
+        caption_text="Départ du port",
+    )
+
+    assert content.line_count == 1
+
+
+def test_caption_without_datetime_still_uses_first_line():
+    from photoalbum.album.composition import (
+        PhotoCaptionContent,
+    )
+
+    content = PhotoCaptionContent(
+        location_text="Saint-Malo",
+        caption_text="Départ du port",
+    )
+
+    assert content.line_count == 2
+
