@@ -255,5 +255,6 @@ jobs:
           gh release upload "${{ github.event.release.tag_name }}" \
             release-assets/*.deb \
             release-assets/*.exe \
+            --repo "${{ github.repository }}" \
             --clobber
 
