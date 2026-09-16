@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
 )
 
+from photoalbum import __version__
 from photoalbum.app import ProjectService
 from photoalbum.gui.models import PhotoTableModel
 from photoalbum.gui.widgets.photo_actions_delegate import (
@@ -191,6 +192,14 @@ class MainWindow(QMainWindow):
         )
         self._quit_action.triggered.connect(self.close)
 
+        self._about_action = QAction(
+            self._translator.tr("main.about"),
+            self,
+        )
+        self._about_action.triggered.connect(
+            self._show_about_dialog
+        )
+
     def _create_menu(self) -> None:
         file_menu = self.menuBar().addMenu(self._translator.tr("main.file"))
 
@@ -199,6 +208,104 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._close_project_action)
         file_menu.addSeparator()
         file_menu.addAction(self._quit_action)
+
+        help_menu = self.menuBar().addMenu(
+            self._translator.tr("main.help")
+        )
+        help_menu.addAction(
+            self._about_action
+        )
+
+    def _show_about_dialog(self) -> None:
+        """Display information about Photo Album."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(
+            self._translator.tr("about.window_title")
+        )
+        dialog.setMinimumWidth(700)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(
+            32,
+            24,
+            32,
+            20,
+        )
+        layout.setSpacing(14)
+
+        title = QLabel("Photo Album")
+        title.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        title.setStyleSheet(
+            "font-size: 26px; font-weight: bold;"
+        )
+        layout.addWidget(title)
+
+        version_label = QLabel(
+            self._translator.tr(
+                "about.version",
+                version=__version__,
+            )
+        )
+        version_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        layout.addWidget(version_label)
+
+        slogan = QLabel(
+            self._translator.tr("about.slogan")
+        )
+        slogan.setWordWrap(True)
+        slogan.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        slogan.setStyleSheet(
+            "font-size: 15px; font-weight: bold;"
+        )
+        layout.addWidget(slogan)
+
+        # Keep the complete body in one label so Qt can calculate
+        # the wrapped height naturally as a single document.
+        body = QLabel(
+            self._translator.tr("about.description")
+            + "<br><br>"
+            + self._translator.tr("about.author")
+            + "<br><br>"
+            + self._translator.tr("about.license")
+        )
+        body.setTextFormat(
+            Qt.TextFormat.RichText
+        )
+        body.setWordWrap(True)
+        body.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextBrowserInteraction
+        )
+        body.setOpenExternalLinks(True)
+        layout.addWidget(body)
+
+        dedication = QLabel(
+            self._translator.tr("about.dedication")
+        )
+        dedication.setTextFormat(
+            Qt.TextFormat.RichText
+        )
+        dedication.setWordWrap(True)
+        dedication.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        layout.addWidget(dedication)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Close
+        )
+        buttons.rejected.connect(
+            dialog.reject
+        )
+        layout.addWidget(buttons)
+
+        dialog.adjustSize()
+        dialog.exec()
 
     def _create_content(self) -> None:
         central_widget = QWidget()

@@ -272,6 +272,42 @@ CATALOGS: dict[str, dict[str, str]] = {
         "preview.image_unavailable": "Image unavailable",
 
         "main.file": "File",
+        "main.help": "Help",
+        "main.about": "About Photo Album…",
+        "about.window_title": "About Photo Album",
+        "about.version": "Version {version}",
+        "about.slogan": (
+            "For people who never get around to making photo albums… "
+            "and those who like knowing where their photos were taken!"
+        ),
+        "about.description": (
+            "<b>Photo Album</b> is an application created by "
+            "<b>Bertrand Boutillier</b> to make photo albums simply, "
+            "with particular attention to dates, places and captions."
+            "<br><br>"
+            "Designed to be highly modular, it now includes the album "
+            "templates its author actually uses himself — direct "
+            "descendants of the layouts he once put together with bits "
+            "of PHP and plenty of home-made tinkering."
+            "<br><br>"
+            "After a few decades of building for the Web, perhaps it "
+            "was time to turn all that into a proper application. "
+            "It is now done, with the help of AI."
+        ),
+        "about.author": (
+            "<b>Bertrand Boutillier</b><br>"
+            "<a href=\"mailto:b.boutillier@gmail.com\">"
+            "b.boutillier@gmail.com</a>"
+        ),
+        "about.license": (
+            "Photo Album is free software distributed under the terms "
+            "of the <b>GNU General Public License, version 3 or later "
+            "(GPLv3+)</b>."
+        ),
+        "about.dedication": (
+            "<i>Dedicated to my two beloved daughters,<br>"
+            "<b>Petit-Gâteau and Sido.</b> ❤️</i>"
+        ),
         "main.new_project": "New Project...",
         "main.open_project": "Open Project...",
         "main.close_project": "Close Project",
@@ -768,6 +804,43 @@ CATALOGS: dict[str, dict[str, str]] = {
         "preview.image_unavailable": "Image indisponible",
 
         "main.file": "Fichier",
+        "main.help": "Aide",
+        "main.about": "À propos de Photo Album…",
+        "about.window_title": "À propos de Photo Album",
+        "about.version": "Version {version}",
+        "about.slogan": (
+            "L’application pour ceux qui ne font jamais d’albums… "
+            "et ceux qui aiment savoir où leurs photos ont été prises !"
+        ),
+        "about.description": (
+            "<b>Photo Album</b> est une application créée par "
+            "<b>Bertrand Boutillier</b> pour réaliser simplement des "
+            "albums photo, avec une attention particulière portée aux "
+            "dates, aux lieux et aux légendes."
+            "<br><br>"
+            "Pensée pour être très modulaire, elle propose aujourd’hui "
+            "les modèles d’album que son auteur utilise lui-même — "
+            "descendants directs de ceux qu’il fabriquait autrefois "
+            "avec quelques bouts de PHP et pas mal de bricolage maison."
+            "<br><br>"
+            "Après quelques décennies à faire du Web, il était peut-être "
+            "temps d’en faire une vraie application. C’est désormais "
+            "chose faite, avec l’aide de l’IA."
+        ),
+        "about.author": (
+            "<b>Bertrand Boutillier</b><br>"
+            "<a href=\"mailto:b.boutillier@gmail.com\">"
+            "b.boutillier@gmail.com</a>"
+        ),
+        "about.license": (
+            "Photo Album est un logiciel libre distribué sous les "
+            "termes de la <b>GNU General Public License, version 3 "
+            "ou ultérieure (GPLv3+)</b>."
+        ),
+        "about.dedication": (
+            "<i>Dédié à mes deux filles adorées,<br>"
+            "<b>Petit-Gâteau et Sido.</b> ❤️</i>"
+        ),
         "main.new_project": "Nouveau projet...",
         "main.open_project": "Ouvrir un projet...",
         "main.close_project": "Fermer le projet",
