@@ -205,6 +205,11 @@ class PhotoPageWidgetRenderer:
                 slot.caption.location_text
             )
 
+        if slot.caption.caption_text:
+            lines.append(
+                slot.caption.caption_text
+            )
+
         font = QFont(
             resolve_font_family(None)
         )

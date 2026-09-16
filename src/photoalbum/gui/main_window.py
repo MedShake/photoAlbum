@@ -20,6 +20,7 @@ from PySide6.QtGui import (
     QImageReader,
 )
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDateTimeEdit,
@@ -221,29 +222,7 @@ class MainWindow(QMainWindow):
         )
 
         # ----------------------------------------------------
-        # Photos tab
-        # ----------------------------------------------------
-
-        photos_tab = QWidget()
-        photos_layout = QVBoxLayout(
-            photos_tab
-        )
-
-        self._photos_tabs = QTabWidget()
-        self._photos_tabs.setStyleSheet(
-            "QTabWidget::pane {"
-            " border-left: 0px;"
-            " border-right: 0px;"
-            " border-bottom: 0px;"
-            "}"
-        )
-        photos_layout.addWidget(
-            self._photos_tabs,
-            1,
-        )
-
-        # ----------------------------------------------------
-        # Photos / Sources
+        # Photos
         # ----------------------------------------------------
 
         self._photos_sources_tab = QWidget()
@@ -465,39 +444,30 @@ class MainWindow(QMainWindow):
         )
         sources_layout.addWidget(splitter, 1)
 
-        self._photos_tabs.addTab(
+        self._tabs.addTab(
             self._photos_sources_tab,
-            self._translator.tr("photos.tab.sources"),
+            self._translator.tr("tab.photos"),
         )
 
         # ----------------------------------------------------
-        # Photos / Lieux
+        # Lieux et légendes
         # ----------------------------------------------------
 
         self._photos_places_widget = PhotoPlacesWidget(
             translator=self._translator,
             save_location=self._save_photo_editorial_location,
+            save_caption=self._save_photo_caption,
+            edit_source_photo=self._go_to_source_photo,
             parent=self,
         )
 
         self._photos_places_index = (
-            self._photos_tabs.addTab(
+            self._tabs.addTab(
                 self._photos_places_widget,
                 self._translator.tr(
-                    "photos.tab.places"
+                    "tab.places_captions"
                 ),
             )
-        )
-
-        # Lieux is only meaningful once an analysis exists.
-        self._photos_tabs.setTabEnabled(
-            self._photos_places_index,
-            False,
-        )
-
-        self._tabs.addTab(
-            photos_tab,
-            self._translator.tr("tab.photos"),
         )
 
         self._album_settings_widget = AlbumSettingsWidget(
@@ -1902,12 +1872,15 @@ class MainWindow(QMainWindow):
             and source_available
         )
 
-        # Lieux is a derived photo view too: keep Sources
-        # available during scans, but disable Lieux until
-        # the source is available and no scan is running.
-        self._photos_tabs.setTabEnabled(
-            self._photos_places_index,
-            derived_tabs_enabled,
+        # Photos remains the project entry point. Every other
+        # workflow tab is available as soon as the project contains
+        # photos and no scan is currently running.
+        photos_available = (
+            self._project_service.is_open
+            and not running
+            and bool(
+                self._project_service.list_photos()
+            )
         )
 
         # Photos is always available. It is the entry point
@@ -1925,7 +1898,7 @@ class MainWindow(QMainWindow):
         ):
             self._tabs.setTabEnabled(
                 index,
-                derived_tabs_enabled,
+                photos_available,
             )
 
         self._progress_bar.setVisible(
@@ -2702,6 +2675,69 @@ class MainWindow(QMainWindow):
                     path=path,
                 )
             )
+
+    def _save_photo_caption(
+        self,
+        photo: Photo,
+        caption: str | None,
+    ) -> None:
+        try:
+            self._project_service.set_photo_caption(
+                photo.path,
+                caption,
+            )
+
+            # Captions are part of the rendered album.
+            self._preview_render_service.clear()
+            self._refresh_album_plan()
+            self._update_pdf_summary()
+        except Exception as exc:
+            self._show_error(str(exc))
+
+    def _go_to_source_photo(
+        self,
+        photo: Photo,
+    ) -> None:
+        # Photos is the first main workflow tab.
+        self._tabs.setCurrentIndex(0)
+
+        source_model = self._photo_model
+
+        for source_row in range(
+            source_model.rowCount()
+        ):
+            index = source_model.index(
+                source_row,
+                0,
+            )
+
+            candidate = source_model.data(
+                index,
+                Qt.ItemDataRole.UserRole,
+            )
+
+            if (
+                isinstance(candidate, Photo)
+                and candidate.path == photo.path
+            ):
+                proxy_index = (
+                    self._photo_proxy_model.mapFromSource(
+                        index
+                    )
+                )
+
+                if not proxy_index.isValid():
+                    return
+
+                self._photo_table.selectRow(
+                    proxy_index.row()
+                )
+                self._photo_table.scrollTo(
+                    proxy_index,
+                    QAbstractItemView.ScrollHint.PositionAtCenter,
+                )
+                self._photo_table.setFocus()
+                return
 
     def _save_photo_editorial_location(
         self,

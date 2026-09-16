@@ -120,6 +120,19 @@ class ProjectService:
             photo_path
         )
 
+    def set_photo_caption(
+        self,
+        photo_path: Path,
+        caption: str | None,
+    ) -> None:
+        database = self._require_database()
+        repository = PhotoRepository(database)
+
+        repository.set_caption(
+            photo_path,
+            caption,
+        )
+
     def set_editorial_location(
         self,
         photo_path: Path,

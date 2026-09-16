@@ -64,11 +64,14 @@ class NormalizedRect:
 class PhotoCaptionContent:
     capture_datetime: datetime | None = None
     location_text: str | None = None
+    caption_text: str | None = None
 
     @property
     def line_count(self) -> int:
-        return int(self.capture_datetime is not None) + int(
-            bool(self.location_text)
+        return (
+            int(self.capture_datetime is not None)
+            + int(bool(self.location_text))
+            + int(bool(self.caption_text))
         )
 
     @property
@@ -152,9 +155,16 @@ def build_photo_caption(
     if settings.caption.show_location:
         location_text = photo_location_text(photo)
 
+    caption_text = (
+        photo.caption.strip()
+        if photo.caption and photo.caption.strip()
+        else None
+    )
+
     return PhotoCaptionContent(
         capture_datetime=capture_datetime,
         location_text=location_text,
+        caption_text=caption_text,
     )
 
 

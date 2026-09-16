@@ -4,6 +4,7 @@ from __future__ import annotations
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
         "tab.photos": "Photos",
+        "tab.places_captions": "Places and captions",
         "main.analyze_photos": "Analyze photos",
         "main.scan_discovered": "Discovered: {count}",
         "main.scan_analyzed": "Analyzed: {count}",
@@ -31,6 +32,36 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.description": (
             "Choose how the place where each photo was taken "
             "will be described."
+        ),
+        "photos.places.search": "Search:",
+        "photos.places.search_placeholder": (
+            "Filename, place or caption"
+        ),
+        "photos.places.column.date": "Date",
+        "photos.places.column.location_caption": (
+            "Place and caption"
+        ),
+        "photos.places.column.edit": "Edit",
+        "photos.places.caption": "Caption:",
+        "photos.places.counter": "{count} photos",
+        "photos.places.counter_filtered": (
+            "{visible} / {total} photos"
+        ),
+        "photos.places.year_group": (
+            "{year} — {count} photos"
+        ),
+        "photos.places.month_group": (
+            "{month} — {count} photos"
+        ),
+        "photos.places.undated_group": (
+            "Photos requiring a date — {count}"
+        ),
+        "photos.places.missing_date": (
+            "You must provide a capture date for this photo "
+            "in Photos."
+        ),
+        "photos.places.fix_in_photos": (
+            "Correct in Photos…"
         ),
         "photos.places.column.number": "No.",
         "photos.places.column.photo": "Photo",
@@ -120,9 +151,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "GPS: {latitude}, {longitude}"
         ),
         "photos.location_tooltip.source": "Source: {value}",
-        "tab.album": "Design",
+        "tab.album": "Album settings",
         "tab.plan": "Plan",
         "tab.preview": "Preview",
+        "tab.pdf": "PDF export",
         "tab.render": "PDF",
         "render.title": "PDF",
         "render.description": (
@@ -433,6 +465,7 @@ CATALOGS: dict[str, dict[str, str]] = {
 
     "fr": {
         "tab.photos": "Photos",
+        "tab.places_captions": "Lieux et légendes",
         "main.analyze_photos": "Analyser les photos",
         "main.scan_discovered": "Détectées : {count}",
         "main.scan_analyzed": "Analysées : {count}",
@@ -460,6 +493,36 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.description": (
             "Choisissez comment décrire le lieu où chaque photo "
             "a été prise."
+        ),
+        "photos.places.search": "Rechercher :",
+        "photos.places.search_placeholder": (
+            "Nom de fichier, lieu ou légende"
+        ),
+        "photos.places.column.date": "Date",
+        "photos.places.column.location_caption": (
+            "Lieu et légende"
+        ),
+        "photos.places.column.edit": "Édition",
+        "photos.places.caption": "Légende :",
+        "photos.places.counter": "{count} photos",
+        "photos.places.counter_filtered": (
+            "{visible} / {total} photos"
+        ),
+        "photos.places.year_group": (
+            "{year} — {count} photos"
+        ),
+        "photos.places.month_group": (
+            "{month} — {count} photos"
+        ),
+        "photos.places.undated_group": (
+            "Photos nécessitant une date — {count}"
+        ),
+        "photos.places.missing_date": (
+            "Vous devez impérativement fournir une date "
+            "à cette photo dans Photos."
+        ),
+        "photos.places.fix_in_photos": (
+            "Corriger dans Photos…"
         ),
         "photos.places.column.number": "N°",
         "photos.places.column.photo": "Photo",
@@ -552,9 +615,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "GPS : {latitude}, {longitude}"
         ),
         "photos.location_tooltip.source": "Source : {value}",
-        "tab.album": "Conception",
+        "tab.album": "Paramètres album",
         "tab.plan": "Plan",
         "tab.preview": "Aperçu",
+        "tab.pdf": "Export PDF",
         "tab.render": "PDF",
         "render.title": "PDF",
         "render.description": (

@@ -431,6 +431,37 @@ class PhotoRepository:
 
         self._database.connection.commit()
 
+    def set_caption(
+        self,
+        path: Path,
+        caption: str | None,
+    ) -> None:
+        normalized_path = str(
+            path.expanduser().resolve()
+        )
+
+        if caption is not None:
+            caption = caption.strip()
+
+        cursor = self._database.connection.execute(
+            """
+            UPDATE photos
+            SET caption = ?
+            WHERE path = ?
+            """,
+            (
+                caption or None,
+                normalized_path,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise KeyError(
+                f"Photo not found: {normalized_path}"
+            )
+
+        self._database.connection.commit()
+
     def set_editorial_location(
         self,
         path: Path,
