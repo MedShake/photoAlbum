@@ -42,6 +42,20 @@ jobs:
         run: |
           tar -C packaging/pyinstaller/dist -czf PhotoAlbum-linux-x86_64.tar.gz photo-album
 
+      - name: Build Debian package
+        run: python packaging/debian/build_deb.py
+
+      - name: Verify Debian package
+        run: |
+          dpkg-deb --info photo-album_*.deb
+          dpkg-deb --contents photo-album_*.deb
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoAlbum-debian-amd64
+          path: photo-album_*.deb
+
       - name: Upload Linux application
         uses: actions/upload-artifact@v4
         with:

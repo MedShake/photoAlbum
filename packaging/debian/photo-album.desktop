@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Photo Album
+Comment=Create chronological photo albums
+Exec=photo-album
+Icon=photo-album
+Terminal=false
+Categories=Graphics;Photography;
+StartupNotify=true
