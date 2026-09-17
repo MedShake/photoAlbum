@@ -75,13 +75,18 @@ def main() -> int:
     shutil.copy2(DESKTOP, applications_dir / "photo-album.desktop")
     shutil.copy2(ICON, icons_dir / "photo-album.svg")
 
-    launcher = bin_dir / "photo-album"
-    launcher.write_text(
-        "#!/bin/sh\n"
-        'exec /opt/photo-album/photo-album "$@"\n',
-        encoding="utf-8",
-    )
-    launcher.chmod(0o755)
+    for command, executable in (
+        ("photo-album", "photo-album"),
+        ("pa", "photo-album"),
+        ("photo-album-cli", "photo-album-cli"),
+    ):
+        launcher = bin_dir / command
+        launcher.write_text(
+            "#!/bin/sh\n"
+            f'exec /opt/photo-album/{executable} "$@"\n',
+            encoding="utf-8",
+        )
+        launcher.chmod(0o755)
 
     control = debian_dir / "control"
     control.write_text(

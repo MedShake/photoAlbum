@@ -7,8 +7,10 @@ from pathlib import Path
 
 from PySide6.QtGui import QGuiApplication
 
+from photoalbum import __version__
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.geocoding import (
+    GeocodingError,
     NominatimGeocoder,
     create_nominatim_location_resolver,
 )
@@ -37,7 +39,8 @@ from photoalbum.template_engine import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Development CLI for Photo Album."
+        prog="photo-album-cli",
+        description="Manage Photo Album project data without modifying source images."
     )
 
     subparsers = parser.add_subparsers(
@@ -120,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     set_location_parser = subparsers.add_parser(
         "set-location",
-        help="Set manual geographic information for a project photo.",
+        help="Set the editorial location used in the preview and PDF.",
     )
 
     set_location_parser.add_argument(
@@ -134,6 +137,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Path to the .photoalbum project file.",
+    )
+
+    set_location_parser.add_argument(
+        "--text",
+        help="Editorial location text; an empty string hides the location.",
     )
 
     set_location_parser.add_argument(
@@ -177,8 +185,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     refresh_location_parser.add_argument(
         "--user-agent",
-        required=True,
-        help="User-Agent used for the geocoding service.",
+        default=f"PhotoAlbum/{__version__}",
+        help="User-Agent used for the geocoding service (default: application ID).",
     )
 
     refresh_location_parser.add_argument(
@@ -186,6 +194,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=NominatimGeocoder.DEFAULT_ENDPOINT,
         help="Nominatim reverse-geocoding endpoint.",
     )
+
+    gps_parser = subparsers.add_parser(
+        "set-gps", help="Update project GPS coordinates and resolve their location.",
+    )
+    gps_parser.add_argument("photo", type=Path)
+    gps_parser.add_argument("latitude", type=float)
+    gps_parser.add_argument("longitude", type=float)
+    gps_parser.add_argument("--project", type=Path, required=True)
+    gps_parser.add_argument("--language", choices=("fr", "en"), default="fr")
+    gps_parser.add_argument("--user-agent", default=f"PhotoAlbum/{__version__}")
+    gps_parser.add_argument("--nominatim-endpoint", default=NominatimGeocoder.DEFAULT_ENDPOINT)
 
     pdf_parser = subparsers.add_parser(
         "pdf",
@@ -312,7 +331,10 @@ def print_summary(result) -> None:
 
 def parse_manual_datetime(value: str) -> datetime:
     try:
-        return datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is not None:
+            raise ValueError("Use a local date/time without a timezone, as in the GUI.")
+        return parsed
     except ValueError as exc:
         raise ValueError(
             "Invalid date/time. Expected a value such as "
@@ -465,16 +487,25 @@ def run_set_location(
     address = normalize_optional_text(args.address)
 
     if (
-        place_name is None
+        args.text is None
+        and place_name is None
         and city is None
         and address is None
     ):
         print(
-            "Error: at least one of --place, --city or "
+            "Error: provide --text or at least one of --place, --city or "
             "--address must be provided.",
             file=sys.stderr,
         )
         return 2
+
+    if args.text is not None and any((place_name, city, address)):
+        print("Error: --text cannot be combined with --place, --city or --address.", file=sys.stderr)
+        return 2
+    location_text = (
+        normalize_optional_text(args.text) if args.text is not None
+        else ", ".join(dict.fromkeys(v for v in (place_name, city, address) if v))
+    )
 
     database = open_project(project_path)
 
@@ -482,11 +513,8 @@ def run_set_location(
         repository = PhotoRepository(database)
 
         try:
-            repository.set_manual_location(
-                photo_path,
-                place_name=place_name,
-                city=city,
-                address=address,
+            repository.set_editorial_location(
+                photo_path, components=(), location_text=location_text,
             )
         except KeyError:
             print(
@@ -498,9 +526,7 @@ def run_set_location(
 
         print("Manual location updated:")
         print(f"Photo:   {photo_path}")
-        print(f"Place:   {place_name or '-'}")
-        print(f"City:    {city or '-'}")
-        print(f"Address: {address or '-'}")
+        print(f"Editorial location: {location_text or '-'}")
 
         return 0
 
@@ -508,78 +534,58 @@ def run_set_location(
         database.close()
 
 
-def run_refresh_location(
-    args: argparse.Namespace,
-) -> int:
-    project_path = args.project.expanduser().resolve()
+def run_set_gps(args: argparse.Namespace) -> int:
+    return _run_geocoding(args, update_gps=True)
+
+
+def run_refresh_location(args: argparse.Namespace) -> int:
+    return _run_geocoding(args, update_gps=False)
+
+
+def _run_geocoding(args: argparse.Namespace, *, update_gps: bool) -> int:
+    service = ProjectService()
     photo_path = args.photo.expanduser().resolve()
-
-    if not project_path.exists():
-        print(
-            f"Error: project does not exist: {project_path}",
-            file=sys.stderr,
-        )
-        return 2
-
-    database = open_project(project_path)
-
     try:
-        repository = PhotoRepository(database)
-
-        photo = repository.find_by_path(photo_path)
-
+        if not args.user_agent.strip():
+            raise ValueError("User-Agent must not be empty.")
+        service.open(args.project)
+        photo = service.find_photo(photo_path)
         if photo is None:
-            print(
-                "Error: photo is not registered in the project: "
-                f"{photo_path}",
-                file=sys.stderr,
-            )
-            return 2
-
+            raise ValueError(f"Photo is not registered in the project: {photo_path}")
+        if update_gps:
+            service.set_manual_gps(photo_path, args.latitude, args.longitude)
+            photo = service.find_photo(photo_path)
+            print("GPS coordinates saved in the project; previous geocoding data cleared.")
         if not photo.has_gps:
-            print(
-                "Error: photo has no GPS coordinates.",
-                file=sys.stderr,
+            raise ValueError("Photo has no GPS coordinates.")
+        try:
+            # Match the GUI for GPS edits; explicit refresh bypasses the cache.
+            location = service.resolve_location(
+                photo.latitude, photo.longitude, language=args.language,
+                user_agent=args.user_agent, endpoint=args.nominatim_endpoint,
+                force_refresh=not update_gps,
             )
-            return 2
-
-        resolver = create_nominatim_location_resolver(
-            database,
-            user_agent=args.user_agent,
-            endpoint=args.nominatim_endpoint,
-        )
-
-        processor = PhotoProcessor(
-            location_resolver=resolver,
-        )
-
-        refreshed = processor.refresh_location(
-            photo,
-            language=args.language,
-            on_event=print_event,
-        )
-
-        if not refreshed:
-            print(
-                "Error: geographic information could not "
-                "be refreshed.",
-                file=sys.stderr,
-            )
+        except GeocodingError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            location = None
+        if location is None:
+            message = "Geographic information could not be resolved."
+            if update_gps:
+                message += " New GPS coordinates remain saved; previous geocoding data is cleared."
+            print(f"Error: {message}", file=sys.stderr)
             return 1
-
-        repository.update_geocoded_location(photo)
-
-        print()
-        print("Geographic information refreshed:")
-        print(f"Photo:   {photo.path}")
-        print(f"Place:   {photo.place_name or '-'}")
-        print(f"City:    {photo.city or '-'}")
-        print(f"Address: {photo.address or '-'}")
-
+        service.set_geocoded_location(
+            photo_path, place_name=location.place_name, city=location.city,
+            address=location.address, raw_location_data=location.raw_data,
+        )
+        print(f"Geographic information updated: {photo_path}")
+        print(f"Address: {location.address or '-'}")
         return 0
-
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
     finally:
-        database.close()
+        service.close()
 
 
 def run_pdf(
@@ -614,7 +620,7 @@ def run_pdf(
 
     if qt_app is None:
         qt_app = QGuiApplication(
-            ["photo-album", "pdf"]
+            ["photo-album-cli", "pdf"]
         )
 
     service = ProjectService()
@@ -751,6 +757,9 @@ def main() -> int:
 
     if args.command == "set-date":
         return run_set_date(args)
+
+    if args.command == "set-gps":
+        return run_set_gps(args)
 
     if args.command == "set-location":
         return run_set_location(args)

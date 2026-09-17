@@ -5,7 +5,8 @@ from pathlib import Path
 
 from photoalbum.models import LocationComponent
 from photoalbum.database import PhotoRepository, ProjectDatabase
-from photoalbum.models import Photo
+from photoalbum.models import Location, Photo
+from photoalbum.geocoding import NominatimGeocoder, create_nominatim_location_resolver
 
 from photoalbum.album import (
     AlbumStructureSettings,
@@ -65,6 +66,28 @@ class ProjectService:
         repository = PhotoRepository(database)
 
         return repository.list_all()
+
+    def find_photo(self, photo_path: Path) -> Photo | None:
+        repository = PhotoRepository(self._require_database())
+        return repository.find_by_path(photo_path.expanduser().resolve())
+
+    def resolve_location(
+        self,
+        latitude: float,
+        longitude: float,
+        *,
+        user_agent: str,
+        endpoint: str = NominatimGeocoder.DEFAULT_ENDPOINT,
+        language: str | None = None,
+        force_refresh: bool = False,
+    ) -> Location | None:
+        """Resolve coordinates using the open project's geocoding cache."""
+        resolver = create_nominatim_location_resolver(
+            self._require_database(), user_agent=user_agent, endpoint=endpoint,
+        )
+        return resolver.resolve(
+            latitude, longitude, language=language, force_refresh=force_refresh,
+        )
 
     def restore_original_capture_datetime(
         self,
@@ -251,4 +274,3 @@ class ProjectService:
             raise RuntimeError("No project is currently open.")
 
         return self._database
-

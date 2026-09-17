@@ -49,6 +49,6 @@ where = ["src"]
 ]
 
 [project.scripts]
-photo-album = "photoalbum.cli:main"
-photo-album-gui = "photoalbum.gui.application:main"
+photo-album = "photoalbum.gui.application:main"
+photo-album-cli = "photoalbum.cli:main"
 pa = "photoalbum.gui.application:main"

@@ -153,3 +153,21 @@ def test_missing_album_settings_return_none(
     )
 
     service.close()
+
+@pytest.mark.parametrize('operation', ['find', 'resolve'])
+def test_photo_access_requires_open_project(operation):
+    service = ProjectService()
+    with pytest.raises(RuntimeError, match='No project is currently open'):
+        if operation == 'find':
+            service.find_photo(Path('photo.jpg'))
+        else:
+            service.resolve_location(48.0, 2.0, user_agent='PhotoAlbum/test')
+
+
+def test_find_photo_missing_from_project(tmp_path):
+    service = ProjectService()
+    service.create(tmp_path / 'album.photoalbum')
+    try:
+        assert service.find_photo(tmp_path / 'missing.jpg') is None
+    finally:
+        service.close()

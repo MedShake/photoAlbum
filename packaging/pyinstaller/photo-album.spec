@@ -41,8 +41,27 @@ exe = EXE(
     icon=icon,
 )
 
+cli_analysis = Analysis(
+    ["photo_album_cli.py"],
+    pathex=["../../src"],
+    datas=datas,
+    hiddenimports=collect_submodules("photoalbum.templates"),
+)
+cli_exe = EXE(
+    PYZ(cli_analysis.pure),
+    cli_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="photo-album-cli",
+    console=True,
+    icon=icon,
+)
+
 coll = COLLECT(
     exe,
+    cli_exe,
+    cli_analysis.binaries,
+    cli_analysis.datas,
     a.binaries,
     a.datas,
     strip=False,

@@ -210,7 +210,9 @@ Pour lancer les tests depuis un environnement de développement configuré :
 
 Le projet fournit notamment la commande :
 
-    pa
+    photo-album
+
+Raccourci : `pa`.
 
 pour lancer l’application graphique depuis l’environnement Python dans lequel Photo Album est installé.
 

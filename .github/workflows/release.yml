@@ -79,6 +79,8 @@ jobs:
       - name: Verify application bundle
         run: |
           test -x packaging/pyinstaller/dist/photo-album/photo-album
+          test -x packaging/pyinstaller/dist/photo-album/photo-album-cli
+          packaging/pyinstaller/dist/photo-album/photo-album-cli --help
           find packaging/pyinstaller/dist/photo-album -name photoalbum.svg -print -quit | grep -q .
 
       - name: Create Linux archive
@@ -143,6 +145,14 @@ jobs:
         run: |
           if (-not (Test-Path "packaging/pyinstaller/dist/photo-album/photo-album.exe")) {
               throw "photo-album.exe not found"
+          }
+
+          if (-not (Test-Path "packaging/pyinstaller/dist/photo-album/photo-album-cli.exe")) {
+              throw "photo-album-cli.exe not found"
+          }
+          & "packaging/pyinstaller/dist/photo-album/photo-album-cli.exe" --help
+          if ($LASTEXITCODE -ne 0) {
+              throw "photo-album-cli --help failed"
           }
 
           $icon = Get-ChildItem `

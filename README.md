@@ -210,7 +210,9 @@ To run the tests from a configured development environment:
 
 The project provides the following command to launch the graphical application from the Python environment in which Photo Album is installed:
 
-    pa
+    photo-album
+
+Shortcut: `pa`.
 
 More detailed installation and development-environment documentation will be added as the project stabilizes.
 
