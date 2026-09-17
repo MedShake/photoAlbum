@@ -1,9 +1,64 @@
 from datetime import datetime
 from pathlib import Path
 
-from PIL import Image
+import pytest
+from PIL import ExifTags, Image
 
-from photoalbum.metadata import ExifReader
+from photoalbum.metadata import ExifReader, PhotoAnalyzer
+from photoalbum.models import DateSource
+
+
+@pytest.mark.parametrize(
+    "root_dates, nested_dates, expected",
+    [
+        ({}, {36867: "2024:06:15 12:34:56"}, datetime(2024, 6, 15, 12, 34, 56)),
+        (
+            {306: "2025:01:01 00:00:00"},
+            {36867: "2024:06:15 12:34:56", 36868: "2024:07:01 00:00:00"},
+            datetime(2024, 6, 15, 12, 34, 56),
+        ),
+        (
+            {306: "2025:01:01 00:00:00"},
+            {36867: "invalid", 36868: "2024:07:01 00:00:00"},
+            datetime(2024, 7, 1),
+        ),
+        ({36867: "2024:06:15 12:34:56"}, {}, datetime(2024, 6, 15, 12, 34, 56)),
+        (
+            {36867: "2024:06:15 12:34:56"},
+            {36868: "2024:07:01 00:00:00"},
+            datetime(2024, 6, 15, 12, 34, 56),
+        ),
+        (
+            {306: "2025:01:01 00:00:00"},
+            {36867: "invalid"},
+            datetime(2025, 1, 1),
+        ),
+        ({}, {36867: "invalid"}, None),
+    ],
+    ids=[
+        "nested-original", "original-before-modification-and-digitized",
+        "invalid-original-falls-back-to-digitized", "root-original",
+        "root-original-before-nested-digitized", "fallback-to-root-datetime",
+        "no-valid-exif-date",
+    ],
+)
+def test_reads_jpeg_date_directories(tmp_path, root_dates, nested_dates, expected):
+    # Numeric EXIF tags: DateTime (306), DateTimeOriginal (36867),
+    # DateTimeDigitized (36868). Serialize and reopen a real JPEG so that
+    # Pillow exposes the nested IFD through get_ifd(), not a flattened mock.
+    path = tmp_path / "2020-02-03.jpg"
+    exif = Image.Exif()
+    for tag, value in root_dates.items():
+        exif[tag] = value
+    if nested_dates:
+        exif[ExifTags.IFD.Exif] = nested_dates
+    Image.new("RGB", (10, 10)).save(path, exif=exif)
+
+    assert ExifReader().read(path).capture_datetime == expected
+
+    photo = PhotoAnalyzer().analyze(path)
+    assert photo.capture_datetime == (expected or datetime(2020, 2, 3))
+    assert photo.date_source == (DateSource.EXIF if expected else DateSource.FILENAME)
 
 
 def test_reads_image_dimensions(tmp_path: Path):
@@ -84,4 +139,3 @@ def test_convert_west_gps_coordinate():
     )
 
     assert result == -1.25
-

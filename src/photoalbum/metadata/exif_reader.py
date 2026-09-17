@@ -54,6 +54,13 @@ class ExifReader:
         return None
 
     def _read_capture_datetime(self, exif: Any) -> datetime | None:
+        # Pillow keeps the Exif IFD separate from the main IFD (IFD0).
+        # Original/digitized dates normally live in that nested directory.
+        try:
+            date_exif = exif.get_ifd(ExifTags.IFD.Exif)
+        except (AttributeError, KeyError, TypeError, ValueError, OSError):
+            date_exif = {}
+
         tag_names = (
             "DateTimeOriginal",
             "DateTimeDigitized",
@@ -65,11 +72,14 @@ class ExifReader:
             if tag_id is None:
                 continue
 
-            raw_value = exif.get(tag_id)
-            parsed = self._parse_exif_datetime(raw_value)
+            # Preserve date priority across both directories, including
+            # files that store original/digitized dates directly in IFD0.
+            for directory in (date_exif, exif):
+                raw_value = directory.get(tag_id)
+                parsed = self._parse_exif_datetime(raw_value)
 
-            if parsed is not None:
-                return parsed
+                if parsed is not None:
+                    return parsed
 
         return None
 
@@ -145,4 +155,3 @@ class ExifReader:
                 return tag_id
 
         return None
-
