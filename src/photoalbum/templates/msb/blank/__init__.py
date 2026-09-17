@@ -6,20 +6,14 @@ def register() -> None:
         PageTemplateExtension,
         register_template_extension,
     )
-    from photoalbum.template_engine.renderers import (
-        SimpleLabelWidgetRenderer,
-    )
     from .settings import BlankSettingsWidget
+    from .widget_renderer import BlankWidgetRenderer
 
     register_template_extension(
         PageTemplateExtension(
             template_id="blank",
             settings_editor_type=BlankSettingsWidget,
-            widget_renderer=(
-                SimpleLabelWidgetRenderer(
-                    "preview.special_page"
-                )
-            ),
+            widget_renderer=BlankWidgetRenderer(),
         )
     )
 

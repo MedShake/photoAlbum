@@ -72,7 +72,11 @@ def test_blank_template_owns_renderer():
 
     assert extension is not None
 
+    from photoalbum.templates.msb.blank.widget_renderer import (
+        BlankWidgetRenderer,
+    )
+
     assert isinstance(
         extension.widget_renderer,
-        SimpleLabelWidgetRenderer,
+        BlankWidgetRenderer,
     )
