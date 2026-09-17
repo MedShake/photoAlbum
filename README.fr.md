@@ -1,5 +1,11 @@
 # Photo Album
 
+<p align="center">
+  <img src="src/photoalbum/resources/icons/photoalbum.svg"
+       alt="Photo Album"
+       width="160">
+</p>
+
 **L’application pour ceux qui ne font jamais d’albums… et ceux qui aiment savoir où leurs photos ont été prises !**
 
 [English](README.md) | **Français**
@@ -93,6 +99,8 @@ Cette partie permet d’importer et d’analyser les photos qui serviront à l�
 
 Les métadonnées disponibles sont examinées afin de récupérer notamment les dates de prise de vue et les éventuelles coordonnées GPS.
 
+📷 [Voir l’écran Photos](docs/screenshots/fr/photos.png)
+
 ### Lieux et légendes
 
 Cette étape permet de contrôler les informations éditoriales associées aux photos.
@@ -102,6 +110,8 @@ Les résultats de la géolocalisation peuvent être examinés et ajustés. Les d
 Les modifications groupées facilitent les corrections lorsque plusieurs photos partagent le même contexte géographique.
 
 Les légendes peuvent également être préparées et modifiées ici.
+
+📷 [Voir l’écran Lieux et légendes](docs/screenshots/fr/places-and-captions.png)
 
 ### Album
 
@@ -120,6 +130,8 @@ Cette organisation permet de faire évoluer l’apparence et la structure d’un
 
 Il est également possible de demander à Photo Album de contraindre le nombre total de pages à un **multiple de 4**, afin de tenir compte des contraintes courantes de fabrication et d’impression des albums.
 
+📷 [Voir l’écran Paramètres de l’album](docs/screenshots/fr/album-settings.png)
+
 ### Plan
 
 Le plan donne une **vue d’ensemble de la structure de l’album** telle qu’elle résulte des photos, des paramètres et des templates sélectionnés.
@@ -130,6 +142,8 @@ Photo Album peut notamment y signaler des **emplacements photo non occupés** et
 
 Le plan constitue ainsi une étape de contrôle entre la configuration de l’album et son rendu visuel.
 
+📷 [Voir l’écran Plan de l’album](docs/screenshots/fr/plan.png)
+
 ### Aperçu
 
 L’aperçu fournit une représentation **WYSIWYG** (*What You See Is What You Get*) de l’album.
@@ -138,11 +152,15 @@ Il permet de parcourir visuellement les pages telles qu’elles seront rendues, 
 
 Cette étape permet de contrôler le résultat réel de la composition avant de générer le document définitif.
 
+📷 [Voir l’écran Aperçu de l’album](docs/screenshots/fr/preview.png)
+
 ### Export PDF
 
 La dernière étape génère le **document PDF final** correspondant à l’album préparé et contrôlé dans l’aperçu.
 
 Photo Album permet de choisir la **qualité du PDF généré**, afin d’adapter le document final à son usage.
+
+📷 [Voir l’écran Export PDF](docs/screenshots/fr/pdf-export.png)
 
 ## Philosophie du projet
 

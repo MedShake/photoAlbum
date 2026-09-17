@@ -1,5 +1,11 @@
 # Photo Album
 
+<p align="center">
+  <img src="src/photoalbum/resources/icons/photoalbum.svg"
+       alt="Photo Album"
+       width="160">
+</p>
+
 **The app for people who never get around to making photo albums… and for those who like knowing where their photos were taken!**
 
 **English** | [Français](README.fr.md)
@@ -10,7 +16,7 @@ It grew out of two main ideas: making real use of the geographic information emb
 
 Designed to be highly modular, Photo Album currently includes the album templates its author actually uses himself — direct descendants of layouts he once built with bits of PHP and plenty of home-made tinkering.
 
-After a few decades of building things for the Web, perhaps it was time to turn all of that into a proper application. It is now done, with the help of AI.
+After a few decades of building things for the Web, perhaps it was time to turn all of that into a proper application. And now it's done — with the help of AI.
 
 ---
 
@@ -93,6 +99,8 @@ This section is used to import and analyze the photographs that will be used in 
 
 Available metadata is examined to retrieve information such as capture dates and GPS coordinates.
 
+📷 [View the Photos screen](docs/screenshots/en/photos.png)
+
 ### Places & Captions
 
 This stage is used to review the editorial information associated with the photographs.
@@ -102,6 +110,8 @@ Reverse-geocoding results can be reviewed and adjusted. Individual location comp
 Batch editing makes corrections easier when several photographs share the same geographic context.
 
 Photo captions can also be prepared and edited here.
+
+📷 [View the Places and captions screen](docs/screenshots/en/places-and-captions.png)
 
 ### Album
 
@@ -120,6 +130,8 @@ This approach makes it possible to change and extend the appearance and structur
 
 Photo Album can also constrain the total page count to a **multiple of 4**, accommodating common album production and printing requirements.
 
+📷 [View the Album settings screen](docs/screenshots/en/album-settings.png)
+
 ### Plan
 
 The plan provides an **overview of the album structure** resulting from the photographs, album settings, and selected templates.
@@ -130,6 +142,8 @@ Photo Album can highlight **unused photo slots** and provide **suggestions for p
 
 The plan therefore acts as a structural review step between configuring the album and inspecting its visual rendering.
 
+📷 [View the Album plan screen](docs/screenshots/en/plan.png)
+
 ### Preview
 
 The preview provides a **WYSIWYG** (*What You See Is What You Get*) representation of the album.
@@ -138,11 +152,15 @@ It lets you visually browse the pages as they will be rendered, including their 
 
 This provides a final visual check of the actual composition before generating the finished document.
 
+📷 [View the Album preview screen](docs/screenshots/en/preview.png)
+
 ### PDF Export
 
 The final stage generates the **finished PDF document** corresponding to the album reviewed in the preview.
 
 Photo Album lets you select the **quality of the generated PDF**, so the final document can be adapted to its intended use.
+
+📷 [View the PDF export screen](docs/screenshots/en/pdf-export.png)
 
 ## Project philosophy
 
