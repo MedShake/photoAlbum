@@ -12,13 +12,21 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QColorDialog,
+    QComboBox,
+    QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QVBoxLayout,
 )
 
-from photoalbum.rendering.fonts import resolve_font_family
+from photoalbum.rendering.fonts import (
+    available_photo_album_fonts,
+)
+from .title_style import (
+    title_font_family,
+    title_font_size,
+)
 
 from photoalbum.album import (
     A4,
@@ -27,6 +35,7 @@ from photoalbum.album import (
 )
 from photoalbum.templates.msb.year_photo_scatter.composition import (
     compose_cover_scatter,
+    cover_period_title,
 )
 
 from photoalbum.gui.preview_render_service import (
@@ -210,17 +219,89 @@ class YearPhotoScatterSettingsWidget(
             self._choose_title_color
         )
 
+        self._update_title_color_button()
+
+        size_label = QLabel(
+            self._translator.tr(
+                "page_settings.title_font_size"
+            )
+        )
+
+        font_label = QLabel(
+            self._translator.tr(
+                "page_settings.title_font_family"
+            )
+        )
+
+        self._title_font_combo = QComboBox()
+
+        for family in available_photo_album_fonts():
+            self._title_font_combo.addItem(
+                family,
+                family,
+            )
+
+        current_family = title_font_family(
+            self._instance.settings
+        )
+        font_index = self._title_font_combo.findData(
+            current_family
+        )
+        if font_index >= 0:
+            self._title_font_combo.setCurrentIndex(
+                font_index
+            )
+
+        font_label.setBuddy(
+            self._title_font_combo
+        )
+
+        self._title_font_size_spin = QDoubleSpinBox()
+        self._title_font_size_spin.setRange(1, 300)
+        self._title_font_size_spin.setDecimals(1)
+        self._title_font_size_spin.setSuffix(" pt")
+        self._title_font_size_spin.setValue(
+            title_font_size(
+                self._instance.settings,
+                cover_period_title(
+                    self._photos,
+                    self._translator.month_name,
+                ),
+            )
+        )
+
+        size_label.setBuddy(
+            self._title_font_size_spin
+        )
+
         color_controls.addWidget(
             self._title_color_button
         )
-
+        color_controls.addWidget(
+            font_label
+        )
+        color_controls.addWidget(
+            self._title_font_combo
+        )
+        color_controls.addWidget(
+            size_label
+        )
+        color_controls.addWidget(
+            self._title_font_size_spin
+        )
         color_controls.addStretch()
 
         layout.addLayout(
             color_controls
         )
 
-        self._update_title_color_button()
+        self._title_font_combo.currentIndexChanged.connect(
+            self._change_title_font_family
+        )
+
+        self._title_font_size_spin.valueChanged.connect(
+            self._change_title_font_size
+        )
 
         self._preview_label = QLabel()
 
@@ -252,7 +333,9 @@ class YearPhotoScatterSettingsWidget(
             self._instance.settings
         )
 
+        scatter = settings.get("scatter", {})
         settings["scatter"] = {
+            **(scatter if isinstance(scatter, dict) else {}),
             "seeds": list(
                 self._seeds
             ),
@@ -386,6 +469,37 @@ class YearPhotoScatterSettingsWidget(
         # hundreds of photographs again.
         self._display_preview()
 
+    def _change_title_font_family(self, index: int) -> None:
+        family = self._title_font_combo.itemData(
+            index
+        )
+        if not family:
+            return
+
+        settings = dict(self._instance.settings)
+        scatter = settings.get("scatter", {})
+        settings["scatter"] = {
+            **(scatter if isinstance(scatter, dict) else {}),
+            "title_font_family": str(family),
+        }
+        self._instance = replace(
+            self._instance,
+            settings=settings,
+        )
+        self.instance_changed.emit()
+        self._display_preview()
+
+    def _change_title_font_size(self, value: float) -> None:
+        settings = dict(self._instance.settings)
+        scatter = settings.get("scatter", {})
+        settings["scatter"] = {
+            **(scatter if isinstance(scatter, dict) else {}),
+            "title_font_size": value,
+        }
+        self._instance = replace(self._instance, settings=settings)
+        self.instance_changed.emit()
+        self._display_preview()
+
     def _request_preview(
         self,
     ) -> None:
@@ -497,16 +611,19 @@ class YearPhotoScatterSettingsWidget(
         )
 
         font = QFont(
-            resolve_font_family(None)
+            title_font_family(
+                self._instance.settings
+            )
         )
 
         font.setBold(
             True
         )
 
-        font.setPixelSize(
-            72
-        )
+        font.setPixelSize(max(1, round(
+            title_font_size(self._instance.settings, self._composition_title)
+            * 25.4 / 72 * pixmap.width() / self._page_format.width_mm
+        )))
 
         painter.setFont(
             font

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
+        "page_settings.title_font_family": "Font",
+        "page_settings.title_font_size": "Size",
         "tab.photos": "Photos",
         "tab.places_captions": "Places and captions",
         "main.analyze_photos": "Analyze photos",
@@ -662,6 +664,8 @@ CATALOGS: dict[str, dict[str, str]] = {
     },
 
     "fr": {
+        "page_settings.title_font_family": "Police",
+        "page_settings.title_font_size": "Taille",
         "tab.photos": "Photos",
         "tab.places_captions": "Lieux et légendes",
         "main.analyze_photos": "Analyser les photos",

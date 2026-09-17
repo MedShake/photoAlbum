@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from PySide6.QtWidgets import QApplication
+
 from photoalbum.rendering.fonts import (
     DEFAULT_MONOSPACE_FONT,
     DEFAULT_SANS_FONT,
@@ -8,6 +10,10 @@ from photoalbum.rendering.fonts import (
     available_photo_album_fonts,
     resolve_font_family,
 )
+
+
+# QFontDatabase requires a Qt application to exist.
+_app = QApplication.instance() or QApplication([])
 
 
 def test_default_fonts_belong_to_declared_palette():

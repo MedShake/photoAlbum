@@ -7,11 +7,14 @@ from PySide6.QtGui import (
     QPainter,
 )
 
-from photoalbum.rendering.fonts import resolve_font_family
 
 from photoalbum.album import PageInstance
 
 from .composition import compose_cover_scatter
+from .title_style import (
+    title_font_family,
+    title_font_size,
+)
 from .scatter_renderer import YearPhotoScatterRenderer
 
 
@@ -234,38 +237,16 @@ class YearPhotoScatterWidgetRenderer:
             )
 
         font = QFont(
-            resolve_font_family(None)
+            title_font_family(
+                instance.settings
+            )
         )
 
         font.setBold(
             True
         )
 
-        title = composition.title.strip()
-
-        # Physical print sizes.
-        #
-        # The historical implementation used very large
-        # screen-oriented values. Here the value is converted
-        # by font_pixel_size(), so it must represent a real
-        # typographic point size on paper.
-        if (
-            len(title) == 4
-            and title.isdigit()
-        ):
-            title_font_pt = 72
-
-        elif (
-            len(title) == 9
-            and title[4] in ("-", "–")
-            and title[:4].isdigit()
-            and title[5:].isdigit()
-        ):
-            title_font_pt = 52
-
-        else:
-            # Typically "Mois ANNEE".
-            title_font_pt = 44
+        title_font_pt = title_font_size(instance.settings, composition.title)
 
         font.setPixelSize(
             font_pixel_size(
