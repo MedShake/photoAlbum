@@ -19,32 +19,6 @@ class MonthDividerLayout:
     title_font_pt: float = 32.0
     cities_font_pt: float = 14.0
 
-    def color_for_month(
-        self,
-        month: int,
-    ) -> tuple[int, int, int]:
-        return MONTH_COLORS.get(
-            month,
-            (0, 0, 0),
-        )
-
-
-MONTH_COLORS: dict[int, tuple[int, int, int]] = {
-    1: (72, 155, 207),
-    2: (134, 96, 188),
-    3: (76, 168, 108),
-    4: (144, 198, 101),
-    5: (238, 201, 88),
-    6: (242, 162, 91),
-    7: (228, 104, 71),
-    8: (200, 76, 76),
-    9: (210, 108, 162),
-    10: (186, 94, 186),
-    11: (90, 125, 206),
-    12: (88, 185, 174),
-}
-
-
 def classic_month_divider_layout(
     *,
     page_width_mm: float,

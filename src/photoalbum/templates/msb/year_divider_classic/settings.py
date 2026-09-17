@@ -11,13 +11,13 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.album import PageInstance
-from photoalbum.gui.template_settings.base import (
-    PageTemplateSettingsWidget,
+from photoalbum.templates.msb.settings_base import (
+    MsbTemplateSettingsWidget,
 )
 
 
 class YearDividerClassicSettingsWidget(
-    PageTemplateSettingsWidget
+    MsbTemplateSettingsWidget
 ):
 
     DEFAULT_TITLE_COLOR = "#d0d0d0"
@@ -30,6 +30,7 @@ class YearDividerClassicSettingsWidget(
         translator,
         render_service=None,
         page_format=None,
+        template_pack_settings=None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -38,6 +39,7 @@ class YearDividerClassicSettingsWidget(
             translator=translator,
             render_service=render_service,
             page_format=page_format,
+            template_pack_settings=template_pack_settings,
             parent=parent,
         )
 
@@ -67,6 +69,11 @@ class YearDividerClassicSettingsWidget(
 
     def _create_content(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        layout.addWidget(
+            self.create_page_settings_title()
+        )
 
         label = QLabel(
             self._translator.tr(
@@ -84,7 +91,10 @@ class YearDividerClassicSettingsWidget(
         layout.addWidget(
             self._title_color_button
         )
-        layout.addStretch()
+        layout.addSpacing(12)
+        layout.addWidget(
+            self.create_msb_theme_group()
+        )
 
         self._update_title_color_button()
 

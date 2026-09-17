@@ -7,6 +7,10 @@ def register() -> None:
         register_template_extension,
     )
 
+    from .settings import (
+        MonthDividerClassicSettingsWidget,
+    )
+
     from .widget_renderer import (
         MonthDividerClassicWidgetRenderer,
     )
@@ -14,6 +18,9 @@ def register() -> None:
     register_template_extension(
         PageTemplateExtension(
             template_id="month-divider-classic",
+            settings_editor_type=(
+                MonthDividerClassicSettingsWidget
+            ),
             widget_renderer=(
                 MonthDividerClassicWidgetRenderer()
             ),

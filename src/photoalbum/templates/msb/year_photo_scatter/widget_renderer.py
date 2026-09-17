@@ -127,7 +127,8 @@ class YearPhotoScatterWidgetRenderer:
         composition=None,
         thumbnail_cache=None,
         pixel_rect=None,
-    ) -> None:
+            template_pack_settings=None,
+) -> None:
         photos = tuple(
             photos
         )

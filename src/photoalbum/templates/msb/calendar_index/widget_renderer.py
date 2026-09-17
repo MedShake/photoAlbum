@@ -6,6 +6,9 @@ from photoalbum.album import PageInstance
 from photoalbum.templates.msb.calendar_index.painter import (
     paint_calendar_index,
 )
+from photoalbum.templates.msb.theme import (
+    msb_theme_from_pack_settings,
+)
 
 from .composition import (
     calendar_month_page_numbers,
@@ -33,6 +36,7 @@ class CalendarIndexWidgetRenderer:
         composition=None,
         thumbnail_cache=None,
         pixel_rect=None,
+        template_pack_settings=None,
     ) -> None:
         photos = tuple(
             photos
@@ -79,10 +83,15 @@ class CalendarIndexWidgetRenderer:
             )
         )
 
+        theme = msb_theme_from_pack_settings(
+            template_pack_settings or {}
+        )
+
         composition = compose_calendar_index(
             photos,
             year=year,
             month_page_numbers=page_numbers,
+            month_colors=theme.month_colors,
         )
 
         paint_calendar_index(

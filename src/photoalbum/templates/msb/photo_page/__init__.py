@@ -15,6 +15,9 @@ def register() -> None:
         register_template_extension,
     )
 
+    from .settings import (
+        PhotoPageSettingsWidget,
+    )
     from .widget_renderer import (
         PhotoPageWidgetRenderer,
     )
@@ -27,6 +30,9 @@ def register() -> None:
         register_template_extension(
             PageTemplateExtension(
                 template_id=template_id,
+                settings_editor_type=(
+                    PhotoPageSettingsWidget
+                ),
                 widget_renderer=renderer,
             )
         )

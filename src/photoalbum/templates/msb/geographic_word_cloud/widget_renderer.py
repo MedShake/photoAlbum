@@ -10,6 +10,10 @@ from photoalbum.album import (
 from .painter import (
     paint_geographic_word_cloud,
 )
+from photoalbum.templates.msb.theme import (
+    msb_theme_from_pack_settings,
+    palette_from_settings,
+)
 
 from .composition import (
     compose_geographic_word_cloud,
@@ -36,6 +40,7 @@ class GeographicWordCloudWidgetRenderer:
         composition=None,
         thumbnail_cache=None,
         pixel_rect=None,
+        template_pack_settings=None,
     ) -> None:
         settings = instance.settings.get(
             "geographic_word_cloud",
@@ -52,6 +57,20 @@ class GeographicWordCloudWidgetRenderer:
             "year"
         )
 
+        theme = msb_theme_from_pack_settings(
+            template_pack_settings or {}
+        )
+
+        palette_colors = palette_from_settings(
+            settings.get("palette"),
+            fallback=theme.month_colors,
+        )
+
+        palette = tuple(
+            palette_colors[month]
+            for month in range(1, 13)
+        )
+
         # Keep the historical A4 cloud geometry even when the
         # physical page is wider (for example US Letter).
         cloud = compose_geographic_word_cloud(
@@ -59,6 +78,7 @@ class GeographicWordCloudWidgetRenderer:
             year=year,
             page_width_mm=A4.width_mm,
             page_height_mm=A4.height_mm,
+            palette=palette,
         )
 
         paint_geographic_word_cloud(

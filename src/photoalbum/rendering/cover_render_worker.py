@@ -140,13 +140,28 @@ class CoverRenderWorker(QRunnable):
                 optimize=False,
             )
 
-            self.signals.finished.emit(
-                self.request_id,
-                buffer.getvalue(),
-            )
+            result = buffer.getvalue()
 
         except Exception as exc:
-            self.signals.failed.emit(
+            try:
+                self.signals.failed.emit(
+                    self.request_id,
+                    str(exc),
+                )
+            except RuntimeError:
+                # The signals object may have been deleted
+                # while this QRunnable was finishing.
+                pass
+
+            return
+
+        try:
+            self.signals.finished.emit(
                 self.request_id,
-                str(exc),
+                result,
             )
+        except RuntimeError:
+            # The preview owner may have disappeared while
+            # this QRunnable was finishing. The rendered
+            # result can simply be discarded.
+            pass

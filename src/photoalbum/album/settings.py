@@ -262,6 +262,14 @@ class AlbumStructureSettings:
         default_factory=list
     )
 
+    # Complete project-persisted settings owned by template packs.
+    #
+    # This deliberately lives at album/project level rather than inside
+    # one PageInstance: several pages may depend on the same pack theme.
+    template_pack_settings: dict[str, object] = field(
+        default_factory=dict
+    )
+
     def year_dividers_available(
         self,
         years: set[int],

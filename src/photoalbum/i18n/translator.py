@@ -3,6 +3,23 @@ from __future__ import annotations
 
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
+        "msb_theme.edit": "MSB theme…",
+        "msb_theme.title": "MSB theme",
+        "msb_theme.album_section": "ALBUM THEME",
+        "msb_theme.modify": "Edit theme…",
+        "msb_theme.template_explanation": (
+            "This template uses the shared MSB theme for this project."
+        ),
+        "msb_theme.explanation": (
+            "These settings belong to the MSB theme for this project. "
+            "Changes affect every MSB template that uses the shared theme."
+        ),
+        "msb_theme.restore_month": "Default",
+        "msb_theme.restore_all": "Restore default MSB theme",
+        "msb_theme.default_font": "Default font",
+        "msb_theme.palette_section": "PALETTE",
+        "msb_theme.typography_section": "TYPOGRAPHY",
+        "page_settings.blank_message": "No settings 😉",
         "page_settings.title_font_family": "Font",
         "page_settings.title_font_size": "Size",
         "tab.photos": "Photos",
@@ -277,6 +294,9 @@ CATALOGS: dict[str, dict[str, str]] = {
             "PDF generated successfully: {path}"
         ),
         "page_settings.title": "Page settings",
+        "page_settings.description": (
+            "Customize the appearance and options of this page."
+        ),
         "calendar_index.title": "Index",
         "calendar_index.year": "Year",
         "calendar_index.page": "Page {page}",
@@ -290,6 +310,16 @@ CATALOGS: dict[str, dict[str, str]] = {
         "calendar_index.sun": "Sun",
         "page_settings.geographic_scope": "Geographic cloud",
         "page_settings.geographic_photos": "Photos",
+        "page_settings.word_cloud_palette_explanation": (
+            "These colors initially come from the MSB project theme. "
+            "Changes made here apply only to this word cloud."
+        ),
+        "page_settings.word_cloud_restore_theme": (
+            "Restore colors from MSB theme"
+        ),
+        "page_settings.word_cloud_choose_color": (
+            "Choose word cloud color"
+        ),
         "page_settings.all_photos": "All photos",
         "page_settings.no_geographic_data": "No geolocated city available for this selection.",
         "page_settings.close": "Close",
@@ -298,6 +328,15 @@ CATALOGS: dict[str, dict[str, str]] = {
         "page_settings.choose_title_color": "Choose title color",
         "page_settings.calculating": "Calculating preview…",
         "page_settings.no_options": "No settings are available for this template.",
+        "page_settings.page_section": "PAGE SETTINGS",
+        "page_settings.theme_section": "THEME SETTINGS",
+        "page_settings.preview_section": "PREVIEW",
+        "page_settings.no_page_settings": (
+            "This page has no settings of its own."
+        ),
+        "page_settings.theme_explanation": (
+            "This page uses the {theme_name} theme shared by the album."
+        ),
         "page_settings.error": "Preview error: {error}",
 
         "preview.blank_page": "Blank page",
@@ -664,6 +703,24 @@ CATALOGS: dict[str, dict[str, str]] = {
     },
 
     "fr": {
+        "msb_theme.edit": "Thème MSB…",
+        "msb_theme.title": "Thème MSB",
+        "msb_theme.album_section": "THÈME DE L’ALBUM",
+        "msb_theme.modify": "Modifier le thème…",
+        "msb_theme.template_explanation": (
+            "Ce modèle utilise le thème MSB commun à ce projet."
+        ),
+        "msb_theme.explanation": (
+            "Ces réglages appartiennent au thème MSB de ce projet. "
+            "Toute modification affecte les modèles MSB utilisant "
+            "le thème commun."
+        ),
+        "msb_theme.restore_month": "Par défaut",
+        "msb_theme.restore_all": "Restaurer le thème MSB par défaut",
+        "msb_theme.default_font": "Police par défaut",
+        "msb_theme.palette_section": "PALETTE",
+        "msb_theme.typography_section": "TYPOGRAPHIE",
+        "page_settings.blank_message": "Pas de réglage 😉",
         "page_settings.title_font_family": "Police",
         "page_settings.title_font_size": "Taille",
         "tab.photos": "Photos",
@@ -943,6 +1000,9 @@ CATALOGS: dict[str, dict[str, str]] = {
             "PDF généré avec succès : {path}"
         ),
         "page_settings.title": "Réglages de la page",
+        "page_settings.description": (
+            "Personnalisez l’apparence et les options de cette page."
+        ),
         "calendar_index.title": "Index",
         "calendar_index.year": "Année",
         "calendar_index.page": "Page {page}",
@@ -956,6 +1016,17 @@ CATALOGS: dict[str, dict[str, str]] = {
         "calendar_index.sun": "Dim",
         "page_settings.geographic_scope": "Nuage géographique",
         "page_settings.geographic_photos": "Photos",
+        "page_settings.word_cloud_palette_explanation": (
+            "Ces couleurs proviennent initialement du thème MSB du projet. "
+            "Les modifications effectuées ici s'appliquent uniquement "
+            "à ce nuage de mots."
+        ),
+        "page_settings.word_cloud_restore_theme": (
+            "Rétablir les couleurs du thème MSB"
+        ),
+        "page_settings.word_cloud_choose_color": (
+            "Choisir la couleur du nuage de mots"
+        ),
         "page_settings.all_photos": "Toutes les photos",
         "page_settings.no_geographic_data": "Aucune ville géolocalisée disponible pour cette sélection.",
         "page_settings.close": "Fermer",
@@ -964,6 +1035,15 @@ CATALOGS: dict[str, dict[str, str]] = {
         "page_settings.choose_title_color": "Choisir la couleur du titre",
         "page_settings.calculating": "Calcul de l’aperçu…",
         "page_settings.no_options": "Aucun réglage disponible pour ce modèle.",
+        "page_settings.page_section": "RÉGLAGES DE LA PAGE",
+        "page_settings.theme_section": "RÉGLAGES DU THÈME",
+        "page_settings.preview_section": "APERÇU",
+        "page_settings.no_page_settings": (
+            "Cette page n’a pas de réglage propre."
+        ),
+        "page_settings.theme_explanation": (
+            "Cette page utilise le thème {theme_name} commun à l’album."
+        ),
         "page_settings.error": "Erreur d’aperçu : {error}",
 
         "preview.blank_page": "Page blanche",

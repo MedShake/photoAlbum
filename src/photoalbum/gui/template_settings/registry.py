@@ -23,6 +23,7 @@ def create_template_settings_editor(
     translator: Translator,
     render_service=None,
     page_format: PageFormat = A4,
+    template_pack_settings=None,
     parent: QWidget | None = None,
 ) -> PageTemplateSettingsWidget | None:
     editor_type = (
@@ -35,11 +36,28 @@ def create_template_settings_editor(
     if editor_type is None:
         return None
 
+    kwargs = {
+        "translator": translator,
+        "render_service": render_service,
+        "page_format": page_format,
+        "parent": parent,
+    }
+
+    # Optional opaque project/template-pack context.
+    # Editors that do not depend on a pack remain completely
+    # unaware of it.
+    from inspect import signature
+
+    if (
+        "template_pack_settings"
+        in signature(editor_type.__init__).parameters
+    ):
+        kwargs["template_pack_settings"] = (
+            template_pack_settings
+        )
+
     return editor_type(
         instance,
         photos,
-        translator=translator,
-        render_service=render_service,
-        page_format=page_format,
-        parent=parent,
+        **kwargs,
     )

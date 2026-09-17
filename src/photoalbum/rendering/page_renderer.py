@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from inspect import signature
 
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QFont, QPainter
@@ -46,6 +47,7 @@ class PageRenderer:
         thumbnail_cache,
         project_photos=(),
         album_pages=(),
+        template_pack_settings=None,
         render_service=None,
         set_waiting_key=None,
         paint_fallback=None,
@@ -70,6 +72,7 @@ class PageRenderer:
                 font_pixel_size=font_pixel_size,
                 project_photos=project_photos,
                 album_pages=album_pages,
+                template_pack_settings=template_pack_settings,
                 render_service=render_service,
                 set_waiting_key=set_waiting_key,
                 thumbnail_cache=thumbnail_cache,
@@ -92,6 +95,7 @@ class PageRenderer:
                 pixel_rect=pixel_rect,
                 thumbnail_cache=thumbnail_cache,
                 album_pages=album_pages,
+                template_pack_settings=template_pack_settings,
                 render_service=render_service,
                 set_waiting_key=set_waiting_key,
                 show_empty_slots=show_empty_slots,
@@ -122,6 +126,7 @@ class PageRenderer:
         font_pixel_size,
         project_photos,
         album_pages,
+        template_pack_settings,
         render_service,
         set_waiting_key,
         thumbnail_cache,
@@ -144,7 +149,7 @@ class PageRenderer:
         if renderer is None:
             return False
 
-        renderer.paint(
+        paint_kwargs = dict(
             painter=painter,
             instance=instance,
             photos=project_photos,
@@ -159,6 +164,18 @@ class PageRenderer:
             page_height_mm=page_height_mm,
             album_pages=album_pages,
             thumbnail_cache=thumbnail_cache,
+        )
+
+        if (
+            "template_pack_settings"
+            in signature(renderer.paint).parameters
+        ):
+            paint_kwargs["template_pack_settings"] = (
+                template_pack_settings or {}
+            )
+
+        renderer.paint(
+            **paint_kwargs
         )
 
         return True
@@ -177,6 +194,7 @@ class PageRenderer:
         pixel_rect,
         thumbnail_cache,
         album_pages,
+        template_pack_settings,
         render_service,
         set_waiting_key,
         show_empty_slots,
@@ -214,6 +232,14 @@ class PageRenderer:
             thumbnail_cache=thumbnail_cache,
             pixel_rect=pixel_rect,
         )
+
+        if (
+            "template_pack_settings"
+            in signature(renderer.paint).parameters
+        ):
+            paint_kwargs["template_pack_settings"] = (
+                template_pack_settings or {}
+            )
 
         # Empty slots only concern photo-page renderers.
         # Other template renderers must keep their existing

@@ -8,6 +8,9 @@ from PySide6.QtGui import (
 )
 
 from photoalbum.rendering.fonts import resolve_font_family
+from photoalbum.templates.msb.theme import (
+    msb_theme_from_pack_settings,
+)
 
 from photoalbum.album.month_divider_layout import (
     classic_month_divider_layout,
@@ -41,6 +44,7 @@ class MonthDividerClassicWidgetRenderer:
         composition=None,
         thumbnail_cache=None,
         pixel_rect=None,
+        template_pack_settings=None,
     ) -> None:
         if (
             composition is None
@@ -77,8 +81,12 @@ class MonthDividerClassicWidgetRenderer:
             f"{month_name} {page.year}"
         )
 
+        theme = msb_theme_from_pack_settings(
+            template_pack_settings or {}
+        )
+
         red, green, blue = (
-            layout.color_for_month(
+            theme.color_for_month(
                 page.month
             )
         )
@@ -92,7 +100,9 @@ class MonthDividerClassicWidgetRenderer:
         )
 
         font = QFont(
-            resolve_font_family(None)
+            resolve_font_family(
+                theme.default_font_family
+            )
         )
 
         font.setBold(

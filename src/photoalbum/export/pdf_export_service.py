@@ -375,6 +375,9 @@ class PdfExportService:
                     thumbnail_cache=image_cache,
                     project_photos=project_photos,
                     album_pages=pages,
+                    template_pack_settings=(
+                        settings.template_pack_settings
+                    ),
                     render_service=None,
                     set_waiting_key=None,
                     paint_fallback=None,

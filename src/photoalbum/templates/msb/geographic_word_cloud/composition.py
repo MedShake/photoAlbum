@@ -6,19 +6,14 @@ from random import Random
 from photoalbum.models import Photo
 
 
-BASE_COLORS = (
-    (72, 155, 207),
-    (134, 96, 188),
-    (76, 168, 108),
-    (144, 198, 101),
-    (238, 201, 88),
-    (242, 162, 91),
-    (228, 104, 71),
-    (200, 76, 76),
-    (210, 108, 162),
-    (186, 94, 186),
-    (90, 125, 206),
-    (88, 185, 174),
+from photoalbum.templates.msb.theme import (
+    DEFAULT_MONTH_COLORS,
+)
+
+
+BASE_COLORS = tuple(
+    DEFAULT_MONTH_COLORS[month]
+    for month in range(1, 13)
 )
 
 
@@ -251,7 +246,12 @@ def compose_geographic_word_cloud(
     margin_mm: float = 20.0,
     minimum_font_pt: float = 10.0,
     maximum_font_pt: float = 40.0,
+    palette: tuple[tuple[int, int, int], ...] | None = None,
 ) -> GeographicWordCloud:
+    palette = palette or BASE_COLORS
+    if not palette:
+        palette = BASE_COLORS
+
     eligible = _eligible_photos(
         photos,
         year,
@@ -309,9 +309,9 @@ def compose_geographic_word_cloud(
 
     colors = {
         city: _color_variation(
-            BASE_COLORS[
+            palette[
                 index
-                % len(BASE_COLORS)
+                % len(palette)
             ],
             random,
         )

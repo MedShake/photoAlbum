@@ -9,20 +9,9 @@ from photoalbum.models import Photo
 from photoalbum.album.planning import PlanItemKind
 
 
-MONTH_COLORS = {
-    1: (72, 155, 207),
-    2: (134, 96, 188),
-    3: (76, 168, 108),
-    4: (144, 198, 101),
-    5: (238, 201, 88),
-    6: (242, 162, 91),
-    7: (228, 104, 71),
-    8: (200, 76, 76),
-    9: (210, 108, 162),
-    10: (186, 94, 186),
-    11: (90, 125, 206),
-    12: (88, 185, 174),
-}
+from photoalbum.templates.msb.theme import (
+    DEFAULT_MONTH_COLORS,
+)
 
 
 @dataclass(frozen=True)
@@ -92,9 +81,13 @@ def compose_calendar_index(
     *,
     year: int,
     month_page_numbers: dict[int, int] | None = None,
+    month_colors: dict[int, tuple[int, int, int]] | None = None,
 ) -> CalendarIndexComposition:
     month_page_numbers = (
         month_page_numbers or {}
+    )
+    month_colors = (
+        month_colors or DEFAULT_MONTH_COLORS
     )
 
     photo_dates: set[date] = {
@@ -168,7 +161,7 @@ def compose_calendar_index(
                         month
                     )
                 ),
-                color=MONTH_COLORS[month],
+                color=month_colors[month],
                 weeks=tuple(weeks),
             )
         )

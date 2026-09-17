@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -24,7 +25,13 @@ from photoalbum.template_engine.defaults import (
 from photoalbum.i18n import Translator
 from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
-
+from photoalbum.templates.msb.theme import (
+    msb_theme_from_pack_settings,
+    pack_settings_with_msb_theme,
+)
+from photoalbum.templates.msb.theme_dialog import (
+    MsbThemeDialog,
+)
 from photoalbum.album import (
     PAGE_FORMATS,
     page_format_from_id,
@@ -65,6 +72,8 @@ class AlbumSettingsWidget(QWidget):
         self._translator = translator or Translator("en")
         self._loading_settings = False
 
+        self._template_pack_settings: dict[str, object] = {}
+
         self._cover_instances: dict[
             CoverPosition,
             PageInstance,
@@ -93,6 +102,7 @@ class AlbumSettingsWidget(QWidget):
         layout.addWidget(
             self._create_page_format_group()
         )
+
         layout.addWidget(self._create_covers_group())
         layout.addWidget(self._create_dividers_group())
         layout.addWidget(self._create_photo_pages_group())
@@ -507,6 +517,33 @@ class AlbumSettingsWidget(QWidget):
 
         return instance
 
+    def _open_msb_theme_dialog(
+        self,
+    ) -> bool:
+        current_theme = (
+            msb_theme_from_pack_settings(
+                self._template_pack_settings
+            )
+        )
+
+        dialog = MsbThemeDialog(
+            current_theme,
+            translator=self._translator,
+            parent=self,
+        )
+
+        if not dialog.exec():
+            return False
+
+        self._template_pack_settings = (
+            pack_settings_with_msb_theme(
+                self._template_pack_settings,
+                dialog.theme(),
+            )
+        )
+
+        return True
+
     def _configure_cover_instance(
         self,
         position: CoverPosition,
@@ -533,15 +570,34 @@ class AlbumSettingsWidget(QWidget):
                     self._page_format_combo.currentData()
                 )
             ),
+            template_pack_settings=(
+                self._template_pack_settings
+            ),
             parent=self,
         )
 
-        if dialog.exec():
-            self._cover_instances[
-                position
-            ] = dialog.instance()
+        result = dialog.exec()
 
-            self._emit_settings_changed()
+        if not result:
+            return
+
+        self._cover_instances[
+            position
+        ] = dialog.instance()
+
+        self._template_pack_settings = (
+            dialog.template_pack_settings()
+        )
+
+        if (
+            result
+            == PageInstanceDialog.THEME_REQUESTED
+        ):
+            if self._open_msb_theme_dialog():
+                self._emit_settings_changed()
+            return
+
+        self._emit_settings_changed()
 
 
     def _create_dividers_group(self) -> QGroupBox:
@@ -693,18 +749,35 @@ class AlbumSettingsWidget(QWidget):
                     self._page_format_combo.currentData()
                 )
             ),
+            template_pack_settings=(
+                self._template_pack_settings
+            ),
             parent=self,
         )
 
-        if not dialog.exec():
+        result = dialog.exec()
+
+        if not result:
             return
 
         instance = dialog.instance()
+
+        self._template_pack_settings = (
+            dialog.template_pack_settings()
+        )
 
         if kind == "month":
             self._month_divider_instance = instance
         else:
             self._year_divider_instance = instance
+
+        if (
+            result
+            == PageInstanceDialog.THEME_REQUESTED
+        ):
+            if self._open_msb_theme_dialog():
+                self._emit_settings_changed()
+            return
 
         self._emit_settings_changed()
 
@@ -1030,6 +1103,8 @@ class AlbumSettingsWidget(QWidget):
 
         self._loading_settings = True
 
+        self._template_pack_settings = {}
+
         try:
             self._front_matter_list.clear()
             self._back_matter_list.clear()
@@ -1146,6 +1221,9 @@ class AlbumSettingsWidget(QWidget):
             back_matter=self._special_pages(
                 self._back_matter_list
             ),
+            template_pack_settings=dict(
+                self._template_pack_settings
+            ),
         )
 
     def set_settings(
@@ -1153,6 +1231,10 @@ class AlbumSettingsWidget(QWidget):
         settings: AlbumStructureSettings,
     ) -> None:
         self._loading_settings = True
+
+        self._template_pack_settings = dict(
+            settings.template_pack_settings
+        )
 
         try:
             page_format_index = (
@@ -1421,13 +1503,22 @@ class AlbumSettingsWidget(QWidget):
                     self._page_format_combo.currentData()
                 )
             ),
+            template_pack_settings=(
+                self._template_pack_settings
+            ),
             parent=self,
         )
 
-        if not dialog.exec():
+        result = dialog.exec()
+
+        if not result:
             return
 
         updated = dialog.instance()
+
+        self._template_pack_settings = (
+            dialog.template_pack_settings()
+        )
 
         item.setData(
             Qt.ItemDataRole.UserRole,
@@ -1439,6 +1530,14 @@ class AlbumSettingsWidget(QWidget):
             item,
             updated,
         )
+
+        if (
+            result
+            == PageInstanceDialog.THEME_REQUESTED
+        ):
+            if self._open_msb_theme_dialog():
+                self._emit_settings_changed()
+            return
 
         self._emit_settings_changed()
 

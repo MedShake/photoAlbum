@@ -126,6 +126,10 @@ def album_settings_to_json(
             _instance_to_data(page)
             for page in settings.back_matter
         ],
+
+        "template_pack_settings": (
+            settings.template_pack_settings
+        ),
     }
 
     return json.dumps(
@@ -226,4 +230,11 @@ def album_settings_from_json(
             _instance_from_data(item)
             for item in data["back_matter"]
         ],
+
+        template_pack_settings=dict(
+            data.get(
+                "template_pack_settings",
+                {},
+            )
+        ),
     )

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from photoalbum.rendering.fonts import (
@@ -44,13 +45,13 @@ from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
 
-from photoalbum.gui.template_settings.base import (
-    PageTemplateSettingsWidget,
+from photoalbum.templates.msb.settings_base import (
+    MsbTemplateSettingsWidget,
 )
 
 
 class YearPhotoScatterSettingsWidget(
-    PageTemplateSettingsWidget
+    MsbTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
     PREVIEW_HEIGHT = 594
@@ -65,6 +66,7 @@ class YearPhotoScatterSettingsWidget(
         translator,
         render_service=None,
         page_format: PageFormat = A4,
+        template_pack_settings=None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -73,6 +75,7 @@ class YearPhotoScatterSettingsWidget(
             translator=translator,
             render_service=render_service,
             page_format=page_format,
+            template_pack_settings=template_pack_settings,
             parent=parent,
         )
 
@@ -155,8 +158,16 @@ class YearPhotoScatterSettingsWidget(
     def _create_content(
         self,
     ) -> None:
-        layout = QVBoxLayout(
-            self
+        root = QHBoxLayout(self)
+        root.setSpacing(28)
+
+        left = QWidget()
+        layout = QVBoxLayout(left)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        layout.addWidget(
+            self.create_page_settings_title()
         )
 
         self._proposal_label = QLabel()
@@ -319,12 +330,32 @@ class YearPhotoScatterSettingsWidget(
             "background: white;"
         )
 
+        layout.addSpacing(12)
         layout.addWidget(
-            self._preview_label,
-            alignment=(
-                Qt.AlignmentFlag.AlignCenter
-            ),
+            self.create_msb_theme_group()
         )
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+
+        right_layout.addWidget(
+            self.create_preview_title()
+        )
+
+        right_layout.addWidget(
+            self._preview_label,
+            alignment=Qt.AlignmentFlag.AlignTop,
+        )
+
+        root.addWidget(left, 1)
+        root.addWidget(right, 0)
+
+    def msb_theme_changed(
+        self,
+    ) -> None:
+        self._display_preview()
 
     def _save_state(
         self,

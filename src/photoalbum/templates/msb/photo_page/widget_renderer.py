@@ -43,7 +43,8 @@ class PhotoPageWidgetRenderer:
         thumbnail_cache=None,
         pixel_rect=None,
         show_empty_slots: bool = True,
-    ) -> None:
+            template_pack_settings=None,
+) -> None:
         if (
             composition is None
             or thumbnail_cache is None

@@ -15,10 +15,19 @@ from photoalbum.templates.msb.year_photo_scatter.settings import (
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 
+from photoalbum.template_engine import (
+    register_discovered_template_extensions,
+)
 
 def ensure_app():
-    if QApplication.instance() is None:
-        QApplication([])
+    application = QApplication.instance()
+
+    if application is None:
+        application = QApplication([])
+
+    register_discovered_template_extensions()
+
+    return application
 
 
 def make_photo():
@@ -64,7 +73,7 @@ def test_geographic_cloud_has_its_own_settings_editor():
     )
 
 
-def test_template_without_settings_returns_none():
+def test_blank_has_its_own_settings_editor():
     ensure_app()
 
     editor = create_template_settings_editor(
@@ -76,7 +85,15 @@ def test_template_without_settings_returns_none():
         translator=Translator("fr"),
     )
 
-    assert editor is None
+    assert editor is not None
+    assert type(editor).__name__ == (
+        "BlankSettingsWidget"
+    )
+    assert getattr(
+        editor,
+        "compact_dialog",
+        False,
+    ) is True
 
 
 def test_editor_preserves_instance_identity():

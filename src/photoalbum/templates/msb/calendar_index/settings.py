@@ -10,8 +10,10 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QVBoxLayout,
+    QWidget,
 )
 
 from photoalbum.album import (
@@ -26,14 +28,17 @@ from photoalbum.templates.msb.calendar_index.composition import (
 from photoalbum.templates.msb.calendar_index.painter import (
     paint_calendar_index,
 )
+from photoalbum.templates.msb.theme import (
+    msb_theme_from_pack_settings,
+)
 
-from photoalbum.gui.template_settings.base import (
-    PageTemplateSettingsWidget,
+from photoalbum.templates.msb.settings_base import (
+    MsbTemplateSettingsWidget,
 )
 
 
 class CalendarIndexSettingsWidget(
-    PageTemplateSettingsWidget
+    MsbTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
     PREVIEW_HEIGHT = 594
@@ -46,6 +51,7 @@ class CalendarIndexSettingsWidget(
         translator,
         render_service=None,
         page_format: PageFormat = A4,
+        template_pack_settings=None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -54,6 +60,7 @@ class CalendarIndexSettingsWidget(
             translator=translator,
             render_service=render_service,
             page_format=page_format,
+            template_pack_settings=template_pack_settings,
             parent=parent,
         )
 
@@ -64,8 +71,16 @@ class CalendarIndexSettingsWidget(
     def _create_content(
         self,
     ) -> None:
-        layout = QVBoxLayout(
-            self
+        root = QHBoxLayout(self)
+        root.setSpacing(28)
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(12)
+
+        left_layout.addWidget(
+            self.create_page_settings_title()
         )
 
         form = QFormLayout()
@@ -79,32 +94,46 @@ class CalendarIndexSettingsWidget(
             self._year_combo,
         )
 
-        layout.addLayout(
-            form
+        left_layout.addLayout(form)
+        left_layout.addSpacing(12)
+        left_layout.addWidget(
+            self.create_msb_theme_group()
+        )
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+
+        right_layout.addWidget(
+            self.create_preview_title()
         )
 
         self._preview_label = QLabel()
-
         self._preview_label.setFixedSize(
             self.PREVIEW_WIDTH,
             self.PREVIEW_HEIGHT,
         )
-
         self._preview_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
-
         self._preview_label.setStyleSheet(
             "border: 1px solid #888;"
             "background: white;"
         )
 
-        layout.addWidget(
+        right_layout.addWidget(
             self._preview_label,
-            alignment=(
-                Qt.AlignmentFlag.AlignCenter
-            ),
+            alignment=Qt.AlignmentFlag.AlignTop,
         )
+
+        root.addWidget(left, 1)
+        root.addWidget(right, 0)
+
+    def msb_theme_changed(
+        self,
+    ) -> None:
+        self._render_preview()
 
     def _load_state(
         self,
@@ -249,9 +278,14 @@ class CalendarIndexSettingsWidget(
         else:
             # In the settings dialog there is intentionally no
             # pagination context yet, so Page N is omitted.
+            theme = msb_theme_from_pack_settings(
+                self._template_pack_settings
+            )
+
             composition = compose_calendar_index(
                 self._photos,
                 year=year,
+                month_colors=theme.month_colors,
             )
 
             paint_calendar_index(

@@ -183,6 +183,7 @@ class AlbumCoverPreview(_PreviewPageBase):
         page_format: PageFormat,
         translator: Translator,
         render_service: PreviewRenderService,
+        template_pack_settings=None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(
@@ -198,6 +199,9 @@ class AlbumCoverPreview(_PreviewPageBase):
         self._thumbnail_cache = thumbnail_cache
         self._translator = translator
         self._render_service = render_service
+        self._template_pack_settings = dict(
+            template_pack_settings or {}
+        )
 
         self._shared_preview_key = None
 
@@ -241,6 +245,9 @@ class AlbumCoverPreview(_PreviewPageBase):
                 page_width_mm=self._page_format.width_mm,
                 page_height_mm=self._page_format.height_mm,
                 album_pages=self._result.pagination.pages,
+                template_pack_settings=(
+                    self._template_pack_settings
+                ),
             )
             return
 
@@ -399,6 +406,7 @@ class AlbumPagePreview(_PreviewPageBase):
         translator: Translator | None = None,
         project_photos=None,
         album_pages=None,
+        template_pack_settings=None,
         render_service=None,
         parent: QWidget | None = None,
     ) -> None:
@@ -424,6 +432,10 @@ class AlbumPagePreview(_PreviewPageBase):
 
         self._album_pages = tuple(
             album_pages or ()
+        )
+
+        self._template_pack_settings = dict(
+            template_pack_settings or {}
         )
 
         # Async state for instantiated special-page scatter.
@@ -479,6 +491,9 @@ class AlbumPagePreview(_PreviewPageBase):
                 ),
                 album_pages=(
                     self._album_pages
+                ),
+                template_pack_settings=(
+                    self._template_pack_settings
                 ),
                 render_service=(
                     self._render_service
@@ -846,6 +861,9 @@ class AlbumPreviewWidget(QWidget):
             page_format=page_format,
             translator=self._translator,
             render_service=self._render_service,
+            template_pack_settings=(
+                settings.template_pack_settings
+            ),
         )
 
     def _resize_page_widgets(
@@ -985,6 +1003,9 @@ class AlbumPreviewWidget(QWidget):
                 render_service=self._render_service,
                 project_photos=project_photos,
                 album_pages=result.pagination.pages,
+                template_pack_settings=(
+                    settings.template_pack_settings
+                ),
             )
 
             # Interior spread row:

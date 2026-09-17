@@ -15,8 +15,8 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.album import PageInstance
-from photoalbum.gui.template_settings.base import (
-    PageTemplateSettingsWidget,
+from photoalbum.templates.msb.settings_base import (
+    MsbTemplateSettingsWidget,
 )
 from photoalbum.rendering.fonts import (
     DEFAULT_SERIF_FONT,
@@ -26,7 +26,7 @@ from photoalbum.rendering.fonts import (
 
 
 class DedicationSettingsWidget(
-    PageTemplateSettingsWidget
+    MsbTemplateSettingsWidget
 ):
     DEFAULT_TEXT = ""
     DEFAULT_FRAME_COLOR = "#808080"
@@ -42,6 +42,7 @@ class DedicationSettingsWidget(
         translator,
         render_service=None,
         page_format=None,
+        template_pack_settings=None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -50,6 +51,7 @@ class DedicationSettingsWidget(
             translator=translator,
             render_service=render_service,
             page_format=page_format,
+            template_pack_settings=template_pack_settings,
             parent=parent,
         )
 
@@ -125,6 +127,11 @@ class DedicationSettingsWidget(
 
     def _create_content(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        layout.addWidget(
+            self.create_page_settings_title()
+        )
 
         layout.addWidget(
             QLabel(
@@ -234,6 +241,11 @@ class DedicationSettingsWidget(
         )
 
         layout.addLayout(form)
+
+        layout.addSpacing(12)
+        layout.addWidget(
+            self.create_msb_theme_group()
+        )
 
         self._update_frame_color_button()
 
