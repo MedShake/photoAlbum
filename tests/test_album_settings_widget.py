@@ -48,7 +48,7 @@ def test_default_month_dividers_are_enabled():
     )
 
 
-def test_year_divider_preference_is_preserved_for_one_year():
+def test_year_divider_is_available_for_one_year():
     widget = create_widget()
 
     widget.set_available_years({2025})
@@ -56,9 +56,9 @@ def test_year_divider_preference_is_preserved_for_one_year():
     settings = widget.settings()
 
     assert settings.year_dividers.enabled
-    assert not widget._year_dividers_checkbox.isEnabled()
+    assert widget._year_dividers_checkbox.isEnabled()
 
-def test_year_dividers_are_not_used_for_one_year():
+def test_year_dividers_are_used_for_one_year():
     widget = create_widget()
 
     widget.set_available_years({2025})
@@ -66,7 +66,7 @@ def test_year_dividers_are_not_used_for_one_year():
     settings = widget.settings()
 
     assert settings.year_dividers.enabled
-    assert not settings.should_use_year_dividers({2025})
+    assert settings.should_use_year_dividers({2025})
 
 def test_year_dividers_are_available_for_multiple_years():
     widget = create_widget()

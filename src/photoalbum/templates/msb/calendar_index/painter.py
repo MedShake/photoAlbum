@@ -110,9 +110,7 @@ def paint_calendar_index(
             Qt.AlignmentFlag.AlignRight
             | Qt.AlignmentFlag.AlignVCenter
         ),
-        translator.tr(
-            "calendar_index.title"
-        ),
+        str(composition.year),
     )
 
     margin = 10.0

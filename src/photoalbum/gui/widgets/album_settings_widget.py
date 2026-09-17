@@ -752,6 +752,11 @@ class AlbumSettingsWidget(QWidget):
             template_pack_settings=(
                 self._template_pack_settings
             ),
+            usage=(
+                "year_divider"
+                if kind == "year"
+                else "month_divider"
+            ),
             parent=self,
         )
 
@@ -1047,6 +1052,10 @@ class AlbumSettingsWidget(QWidget):
             self._photo_page_combo,
             DEFAULT_TEMPLATES.photo_page,
         )
+        self._set_combo_template(
+            self._year_divider_combo,
+            DEFAULT_TEMPLATES.year_divider,
+        )
 
         self._set_placement(
             self._month_placement_combo,
@@ -1061,9 +1070,7 @@ class AlbumSettingsWidget(QWidget):
         self,
         years: set[int],
     ) -> None:
-        self._year_dividers_available = (
-            len(years) > 1
-        )
+        self._year_dividers_available = bool(years)
 
         self._year_dividers_checkbox.setEnabled(
             self._year_dividers_available
@@ -1074,14 +1081,6 @@ class AlbumSettingsWidget(QWidget):
                 self._translator.tr(
                     "album.years_detected",
                     count=len(years),
-                )
-            )
-        elif years:
-            year = next(iter(years))
-            self._year_divider_hint.setText(
-                self._translator.tr(
-                    "album.year_unavailable",
-                    year=year,
                 )
             )
         else:

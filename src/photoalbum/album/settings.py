@@ -274,7 +274,7 @@ class AlbumStructureSettings:
         self,
         years: set[int],
     ) -> bool:
-        return len(years) > 1
+        return bool(years)
 
     def should_use_year_dividers(
         self,

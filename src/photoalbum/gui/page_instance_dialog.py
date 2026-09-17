@@ -41,6 +41,7 @@ class PageInstanceDialog(QDialog):
         render_service=None,
         page_format: PageFormat = A4,
         template_pack_settings=None,
+        usage: str | None = None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -57,6 +58,7 @@ class PageInstanceDialog(QDialog):
         self._template_pack_settings = dict(
             template_pack_settings or {}
         )
+        self._usage = usage
 
         self._editor = None
 
@@ -163,6 +165,7 @@ class PageInstanceDialog(QDialog):
                 template_pack_settings=(
                     self._template_pack_settings
                 ),
+                usage=self._usage,
                 parent=self,
             )
         )

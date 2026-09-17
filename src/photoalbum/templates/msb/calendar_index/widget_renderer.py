@@ -37,9 +37,12 @@ class CalendarIndexWidgetRenderer:
         thumbnail_cache=None,
         pixel_rect=None,
         template_pack_settings=None,
+        project_photos=None,
     ) -> None:
         photos = tuple(
-            photos
+            project_photos
+            if project_photos is not None
+            else photos
         )
 
         settings = instance.settings.get(
@@ -62,8 +65,15 @@ class CalendarIndexWidgetRenderer:
             }
         )
 
-        year = settings.get(
-            "year"
+        plan_year = None
+        if composition is not None:
+            page = getattr(composition, "page", None)
+            plan_year = getattr(page, "year", None)
+
+        year = (
+            plan_year
+            if plan_year in years
+            else settings.get("year")
         )
 
         if year not in years:

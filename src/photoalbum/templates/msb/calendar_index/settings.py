@@ -52,8 +52,11 @@ class CalendarIndexSettingsWidget(
         render_service=None,
         page_format: PageFormat = A4,
         template_pack_settings=None,
+        usage: str | None = None,
         parent=None,
     ) -> None:
+        self._usage = usage
+
         super().__init__(
             instance,
             photos,
@@ -162,6 +165,24 @@ class CalendarIndexSettingsWidget(
         )
 
         self._year_combo.clear()
+
+        if self._usage == "year_divider":
+            self._year_combo.addItem(
+                "Automatique",
+                None,
+            )
+            self._year_combo.setEnabled(False)
+
+            self._year_combo.blockSignals(
+                False
+            )
+
+            self._year_combo.currentIndexChanged.connect(
+                self._year_changed
+            )
+            return
+
+        self._year_combo.setEnabled(True)
 
         for year in years:
             self._year_combo.addItem(

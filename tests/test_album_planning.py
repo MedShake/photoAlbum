@@ -133,6 +133,7 @@ def test_month_divider_precedes_photo_group():
         item.kind
         for item in plan.items
     ] == [
+        PlanItemKind.YEAR_DIVIDER,
         PlanItemKind.MONTH_DIVIDER,
         PlanItemKind.PHOTO_GROUP,
     ]
@@ -153,7 +154,7 @@ def test_month_dividers_can_be_disabled():
     )
 
 
-def test_single_year_has_no_year_divider():
+def test_single_year_has_year_divider():
     plan = AlbumPlanner().plan(
         [
             photo("a.jpg", datetime(2025, 3, 1)),
@@ -162,10 +163,11 @@ def test_single_year_has_no_year_divider():
         settings(years=True),
     )
 
-    assert all(
-        item.kind != PlanItemKind.YEAR_DIVIDER
-        for item in plan.items
+    assert (
+        plan.items[0].kind
+        == PlanItemKind.YEAR_DIVIDER
     )
+    assert plan.items[0].year == 2025
 
 
 def test_multiple_years_have_year_dividers():

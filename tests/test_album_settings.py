@@ -55,12 +55,12 @@ def test_month_divider_has_one_global_template():
     )
 
 
-def test_year_dividers_unavailable_for_single_year():
+def test_year_dividers_available_for_single_year():
     settings = create_settings()
 
     assert (
         settings.year_dividers_available({2025})
-        is False
+        is True
     )
 
 
@@ -75,14 +75,14 @@ def test_year_dividers_available_for_multiple_years():
     )
 
 
-def test_enabled_year_dividers_are_not_used_for_single_year():
+def test_enabled_year_dividers_are_used_for_single_year():
     settings = create_settings(
         year_dividers_enabled=True,
     )
 
     assert (
         settings.should_use_year_dividers({2025})
-        is False
+        is True
     )
 
 

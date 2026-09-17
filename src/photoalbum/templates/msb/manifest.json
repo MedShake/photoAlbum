@@ -67,7 +67,8 @@
       "module": "calendar_index",
       "kinds": [
         "cover",
-        "special_page"
+        "special_page",
+        "year_divider"
       ],
       "cover_positions": [
         "front",
@@ -203,7 +204,8 @@
       "name": "Dedication",
       "module": "dedication",
       "kinds": [
-        "special_page"
+        "special_page",
+        "cover"
       ],
       "targets": [
         {
@@ -214,6 +216,9 @@
           "format": "us-letter",
           "orientation": "portrait"
         }
+      ],
+      "cover_positions": [
+        "inside_back"
       ]
     },
     {

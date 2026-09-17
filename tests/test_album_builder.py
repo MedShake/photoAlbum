@@ -139,7 +139,7 @@ def test_builder_creates_complete_album_result():
     assert result.pagination.pages
 
 
-def test_builder_keeps_single_year_without_year_divider():
+def test_builder_adds_year_divider_for_single_year():
     photos = [
         make_photo(
             "march.jpg",
@@ -162,10 +162,14 @@ def test_builder_keeps_single_year_without_year_divider():
         make_settings(),
     )
 
-    assert all(
-        item.kind != PlanItemKind.YEAR_DIVIDER
+    year_dividers = [
+        item
         for item in result.plan.items
-    )
+        if item.kind == PlanItemKind.YEAR_DIVIDER
+    ]
+
+    assert len(year_dividers) == 1
+    assert year_dividers[0].year == 2025
 
 
 def test_builder_uses_year_dividers_for_multiple_years():

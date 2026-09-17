@@ -62,6 +62,7 @@ def test_builtin_registry_contains_dividers():
         template.template_id
         for template in year_templates
     } == {
+        "calendar-index",
         "year-divider-classic",
     }
 
@@ -94,6 +95,9 @@ def test_calendar_index_is_reusable():
     assert template.supports(
         TemplateKind.SPECIAL_PAGE
     )
+    assert template.supports(
+        TemplateKind.YEAR_DIVIDER
+    )
 
 
 def test_dedication_is_special_page_only():
@@ -106,7 +110,7 @@ def test_dedication_is_special_page_only():
     assert template.supports(
         TemplateKind.SPECIAL_PAGE
     )
-    assert not template.supports(
+    assert template.supports(
         TemplateKind.COVER
     )
 

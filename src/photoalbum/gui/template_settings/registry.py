@@ -24,6 +24,7 @@ def create_template_settings_editor(
     render_service=None,
     page_format: PageFormat = A4,
     template_pack_settings=None,
+    usage: str | None = None,
     parent: QWidget | None = None,
 ) -> PageTemplateSettingsWidget | None:
     editor_type = (
@@ -48,13 +49,17 @@ def create_template_settings_editor(
     # unaware of it.
     from inspect import signature
 
-    if (
-        "template_pack_settings"
-        in signature(editor_type.__init__).parameters
-    ):
+    parameters = signature(
+        editor_type.__init__
+    ).parameters
+
+    if "template_pack_settings" in parameters:
         kwargs["template_pack_settings"] = (
             template_pack_settings
         )
+
+    if "usage" in parameters:
+        kwargs["usage"] = usage
 
     return editor_type(
         instance,

@@ -99,6 +99,7 @@ class PageRenderer:
                 render_service=render_service,
                 set_waiting_key=set_waiting_key,
                 show_empty_slots=show_empty_slots,
+                project_photos=project_photos,
             )
 
         if not rendered and paint_fallback is not None:
@@ -198,6 +199,7 @@ class PageRenderer:
         render_service,
         set_waiting_key,
         show_empty_slots,
+        project_photos=None,
     ) -> bool:
         page = composition.page
 
@@ -233,12 +235,20 @@ class PageRenderer:
             pixel_rect=pixel_rect,
         )
 
-        if (
-            "template_pack_settings"
-            in signature(renderer.paint).parameters
-        ):
+        parameters = signature(
+            renderer.paint
+        ).parameters
+
+        if "template_pack_settings" in parameters:
             paint_kwargs["template_pack_settings"] = (
                 template_pack_settings or {}
+            )
+
+        if "project_photos" in parameters:
+            paint_kwargs["project_photos"] = (
+                project_photos
+                if project_photos is not None
+                else page.photos
             )
 
         # Empty slots only concern photo-page renderers.
