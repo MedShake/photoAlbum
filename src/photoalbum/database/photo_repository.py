@@ -331,6 +331,7 @@ class PhotoRepository:
                 place_name = NULL,
                 city = NULL,
                 address = NULL,
+                raw_location_data = NULL,
                 location_source = ?
             WHERE path = ?
             """,
@@ -366,6 +367,7 @@ class PhotoRepository:
                 place_name = NULL,
                 city = NULL,
                 address = NULL,
+                raw_location_data = NULL,
                 location_source = ?
             WHERE path = ?
             """,

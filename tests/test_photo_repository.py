@@ -1,6 +1,9 @@
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
+from photoalbum.album.composition import photo_location_text
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import (
     DateSource,
@@ -17,6 +20,71 @@ def create_repository(tmp_path: Path) -> tuple[ProjectDatabase, PhotoRepository]
     repository = PhotoRepository(database)
 
     return database, repository
+
+
+@pytest.mark.parametrize("restore", [False, True], ids=["manual", "restore"])
+@pytest.mark.parametrize("editorial", [False, True], ids=["automatic", "editorial"])
+def test_gps_change_clears_geocoding_and_preserves_editorial_data(
+    tmp_path: Path, restore: bool, editorial: bool,
+):
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+    components = (LocationComponent(key="city", value="My chosen place"),)
+    photo = Photo(
+        path=path,
+        filename=path.name,
+        latitude=48.0,
+        longitude=2.0,
+        original_latitude=46.0,
+        original_longitude=3.0,
+        place_name="Old place",
+        city="Old city",
+        address="Old address",
+        raw_location_data={"address": {"city": "Old city"}},
+        location_source=LocationSource.GEOCODING,
+        caption="My caption",
+        selected_location_components=components if editorial else (),
+        location_text="My chosen place" if editorial else None,
+        location_selection_edited=editorial,
+    )
+    repository.save(photo)
+    if restore:
+        repository.restore_original_gps(path)
+    else:
+        repository.set_manual_gps(path, 45.0, 4.0)
+    database.close()
+
+    # Reopen before any reverse-geocoding response: an unsuccessful lookup
+    # must leave no old automatic location, including in persisted data.
+    database = ProjectDatabase(tmp_path / "test.sqlite3")
+    repository = PhotoRepository(database)
+    try:
+        loaded = repository.find_by_path(path)
+        assert loaded is not None
+        assert (loaded.latitude, loaded.longitude) == (
+            (46.0, 3.0) if restore else (45.0, 4.0)
+        )
+        assert loaded.original_latitude == 46.0
+        assert loaded.original_longitude == 3.0
+        assert loaded.place_name is None
+        assert loaded.city is None
+        assert loaded.address is None
+        assert loaded.raw_location_data is None
+        assert loaded.caption == photo.caption
+        assert loaded.selected_location_components == photo.selected_location_components
+        assert loaded.location_text == photo.location_text
+        assert loaded.location_selection_edited == editorial
+        assert photo_location_text(loaded) == ("My chosen place" if editorial else None)
+
+        repository.set_geocoded_location(
+            path, place_name="New place", city="New city", address="New address",
+            raw_location_data={"address": {"city": "New city"}},
+        )
+        loaded = repository.find_by_path(path)
+        assert loaded.raw_location_data == {"address": {"city": "New city"}}
+        assert photo_location_text(loaded) == ("My chosen place" if editorial else "New city")
+    finally:
+        database.close()
 
 
 def test_save_and_load_photo(tmp_path: Path):
