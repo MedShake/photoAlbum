@@ -492,10 +492,17 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.page_multiple_warning_title": (
             "Print page count"
         ),
-        "render.page_multiple_warning": (
+        "render.page_multiple_warning_one": (
             "The selected export contains {count} pages. "
             "This is not a multiple of {multiple}.\n\n"
-            "{pages_to_add} additional page(s) would be needed "
+            "1 additional page would be needed "
+            "to meet the selected print constraint.\n\n"
+            "Do you want to generate the PDF anyway?"
+        ),
+        "render.page_multiple_warning_many": (
+            "The selected export contains {count} pages. "
+            "This is not a multiple of {multiple}.\n\n"
+            "{pages_to_add} additional pages would be needed "
             "to meet the selected print constraint.\n\n"
             "Do you want to generate the PDF anyway?"
         ),
@@ -524,13 +531,22 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.missing_photos_title": (
             "Missing files"
         ),
-        "main.missing_photos_warning": (
-            "{count} file(s) belonging to this project "
+        "main.missing_photos_warning_one": (
+            "1 file belonging to this project "
+            "is no longer present in the source folder. "
+            "See the analysis log for details."
+        ),
+        "main.missing_photos_warning_many": (
+            "{count} files belonging to this project "
             "are no longer present in the source folder. "
             "See the analysis log for details."
         ),
-        "main.missing_photos_log_header": (
-            "⚠ {count} project file(s) are missing "
+        "main.missing_photos_log_header_one": (
+            "⚠ 1 project file is missing "
+            "from the source folder:"
+        ),
+        "main.missing_photos_log_header_many": (
+            "⚠ {count} project files are missing "
             "from the source folder:"
         ),
         "main.missing_photo_log": (
@@ -1225,10 +1241,17 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.page_multiple_warning_title": (
             "Nombre de pages pour l’impression"
         ),
-        "render.page_multiple_warning": (
+        "render.page_multiple_warning_one": (
             "L’export sélectionné contient {count} pages. "
             "Ce nombre n’est pas un multiple de {multiple}.\n\n"
-            "Il faudrait ajouter {pages_to_add} page(s) pour "
+            "Il faudrait ajouter 1 page pour "
+            "respecter la contrainte d’impression choisie.\n\n"
+            "Voulez-vous tout de même générer le PDF ?"
+        ),
+        "render.page_multiple_warning_many": (
+            "L’export sélectionné contient {count} pages. "
+            "Ce nombre n’est pas un multiple de {multiple}.\n\n"
+            "Il faudrait ajouter {pages_to_add} pages pour "
             "respecter la contrainte d’impression choisie.\n\n"
             "Voulez-vous tout de même générer le PDF ?"
         ),
@@ -1257,14 +1280,24 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.missing_photos_title": (
             "Fichiers manquants"
         ),
-        "main.missing_photos_warning": (
-            "{count} fichier(s) appartenant à ce projet "
+        "main.missing_photos_warning_one": (
+            "1 fichier appartenant à ce projet "
+            "n’est plus présent dans le dossier source. "
+            "Consultez le journal d’analyse pour connaître "
+            "le fichier concerné."
+        ),
+        "main.missing_photos_warning_many": (
+            "{count} fichiers appartenant à ce projet "
             "ne sont plus présents dans le dossier source. "
             "Consultez le journal d’analyse pour connaître "
             "les fichiers concernés."
         ),
-        "main.missing_photos_log_header": (
-            "⚠ {count} fichier(s) du projet sont manquants "
+        "main.missing_photos_log_header_one": (
+            "⚠ 1 fichier du projet est manquant "
+            "dans le dossier source :"
+        ),
+        "main.missing_photos_log_header_many": (
+            "⚠ {count} fichiers du projet sont manquants "
             "dans le dossier source :"
         ),
         "main.missing_photo_log": (

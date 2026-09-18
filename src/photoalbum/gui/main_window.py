@@ -1246,7 +1246,11 @@ class MainWindow(QMainWindow):
                     "render.page_multiple_warning_title"
                 ),
                 self._translator.tr(
-                    "render.page_multiple_warning",
+                    (
+                        "render.page_multiple_warning_one"
+                        if pages_to_add == 1
+                        else "render.page_multiple_warning_many"
+                    ),
                     count=total_pages,
                     multiple=page_multiple,
                     pages_to_add=pages_to_add,
@@ -2041,7 +2045,11 @@ class MainWindow(QMainWindow):
 
             self._log_view.appendPlainText(
                 self._translator.tr(
-                    "main.missing_photos_log_header",
+                    (
+                        "main.missing_photos_log_header_one"
+                        if len(result.missing_photos) == 1
+                        else "main.missing_photos_log_header_many"
+                    ),
                     count=len(
                         result.missing_photos
                     ),
@@ -2062,7 +2070,11 @@ class MainWindow(QMainWindow):
                     "main.missing_photos_title"
                 ),
                 self._translator.tr(
-                    "main.missing_photos_warning",
+                    (
+                        "main.missing_photos_warning_one"
+                        if len(result.missing_photos) == 1
+                        else "main.missing_photos_warning_many"
+                    ),
                     count=len(
                         result.missing_photos
                     ),
