@@ -158,13 +158,6 @@ class AlbumSettingsWidget(QWidget):
         self._year_dividers_checkbox.toggled.connect(
             self._emit_settings_changed
         )
-
-        self._caption_datetime_checkbox.toggled.connect(
-            self._emit_settings_changed
-        )
-        self._caption_location_checkbox.toggled.connect(
-            self._emit_settings_changed
-        )
         self._page_numbers_checkbox.toggled.connect(
             self._emit_settings_changed
         )
@@ -831,22 +824,6 @@ class AlbumSettingsWidget(QWidget):
             template_container,
         )
 
-        self._caption_datetime_checkbox = QCheckBox(
-            self._translator.tr("album.caption_datetime")
-        )
-        self._caption_location_checkbox = QCheckBox(
-            self._translator.tr("album.caption_location")
-        )
-
-        form.addRow(
-            "",
-            self._caption_datetime_checkbox,
-        )
-        form.addRow(
-            "",
-            self._caption_location_checkbox,
-        )
-
         return group
 
     def _photo_instance(
@@ -861,6 +838,7 @@ class AlbumSettingsWidget(QWidget):
             or self._photo_page_instance.template_id
             != template_id
         ):
+            self._photo_caption_legacy = PhotoCaptionSettings()
             self._photo_page_instance = PageInstance(
                 template_id=template_id
             )
@@ -1123,8 +1101,6 @@ class AlbumSettingsWidget(QWidget):
 
     def _apply_defaults(self) -> None:
 
-        self._caption_datetime_checkbox.setChecked(True)
-        self._caption_location_checkbox.setChecked(True)
         self._page_numbers_checkbox.setChecked(True)
         self._page_multiple_4_checkbox.setChecked(False)
 
@@ -1298,13 +1274,32 @@ class AlbumSettingsWidget(QWidget):
             ),
             photo_pages=PhotoPageSettings(
                 page=self._photo_instance(),
-                caption=PhotoCaptionSettings(
-                    show_datetime=(
-                        self._caption_datetime_checkbox.isChecked()
-                    ),
-                    show_location=(
-                        self._caption_location_checkbox.isChecked()
-                    ),
+                caption=(
+                    PhotoCaptionSettings(
+                        show_datetime=bool(
+                            self._photo_instance().settings[
+                                "photo_caption"
+                            ].get(
+                                "show_datetime",
+                                True,
+                            )
+                        ),
+                        show_location=bool(
+                            self._photo_instance().settings[
+                                "photo_caption"
+                            ].get(
+                                "show_location",
+                                True,
+                            )
+                        ),
+                    )
+                    if isinstance(
+                        self._photo_instance().settings.get(
+                            "photo_caption"
+                        ),
+                        dict,
+                    )
+                    else self._photo_caption_legacy
                 ),
             ),
             page_numbers=PageNumberSettings(
@@ -1437,12 +1432,8 @@ class AlbumSettingsWidget(QWidget):
             self._photo_page_instance = (
                 settings.photo_pages.page
             )
-
-            self._caption_datetime_checkbox.setChecked(
-                settings.photo_pages.caption.show_datetime
-            )
-            self._caption_location_checkbox.setChecked(
-                settings.photo_pages.caption.show_location
+            self._photo_caption_legacy = (
+                settings.photo_pages.caption
             )
             self._page_numbers_checkbox.setChecked(
                 settings.page_numbers.enabled

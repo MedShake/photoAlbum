@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
+    QColor,
     QFont,
     QPainter,
     QPen,
@@ -10,7 +11,12 @@ from PySide6.QtGui import (
 from photoalbum.i18n.date_formatter import (
     format_datetime,
 )
-from photoalbum.rendering.fonts import resolve_font_family
+from photoalbum.templates.msb.photo_page.caption_style import (
+    caption_color,
+    caption_font_family,
+    caption_font_size,
+    caption_lines,
+)
 
 
 class PhotoPageWidgetRenderer:
@@ -80,6 +86,7 @@ class PhotoPageWidgetRenderer:
             self._paint_caption(
                 painter,
                 slot,
+                instance=instance,
                 font_pixel_size=font_pixel_size,
                 pixel_rect=pixel_rect,
             )
@@ -179,6 +186,7 @@ class PhotoPageWidgetRenderer:
         painter,
         slot,
         *,
+        instance,
         font_pixel_size,
         pixel_rect,
     ) -> None:
@@ -192,55 +200,50 @@ class PhotoPageWidgetRenderer:
             slot.caption_rect
         )
 
-        lines: list[str] = []
-
-        first_line_parts: list[str] = []
-
-        if slot.caption.caption_text:
-            first_line_parts.append(
-                slot.caption.caption_text
+        datetime_text = (
+            format_datetime(
+                slot.caption.capture_datetime
             )
-
-        if (
-            slot.caption.capture_datetime
+            if slot.caption.capture_datetime
             is not None
-        ):
-            first_line_parts.append(
-                format_datetime(
-                    slot.caption.capture_datetime
-                )
-            )
+            else None
+        )
 
-        if first_line_parts:
-            lines.append(
-                " — ".join(first_line_parts)
-            )
+        settings = (
+            instance.settings
+            if instance is not None
+            else {}
+        )
 
-        if slot.caption.location_text:
-            lines.append(
-                slot.caption.location_text
-            )
+        lines = caption_lines(
+            caption_text=slot.caption.caption_text,
+            capture_datetime_text=datetime_text,
+            location_text=slot.caption.location_text,
+            settings=settings,
+        )
+
+        if not lines:
+            return
 
         font = QFont(
-            resolve_font_family(None)
+            caption_font_family(
+                settings
+            )
         )
-
-        font.setBold(
-            False
-        )
-
+        font.setBold(False)
         font.setPixelSize(
             font_pixel_size(
-                8
+                caption_font_size(
+                    settings
+                )
             )
         )
 
-        painter.setFont(
-            font
-        )
-
+        painter.setFont(font)
         painter.setPen(
-            Qt.GlobalColor.black
+            caption_color(
+                settings
+            )
         )
 
         painter.drawText(
@@ -250,7 +253,5 @@ class PhotoPageWidgetRenderer:
                 | Qt.AlignmentFlag.AlignTop
                 | Qt.TextFlag.TextWordWrap
             ),
-            "\n".join(
-                lines
-            ),
+            "\n".join(lines),
         )

@@ -166,6 +166,7 @@ class AlbumPlanner:
                 year=year,
                 month=month,
                 photos=tuple(photos),
+                page_instance=settings.photo_pages.page,
             )
         )
 

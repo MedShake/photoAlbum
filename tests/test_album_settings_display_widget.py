@@ -61,8 +61,6 @@ def test_display_options_can_be_restored():
 def test_reset_restores_display_defaults():
     widget = create_widget()
 
-    widget._caption_datetime_checkbox.setChecked(False)
-    widget._caption_location_checkbox.setChecked(False)
     widget._page_numbers_checkbox.setChecked(False)
 
     widget.reset_to_defaults()

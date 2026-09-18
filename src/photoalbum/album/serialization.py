@@ -139,6 +139,36 @@ def album_settings_to_json(
     )
 
 
+
+def _photo_page_settings_from_data(
+    photo_data: dict,
+    caption_data: dict,
+) -> PhotoPageSettings:
+    if isinstance(photo_data.get("page"), dict):
+        page = _instance_from_data(photo_data["page"])
+    else:
+        page = PageInstance(
+            template_id=str(photo_data["template_id"])
+        )
+
+    return PhotoPageSettings(
+        page=page,
+        caption=PhotoCaptionSettings(
+            show_datetime=bool(
+                caption_data.get(
+                    "show_datetime",
+                    True,
+                )
+            ),
+            show_location=bool(
+                caption_data.get(
+                    "show_location",
+                    True,
+                )
+            ),
+        ),
+    )
+
 def album_settings_from_json(
     value: str,
 ) -> AlbumStructureSettings:
@@ -157,7 +187,7 @@ def album_settings_from_json(
     month_data = data["month_dividers"]
     year_data = data["year_dividers"]
     photo_data = data["photo_pages"]
-    caption_data = photo_data["caption"]
+    caption_data = photo_data.get("caption", {})
     page_number_data = data["page_numbers"]
     print_data = data["print_settings"]
 
@@ -188,29 +218,9 @@ def album_settings_from_json(
             ),
         ),
 
-        photo_pages=PhotoPageSettings(
-            page=(
-                _instance_from_data(
-                    photo_data["page"]
-                )
-                if isinstance(
-                    photo_data.get("page"),
-                    dict,
-                )
-                else PageInstance(
-                    template_id=str(
-                        photo_data["template_id"]
-                    )
-                )
-            ),
-            caption=PhotoCaptionSettings(
-                show_datetime=bool(
-                    caption_data["show_datetime"]
-                ),
-                show_location=bool(
-                    caption_data["show_location"]
-                ),
-            ),
+        photo_pages=_photo_page_settings_from_data(
+            photo_data,
+            caption_data,
         ),
 
         page_numbers=PageNumberSettings(

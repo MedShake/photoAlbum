@@ -216,6 +216,7 @@ class PaginationEngine:
                     month=item.month,
                     photos=photos,
                     photo_capacity=capacity,
+                    page_instance=item.page_instance,
                 )
             )
 

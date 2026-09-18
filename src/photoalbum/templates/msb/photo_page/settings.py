@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
+    QColor,
     QFont,
     QPainter,
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -17,20 +29,27 @@ from photoalbum.album import (
     A4,
     PageFormat,
     PageInstance,
-    PhotoCaptionSettings,
-    PhotoPageSettings,
 )
-from photoalbum.album.composition import (
-    build_photo_caption,
-)
-from photoalbum.i18n.date_formatter import (
-    format_datetime,
-)
+from photoalbum.i18n.date_formatter import format_datetime
 from photoalbum.rendering.fonts import (
-    resolve_font_family,
+    available_photo_album_fonts,
 )
 from photoalbum.templates.msb.settings_base import (
     MsbTemplateSettingsWidget,
+)
+
+from .caption_style import (
+    DEFAULT_CAPTION_COLOR,
+    DEFAULT_CAPTION_FONT_SIZE,
+    DEFAULT_CAPTION_ORDER,
+    caption_color_name,
+    caption_font_family,
+    caption_font_size,
+    caption_lines,
+    caption_order,
+    caption_show_datetime,
+    caption_show_location,
+    caption_show_user,
 )
 
 
@@ -41,6 +60,13 @@ class PhotoPageSettingsWidget(
 
     PREVIEW_WIDTH = 360
     PREVIEW_HEIGHT = 510
+
+    _ORDER_LABELS = {
+        "caption": "Légende utilisateur",
+        "datetime": "Date et heure",
+        "break": "─────── saut de ligne ───────",
+        "location": "Lieu",
+    }
 
     def __init__(
         self,
@@ -63,6 +89,18 @@ class PhotoPageSettingsWidget(
             parent=parent,
         )
 
+        self._loading = True
+        self._caption_color = caption_color_name(
+            self._instance.settings
+        )
+
+        self._create_content()
+        self._load_state()
+
+        self._loading = False
+        self._render_preview()
+
+    def _create_content(self) -> None:
         root = QHBoxLayout(self)
         root.setSpacing(24)
 
@@ -74,9 +112,72 @@ class PhotoPageSettingsWidget(
         left_layout.addWidget(
             self.create_page_settings_title()
         )
-        left_layout.addWidget(
-            self.create_no_page_settings_label()
+
+        caption_group = QGroupBox("Légendes")
+        caption_layout = QVBoxLayout(caption_group)
+
+        self._show_caption = QCheckBox(
+            "Afficher la légende utilisateur"
         )
+        self._show_datetime = QCheckBox(
+            "Afficher la date et l'heure"
+        )
+        self._show_location = QCheckBox(
+            "Afficher le lieu"
+        )
+
+        caption_layout.addWidget(self._show_caption)
+        caption_layout.addWidget(self._show_datetime)
+        caption_layout.addWidget(self._show_location)
+
+        style_form = QFormLayout()
+
+        self._font = QComboBox()
+        for family in available_photo_album_fonts():
+            self._font.addItem(family, family)
+
+        self._size = QDoubleSpinBox()
+        self._size.setRange(1.0, 300.0)
+        self._size.setDecimals(1)
+        self._size.setSingleStep(0.5)
+        self._size.setSuffix(" pt")
+
+        self._color_button = QPushButton()
+        self._color_button.clicked.connect(
+            self._choose_color
+        )
+
+        style_form.addRow("Police", self._font)
+        style_form.addRow("Taille", self._size)
+        style_form.addRow("Couleur", self._color_button)
+
+        caption_layout.addLayout(style_form)
+
+        caption_layout.addWidget(QLabel("Disposition"))
+
+        self._order_list = QListWidget()
+        self._order_list.setMaximumHeight(120)
+        caption_layout.addWidget(self._order_list)
+
+        move_controls = QHBoxLayout()
+
+        self._up = QPushButton("↑")
+        self._down = QPushButton("↓")
+
+        self._up.clicked.connect(
+            lambda checked=False: self._move_order(-1)
+        )
+        self._down.clicked.connect(
+            lambda checked=False: self._move_order(1)
+        )
+
+        move_controls.addWidget(self._up)
+        move_controls.addWidget(self._down)
+        move_controls.addStretch()
+
+        caption_layout.addLayout(move_controls)
+        left_layout.addWidget(caption_group)
+
         left_layout.addSpacing(12)
         left_layout.addWidget(
             self.create_msb_theme_group()
@@ -111,24 +212,181 @@ class PhotoPageSettingsWidget(
         root.addWidget(left, 1)
         root.addWidget(right, 0)
 
+        self._show_caption.toggled.connect(
+            self._changed
+        )
+        self._show_datetime.toggled.connect(
+            self._changed
+        )
+        self._show_location.toggled.connect(
+            self._changed
+        )
+        self._font.currentIndexChanged.connect(
+            self._changed
+        )
+        self._size.valueChanged.connect(
+            self._changed
+        )
+
+    def _load_state(self) -> None:
+        settings = self._instance.settings
+
+        self._show_caption.setChecked(
+            caption_show_user(settings)
+        )
+        self._show_datetime.setChecked(
+            caption_show_datetime(settings)
+        )
+        self._show_location.setChecked(
+            caption_show_location(settings)
+        )
+
+        family = caption_font_family(settings)
+        index = self._font.findData(family)
+        if index >= 0:
+            self._font.setCurrentIndex(index)
+
+        self._size.setValue(
+            caption_font_size(settings)
+        )
+
+        self._order_list.clear()
+        for value in caption_order(settings):
+            item = QListWidgetItem(
+                self._ORDER_LABELS[value]
+            )
+            item.setData(
+                Qt.ItemDataRole.UserRole,
+                value,
+            )
+            self._order_list.addItem(item)
+
+        self._update_color_button()
+
+    def _current_order(self) -> list[str]:
+        return [
+            str(
+                self._order_list.item(index).data(
+                    Qt.ItemDataRole.UserRole
+                )
+            )
+            for index in range(
+                self._order_list.count()
+            )
+        ]
+
+    def _move_order(self, delta: int) -> None:
+        row = self._order_list.currentRow()
+        target = row + delta
+
+        if (
+            row < 0
+            or target < 0
+            or target >= self._order_list.count()
+        ):
+            return
+
+        item = self._order_list.takeItem(row)
+        self._order_list.insertItem(target, item)
+        self._order_list.setCurrentRow(target)
+
+        self._changed()
+
+    def _choose_color(self) -> None:
+        color = QColorDialog.getColor(
+            QColor(self._caption_color),
+            self,
+            "Couleur des légendes",
+        )
+
+        if not color.isValid():
+            return
+
+        self._caption_color = color.name()
+        self._update_color_button()
+        self._changed()
+
+    def _update_color_button(self) -> None:
+        self._color_button.setText(
+            self._caption_color.upper()
+        )
+        self._color_button.setStyleSheet(
+            "QPushButton {"
+            f"background-color: {self._caption_color};"
+            "}"
+        )
+
+    def _changed(self, *args) -> None:
+        if self._loading:
+            return
+
+        settings = dict(self._instance.settings)
+
+        settings["photo_caption"] = {
+            "show_caption": self._show_caption.isChecked(),
+            "show_datetime": self._show_datetime.isChecked(),
+            "show_location": self._show_location.isChecked(),
+            "font_family": (
+                self._font.currentData()
+                or caption_font_family(settings)
+            ),
+            "font_size": self._size.value(),
+            "color": self._caption_color,
+            "order": self._current_order(),
+        }
+
+        self._instance = replace(
+            self._instance,
+            settings=settings,
+        )
+
+        self.instance_changed.emit()
         self._render_preview()
 
     def msb_theme_changed(self) -> None:
         self._render_preview()
 
+    def _preview_text(self, photo) -> str:
+        caption_text = getattr(
+            photo,
+            "caption",
+            None,
+        )
+
+        capture_datetime = getattr(
+            photo,
+            "capture_datetime",
+            None,
+        )
+        datetime_text = (
+            format_datetime(capture_datetime)
+            if capture_datetime is not None
+            else None
+        )
+
+        location_text = getattr(
+            photo,
+            "location_text",
+            None,
+        )
+
+        if not location_text:
+            location_text = getattr(
+                photo,
+                "city",
+                None,
+            )
+
+        lines = caption_lines(
+            caption_text=caption_text,
+            capture_datetime_text=datetime_text,
+            location_text=location_text,
+            settings=self._instance.settings,
+        )
+
+        return "\n".join(lines)
+
     def _render_preview(self) -> None:
-        """
-        Lightweight representative preview.
-
-        The production PhotoPageWidgetRenderer deliberately
-        requires a real PageComposition, thumbnail cache and
-        pixel_rect. A settings editor has none of those, so it
-        must not invent them.
-
-        This preview therefore shows the selected template's
-        number of photo zones and, when project photos are
-        available, uses their actual image files.
-        """
         pixmap = QPixmap(
             self.PREVIEW_WIDTH,
             self.PREVIEW_HEIGHT,
@@ -151,7 +409,6 @@ class PhotoPageSettingsWidget(
 
         margin = 24
         gap = 12
-
         usable_width = (
             self.PREVIEW_WIDTH - 2 * margin
         )
@@ -176,9 +433,6 @@ class PhotoPageSettingsWidget(
             - gap * (rows - 1)
         ) // rows
 
-        # Même logique visuelle que les vraies pages :
-        # une petite zone sous chaque photo est réservée
-        # à la légende.
         caption_height = max(
             34,
             min(52, cell_height // 5),
@@ -205,7 +459,6 @@ class PhotoPageSettingsWidget(
                 cell_width,
                 image_height,
             )
-
             caption_rect = pixmap.rect().__class__(
                 x,
                 y + image_height,
@@ -216,22 +469,19 @@ class PhotoPageSettingsWidget(
             drawn = False
 
             if index < len(self._photos):
-                path = getattr(
+                source = getattr(
                     self._photos[index],
                     "path",
                     None,
                 )
-
-                if path is not None:
-                    photo = QPixmap(str(path))
-
-                    if not photo.isNull():
-                        scaled = photo.scaled(
+                if source is not None:
+                    photo_pixmap = QPixmap(str(source))
+                    if not photo_pixmap.isNull():
+                        scaled = photo_pixmap.scaled(
                             image_rect.size(),
                             Qt.AspectRatioMode.KeepAspectRatio,
                             Qt.TransformationMode.SmoothTransformation,
                         )
-
                         px = (
                             image_rect.x()
                             + (
@@ -246,7 +496,6 @@ class PhotoPageSettingsWidget(
                                 - scaled.height()
                             ) // 2
                         )
-
                         painter.drawPixmap(
                             px,
                             py,
@@ -265,86 +514,59 @@ class PhotoPageSettingsWidget(
                     str(index + 1),
                 )
 
-            if index < len(self._photos):
-                caption = build_photo_caption(
-                    self._photos[index],
-                    PhotoPageSettings(
-                        page=self._instance,
-                        caption=PhotoCaptionSettings(
-                            show_datetime=True,
-                            show_location=True,
-                        ),
+            if index >= len(self._photos):
+                continue
+
+            text = self._preview_text(
+                self._photos[index]
+            )
+            if not text:
+                continue
+
+            font = QFont(
+                caption_font_family(
+                    self._instance.settings
+                )
+            )
+            font.setBold(False)
+
+            size = caption_font_size(
+                self._instance.settings
+            )
+            font.setPixelSize(
+                max(
+                    1,
+                    round(
+                        size
+                        * self.PREVIEW_HEIGHT
+                        / 510
                     ),
                 )
+            )
 
-                lines: list[str] = []
-                first_line_parts: list[str] = []
-
-                if caption.caption_text:
-                    first_line_parts.append(
-                        caption.caption_text
+            painter.setFont(font)
+            painter.setPen(
+                QColor(
+                    caption_color_name(
+                        self._instance.settings
                     )
+                )
+            )
 
-                if (
-                    caption.capture_datetime
-                    is not None
-                ):
-                    first_line_parts.append(
-                        format_datetime(
-                            caption.capture_datetime
-                        )
-                    )
-
-                if first_line_parts:
-                    lines.append(
-                        " — ".join(
-                            first_line_parts
-                        )
-                    )
-
-                if caption.location_text:
-                    lines.append(
-                        caption.location_text
-                    )
-
-                if lines:
-                    font = QFont(
-                        resolve_font_family(None)
-                    )
-                    font.setBold(False)
-
-                    # 8 pt environ à l'échelle de
-                    # notre miniature.
-                    font.setPixelSize(
-                        max(
-                            8,
-                            round(
-                                8
-                                * self.PREVIEW_HEIGHT
-                                / 510
-                            ),
-                        )
-                    )
-
-                    painter.setFont(font)
-                    painter.setPen(
-                        Qt.GlobalColor.black
-                    )
-
-                    painter.drawText(
-                        caption_rect.adjusted(
-                            3,
-                            2,
-                            -3,
-                            -2,
-                        ),
-                        (
-                            Qt.AlignmentFlag.AlignHCenter
-                            | Qt.AlignmentFlag.AlignTop
-                            | Qt.TextFlag.TextWordWrap
-                        ),
-                        "\n".join(lines),
-                    )
+            painter.drawText(
+                caption_rect.adjusted(
+                    3,
+                    2,
+                    -3,
+                    -2,
+                ),
+                (
+                    Qt.AlignmentFlag.AlignHCenter
+                    | Qt.AlignmentFlag.AlignTop
+                    | Qt.TextFlag.TextWordWrap
+                ),
+                text,
+            )
 
         painter.end()
         self._preview_label.setPixmap(pixmap)
