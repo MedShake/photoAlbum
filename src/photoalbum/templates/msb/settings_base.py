@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
@@ -80,6 +80,22 @@ class MsbTemplateSettingsWidget(
                 "page_settings.preview_section"
             )
         )
+
+    def create_preview_label(
+        self,
+        width: int,
+        height: int,
+    ) -> QLabel:
+        label = QLabel()
+        label.setFixedSize(width, height)
+        label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        label.setStyleSheet(
+            "border: 1px solid #888;"
+            "background: white;"
+        )
+        return label
 
     def create_msb_theme_group(
         self,

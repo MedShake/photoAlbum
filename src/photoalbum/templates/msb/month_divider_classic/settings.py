@@ -29,7 +29,7 @@ class MonthDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         ll.addWidget(self.create_page_settings_title()); ll.addWidget(self.create_no_page_settings_label())
         note=QLabel(self._translator.tr("month_divider.sample_cities_note")); note.setWordWrap(True); ll.addWidget(note); ll.addSpacing(12); ll.addWidget(self.create_msb_theme_group())
         right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8); rl.addWidget(self.create_preview_title())
-        self._preview=QLabel(); self._preview.setFixedSize(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT); self._preview.setAlignment(Qt.AlignmentFlag.AlignCenter); self._preview.setStyleSheet("border: 1px solid #888;background: white;")
+        self._preview=self.create_preview_label(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT)
         rl.addWidget(self._preview,alignment=Qt.AlignmentFlag.AlignTop); root.addWidget(left,1); root.addWidget(right,0); self._render_preview()
 
     def _render_preview(self):

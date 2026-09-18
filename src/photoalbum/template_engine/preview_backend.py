@@ -57,6 +57,21 @@ class TemplatePreviewBackend(ABC):
             )
         )
 
+    def render_settings_signature(
+        self,
+        instance: PageInstance,
+    ) -> object:
+        """
+        Return the settings state that affects the expensive
+        raster produced by this backend.
+
+        The default keeps the historical behaviour: every setting
+        participates in the preview cache key. Backends may return
+        a smaller immutable value when some settings are rendered
+        later as lightweight overlays.
+        """
+        return instance.settings
+
     @abstractmethod
     def create_job(
         self,

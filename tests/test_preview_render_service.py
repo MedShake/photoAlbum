@@ -92,3 +92,100 @@ def test_scatter_effective_photos_ignore_undated():
             second
         )
     )
+
+def test_scatter_title_style_does_not_invalidate_raster_cache_key():
+    ensure_app()
+    register_discovered_template_extensions()
+
+    service = PreviewRenderService(
+        Translator("fr")
+    )
+
+    photos = [
+        photo(
+            "1.jpg",
+            dated=True,
+        )
+    ]
+
+    first = PageInstance(
+        template_id="year-photo-scatter",
+        instance_id="same-instance",
+        settings={
+            "scatter": {
+                "seeds": [123],
+                "selected_seed_index": 0,
+                "title_font_size": 72,
+                "title_font_family": "Sans Serif",
+                "title_color": "#ffffff",
+            }
+        },
+    )
+
+    second = PageInstance(
+        template_id="year-photo-scatter",
+        instance_id="same-instance",
+        settings={
+            "scatter": {
+                "seeds": [123],
+                "selected_seed_index": 0,
+                "title_font_size": 38.5,
+                "title_font_family": "Serif",
+                "title_color": "#000000",
+            }
+        },
+    )
+
+    assert service.key_for(
+        first,
+        photos,
+    ) == service.key_for(
+        second,
+        photos,
+    )
+
+
+def test_scatter_seed_change_invalidates_raster_cache_key():
+    ensure_app()
+    register_discovered_template_extensions()
+
+    service = PreviewRenderService(
+        Translator("fr")
+    )
+
+    photos = [
+        photo(
+            "1.jpg",
+            dated=True,
+        )
+    ]
+
+    first = PageInstance(
+        template_id="year-photo-scatter",
+        instance_id="same-instance",
+        settings={
+            "scatter": {
+                "seeds": [123, 456],
+                "selected_seed_index": 0,
+            }
+        },
+    )
+
+    second = PageInstance(
+        template_id="year-photo-scatter",
+        instance_id="same-instance",
+        settings={
+            "scatter": {
+                "seeds": [123, 456],
+                "selected_seed_index": 1,
+            }
+        },
+    )
+
+    assert service.key_for(
+        first,
+        photos,
+    ) != service.key_for(
+        second,
+        photos,
+    )

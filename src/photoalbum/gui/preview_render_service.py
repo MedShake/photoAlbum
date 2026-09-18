@@ -99,14 +99,30 @@ class PreviewRenderService(QObject):
     def _settings_signature(
         instance: PageInstance,
     ) -> str:
-        # repr is sufficient here because this is an in-memory
-        # cache key, not a persistent serialization format.
-        value = repr(
-            instance.settings
+        extension = (
+            template_extension_registry.get(
+                instance.template_id
+            )
         )
 
+        backend = (
+            extension.preview_backend
+            if extension is not None
+            else None
+        )
+
+        value = (
+            backend.render_settings_signature(
+                instance
+            )
+            if backend is not None
+            else instance.settings
+        )
+
+        # repr is sufficient here because this is an in-memory
+        # cache key, not a persistent serialization format.
         return sha256(
-            value.encode(
+            repr(value).encode(
                 "utf-8"
             )
         ).hexdigest()

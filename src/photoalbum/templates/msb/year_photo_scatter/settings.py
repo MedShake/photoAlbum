@@ -306,20 +306,9 @@ class YearPhotoScatterSettingsWidget(
             self._change_title_font_size
         )
 
-        self._preview_label = QLabel()
-
-        self._preview_label.setFixedSize(
+        self._preview_label = self.create_preview_label(
             self.PREVIEW_WIDTH,
             self.PREVIEW_HEIGHT,
-        )
-
-        self._preview_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-
-        self._preview_label.setStyleSheet(
-            "border: 1px solid #888;"
-            "background: white;"
         )
 
         layout.addSpacing(12)

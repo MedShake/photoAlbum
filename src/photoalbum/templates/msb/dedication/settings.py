@@ -247,14 +247,9 @@ class DedicationSettingsWidget(
             self.create_preview_title()
         )
 
-        self._preview_label = QLabel()
-        self._preview_label.setFixedSize(
+        self._preview_label = self.create_preview_label(
             self.PREVIEW_WIDTH,
             self.PREVIEW_HEIGHT,
-        )
-        self._preview_label.setStyleSheet(
-            "border: 1px solid #888;"
-            "background: white;"
         )
 
         right_layout.addWidget(

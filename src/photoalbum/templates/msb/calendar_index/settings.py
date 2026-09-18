@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QHBoxLayout,
-    QLabel,
     QVBoxLayout,
     QWidget,
 )
@@ -111,17 +110,9 @@ class CalendarIndexSettingsWidget(
             self.create_preview_title()
         )
 
-        self._preview_label = QLabel()
-        self._preview_label.setFixedSize(
+        self._preview_label = self.create_preview_label(
             self.PREVIEW_WIDTH,
             self.PREVIEW_HEIGHT,
-        )
-        self._preview_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-        self._preview_label.setStyleSheet(
-            "border: 1px solid #888;"
-            "background: white;"
         )
 
         right_layout.addWidget(

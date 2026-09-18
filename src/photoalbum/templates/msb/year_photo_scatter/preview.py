@@ -86,6 +86,18 @@ class YearPhotoScatterPreviewBackend(
 
         return seeds[index]
 
+    def render_settings_signature(
+        self,
+        instance: PageInstance,
+    ) -> object:
+        # The expensive raster contains the photo scatter only.
+        # Title font, size and color are painted later by the
+        # lightweight widget renderer and must not invalidate it.
+        return (
+            "seed",
+            self._seed(instance),
+        )
+
     def create_job(
         self,
         *,

@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -74,7 +73,7 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         ll.addSpacing(12)
         ll.addWidget(self.create_msb_theme_group())
         right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8); rl.addWidget(self.create_preview_title())
-        self._preview=QLabel(); self._preview.setFixedSize(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT); self._preview.setAlignment(Qt.AlignmentFlag.AlignCenter); self._preview.setStyleSheet("border: 1px solid #888;background: white;")
+        self._preview=self.create_preview_label(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT)
         rl.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignTop); root.addWidget(left,1); root.addWidget(right,0)
     def _connect_change_signals(self):
         self._font.currentIndexChanged.connect(self._changed)
