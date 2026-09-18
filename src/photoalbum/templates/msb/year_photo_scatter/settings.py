@@ -32,13 +32,10 @@ from photoalbum.album import (
     PageInstance,
 )
 from photoalbum.templates.msb.year_photo_scatter.composition import (
-    compose_cover_scatter,
     cover_period_title,
 )
 
 from photoalbum.gui.preview_render_service import (
-    PREVIEW_RENDER_HEIGHT,
-    PREVIEW_RENDER_WIDTH,
     PreviewRenderService,
 )
 
