@@ -90,6 +90,12 @@ class PhotoSlotComposition:
     caption_rect: NormalizedRect | None
     caption: PhotoCaptionContent
     image_fit: ImageFit = ImageFit.CONTAIN
+    required_caption_lines: int = 0
+    max_caption_lines: int = 0
+
+    @property
+    def caption_overflow(self) -> bool:
+        return self.required_caption_lines > self.max_caption_lines
 
 
 @dataclass(frozen=True)
@@ -347,6 +353,16 @@ class PhotoTemplateLayout:
             for photo in page.photos
         )
 
+        required_caption_lines = tuple(
+            self._required_caption_lines(
+                caption,
+                cell,
+                settings=photo_settings.page.settings,
+                page_width_mm=page_width_mm,
+            )
+            for caption, cell in zip(captions, cells)
+        )
+
         if reserved_caption_lines is None:
             row_caption_lines = self._row_caption_lines(
                 captions,
@@ -378,6 +394,11 @@ class PhotoTemplateLayout:
                 reserved_lines=row_caption_lines[
                     self._row_key(cell)
                 ],
+                required_lines=(
+                    required_caption_lines[index]
+                    if index < len(required_caption_lines)
+                    else 0
+                ),
                 page_height_mm=page_height_mm,
                 settings=photo_settings.page.settings,
             )
@@ -389,6 +410,21 @@ class PhotoTemplateLayout:
             photo_slots=slots,
             page_number=page_number,
         )
+
+    def _required_caption_lines(
+        self,
+        caption: PhotoCaptionContent,
+        cell: NormalizedRect,
+        *,
+        settings: dict | None = None,
+        page_width_mm: float = 210.0,
+    ) -> int:
+        required = caption.line_count
+        if self.caption_line_counter is not None:
+            required = self.caption_line_counter(
+                caption, settings or {}, cell.width * page_width_mm
+            )
+        return max(0, int(required))
 
     def _row_caption_lines(
         self,
@@ -403,28 +439,18 @@ class PhotoTemplateLayout:
         for index, cell in enumerate(cells):
             key = self._row_key(cell)
 
+            required = 0
             if index < len(captions):
-                caption = captions[index]
-                required = caption.line_count
-                if self.caption_line_counter is not None:
-                    required = self.caption_line_counter(
-                        caption,
-                        settings or {},
-                        cell.width * page_width_mm,
-                    )
-                # Keep the real requirement until the template
-                # capacity is applied. Spread composition can then use
-                # the maximum requirement of both facing pages.
-                lines = min(
-                    required,
-                    self.max_caption_lines,
+                required = self._required_caption_lines(
+                    captions[index],
+                    cell,
+                    settings=settings,
+                    page_width_mm=page_width_mm,
                 )
-            else:
-                lines = 0
 
             result[key] = max(
                 result.get(key, 0),
-                lines,
+                min(required, self.max_caption_lines),
             )
 
         return result
@@ -457,14 +483,24 @@ class PhotoTemplateLayout:
         caption: PhotoCaptionContent,
         reserved_lines: int,
         page_height_mm: float,
+        required_lines: int | None = None,
         settings: dict | None = None,
     ) -> PhotoSlotComposition:
+        if required_lines is None:
+            required_lines = self._required_caption_lines(
+                caption,
+                cell,
+                settings=settings,
+            )
+
         if reserved_lines <= 0:
             return PhotoSlotComposition(
                 image_rect=cell,
                 caption_rect=None,
                 caption=caption,
                 image_fit=self.image_fit,
+                required_caption_lines=required_lines,
+                max_caption_lines=self.max_caption_lines,
             )
 
         # Layout geometry belongs to the template.  Values are stored
@@ -528,6 +564,8 @@ class PhotoTemplateLayout:
             caption_rect=caption_rect,
             caption=caption,
             image_fit=self.image_fit,
+            required_caption_lines=required_lines,
+            max_caption_lines=self.max_caption_lines,
         )
 
     def _page_number(
@@ -880,14 +918,12 @@ class PageComposer:
                 effective_settings,
             )
 
-            required = caption.line_count
-
-            if layout.caption_line_counter is not None:
-                required = layout.caption_line_counter(
-                    caption,
-                    effective_settings.page.settings or {},
-                    cells[index].width * page_width_mm,
-                )
+            required = layout._required_caption_lines(
+                caption,
+                cells[index],
+                settings=effective_settings.page.settings,
+                page_width_mm=page_width_mm,
+            )
 
             required_max = max(
                 required_max,

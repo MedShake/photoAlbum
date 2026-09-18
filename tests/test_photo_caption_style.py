@@ -170,7 +170,8 @@ def test_photo_settings_preview_does_not_own_page_geometry():
     source = path.read_text(encoding="utf-8")
 
     assert "PageComposer" in source
-    assert "PhotoPageWidgetRenderer" in source
+    assert "render_composition_preview" in source
+    assert "PhotoPageWidgetRenderer" not in source
 
     forbidden = (
         "margin = 24",

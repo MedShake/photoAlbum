@@ -641,7 +641,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "template.blank": "Blank page",
 
         "plan.summary": "Summary",
-        "plan.optimizations": "Warnings and possible optimizations",
+        "plan.warnings": "Warnings",
+        "plan.optimizations": "Possible optimizations",
         "plan.structure": "Document structure",
         "plan.album_body": "Album body",
         "plan.section": "Section",
@@ -658,9 +659,8 @@ CATALOGS: dict[str, dict[str, str]] = {
             "No warning or possible optimization detected."
         ),
         "plan.caption_overflow": (
-            "Warning — page {page}, {photo}: caption requires "
-            "{required} lines; this template displays up to "
-            "{available}."
+            "Page {page}, {photo}: the caption requires {required} lines, "
+            "but this template displays at most {available}."
         ),
 
         "plan.photos": "Photos",
@@ -678,16 +678,23 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Print diagnostic: {pages} pages — compatible "
             "with a multiple of {multiple}."
         ),
-        "plan.print_incompatible": (
+        "plan.print_incompatible_one": (
             "Print diagnostic: {pages} pages — not a multiple "
-            "of {multiple}. {additional} additional page(s) "
+            "of {multiple}. 1 additional page would be required."
+        ),
+        "plan.print_incompatible_many": (
+            "Print diagnostic: {pages} pages — not a multiple "
+            "of {multiple}. {additional} additional pages "
             "would be required."
         ),
 
-        "plan.suggestion": (
-            "{month} {year}: up to {slots} additional photo(s) "
-            "can be added without increasing the number of pages "
-            "before the next period."
+        "plan.suggestion_one": (
+            "{month} {year}: 1 additional photo can be added "
+            "without increasing the number of pages before the next period."
+        ),
+        "plan.suggestion_many": (
+            "{month} {year}: up to {slots} additional photos can be added "
+            "without increasing the number of pages before the next period."
         ),
 
         "plan.other_pages": "Other pages",
@@ -698,7 +705,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.special_page": "Special page",
         "plan.technical_blank": "Technical blank",
         "plan.editorial_blank": "Editorial blank",
-        "plan.unused_slots": "{count} unused slot(s)",
+        "plan.caption_too_long": "Caption too long",
+        "plan.captions_too_long": "Captions too long",
+        "plan.unused_slot": "1 unused slot",
+        "plan.unused_slots": "{count} unused slots",
 
         "month.1": "January",
         "month.2": "February",
@@ -1363,7 +1373,8 @@ CATALOGS: dict[str, dict[str, str]] = {
 
 
         "plan.summary": "Résumé",
-        "plan.optimizations": "Avertissements et optimisations possibles",
+        "plan.warnings": "Avertissements",
+        "plan.optimizations": "Optimisations possibles",
         "plan.structure": "Structure du document",
         "plan.album_body": "Corps de l’album",
         "plan.section": "Section",
@@ -1380,9 +1391,8 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Aucun avertissement ni optimisation possible détecté."
         ),
         "plan.caption_overflow": (
-            "Avertissement — page {page}, {photo} : la légende "
-            "nécessite {required} lignes ; ce modèle en affiche "
-            "au maximum {available}."
+            "Page {page}, {photo} : la légende nécessite {required} lignes, "
+            "mais ce modèle n’en affiche au maximum que {available}."
         ),
 
         "plan.photos": "Photos",
@@ -1401,17 +1411,25 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Diagnostic d’impression : {pages} pages — compatible "
             "avec un multiple de {multiple}."
         ),
-        "plan.print_incompatible": (
+        "plan.print_incompatible_one": (
             "Diagnostic d’impression : {pages} pages — ce nombre "
             "n’est pas un multiple de {multiple}. "
-            "{additional} page(s) supplémentaire(s) seraient "
-            "nécessaires."
+            "1 page supplémentaire serait nécessaire."
+        ),
+        "plan.print_incompatible_many": (
+            "Diagnostic d’impression : {pages} pages — ce nombre "
+            "n’est pas un multiple de {multiple}. "
+            "{additional} pages supplémentaires seraient nécessaires."
         ),
 
-        "plan.suggestion": (
-            "{month} {year} : jusqu’à {slots} photo(s) "
-            "supplémentaire(s) peuvent être ajoutées sans augmenter "
-            "le nombre de pages avant la période suivante."
+        "plan.suggestion_one": (
+            "{month} {year} : 1 photo supplémentaire peut être ajoutée "
+            "sans augmenter le nombre de pages avant la période suivante."
+        ),
+        "plan.suggestion_many": (
+            "{month} {year} : jusqu’à {slots} photos supplémentaires "
+            "peuvent être ajoutées sans augmenter le nombre de pages "
+            "avant la période suivante."
         ),
 
         "plan.other_pages": "Autres pages",
@@ -1422,7 +1440,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.special_page": "Page spéciale",
         "plan.technical_blank": "Page blanche technique",
         "plan.editorial_blank": "Page blanche éditoriale",
-        "plan.unused_slots": "{count} emplacement(s) inutilisé(s)",
+        "plan.caption_too_long": "Légende trop longue",
+        "plan.captions_too_long": "Légendes trop longues",
+        "plan.unused_slot": "1 emplacement inutilisé",
+        "plan.unused_slots": "{count} emplacements inutilisés",
 
         "month.1": "janvier",
         "month.2": "février",

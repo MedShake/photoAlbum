@@ -6,9 +6,6 @@ from secrets import randbelow
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
-    QFont,
-    QPainter,
-    QPixmap,
 )
 from PySide6.QtWidgets import (
     QColorDialog,
@@ -87,6 +84,7 @@ class YearPhotoScatterSettingsWidget(
             )
         )
 
+        self._render_service = self._shared_render_service
         self._shared_render_key = None
 
         self._shared_render_service.preview_ready.connect(
@@ -97,9 +95,6 @@ class YearPhotoScatterSettingsWidget(
             self._shared_preview_failed
         )
 
-
-        self._base_pixmap = QPixmap()
-        self._composition_title = ""
 
         self._load_state()
         self._create_content()
@@ -355,7 +350,7 @@ class YearPhotoScatterSettingsWidget(
     def msb_theme_changed(
         self,
     ) -> None:
-        self._display_preview()
+        self._request_preview()
 
     def _save_state(
         self,
@@ -498,7 +493,7 @@ class YearPhotoScatterSettingsWidget(
 
         # Only the title color changed. No need to decode
         # hundreds of photographs again.
-        self._display_preview()
+        self._request_preview()
 
     def _change_title_font_family(self, index: int) -> None:
         family = self._title_font_combo.itemData(
@@ -518,7 +513,7 @@ class YearPhotoScatterSettingsWidget(
             settings=settings,
         )
         self.instance_changed.emit()
-        self._display_preview()
+        self._request_preview()
 
     def _change_title_font_size(self, value: float) -> None:
         settings = dict(self._instance.settings)
@@ -529,87 +524,30 @@ class YearPhotoScatterSettingsWidget(
         }
         self._instance = replace(self._instance, settings=settings)
         self.instance_changed.emit()
-        self._display_preview()
+        self._request_preview()
 
     def _request_preview(
         self,
     ) -> None:
-        composition = compose_cover_scatter(
-            list(
-                self._photos
-            ),
-            seed=self._seeds[
-                self._index
-            ],
-            month_name=(
-                self._translator.month_name
-            ),
-        )
+        def set_waiting_key(key):
+            self._shared_render_key = key
 
-        self._composition_title = (
-            composition.title
-        )
-
-        key = (
-            self._shared_render_service.key_for(
-                self._instance,
-                self._photos,
-                width=PREVIEW_RENDER_WIDTH,
-                height=PREVIEW_RENDER_HEIGHT,
+        self._preview_label.setPixmap(
+            self.render_template_preview(
+                width=self.PREVIEW_WIDTH,
+                height=self.PREVIEW_HEIGHT,
+                photos=self._photos,
+                set_waiting_key=set_waiting_key,
             )
         )
-
-        self._shared_render_key = key
-
-        pixmap = (
-            self._shared_render_service.cached(
-                key
-            )
-        )
-
-        if pixmap is not None:
-            self._base_pixmap = pixmap
-            self._display_preview()
-            return
-
-        self._preview_label.clear()
-
-        self._preview_label.setText(
-            self._translator.tr(
-                "page_settings.calculating"
-            )
-        )
-
-        self._shared_render_service.request(
-            self._instance,
-            self._photos,
-            width=PREVIEW_RENDER_WIDTH,
-            height=PREVIEW_RENDER_HEIGHT,
-        )
-
 
     def _shared_preview_ready(
         self,
         key,
     ) -> None:
-        if (
-            key
-            != self._shared_render_key
-        ):
+        if key != self._shared_render_key:
             return
-
-        pixmap = (
-            self._shared_render_service.cached(
-                key
-            )
-        )
-
-        if pixmap is None:
-            return
-
-        self._base_pixmap = pixmap
-
-        self._display_preview()
+        self._request_preview()
 
     def _shared_preview_failed(
         self,
@@ -627,58 +565,4 @@ class YearPhotoScatterSettingsWidget(
                 "page_settings.error",
                 error=message,
             )
-        )
-
-    def _display_preview(
-        self,
-    ) -> None:
-        if self._base_pixmap.isNull():
-            return
-
-        pixmap = self._base_pixmap.copy()
-
-        painter = QPainter(
-            pixmap
-        )
-
-        font = QFont(
-            title_font_family(
-                self._instance.settings
-            )
-        )
-
-        font.setBold(
-            True
-        )
-
-        font.setPixelSize(max(1, round(
-            title_font_size(self._instance.settings, self._composition_title)
-            * 25.4 / 72 * pixmap.width() / self._page_format.width_mm
-        )))
-
-        painter.setFont(
-            font
-        )
-
-        painter.setPen(
-            QColor(
-                self._title_color
-            )
-        )
-
-        painter.drawText(
-            pixmap.rect().adjusted(
-                15,
-                15,
-                -15,
-                -15,
-            ),
-            Qt.AlignmentFlag.AlignCenter,
-            self._composition_title,
-        )
-
-        painter.end()
-
-        self._preview_label.setPixmap(
-            pixmap
         )

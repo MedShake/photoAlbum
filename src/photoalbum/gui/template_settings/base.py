@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from types import SimpleNamespace
+
+from PySide6.QtCore import QRect, Signal, Qt
+from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import QWidget
 
 from photoalbum.album import (
@@ -9,6 +12,9 @@ from photoalbum.album import (
     PageInstance,
 )
 from photoalbum.i18n import Translator
+from photoalbum.album.composition import PageComposition
+from photoalbum.album.planning import PlanItemKind
+from photoalbum.rendering import PageRenderGeometry, PageRenderer, RenderImageCache
 
 
 class PageTemplateSettingsWidget(QWidget):
@@ -45,6 +51,81 @@ class PageTemplateSettingsWidget(QWidget):
         self._template_pack_settings = dict(
             template_pack_settings or {}
         )
+        self._settings_page_renderer = PageRenderer(translator=self._translator)
+        self._settings_image_cache = RenderImageCache()
+
+    def render_composition_preview(
+        self, composition, *, width: int, height: int, project_photos=(),
+        album_pages=(), show_empty_slots=True, set_waiting_key=None,
+    ) -> QPixmap:
+        pixmap = QPixmap(max(1, int(width)), max(1, int(height)))
+        pixmap.fill(Qt.GlobalColor.white)
+        geometry = PageRenderGeometry(
+            width=pixmap.width(), height=pixmap.height(),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
+        painter = QPainter(pixmap)
+        try:
+            self._settings_page_renderer.paint(
+                painter=painter, composition=composition,
+                target_rect=QRect(0, 0, pixmap.width(), pixmap.height()),
+                width=pixmap.width(), height=pixmap.height(),
+                page_width_mm=self._page_format.width_mm,
+                page_height_mm=self._page_format.height_mm,
+                font_pixel_size=geometry.font_pixel_size, pixel_rect=geometry.pixel_rect,
+                thumbnail_cache=self._settings_image_cache,
+                project_photos=tuple(project_photos), album_pages=tuple(album_pages),
+                template_pack_settings=self._template_pack_settings,
+                render_service=self._render_service, set_waiting_key=set_waiting_key,
+                paint_fallback=None, show_empty_slots=show_empty_slots,
+            )
+        finally:
+            painter.end()
+        return pixmap
+
+    def render_template_preview(
+        self, *, width: int, height: int, photos=(), page_attributes=None,
+        album_pages=(), set_waiting_key=None,
+        kind: PlanItemKind = PlanItemKind.SPECIAL_PAGE,
+    ) -> QPixmap:
+        attributes = dict(page_attributes or {})
+        page = SimpleNamespace(
+            number=int(attributes.pop("number", 1)),
+            kind=kind,
+            template_id=self._instance.template_id,
+            page_instance=self._instance,
+            photos=tuple(photos),
+            **attributes,
+        )
+        composition = PageComposition(page=page)
+        pixmap = QPixmap(max(1, int(width)), max(1, int(height)))
+        pixmap.fill(Qt.GlobalColor.white)
+        geometry = PageRenderGeometry(
+            width=pixmap.width(), height=pixmap.height(),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
+        painter = QPainter(pixmap)
+        try:
+            self._settings_page_renderer.paint(
+                painter=painter, composition=composition,
+                target_rect=QRect(0, 0, pixmap.width(), pixmap.height()),
+                width=pixmap.width(), height=pixmap.height(),
+                page_width_mm=self._page_format.width_mm,
+                page_height_mm=self._page_format.height_mm,
+                font_pixel_size=geometry.font_pixel_size,
+                pixel_rect=geometry.pixel_rect,
+                thumbnail_cache=self._settings_image_cache,
+                project_photos=tuple(photos), album_pages=tuple(album_pages),
+                template_pack_settings=self._template_pack_settings,
+                render_service=self._render_service,
+                set_waiting_key=set_waiting_key, paint_fallback=None,
+                show_empty_slots=True,
+            )
+        finally:
+            painter.end()
+        return pixmap
 
     def instance(
         self,

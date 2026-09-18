@@ -169,3 +169,14 @@ def test_photo_renderer_accepts_qrectf_pixel_geometry():
 
     assert isinstance(Cache.received_size, QSize)
     assert Cache.received_size == QSize(80, 60)
+
+
+def test_msb_settings_do_not_own_qpainter_rendering():
+    from pathlib import Path
+    offenders = []
+    for settings_file in sorted(Path("src/photoalbum/templates/msb").glob("*/settings.py")):
+        source = settings_file.read_text()
+        found = [token for token in ("QPainter", ".paint(", "drawText(", "drawPixmap(", "drawRect(") if token in source]
+        if found:
+            offenders.append(f"{settings_file}: {', '.join(found)}")
+    assert not offenders, "\n".join(offenders)

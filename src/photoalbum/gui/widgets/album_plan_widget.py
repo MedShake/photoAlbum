@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from photoalbum.i18n import Translator
-from photoalbum.album.composition import (
-    PageComposer,
-    create_builtin_layout_registry,
-)
+from photoalbum.album.composition import PageComposer
 from photoalbum.album.models import page_format_from_id
-from photoalbum.templates.msb.photo_page.caption_layout import (
-    required_line_count,
-)
 
 from photoalbum.gui.template_labels import template_display_name
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHeaderView,
     QGroupBox,
+    QScrollArea,
     QLabel,
     QTreeWidget,
     QTreeWidgetItem,
@@ -45,6 +42,7 @@ class AlbumPlanWidget(QWidget):
         self._registry = registry
         self._translator = translator or Translator()
         self._summary_builder = AlbumSummaryBuilder()
+        self._caption_overflows = {}
 
         self._create_ui()
         self.clear()
@@ -60,29 +58,79 @@ class AlbumPlanWidget(QWidget):
         self._summary_label = QLabel()
         self._summary_label.setWordWrap(True)
 
-        self._print_label = QLabel()
-        self._print_label.setWordWrap(True)
-
         summary_layout.addWidget(self._summary_label)
-        summary_layout.addWidget(self._print_label)
 
         layout.addWidget(summary_group)
 
-        suggestions_group = QGroupBox(
+        # Warnings are exceptional: the whole panel disappears
+        # when there is nothing requiring the user's attention.
+        self._warnings_group = QGroupBox(
+            self._translator.tr("plan.warnings")
+        )
+        warnings_layout = QVBoxLayout(
+            self._warnings_group
+        )
+
+        self._warnings_label = QLabel()
+        self._warnings_label.setWordWrap(True)
+        self._warnings_label.setAlignment(
+            Qt.AlignmentFlag.AlignTop
+            | Qt.AlignmentFlag.AlignLeft
+        )
+
+        self._warnings_scroll = QScrollArea()
+        self._warnings_scroll.setWidgetResizable(True)
+        self._warnings_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._warnings_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self._warnings_scroll.setMaximumHeight(90)
+        self._warnings_scroll.setWidget(
+            self._warnings_label
+        )
+
+        warnings_layout.addWidget(
+            self._warnings_scroll
+        )
+
+        layout.addWidget(self._warnings_group)
+
+        # Optimizations are useful information even when there is
+        # currently nothing to optimize, so this panel always remains.
+        self._optimizations_group = QGroupBox(
             self._translator.tr("plan.optimizations")
         )
-        suggestions_layout = QVBoxLayout(
-            suggestions_group
+        optimizations_layout = QVBoxLayout(
+            self._optimizations_group
         )
 
         self._suggestions_label = QLabel()
         self._suggestions_label.setWordWrap(True)
+        self._suggestions_label.setAlignment(
+            Qt.AlignmentFlag.AlignTop
+            | Qt.AlignmentFlag.AlignLeft
+        )
 
-        suggestions_layout.addWidget(
+        self._suggestions_scroll = QScrollArea()
+        self._suggestions_scroll.setWidgetResizable(True)
+        self._suggestions_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._suggestions_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self._suggestions_scroll.setMaximumHeight(90)
+        self._suggestions_scroll.setWidget(
             self._suggestions_label
         )
 
-        layout.addWidget(suggestions_group)
+        optimizations_layout.addWidget(
+            self._suggestions_scroll
+        )
+
+        layout.addWidget(self._optimizations_group)
 
         structure_group = QGroupBox(
             self._translator.tr("plan.structure")
@@ -138,7 +186,8 @@ class AlbumPlanWidget(QWidget):
         self._summary_label.setText(
             self._translator.tr("plan.no_plan")
         )
-        self._print_label.clear()
+        self._warnings_label.clear()
+        self._warnings_group.setVisible(False)
         self._suggestions_label.setText(
             self._translator.tr("plan.no_optimization")
         )
@@ -150,6 +199,7 @@ class AlbumPlanWidget(QWidget):
         settings: AlbumStructureSettings | None = None,
     ) -> None:
         summary = self._summary_builder.build(result)
+        self._caption_overflows = self._collect_caption_overflows(result, settings)
 
         self._summary_label.setText(
             " | ".join(
@@ -186,32 +236,6 @@ class AlbumPlanWidget(QWidget):
             )
         )
 
-        if summary.print_page_multiple is None:
-            self._print_label.setText(
-                self._translator.tr(
-                    "plan.print_disabled"
-                )
-            )
-
-        elif summary.print_compatible:
-            self._print_label.setText(
-                self._translator.tr(
-                    "plan.print_compatible",
-                    pages=summary.total_pages,
-                    multiple=summary.print_page_multiple,
-                )
-            )
-
-        else:
-            self._print_label.setText(
-                self._translator.tr(
-                    "plan.print_incompatible",
-                    pages=summary.total_pages,
-                    multiple=summary.print_page_multiple,
-                    additional=summary.print_pages_to_add,
-                )
-            )
-
         self._set_suggestions(
             summary,
             result=result,
@@ -229,101 +253,124 @@ class AlbumPlanWidget(QWidget):
         result: AlbumBuildResult | None = None,
         settings: AlbumStructureSettings | None = None,
     ) -> None:
-        lines = self._caption_warning_lines(
-            result, settings
+        warning_lines = []
+
+        if (
+            summary.print_page_multiple is not None
+            and not summary.print_compatible
+        ):
+            warning_lines.append(
+                self._translator.tr(
+                    (
+                        "plan.print_incompatible_one"
+                        if summary.print_pages_to_add == 1
+                        else "plan.print_incompatible_many"
+                    ),
+                    pages=summary.total_pages,
+                    multiple=summary.print_page_multiple,
+                    additional=summary.print_pages_to_add,
+                )
+            )
+
+        warning_lines.extend(
+            self._caption_warning_lines(
+                result,
+                settings,
+            )
         )
+
+        self._warnings_label.setText(
+            "\n".join(warning_lines)
+        )
+        self._warnings_group.setVisible(
+            bool(warning_lines)
+        )
+
+        optimization_lines = []
 
         for suggestion in summary.period_fill_suggestions:
             month_name = self._translator.month_name(
                 suggestion.month
             )
-            lines.append(
+
+            # A month starts the sentence here, so capitalize it even
+            # in locales whose normal month names are lowercase.
+            if month_name:
+                month_name = (
+                    month_name[0].upper()
+                    + month_name[1:]
+                )
+
+            slots = suggestion.available_photo_slots
+
+            optimization_lines.append(
                 self._translator.tr(
-                    "plan.suggestion",
+                    (
+                        "plan.suggestion_one"
+                        if slots == 1
+                        else "plan.suggestion_many"
+                    ),
                     month=month_name,
                     year=suggestion.year,
-                    slots=suggestion.available_photo_slots,
+                    slots=slots,
                 )
             )
 
-        if not lines:
-            lines.append(
+        if not optimization_lines:
+            optimization_lines.append(
                 self._translator.tr(
-                    "plan.no_warning_or_optimization"
+                    "plan.no_optimization"
                 )
             )
 
         self._suggestions_label.setText(
-            "\n".join(lines)
+            "\n".join(optimization_lines)
         )
 
-    def _caption_warning_lines(
-        self,
-        result: AlbumBuildResult | None,
-        settings: AlbumStructureSettings | None,
-    ) -> list[str]:
+    def _collect_caption_overflows(self, result, settings):
         if result is None or settings is None:
-            return []
-
-        page_format = page_format_from_id(
-            settings.page_format
-        )
-        width_mm = page_format.width_mm
-        height_mm = page_format.height_mm
+            return {}
+        page_format = page_format_from_id(settings.page_format)
+        width_mm, height_mm = page_format.width_mm, page_format.height_mm
         if settings.orientation.value == "landscape":
             width_mm, height_mm = height_mm, width_mm
-
-        registry = create_builtin_layout_registry()
-        composer = PageComposer(registry)
-        lines: list[str] = []
-
-        for page in result.pagination.pages:
-            if (
-                page.kind != PlanItemKind.PHOTO_GROUP
-                or not page.template_id
-            ):
+        composer = PageComposer()
+        pages = tuple(result.pagination.pages)
+        found = {}
+        for page in pages:
+            if page.kind != PlanItemKind.PHOTO_GROUP or not page.template_id:
                 continue
             try:
-                layout = registry.get(page.template_id)
+                reserve = composer.spread_caption_lines(
+                    page, pages, settings.photo_pages,
+                    page_width_mm=width_mm, page_height_mm=height_mm,
+                )
+                composition = composer.compose(
+                    page, settings.photo_pages, settings.page_numbers,
+                    page_width_mm=width_mm, page_height_mm=height_mm,
+                    reserved_caption_lines=reserve,
+                )
             except KeyError:
-                # A third-party template owns its own diagnostics.
                 continue
+            for index, slot in enumerate(composition.photo_slots[:len(page.photos)]):
+                if slot.caption_overflow:
+                    found.setdefault(page.number, []).append((
+                        page.photos[index].filename,
+                        slot.required_caption_lines,
+                        slot.max_caption_lines,
+                    ))
+        return found
 
-            composition = composer.compose(
-                page,
-                settings.photo_pages,
-                settings.page_numbers,
-                page_width_mm=width_mm,
-                page_height_mm=height_mm,
+    def _caption_warning_lines(self, result, settings) -> list[str]:
+        diagnostics = self._caption_overflows or self._collect_caption_overflows(result, settings)
+        return [
+            self._translator.tr(
+                "plan.caption_overflow", page=page_number, photo=photo,
+                required=required, available=available,
             )
-            render_settings = (
-                page.page_instance.settings
-                if page.page_instance is not None
-                else settings.photo_pages.page.settings
-            )
-
-            for index, slot in enumerate(
-                composition.photo_slots[:len(page.photos)]
-            ):
-                required = required_line_count(
-                    slot.caption,
-                    width_mm=slot.image_rect.width * width_mm,
-                    settings=render_settings,
-                )
-                if required <= layout.max_caption_lines:
-                    continue
-                photo = page.photos[index]
-                lines.append(
-                    self._translator.tr(
-                        "plan.caption_overflow",
-                        page=page.number,
-                        photo=photo.filename,
-                        required=required,
-                        available=layout.max_caption_lines,
-                    )
-                )
-
-        return lines
+            for page_number in sorted(diagnostics)
+            for photo, required, available in diagnostics[page_number]
+        ]
 
     def _set_basic_structure(
         self,
@@ -895,27 +942,44 @@ class AlbumPlanWidget(QWidget):
                 details = page.template_id
 
         if page.unused_photo_slots:
+            unused_count = page.unused_photo_slots
             unused_slots = self._translator.tr(
-                "plan.unused_slots",
-                count=page.unused_photo_slots,
+                (
+                    "plan.unused_slot"
+                    if unused_count == 1
+                    else "plan.unused_slots"
+                ),
+                count=unused_count,
             )
 
             details = (
                 f"{details} — {unused_slots}"
             )
 
-        return QTreeWidgetItem(
-            [
-                self._translator.tr(
-                    "plan.page_label",
-                    number=page.number,
-                    type=page_type,
-                ),
-                "1",
-                str(photo_count),
-                details,
-            ]
-        )
+        overflows = self._caption_overflows.get(page.number, [])
+        if overflows:
+            overflow_details = self._translator.tr(
+                (
+                    "plan.caption_too_long"
+                    if len(overflows) == 1
+                    else "plan.captions_too_long"
+                )
+            )
+            details = (
+                f"{details} — {overflow_details}"
+                if details
+                else overflow_details
+            )
+
+        item = QTreeWidgetItem([
+            self._translator.tr("plan.page_label", number=page.number, type=page_type),
+            "1", str(photo_count), details,
+        ])
+        if overflows:
+            item.setForeground(3, QColor("#c62828"))
+        elif page.unused_photo_slots:
+            item.setForeground(3, QColor("#ef6c00"))
+        return item
 
     def _update_group_totals(self) -> None:
         for index in range(
@@ -957,4 +1021,3 @@ class AlbumPlanWidget(QWidget):
         item.setText(2, str(photo_count))
 
         return page_count, photo_count
-

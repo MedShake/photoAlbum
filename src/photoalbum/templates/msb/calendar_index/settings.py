@@ -3,10 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import (
-    QPainter,
-    QPixmap,
-)
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -24,10 +20,6 @@ from photoalbum.album import (
 )
 from photoalbum.templates.msb.calendar_index.composition import (
     available_calendar_years,
-    compose_calendar_index,
-)
-from photoalbum.templates.msb.calendar_index.painter import (
-    paint_calendar_index,
 )
 from photoalbum.templates.msb.theme import (
     msb_theme_from_pack_settings,
@@ -285,64 +277,18 @@ class CalendarIndexSettingsWidget(
 
         self._render_preview()
 
-    def _render_preview(
-        self,
-    ) -> None:
+    def _render_preview(self) -> None:
         year = self._year_combo.currentData()
         if self._usage == "year_divider":
             years = available_calendar_years(self._photos)
             year = years[0] if years else None
-
-        pixmap = QPixmap(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
-
-        pixmap.fill(
-            Qt.GlobalColor.white
-        )
-
-        painter = QPainter(
-            pixmap
-        )
-
         if year is None:
-            painter.setPen(
-                Qt.GlobalColor.darkGray
-            )
-
-            painter.drawText(
-                pixmap.rect(),
-                Qt.AlignmentFlag.AlignCenter,
-                self._translator.tr(
-                    "calendar_index.no_year"
-                ),
-            )
-        else:
-            # In the settings dialog there is intentionally no
-            # pagination context yet, so Page N is omitted.
-            theme = msb_theme_from_pack_settings(
-                self._template_pack_settings
-            )
-
-            composition = compose_calendar_index(
-                self._photos,
-                year=year,
-                month_colors=theme.month_colors,
-            )
-
-            paint_calendar_index(
-                painter,
-                target_rect=pixmap.rect(),
-                composition=composition,
-                translator=self._translator,
-                page_width_mm=self._page_format.width_mm,
-                page_height_mm=self._page_format.height_mm,
-                show_title=self._show_title_checkbox.isChecked(),
-            )
-
-        painter.end()
-
+            self._preview_label.clear()
+            self._preview_label.setText(self._translator.tr("calendar_index.no_year"))
+            return
         self._preview_label.setPixmap(
-            pixmap
+            self.render_template_preview(
+                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT,
+                photos=self._photos, page_attributes={"year": year},
+            )
         )

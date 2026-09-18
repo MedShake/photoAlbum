@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
@@ -26,7 +26,6 @@ from photoalbum.rendering.fonts import (
     available_photo_album_fonts,
     resolve_font_family,
 )
-from .widget_renderer import DedicationWidgetRenderer
 
 
 class DedicationSettingsWidget(
@@ -270,46 +269,13 @@ class DedicationSettingsWidget(
         self._update_frame_color_button()
         self._render_preview()
 
-    def _render_preview(self) -> None:
-        pixmap = QPixmap(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
+    def _render_preview(self):
+        self._preview_label.setPixmap(
+            self.render_template_preview(
+                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT, photos=self._photos,
+                page_attributes={},
+            )
         )
-        pixmap.fill(Qt.GlobalColor.white)
-
-        painter = QPainter(pixmap)
-
-        renderer = DedicationWidgetRenderer()
-
-        renderer.paint(
-            painter=painter,
-            instance=self._instance,
-            photos=self._photos,
-            target_rect=pixmap.rect(),
-            width=pixmap.width(),
-            height=pixmap.height(),
-            translator=self._translator,
-            render_service=self._render_service,
-            set_waiting_key=None,
-            font_pixel_size=lambda points: max(
-                1,
-                round(
-                    points
-                    * self.PREVIEW_HEIGHT
-                    / self._page_format.height_mm
-                    * 25.4
-                    / 72.0
-                ),
-            ),
-            page_width_mm=self._page_format.width_mm,
-            page_height_mm=self._page_format.height_mm,
-            template_pack_settings=(
-                self._template_pack_settings
-            ),
-        )
-
-        painter.end()
-        self._preview_label.setPixmap(pixmap)
 
     def msb_theme_changed(self) -> None:
         self._render_preview()

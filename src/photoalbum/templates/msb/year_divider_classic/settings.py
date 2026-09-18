@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from types import SimpleNamespace
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
@@ -18,14 +17,15 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.album import A4, PageFormat, PageInstance
+from photoalbum.album.planning import PlanItemKind
 from photoalbum.rendering.fonts import available_photo_album_fonts, resolve_font_family
 from photoalbum.templates.msb.divider_style import divider_font_family, divider_font_size
 from photoalbum.templates.msb.settings_base import MsbTemplateSettingsWidget
 from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
-from .widget_renderer import YearDividerClassicWidgetRenderer
 
 
 class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
+    DEFAULT_TITLE_COLOR = "#d0d0d0"
     PREVIEW_WIDTH = 420
     PREVIEW_HEIGHT = 594
 
@@ -33,7 +33,10 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
                  page_format: PageFormat = A4, template_pack_settings=None, parent=None) -> None:
         super().__init__(instance, photos, translator=translator, render_service=render_service,
                          page_format=page_format, template_pack_settings=template_pack_settings, parent=parent)
-        self._create_content(); self._load_state(); self._render_preview()
+        self._create_content()
+        self._load_state()
+        self._connect_change_signals()
+        self._render_preview()
 
     def _create_content(self):
         root=QHBoxLayout(self); root.setSpacing(28)
@@ -73,7 +76,9 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8); rl.addWidget(self.create_preview_title())
         self._preview=QLabel(); self._preview.setFixedSize(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT); self._preview.setAlignment(Qt.AlignmentFlag.AlignCenter); self._preview.setStyleSheet("border: 1px solid #888;background: white;")
         rl.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignTop); root.addWidget(left,1); root.addWidget(right,0)
-        self._font.currentIndexChanged.connect(self._changed); self._size.valueChanged.connect(self._changed)
+    def _connect_change_signals(self):
+        self._font.currentIndexChanged.connect(self._changed)
+        self._size.valueChanged.connect(self._changed)
 
     def _load_state(self):
         theme=msb_theme_from_pack_settings(self._template_pack_settings)
@@ -96,11 +101,11 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
             str(
                 local.get(
                     "title_color",
-                    YearDividerClassicWidgetRenderer.DEFAULT_TITLE_COLOR,
+                    self.DEFAULT_TITLE_COLOR,
                 )
             )
             if isinstance(local, dict)
-            else YearDividerClassicWidgetRenderer.DEFAULT_TITLE_COLOR
+            else self.DEFAULT_TITLE_COLOR
         )
         self._update_color_button()
 
@@ -156,9 +161,12 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         )
 
     def _render_preview(self):
-        pix=QPixmap(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT); pix.fill(Qt.GlobalColor.white); painter=QPainter(pix)
-        comp=SimpleNamespace(page=SimpleNamespace(year=2025))
-        YearDividerClassicWidgetRenderer().paint(painter=painter,instance=self._instance,photos=(),target_rect=pix.rect(),width=pix.width(),height=pix.height(),translator=self._translator,render_service=None,set_waiting_key=None,font_pixel_size=lambda pt:max(1,round(pt*pix.width()/595)),composition=comp,template_pack_settings=self._template_pack_settings)
-        painter.end(); self._preview.setPixmap(pix)
+        self._preview.setPixmap(
+            self.render_template_preview(
+                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT, photos=(),
+                kind=PlanItemKind.YEAR_DIVIDER,
+                page_attributes={"year": 2025},
+            )
+        )
 
     def msb_theme_changed(self): self._render_preview()

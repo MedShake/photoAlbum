@@ -111,17 +111,18 @@ def test_plan_widget_displays_summary():
     assert "Technical blanks: 1" in text
 
 
-def test_plan_widget_displays_no_print_constraint():
+
+def test_plan_widget_hides_warnings_without_print_constraint():
     widget = create_widget()
 
     widget.set_result(create_result())
 
-    assert (
-        "no page-count constraint enabled"
-        in widget._print_label.text()
-    )
+    assert widget._warnings_label.text() == ""
+    assert not widget._warnings_group.isVisible()
 
-def test_plan_widget_displays_print_compatibility():
+
+
+def test_plan_widget_hides_warnings_when_print_is_compatible():
     widget = create_widget()
 
     result = create_result()
@@ -139,9 +140,12 @@ def test_plan_widget_displays_print_compatibility():
 
     widget.set_result(constrained_result)
 
-    assert "multiple of 4" in widget._print_label.text()
+    assert widget._warnings_label.text() == ""
+    assert not widget._warnings_group.isVisible()
 
-def test_plan_widget_displays_print_warning():
+
+
+def test_plan_widget_displays_incompatible_print_as_warning():
     widget = create_widget()
 
     result = create_result()
@@ -159,10 +163,14 @@ def test_plan_widget_displays_print_warning():
 
     widget.set_result(constrained_result)
 
-    text = widget._print_label.text()
+    text = widget._warnings_label.text()
 
-    assert "not a multiple of 4" in text
-    assert "2 additional page(s)" in text
+    assert "multiple of 4" in text
+    assert "2 additional pages" in text
+    assert "page(s)" not in text
+    assert not widget._warnings_group.isHidden()
+
+
 
 def test_plan_widget_displays_period_suggestion():
     widget = create_widget()
@@ -172,7 +180,9 @@ def test_plan_widget_displays_period_suggestion():
     text = widget._suggestions_label.text()
 
     assert "March 2025" in text
-    assert "3 additional photo(s)" in text
+    assert "Optimization —" not in text
+    assert "3 additional photos" in text
+    assert not widget._optimizations_group.isHidden()
 
 
 def test_plan_widget_groups_pages_by_year_and_month():

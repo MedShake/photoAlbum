@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from photoalbum.album import A4, PageFormat, PageInstance
+from photoalbum.album.planning import PlanItemKind
 from photoalbum.templates.msb.settings_base import MsbTemplateSettingsWidget
-from .widget_renderer import MonthDividerClassicWidgetRenderer
 
 
 class MonthDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
@@ -35,10 +33,12 @@ class MonthDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         rl.addWidget(self._preview,alignment=Qt.AlignmentFlag.AlignTop); root.addWidget(left,1); root.addWidget(right,0); self._render_preview()
 
     def _render_preview(self):
-        pix=QPixmap(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT); pix.fill(Qt.GlobalColor.white); painter=QPainter(pix)
-        page=SimpleNamespace(year=2025,month=6,cities=self.SAMPLE_CITIES); comp=SimpleNamespace(page=page)
-        def pixel_rect(r): return QRectF(r.x*pix.width(),r.y*pix.height(),r.width*pix.width(),r.height*pix.height())
-        MonthDividerClassicWidgetRenderer().paint(painter=painter,instance=self._instance,photos=(),target_rect=pix.rect(),width=pix.width(),height=pix.height(),translator=self._translator,render_service=None,set_waiting_key=None,font_pixel_size=lambda pt:max(1,round(pt*pix.width()/595)),page_width_mm=self._page_format.width_mm,page_height_mm=self._page_format.height_mm,composition=comp,pixel_rect=pixel_rect,template_pack_settings=self._template_pack_settings)
-        painter.end(); self._preview.setPixmap(pix)
+        self._preview.setPixmap(
+            self.render_template_preview(
+                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT, photos=(),
+                kind=PlanItemKind.MONTH_DIVIDER,
+                page_attributes={"year": 2025, "month": 6, "cities": self.SAMPLE_CITIES},
+            )
+        )
 
     def msb_theme_changed(self): self._render_preview()

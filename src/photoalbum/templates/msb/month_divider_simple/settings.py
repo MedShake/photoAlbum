@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from types import SimpleNamespace
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from photoalbum.album import A4, PageFormat, PageInstance
+from photoalbum.album.planning import PlanItemKind
 from photoalbum.rendering.fonts import available_photo_album_fonts
 from photoalbum.templates.msb.divider_style import divider_font_family, divider_font_size
 from photoalbum.templates.msb.settings_base import MsbTemplateSettingsWidget
 from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
-from .widget_renderer import MonthDividerSimpleWidgetRenderer
 
 class MonthDividerSimpleSettingsWidget(MsbTemplateSettingsWidget):
     PREVIEW_WIDTH=420; PREVIEW_HEIGHT=594
@@ -28,6 +26,12 @@ class MonthDividerSimpleSettingsWidget(MsbTemplateSettingsWidget):
     def _changed(self,*args):
         settings=dict(self._instance.settings); local=dict(settings.get("month_divider_simple",{})); local["title_font_family"]=self._font.currentData(); local["title_font_size"]=self._size.value(); settings["month_divider_simple"]=local; self._instance=replace(self._instance,settings=settings); self.instance_changed.emit(); self._render_preview()
     def _render_preview(self):
-        pix=QPixmap(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT); pix.fill(Qt.GlobalColor.white); painter=QPainter(pix); comp=SimpleNamespace(page=SimpleNamespace(year=2025,month=6,cities=()))
-        MonthDividerSimpleWidgetRenderer().paint(painter=painter,instance=self._instance,photos=(),target_rect=pix.rect(),width=pix.width(),height=pix.height(),translator=self._translator,render_service=None,set_waiting_key=None,font_pixel_size=lambda pt:max(1,round(pt*pix.width()/595)),composition=comp,template_pack_settings=self._template_pack_settings); painter.end(); self._preview.setPixmap(pix)
+        self._preview.setPixmap(
+            self.render_template_preview(
+                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT, photos=(),
+                kind=PlanItemKind.MONTH_DIVIDER,
+                page_attributes={"year": 2025, "month": 6, "cities": ()},
+            )
+        )
+
     def msb_theme_changed(self): self._render_preview()

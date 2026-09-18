@@ -5,8 +5,6 @@ from dataclasses import replace
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
-    QPainter,
-    QPixmap,
 )
 from PySide6.QtWidgets import (
     QColorDialog,
@@ -24,15 +22,6 @@ from photoalbum.album import (
     A4,
     PageFormat,
     PageInstance,
-)
-from photoalbum.rendering.page_geometry import (
-    PageRenderGeometry,
-)
-from photoalbum.templates.msb.geographic_word_cloud.composition import (
-    compose_geographic_word_cloud,
-)
-from .painter import (
-    paint_geographic_word_cloud,
 )
 
 from photoalbum.templates.msb.theme import (
@@ -451,72 +440,12 @@ class GeographicWordCloudSettingsWidget(
 
         self._render_preview()
 
-    def _render_preview(
-        self,
-    ) -> None:
-        year = self._year_combo.currentData()
-
-        # The geographic cloud keeps the historical A4
-        # composition geometry on every supported page format.
-        # Wider formats such as US Letter therefore gain extra
-        # horizontal breathing room instead of stretching the
-        # cloud layout.
-        cloud = compose_geographic_word_cloud(
-            list(
-                self._photos
-            ),
-            year=year,
-            page_width_mm=A4.width_mm,
-            page_height_mm=A4.height_mm,
-            palette=tuple(
-                self._palette[month]
-                for month in range(1, 13)
-            ),
-        )
-
+    def _render_preview(self) -> None:
         self._update_preview_size()
-
-        pixmap = QPixmap(
-            self._preview_label.size()
-        )
-
-        pixmap.fill(
-            Qt.GlobalColor.white
-        )
-
-        painter = QPainter(
-            pixmap
-        )
-
-        geometry = PageRenderGeometry(
-            width=pixmap.width(),
-            height=pixmap.height(),
-            page_width_mm=self._page_format.width_mm,
-            page_height_mm=self._page_format.height_mm,
-        )
-
-        paint_geographic_word_cloud(
-            painter,
-            target_rect=pixmap.rect(),
-            cloud=cloud,
-            font_pixel_size=geometry.font_pixel_size,
-        )
-
-        if not cloud.words:
-            painter.setPen(
-                Qt.GlobalColor.darkGray
-            )
-
-            painter.drawText(
-                pixmap.rect(),
-                Qt.AlignmentFlag.AlignCenter,
-                self._translator.tr(
-                    "page_settings.no_geographic_data"
-                ),
-            )
-
-        painter.end()
-
         self._preview_label.setPixmap(
-            pixmap
+            self.render_template_preview(
+                width=self._preview_label.width(),
+                height=self._preview_label.height(),
+                photos=self._photos,
+            )
         )

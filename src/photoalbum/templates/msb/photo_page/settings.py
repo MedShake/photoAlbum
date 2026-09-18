@@ -5,8 +5,6 @@ from dataclasses import replace
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
-    QPainter,
-    QPixmap,
 )
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -49,7 +47,6 @@ from photoalbum.templates.msb.settings_base import (
     MsbTemplateSettingsWidget,
 )
 
-from .widget_renderer import PhotoPageWidgetRenderer
 
 from .caption_style import (
     DEFAULT_CAPTION_COLOR,
@@ -359,146 +356,32 @@ class PhotoPageSettingsWidget(
         self._render_preview()
 
     def _render_preview(self) -> None:
-        """
-        Render the settings preview from the canonical page
-        composition.
-
-        Photo-page geometry belongs to PageComposer.  This widget
-        deliberately owns no margin/grid/caption geometry.
-        """
-        from PySide6.QtCore import QRectF
-
-        class _PixmapCache:
-            @staticmethod
-            def load(path, size):
-                pixmap = QPixmap(str(path))
-
-                if pixmap.isNull():
-                    return pixmap
-
-                return pixmap.scaled(
-                    size,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-
-        pixmap = QPixmap(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
-        pixmap.fill(Qt.GlobalColor.white)
-
         try:
-            capacity = int(
-                self._instance.template_id.rsplit(
-                    "-",
-                    1,
-                )[1]
-            )
+            capacity = int(self._instance.template_id.rsplit("-", 1)[1])
         except (ValueError, IndexError):
             capacity = 1
-
-        capacity = max(
-            1,
-            min(4, capacity),
-        )
-
-        photos = tuple(
-            self._photos[:capacity]
-        )
-
+        capacity = max(1, min(4, capacity))
+        photos = tuple(self._photos[:capacity])
         page = PlannedPage(
-            number=1,
-            side=PageSide.RIGHT,
-            kind=PlanItemKind.PHOTO_GROUP,
-            template_id=self._instance.template_id,
-            photos=photos,
-            photo_capacity=capacity,
-            page_instance=self._instance,
+            number=1, side=PageSide.RIGHT, kind=PlanItemKind.PHOTO_GROUP,
+            template_id=self._instance.template_id, photos=photos,
+            photo_capacity=capacity, page_instance=self._instance,
         )
-
         photo_settings = PhotoPageSettings(
             page=self._instance,
             caption=PhotoCaptionSettings(
-                show_datetime=caption_show_datetime(
-                    self._instance.settings
-                ),
-                show_location=caption_show_location(
-                    self._instance.settings
-                ),
+                show_datetime=caption_show_datetime(self._instance.settings),
+                show_location=caption_show_location(self._instance.settings),
             ),
         )
-
-        composer = PageComposer()
-
-        composition = composer.compose(
-            page,
-            photo_settings,
-            PageNumberSettings(
-                enabled=False
-            ),
-            page_width_mm=(
-                self._page_format.width_mm
-            ),
-            page_height_mm=(
-                self._page_format.height_mm
-            ),
+        composition = PageComposer().compose(
+            page, photo_settings, PageNumberSettings(enabled=False),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
         )
-
-        painter = QPainter(pixmap)
-
-        def pixel_rect(rect):
-            return QRectF(
-                rect.x * pixmap.width(),
-                rect.y * pixmap.height(),
-                rect.width * pixmap.width(),
-                rect.height * pixmap.height(),
-            )
-
-        def font_pixel_size(points):
-            # Same physical conversion principle as the album/PDF
-            # preview: points -> physical page height -> pixels.
-            return max(
-                1,
-                round(
-                    points
-                    * pixmap.height()
-                    / self._page_format.height_mm
-                    * 25.4
-                    / 72.0
-                ),
-            )
-
-        try:
-            PhotoPageWidgetRenderer().paint(
-                painter=painter,
-                instance=self._instance,
-                photos=photos,
-                target_rect=pixmap.rect(),
-                width=pixmap.width(),
-                height=pixmap.height(),
-                translator=self._translator,
-                render_service=self._render_service,
-                set_waiting_key=None,
-                font_pixel_size=font_pixel_size,
-                page_width_mm=(
-                    self._page_format.width_mm
-                ),
-                page_height_mm=(
-                    self._page_format.height_mm
-                ),
-                album_pages=(),
-                composition=composition,
-                thumbnail_cache=_PixmapCache(),
-                pixel_rect=pixel_rect,
-                show_empty_slots=True,
-                template_pack_settings=(
-                    self._template_pack_settings
-                ),
-            )
-        finally:
-            painter.end()
-
         self._preview_label.setPixmap(
-            pixmap
+            self.render_composition_preview(
+                composition, width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT,
+                project_photos=photos, show_empty_slots=True,
+            )
         )
