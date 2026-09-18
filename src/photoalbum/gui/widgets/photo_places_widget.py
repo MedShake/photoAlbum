@@ -2174,12 +2174,6 @@ class PhotoPlacesWidget(QWidget):
                 candidate.value
             )
             checkbox.setAutoFillBackground(False)
-            checkbox.setStyleSheet(
-                "QCheckBox {"
-                " background: transparent;"
-                " padding: 0px;"
-                "}"
-            )
             checkbox.setChecked(
                 (
                     candidate.key,
