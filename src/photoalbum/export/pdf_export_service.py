@@ -348,12 +348,23 @@ class PdfExportService:
                 body_pages,
                 start=1,
             ):
+                reserved_caption_lines = (
+                    self._page_composer.spread_caption_lines(
+                        page,
+                        pages,
+                        settings.photo_pages,
+                        page_width_mm=page_width_mm,
+                        page_height_mm=page_height_mm,
+                    )
+                )
+
                 composition = self._page_composer.compose(
                     page,
                     settings.photo_pages,
                     settings.page_numbers,
                     page_width_mm=page_width_mm,
                     page_height_mm=page_height_mm,
+                    reserved_caption_lines=reserved_caption_lines,
                 )
 
                 begin_output_page()

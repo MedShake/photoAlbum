@@ -641,7 +641,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "template.blank": "Blank page",
 
         "plan.summary": "Summary",
-        "plan.optimizations": "Possible optimizations",
+        "plan.optimizations": "Warnings and possible optimizations",
         "plan.structure": "Document structure",
         "plan.album_body": "Album body",
         "plan.section": "Section",
@@ -653,6 +653,14 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.no_unused_capacity": (
             "No unused photo capacity detected "
             "at the end of a month."
+        ),
+        "plan.no_warning_or_optimization": (
+            "No warning or possible optimization detected."
+        ),
+        "plan.caption_overflow": (
+            "Warning — page {page}, {photo}: caption requires "
+            "{required} lines; this template displays up to "
+            "{available}."
         ),
 
         "plan.photos": "Photos",
@@ -1355,7 +1363,7 @@ CATALOGS: dict[str, dict[str, str]] = {
 
 
         "plan.summary": "Résumé",
-        "plan.optimizations": "Optimisations possibles",
+        "plan.optimizations": "Avertissements et optimisations possibles",
         "plan.structure": "Structure du document",
         "plan.album_body": "Corps de l’album",
         "plan.section": "Section",
@@ -1367,6 +1375,14 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.no_unused_capacity": (
             "Aucune capacité photo inutilisée détectée "
             "en fin de mois."
+        ),
+        "plan.no_warning_or_optimization": (
+            "Aucun avertissement ni optimisation possible détecté."
+        ),
+        "plan.caption_overflow": (
+            "Avertissement — page {page}, {photo} : la légende "
+            "nécessite {required} lignes ; ce modèle en affiche "
+            "au maximum {available}."
         ),
 
         "plan.photos": "Photos",

@@ -8,15 +8,12 @@ from PySide6.QtGui import (
     QPen,
 )
 
-from photoalbum.i18n.date_formatter import (
-    format_datetime,
-)
 from photoalbum.templates.msb.photo_page.caption_style import (
     caption_color,
     caption_font_family,
     caption_font_size,
-    caption_lines,
 )
+from photoalbum.templates.msb.photo_page.caption_layout import display_lines
 
 
 class PhotoPageWidgetRenderer:
@@ -89,6 +86,7 @@ class PhotoPageWidgetRenderer:
                 instance=instance,
                 font_pixel_size=font_pixel_size,
                 pixel_rect=pixel_rect,
+                page_width_mm=page_width_mm,
             )
 
     @staticmethod
@@ -189,6 +187,7 @@ class PhotoPageWidgetRenderer:
         instance,
         font_pixel_size,
         pixel_rect,
+        page_width_mm,
     ) -> None:
         if (
             slot.caption_rect is None
@@ -200,25 +199,17 @@ class PhotoPageWidgetRenderer:
             slot.caption_rect
         )
 
-        datetime_text = (
-            format_datetime(
-                slot.caption.capture_datetime
-            )
-            if slot.caption.capture_datetime
-            is not None
-            else None
-        )
-
         settings = (
             instance.settings
             if instance is not None
             else {}
         )
 
-        lines = caption_lines(
-            caption_text=slot.caption.caption_text,
-            capture_datetime_text=datetime_text,
-            location_text=slot.caption.location_text,
+        lines = display_lines(
+            slot.caption,
+            width_mm=(
+                slot.caption_rect.width * page_width_mm
+            ),
             settings=settings,
         )
 
@@ -251,7 +242,6 @@ class PhotoPageWidgetRenderer:
             (
                 Qt.AlignmentFlag.AlignHCenter
                 | Qt.AlignmentFlag.AlignTop
-                | Qt.TextFlag.TextWordWrap
             ),
             "\n".join(lines),
         )

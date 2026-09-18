@@ -1,6 +1,15 @@
 from __future__ import annotations
 
 from photoalbum.i18n import Translator
+from photoalbum.album.composition import (
+    PageComposer,
+    create_builtin_layout_registry,
+)
+from photoalbum.album.models import page_format_from_id
+from photoalbum.templates.msb.photo_page.caption_layout import (
+    required_line_count,
+)
+
 from photoalbum.gui.template_labels import template_display_name
 
 from PySide6.QtWidgets import (
@@ -203,44 +212,118 @@ class AlbumPlanWidget(QWidget):
                 )
             )
 
-        self._set_suggestions(summary)
+        self._set_suggestions(
+            summary,
+            result=result,
+            settings=settings,
+        )
         self._set_structure(
             result,
             settings,
         )
 
-    def _set_suggestions(self, summary) -> None:
-        suggestions = summary.period_fill_suggestions
+    def _set_suggestions(
+        self,
+        summary,
+        *,
+        result: AlbumBuildResult | None = None,
+        settings: AlbumStructureSettings | None = None,
+    ) -> None:
+        lines = self._caption_warning_lines(
+            result, settings
+        )
 
-        if not suggestions:
-            self._suggestions_label.setText(
-                self._translator.tr(
-                    "plan.no_unused_capacity"
-                )
-            )
-            return
-
-        lines = []
-
-        for suggestion in suggestions:
+        for suggestion in summary.period_fill_suggestions:
             month_name = self._translator.month_name(
                 suggestion.month
             )
-
-            slots = suggestion.available_photo_slots
-
             lines.append(
                 self._translator.tr(
                     "plan.suggestion",
                     month=month_name,
                     year=suggestion.year,
-                    slots=slots,
+                    slots=suggestion.available_photo_slots,
+                )
+            )
+
+        if not lines:
+            lines.append(
+                self._translator.tr(
+                    "plan.no_warning_or_optimization"
                 )
             )
 
         self._suggestions_label.setText(
             "\n".join(lines)
         )
+
+    def _caption_warning_lines(
+        self,
+        result: AlbumBuildResult | None,
+        settings: AlbumStructureSettings | None,
+    ) -> list[str]:
+        if result is None or settings is None:
+            return []
+
+        page_format = page_format_from_id(
+            settings.page_format
+        )
+        width_mm = page_format.width_mm
+        height_mm = page_format.height_mm
+        if settings.orientation.value == "landscape":
+            width_mm, height_mm = height_mm, width_mm
+
+        registry = create_builtin_layout_registry()
+        composer = PageComposer(registry)
+        lines: list[str] = []
+
+        for page in result.pagination.pages:
+            if (
+                page.kind != PlanItemKind.PHOTO_GROUP
+                or not page.template_id
+            ):
+                continue
+            try:
+                layout = registry.get(page.template_id)
+            except KeyError:
+                # A third-party template owns its own diagnostics.
+                continue
+
+            composition = composer.compose(
+                page,
+                settings.photo_pages,
+                settings.page_numbers,
+                page_width_mm=width_mm,
+                page_height_mm=height_mm,
+            )
+            render_settings = (
+                page.page_instance.settings
+                if page.page_instance is not None
+                else settings.photo_pages.page.settings
+            )
+
+            for index, slot in enumerate(
+                composition.photo_slots[:len(page.photos)]
+            ):
+                required = required_line_count(
+                    slot.caption,
+                    width_mm=slot.image_rect.width * width_mm,
+                    settings=render_settings,
+                )
+                if required <= layout.max_caption_lines:
+                    continue
+                photo = page.photos[index]
+                lines.append(
+                    self._translator.tr(
+                        "plan.caption_overflow",
+                        page=page.number,
+                        photo=photo.filename,
+                        required=required,
+                        available=layout.max_caption_lines,
+                    )
+                )
+
+        return lines
 
     def _set_basic_structure(
         self,

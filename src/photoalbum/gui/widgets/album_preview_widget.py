@@ -987,12 +987,23 @@ class AlbumPreviewWidget(QWidget):
         # Interior starts on the right opposite the inside
         # front cover.
         for page in pages:
+            reserved_caption_lines = (
+                self._composer.spread_caption_lines(
+                    page,
+                    pages,
+                    settings.photo_pages,
+                    page_width_mm=page_format.width_mm,
+                    page_height_mm=page_format.height_mm,
+                )
+            )
+
             composition = self._composer.compose(
                 page,
                 settings.photo_pages,
                 settings.page_numbers,
                 page_width_mm=page_format.width_mm,
                 page_height_mm=page_format.height_mm,
+                reserved_caption_lines=reserved_caption_lines,
             )
 
             preview = AlbumPagePreview(

@@ -94,3 +94,65 @@ def test_break_after_all_items_gives_one_line():
     ) == [
         "Une légende — 18/09/2026 10:30 — Paris",
     ]
+
+def test_canonical_caption_wrap_is_deterministic():
+    from PySide6.QtWidgets import QApplication
+
+    if QApplication.instance() is None:
+        QApplication([])
+    from photoalbum.templates.msb.photo_page.caption_layout import wrap_text
+
+    settings = {"photo_caption": {"font_size": 8.0}}
+    text = "Avenue de l'Île, Plaisance, Orvault, Nantes, Loire-Atlantique"
+    first = wrap_text(text, width_mm=45.0, settings=settings)
+    second = wrap_text(text, width_mm=45.0, settings=settings)
+
+    assert first == second
+    assert " ".join(first) == text
+    assert len(first) >= 2
+
+
+def test_canonical_caption_wrap_splits_a_single_oversized_block():
+    from PySide6.QtWidgets import QApplication
+
+    if QApplication.instance() is None:
+        QApplication([])
+    from photoalbum.templates.msb.photo_page.caption_layout import wrap_text
+
+    settings = {"photo_caption": {"font_size": 8.0}}
+    text = "UnBlocSansAucunEspaceQuiEstVraimentBeaucoupTropLongPourLaZone"
+    lines = wrap_text(text, width_mm=20.0, settings=settings)
+
+    assert len(lines) > 1
+    assert "".join(lines) == text
+
+
+
+def test_physical_caption_line_height_follows_font_size():
+    from PySide6.QtWidgets import QApplication
+
+    if QApplication.instance() is None:
+        QApplication([])
+
+    from photoalbum.templates.msb.photo_page.caption_layout import (
+        physical_line_height_mm,
+    )
+
+    small = physical_line_height_mm(
+        {
+            "photo_caption": {
+                "font_size": 8.0,
+            }
+        }
+    )
+
+    large = physical_line_height_mm(
+        {
+            "photo_caption": {
+                "font_size": 20.0,
+            }
+        }
+    )
+
+    assert small > 0.0
+    assert large > small
