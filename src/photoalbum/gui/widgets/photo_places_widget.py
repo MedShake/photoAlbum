@@ -292,6 +292,19 @@ class PhotoPlacesWidget(QWidget):
             None,
         ]
         | None = None,
+        save_locations: Callable[
+            [
+                list[
+                    tuple[
+                        Photo,
+                        tuple[LocationComponent, ...],
+                        str | None,
+                    ]
+                ]
+            ],
+            None,
+        ]
+        | None = None,
         edit_source_photo: Callable[
             [Photo],
             None,
@@ -304,6 +317,7 @@ class PhotoPlacesWidget(QWidget):
         self._translator = translator or Translator("en")
         self._save_location = save_location
         self._save_caption = save_caption
+        self._save_locations = save_locations
         self._edit_source_photo = edit_source_photo
 
         self._caption_builder = LocationCaptionBuilder()
@@ -3761,6 +3775,14 @@ class PhotoPlacesWidget(QWidget):
         action: str,
         target_key: str | None,
     ) -> None:
+        pending_saves: list[
+            tuple[
+                Photo,
+                tuple[LocationComponent, ...],
+                str | None,
+            ]
+        ] = []
+
         for photo in photos:
             values = self._location_candidates_by_key(
                 photo
@@ -3863,15 +3885,34 @@ class PhotoPlacesWidget(QWidget):
             photo.location_text = location_text
             photo.location_selection_edited = True
 
-            if self._save_location is not None:
-                self._save_location(
+            pending_saves.append(
+                (
                     photo,
                     selected,
                     location_text,
                 )
+            )
 
-        # One refresh after the complete atomic-looking operation,
-        # never one rebuild per modified photo.
+        if pending_saves:
+            if self._save_locations is not None:
+                self._save_locations(
+                    pending_saves
+                )
+            elif self._save_location is not None:
+                # Compatibility fallback for callers that only
+                # provide the historical per-photo callback.
+                for (
+                    photo,
+                    selected,
+                    location_text,
+                ) in pending_saves:
+                    self._save_location(
+                        photo,
+                        selected,
+                        location_text,
+                    )
+
+        # One widget refresh after the complete grouped operation.
         self._rebuild_tree()
 
     def _composition_changed(

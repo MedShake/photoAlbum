@@ -138,6 +138,12 @@ class MainWindow(QMainWindow):
         self._scan_seen_paths: set[str] = set()
         self._analysis_completed = False
 
+        # Editorial changes made in "Lieux et légendes" are
+        # persisted immediately, but rebuilding the whole album is
+        # deferred until the user leaves that tab.
+        self._editorial_album_dirty = False
+        self._previous_tab_index = 0
+
         self.setWindowTitle("Photo Album")
         self.resize(1100, 700)
 
@@ -599,6 +605,7 @@ class MainWindow(QMainWindow):
             translator=self._translator,
             save_location=self._save_photo_editorial_location,
             save_caption=self._save_photo_caption,
+            save_locations=self._save_photo_editorial_locations,
             edit_source_photo=self._go_to_source_photo,
             parent=self,
         )
@@ -975,7 +982,38 @@ class MainWindow(QMainWindow):
 
         self._update_pdf_summary()
 
+        self._previous_tab_index = self._tabs.currentIndex()
+        self._tabs.currentChanged.connect(
+            self._main_tab_changed
+        )
+
         self.setCentralWidget(central_widget)
+
+    def _mark_editorial_album_dirty(self) -> None:
+        self._editorial_album_dirty = True
+
+    def _flush_editorial_album_changes(self) -> None:
+        if not self._editorial_album_dirty:
+            return
+
+        if not self._project_service.is_open:
+            self._editorial_album_dirty = False
+            return
+
+        self._preview_render_service.clear()
+        self._refresh_album_plan()
+        self._update_pdf_summary()
+        self._editorial_album_dirty = False
+
+    def _main_tab_changed(self, index: int) -> None:
+        previous = self._previous_tab_index
+        self._previous_tab_index = index
+
+        if (
+            previous == self._photos_places_index
+            and index != self._photos_places_index
+        ):
+            self._flush_editorial_album_changes()
 
     def _choose_pdf_output(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
@@ -1109,6 +1147,8 @@ class MainWindow(QMainWindow):
                 )
             )
             return
+
+        self._flush_editorial_album_changes()
 
         result = self._album_build_result
 
@@ -3055,10 +3095,9 @@ class MainWindow(QMainWindow):
                 caption,
             )
 
-            # Captions are part of the rendered album.
-            self._preview_render_service.clear()
-            self._refresh_album_plan()
-            self._update_pdf_summary()
+            # Persist immediately, but defer the expensive album
+            # rebuild until "Lieux et légendes" is left.
+            self._mark_editorial_album_dirty()
         except Exception as exc:
             self._show_error(str(exc))
 
@@ -3107,6 +3146,30 @@ class MainWindow(QMainWindow):
                 self._photo_table.setFocus()
                 return
 
+    def _save_photo_editorial_locations(
+        self,
+        changes,
+    ) -> None:
+        """
+        Persist a grouped editorial-location edit and mark the
+        album for one deferred refresh.
+        """
+        changed = False
+
+        try:
+            for photo, components, location_text in changes:
+                self._project_service.set_editorial_location(
+                    photo.path,
+                    components=components,
+                    location_text=location_text,
+                )
+                changed = True
+        except Exception as exc:
+            self._show_error(str(exc))
+        finally:
+            if changed:
+                self._mark_editorial_album_dirty()
+
     def _save_photo_editorial_location(
         self,
         photo: Photo,
@@ -3120,12 +3183,9 @@ class MainWindow(QMainWindow):
                 location_text=location_text,
             )
 
-            # The album composition and rendered previews depend on
-            # the effective editorial location. Rebuild them
-            # immediately after a location edit.
-            self._preview_render_service.clear()
-            self._refresh_album_plan()
-            self._update_pdf_summary()
+            # Persist immediately, but defer the expensive album
+            # rebuild until "Lieux et légendes" is left.
+            self._mark_editorial_album_dirty()
         except Exception as exc:
             self._show_error(str(exc))
 
