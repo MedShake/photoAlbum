@@ -156,3 +156,30 @@ def test_physical_caption_line_height_follows_font_size():
 
     assert small > 0.0
     assert large > small
+
+
+
+def test_photo_settings_preview_does_not_own_page_geometry():
+    """Settings preview must use canonical composition geometry."""
+    from pathlib import Path
+
+    path = (
+        Path(__file__).parents[1]
+        / "src/photoalbum/templates/msb/photo_page/settings.py"
+    )
+    source = path.read_text(encoding="utf-8")
+
+    assert "PageComposer" in source
+    assert "PhotoPageWidgetRenderer" in source
+
+    forbidden = (
+        "margin = 24",
+        "gap = 12",
+        "cell_width =",
+        "cell_height =",
+        "caption_height =",
+        "image_height =",
+    )
+
+    for fragment in forbidden:
+        assert fragment not in source

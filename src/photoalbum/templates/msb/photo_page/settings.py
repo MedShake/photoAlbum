@@ -5,7 +5,6 @@ from dataclasses import replace
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
-    QFont,
     QPainter,
     QPixmap,
 )
@@ -30,13 +29,27 @@ from photoalbum.album import (
     PageFormat,
     PageInstance,
 )
-from photoalbum.i18n.date_formatter import format_datetime
+from photoalbum.album.composition import (
+    PageComposer,
+    PageNumberSettings,
+)
+from photoalbum.album.pagination import (
+    PageSide,
+    PlannedPage,
+)
+from photoalbum.album.planning import PlanItemKind
+from photoalbum.album.settings import (
+    PhotoCaptionSettings,
+    PhotoPageSettings,
+)
 from photoalbum.rendering.fonts import (
     available_photo_album_fonts,
 )
 from photoalbum.templates.msb.settings_base import (
     MsbTemplateSettingsWidget,
 )
+
+from .widget_renderer import PhotoPageWidgetRenderer
 
 from .caption_style import (
     DEFAULT_CAPTION_COLOR,
@@ -45,7 +58,6 @@ from .caption_style import (
     caption_color_name,
     caption_font_family,
     caption_font_size,
-    caption_lines,
     caption_order,
     caption_show_datetime,
     caption_show_location,
@@ -346,54 +358,35 @@ class PhotoPageSettingsWidget(
     def msb_theme_changed(self) -> None:
         self._render_preview()
 
-    def _preview_text(self, photo) -> str:
-        caption_text = getattr(
-            photo,
-            "caption",
-            None,
-        )
-
-        capture_datetime = getattr(
-            photo,
-            "capture_datetime",
-            None,
-        )
-        datetime_text = (
-            format_datetime(capture_datetime)
-            if capture_datetime is not None
-            else None
-        )
-
-        location_text = getattr(
-            photo,
-            "location_text",
-            None,
-        )
-
-        if not location_text:
-            location_text = getattr(
-                photo,
-                "city",
-                None,
-            )
-
-        lines = caption_lines(
-            caption_text=caption_text,
-            capture_datetime_text=datetime_text,
-            location_text=location_text,
-            settings=self._instance.settings,
-        )
-
-        return "\n".join(lines)
-
     def _render_preview(self) -> None:
+        """
+        Render the settings preview from the canonical page
+        composition.
+
+        Photo-page geometry belongs to PageComposer.  This widget
+        deliberately owns no margin/grid/caption geometry.
+        """
+        from PySide6.QtCore import QRectF
+
+        class _PixmapCache:
+            @staticmethod
+            def load(path, size):
+                pixmap = QPixmap(str(path))
+
+                if pixmap.isNull():
+                    return pixmap
+
+                return pixmap.scaled(
+                    size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+
         pixmap = QPixmap(
             self.PREVIEW_WIDTH,
             self.PREVIEW_HEIGHT,
         )
         pixmap.fill(Qt.GlobalColor.white)
-
-        painter = QPainter(pixmap)
 
         try:
             capacity = int(
@@ -405,168 +398,107 @@ class PhotoPageSettingsWidget(
         except (ValueError, IndexError):
             capacity = 1
 
-        capacity = max(1, min(4, capacity))
-
-        margin = 24
-        gap = 12
-        usable_width = (
-            self.PREVIEW_WIDTH - 2 * margin
-        )
-        usable_height = (
-            self.PREVIEW_HEIGHT - 2 * margin
-        )
-
-        if capacity == 1:
-            rows, columns = 1, 1
-        elif capacity == 2:
-            rows, columns = 2, 1
-        else:
-            rows, columns = 2, 2
-
-        cell_width = (
-            usable_width
-            - gap * (columns - 1)
-        ) // columns
-
-        cell_height = (
-            usable_height
-            - gap * (rows - 1)
-        ) // rows
-
-        caption_height = max(
-            34,
-            min(52, cell_height // 5),
-        )
-        image_height = max(
+        capacity = max(
             1,
-            cell_height - caption_height,
+            min(4, capacity),
         )
 
-        for index in range(capacity):
-            row = index // columns
-            column = index % columns
+        photos = tuple(
+            self._photos[:capacity]
+        )
 
-            x = margin + column * (
-                cell_width + gap
-            )
-            y = margin + row * (
-                cell_height + gap
-            )
+        page = PlannedPage(
+            number=1,
+            side=PageSide.RIGHT,
+            kind=PlanItemKind.PHOTO_GROUP,
+            template_id=self._instance.template_id,
+            photos=photos,
+            photo_capacity=capacity,
+            page_instance=self._instance,
+        )
 
-            image_rect = pixmap.rect().__class__(
-                x,
-                y,
-                cell_width,
-                image_height,
-            )
-            caption_rect = pixmap.rect().__class__(
-                x,
-                y + image_height,
-                cell_width,
-                caption_height,
-            )
-
-            drawn = False
-
-            if index < len(self._photos):
-                source = getattr(
-                    self._photos[index],
-                    "path",
-                    None,
-                )
-                if source is not None:
-                    photo_pixmap = QPixmap(str(source))
-                    if not photo_pixmap.isNull():
-                        scaled = photo_pixmap.scaled(
-                            image_rect.size(),
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
-                        px = (
-                            image_rect.x()
-                            + (
-                                image_rect.width()
-                                - scaled.width()
-                            ) // 2
-                        )
-                        py = (
-                            image_rect.y()
-                            + (
-                                image_rect.height()
-                                - scaled.height()
-                            ) // 2
-                        )
-                        painter.drawPixmap(
-                            px,
-                            py,
-                            scaled,
-                        )
-                        drawn = True
-
-            if not drawn:
-                painter.setPen(
-                    Qt.GlobalColor.lightGray
-                )
-                painter.drawRect(image_rect)
-                painter.drawText(
-                    image_rect,
-                    Qt.AlignmentFlag.AlignCenter,
-                    str(index + 1),
-                )
-
-            if index >= len(self._photos):
-                continue
-
-            text = self._preview_text(
-                self._photos[index]
-            )
-            if not text:
-                continue
-
-            font = QFont(
-                caption_font_family(
+        photo_settings = PhotoPageSettings(
+            page=self._instance,
+            caption=PhotoCaptionSettings(
+                show_datetime=caption_show_datetime(
                     self._instance.settings
-                )
-            )
-            font.setBold(False)
-
-            size = caption_font_size(
-                self._instance.settings
-            )
-            font.setPixelSize(
-                max(
-                    1,
-                    round(
-                        size
-                        * self.PREVIEW_HEIGHT
-                        / 510
-                    ),
-                )
-            )
-
-            painter.setFont(font)
-            painter.setPen(
-                QColor(
-                    caption_color_name(
-                        self._instance.settings
-                    )
-                )
-            )
-
-            painter.drawText(
-                caption_rect.adjusted(
-                    3,
-                    2,
-                    -3,
-                    -2,
                 ),
-                (
-                    Qt.AlignmentFlag.AlignHCenter
-                    | Qt.AlignmentFlag.AlignTop
-                    | Qt.TextFlag.TextWordWrap
+                show_location=caption_show_location(
+                    self._instance.settings
                 ),
-                text,
+            ),
+        )
+
+        composer = PageComposer()
+
+        composition = composer.compose(
+            page,
+            photo_settings,
+            PageNumberSettings(
+                enabled=False
+            ),
+            page_width_mm=(
+                self._page_format.width_mm
+            ),
+            page_height_mm=(
+                self._page_format.height_mm
+            ),
+        )
+
+        painter = QPainter(pixmap)
+
+        def pixel_rect(rect):
+            return QRectF(
+                rect.x * pixmap.width(),
+                rect.y * pixmap.height(),
+                rect.width * pixmap.width(),
+                rect.height * pixmap.height(),
             )
 
-        painter.end()
-        self._preview_label.setPixmap(pixmap)
+        def font_pixel_size(points):
+            # Same physical conversion principle as the album/PDF
+            # preview: points -> physical page height -> pixels.
+            return max(
+                1,
+                round(
+                    points
+                    * pixmap.height()
+                    / self._page_format.height_mm
+                    * 25.4
+                    / 72.0
+                ),
+            )
+
+        try:
+            PhotoPageWidgetRenderer().paint(
+                painter=painter,
+                instance=self._instance,
+                photos=photos,
+                target_rect=pixmap.rect(),
+                width=pixmap.width(),
+                height=pixmap.height(),
+                translator=self._translator,
+                render_service=self._render_service,
+                set_waiting_key=None,
+                font_pixel_size=font_pixel_size,
+                page_width_mm=(
+                    self._page_format.width_mm
+                ),
+                page_height_mm=(
+                    self._page_format.height_mm
+                ),
+                album_pages=(),
+                composition=composition,
+                thumbnail_cache=_PixmapCache(),
+                pixel_rect=pixel_rect,
+                show_empty_slots=True,
+                template_pack_settings=(
+                    self._template_pack_settings
+                ),
+            )
+        finally:
+            painter.end()
+
+        self._preview_label.setPixmap(
+            pixmap
+        )

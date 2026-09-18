@@ -103,9 +103,13 @@ class PhotoPageWidgetRenderer:
             slot.image_rect
         )
 
+        target_size = rect.size()
+        if hasattr(target_size, "toSize"):
+            target_size = target_size.toSize()
+
         pixmap = thumbnail_cache.load(
             path,
-            rect.size(),
+            target_size,
         )
 
         if pixmap.isNull():
@@ -130,7 +134,7 @@ class PhotoPageWidgetRenderer:
             return
 
         scaled = pixmap.scaled(
-            rect.size(),
+            target_size,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
