@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
@@ -11,7 +12,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QTextEdit,
+    QHBoxLayout,
     QVBoxLayout,
+    QWidget,
 )
 
 from photoalbum.album import PageInstance
@@ -23,6 +26,7 @@ from photoalbum.rendering.fonts import (
     available_photo_album_fonts,
     resolve_font_family,
 )
+from .widget_renderer import DedicationWidgetRenderer
 
 
 class DedicationSettingsWidget(
@@ -125,8 +129,16 @@ class DedicationSettingsWidget(
 
         self._create_content()
 
+    PREVIEW_WIDTH = 360
+    PREVIEW_HEIGHT = 510
+
     def _create_content(self) -> None:
-        layout = QVBoxLayout(self)
+        root = QHBoxLayout(self)
+        root.setSpacing(24)
+
+        left = QWidget()
+        layout = QVBoxLayout(left)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
         layout.addWidget(
@@ -147,11 +159,9 @@ class DedicationSettingsWidget(
             "**Pour vous**\n\n"
             "Avec toute notre affection."
         )
-
         self._text_edit.textChanged.connect(
             self._text_changed
         )
-
         layout.addWidget(
             self._text_edit,
             1,
@@ -160,10 +170,7 @@ class DedicationSettingsWidget(
         form = QFormLayout()
 
         self._font_combo = QComboBox()
-
-        fonts = available_photo_album_fonts()
-
-        for family in fonts:
+        for family in available_photo_album_fonts():
             self._font_combo.addItem(
                 family,
                 family,
@@ -172,7 +179,6 @@ class DedicationSettingsWidget(
         font_index = self._font_combo.findData(
             self._font_family
         )
-
         if font_index >= 0:
             self._font_combo.setCurrentIndex(
                 font_index
@@ -181,73 +187,132 @@ class DedicationSettingsWidget(
         self._font_combo.currentIndexChanged.connect(
             self._font_changed
         )
-
         form.addRow(
             "Police",
             self._font_combo,
         )
 
         self._font_size_spin = QDoubleSpinBox()
-        self._font_size_spin.setRange(
-            6.0,
-            72.0,
-        )
+        self._font_size_spin.setRange(6.0, 72.0)
         self._font_size_spin.setDecimals(1)
         self._font_size_spin.setSingleStep(0.5)
         self._font_size_spin.setSuffix(" pt")
         self._font_size_spin.setValue(
             self._font_size
         )
-
         self._font_size_spin.valueChanged.connect(
             self._font_size_changed
         )
-
         form.addRow(
             "Taille du texte",
             self._font_size_spin,
         )
 
         self._frame_color_button = QPushButton()
-
         self._frame_color_button.clicked.connect(
             self._choose_frame_color
         )
-
         form.addRow(
             "Couleur du cadre",
             self._frame_color_button,
         )
 
         self._frame_width_spin = QDoubleSpinBox()
-        self._frame_width_spin.setRange(
-            0.1,
-            10.0,
-        )
+        self._frame_width_spin.setRange(0.1, 10.0)
         self._frame_width_spin.setDecimals(1)
         self._frame_width_spin.setSingleStep(0.1)
         self._frame_width_spin.setSuffix(" pt")
         self._frame_width_spin.setValue(
             self._frame_width
         )
-
         self._frame_width_spin.valueChanged.connect(
             self._frame_width_changed
         )
-
         form.addRow(
             "Épaisseur du cadre",
             self._frame_width_spin,
         )
 
         layout.addLayout(form)
-
         layout.addSpacing(12)
         layout.addWidget(
             self.create_msb_theme_group()
         )
 
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(12)
+
+        right_layout.addWidget(
+            self.create_preview_title()
+        )
+
+        self._preview_label = QLabel()
+        self._preview_label.setFixedSize(
+            self.PREVIEW_WIDTH,
+            self.PREVIEW_HEIGHT,
+        )
+        self._preview_label.setStyleSheet(
+            "border: 1px solid #888;"
+            "background: white;"
+        )
+
+        right_layout.addWidget(
+            self._preview_label,
+            alignment=Qt.AlignmentFlag.AlignTop,
+        )
+        right_layout.addStretch()
+
+        root.addWidget(left, 1)
+        root.addWidget(right, 0)
+
         self._update_frame_color_button()
+        self._render_preview()
+
+    def _render_preview(self) -> None:
+        pixmap = QPixmap(
+            self.PREVIEW_WIDTH,
+            self.PREVIEW_HEIGHT,
+        )
+        pixmap.fill(Qt.GlobalColor.white)
+
+        painter = QPainter(pixmap)
+
+        renderer = DedicationWidgetRenderer()
+
+        renderer.paint(
+            painter=painter,
+            instance=self._instance,
+            photos=self._photos,
+            target_rect=pixmap.rect(),
+            width=pixmap.width(),
+            height=pixmap.height(),
+            translator=self._translator,
+            render_service=self._render_service,
+            set_waiting_key=None,
+            font_pixel_size=lambda points: max(
+                1,
+                round(
+                    points
+                    * self.PREVIEW_HEIGHT
+                    / self._page_format.height_mm
+                    * 25.4
+                    / 72.0
+                ),
+            ),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+            template_pack_settings=(
+                self._template_pack_settings
+            ),
+        )
+
+        painter.end()
+        self._preview_label.setPixmap(pixmap)
+
+    def msb_theme_changed(self) -> None:
+        self._render_preview()
 
     def _update_frame_color_button(
         self,
@@ -277,6 +342,7 @@ class DedicationSettingsWidget(
         )
 
         self.instance_changed.emit()
+        self._render_preview()
 
     def _text_changed(
         self,

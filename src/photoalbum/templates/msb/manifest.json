@@ -63,7 +63,7 @@
     },
     {
       "id": "calendar-index",
-      "name": "Calendar index",
+      "name": "Annual calendar",
       "module": "calendar_index",
       "kinds": [
         "cover",
@@ -89,7 +89,7 @@
     },
     {
       "id": "year-divider-classic",
-      "name": "Classic year divider",
+      "name": "Simple year divider",
       "module": "year_divider_classic",
       "kinds": [
         "year_divider"
@@ -107,8 +107,26 @@
     },
     {
       "id": "month-divider-classic",
-      "name": "Classic month divider",
+      "name": "Month divider with city list",
       "module": "month_divider_classic",
+      "kinds": [
+        "month_divider"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        }
+      ]
+    },
+    {
+      "id": "month-divider-simple",
+      "name": "Simple month divider",
+      "module": "month_divider_simple",
       "kinds": [
         "month_divider"
       ],

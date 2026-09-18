@@ -120,6 +120,9 @@ class AlbumPlanner:
                             ),
                             year=year,
                             month=month,
+                            page_instance=(
+                                settings.month_dividers.page
+                            ),
                         )
                     )
 

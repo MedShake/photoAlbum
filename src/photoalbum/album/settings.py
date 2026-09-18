@@ -216,12 +216,49 @@ class PhotoCaptionSettings:
     show_location: bool = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class PhotoPageSettings:
-    template_id: str
-    caption: PhotoCaptionSettings = field(
-        default_factory=PhotoCaptionSettings
-    )
+    page: PageInstance
+    caption: PhotoCaptionSettings
+
+    def __init__(
+        self,
+        template_id: str | None = None,
+        caption: PhotoCaptionSettings | None = None,
+        *,
+        page: PageInstance | None = None,
+    ) -> None:
+        if page is None:
+            if template_id is None:
+                raise ValueError(
+                    "template_id or page is required"
+                )
+
+            page = PageInstance(
+                template_id=template_id
+            )
+
+        if caption is None:
+            caption = PhotoCaptionSettings()
+
+        object.__setattr__(
+            self,
+            "page",
+            page,
+        )
+        object.__setattr__(
+            self,
+            "caption",
+            caption,
+        )
+
+    @property
+    def template_id(self) -> str:
+        return self.page.template_id
+
+    @property
+    def instance_id(self) -> str:
+        return self.page.instance_id
 
 
 @dataclass(frozen=True)

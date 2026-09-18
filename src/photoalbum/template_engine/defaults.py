@@ -11,6 +11,7 @@ class BuiltinTemplateDefaults:
     back_cover: str
     photo_page: str
     year_divider: str
+    month_divider: str
 
 
 DEFAULT_TEMPLATES = BuiltinTemplateDefaults(
@@ -20,4 +21,5 @@ DEFAULT_TEMPLATES = BuiltinTemplateDefaults(
     back_cover="geographic-word-cloud",
     photo_page="photo-page-2",
     year_divider="calendar-index",
+    month_divider="month-divider-classic",
 )

@@ -28,6 +28,7 @@ def paint_calendar_index(
     translator: Translator,
     page_width_mm: float,
     page_height_mm: float,
+    show_title: bool = True,
 ) -> None:
     sx = (
         target_rect.width()
@@ -80,38 +81,18 @@ def paint_calendar_index(
 
         return font
 
-    # --------------------------------------------------------
-    # "Index" title — same spirit as PHP.
-    # --------------------------------------------------------
+    # The year is the page title. 72 pt gives it real visual presence,
+    # while a physical title band keeps the 12-month grid safely on-page.
+    title_band_mm = 28.0 if show_title else 0.0
 
-    painter.setFont(
-        font_pt(
-            24,
-            bold=True,
+    if show_title:
+        painter.setFont(font_pt(72, bold=True))
+        painter.setPen(QColor(0, 141, 195))
+        painter.drawText(
+            rect_mm(10, 5, page_width_mm - 20, title_band_mm),
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+            str(composition.year),
         )
-    )
-
-    painter.setPen(
-        QColor(
-            0,
-            141,
-            195,
-        )
-    )
-
-    painter.drawText(
-        rect_mm(
-            10,
-            7,
-            page_width_mm - 20,
-            15,
-        ),
-        (
-            Qt.AlignmentFlag.AlignRight
-            | Qt.AlignmentFlag.AlignVCenter
-        ),
-        str(composition.year),
-    )
 
     margin = 10.0
     column_spacing = 8.0
@@ -125,21 +106,15 @@ def paint_calendar_index(
         - column_spacing
     )
 
-    page_area_height = (
-        page_height_mm
-        - 2 * margin
-    )
+    calendar_top = margin + title_band_mm
+    page_area_height = page_height_mm - calendar_top - margin
 
     month_width = (
         page_area_width
         / columns
     )
 
-    # Exact principle used by the PHP.
-    month_height = (
-        page_area_height / rows
-        - 7
-    )
+    month_height = page_area_height / rows
 
     weekday_labels = (
         translator.tr(
@@ -180,11 +155,7 @@ def paint_calendar_index(
             )
         )
 
-        y = (
-            margin
-            + row * month_height
-            + 20
-        )
+        y = calendar_top + row * month_height
 
         # ----------------------------------------------------
         # Month title + optional index page number.

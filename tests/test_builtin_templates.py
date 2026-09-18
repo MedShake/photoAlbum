@@ -56,6 +56,7 @@ def test_builtin_registry_contains_dividers():
         for template in month_templates
     } == {
         "month-divider-classic",
+        "month-divider-simple",
     }
 
     assert {

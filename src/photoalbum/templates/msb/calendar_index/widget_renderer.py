@@ -56,6 +56,8 @@ class CalendarIndexWidgetRenderer:
         ):
             settings = {}
 
+        show_title = bool(settings.get("show_title", True))
+
         years = sorted(
             {
                 photo.capture_datetime.year
@@ -111,4 +113,5 @@ class CalendarIndexWidgetRenderer:
             translator=translator,
             page_width_mm=page_width_mm,
             page_height_mm=page_height_mm,
+            show_title=show_title,
         )

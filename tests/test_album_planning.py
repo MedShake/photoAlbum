@@ -138,6 +138,18 @@ def test_month_divider_precedes_photo_group():
         PlanItemKind.PHOTO_GROUP,
     ]
 
+    month_divider = next(
+        item
+        for item in plan.items
+        if item.kind == PlanItemKind.MONTH_DIVIDER
+    )
+
+    assert month_divider.page_instance is not None
+    assert (
+        month_divider.page_instance.template_id
+        == "month"
+    )
+
 
 def test_month_dividers_can_be_disabled():
     plan = AlbumPlanner().plan(

@@ -91,8 +91,8 @@ def album_settings_to_json(
         },
 
         "photo_pages": {
-            "template_id": (
-                settings.photo_pages.template_id
+            "page": _instance_to_data(
+                settings.photo_pages.page
             ),
             "caption": {
                 "show_datetime": (
@@ -189,8 +189,19 @@ def album_settings_from_json(
         ),
 
         photo_pages=PhotoPageSettings(
-            template_id=str(
-                photo_data["template_id"]
+            page=(
+                _instance_from_data(
+                    photo_data["page"]
+                )
+                if isinstance(
+                    photo_data.get("page"),
+                    dict,
+                )
+                else PageInstance(
+                    template_id=str(
+                        photo_data["template_id"]
+                    )
+                )
             ),
             caption=PhotoCaptionSettings(
                 show_datetime=bool(

@@ -8,6 +8,7 @@ from PySide6.QtGui import (
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QHBoxLayout,
@@ -91,11 +92,17 @@ class CalendarIndexSettingsWidget(
         self._year_combo = QComboBox()
 
         form.addRow(
-            self._translator.tr(
-                "calendar_index.year"
-            ),
+            self._translator.tr("calendar_index.year"),
             self._year_combo,
         )
+
+        self._show_title_checkbox = QCheckBox(
+            self._translator.tr("calendar_index.show_title")
+        )
+        self._show_title_checkbox.toggled.connect(
+            self._show_title_changed
+        )
+        form.addRow("", self._show_title_checkbox)
 
         left_layout.addLayout(form)
         left_layout.addSpacing(12)
@@ -156,9 +163,12 @@ class CalendarIndexSettingsWidget(
         ):
             settings = {}
 
-        selected_year = settings.get(
-            "year"
+        selected_year = settings.get("year")
+        self._show_title_checkbox.blockSignals(True)
+        self._show_title_checkbox.setChecked(
+            bool(settings.get("show_title", True))
         )
+        self._show_title_checkbox.blockSignals(False)
 
         self._year_combo.blockSignals(
             True
@@ -168,7 +178,7 @@ class CalendarIndexSettingsWidget(
 
         if self._usage == "year_divider":
             self._year_combo.addItem(
-                "Automatique",
+                self._translator.tr("calendar_index.year_automatic"),
                 None,
             )
             self._year_combo.setEnabled(False)
@@ -218,6 +228,15 @@ class CalendarIndexSettingsWidget(
         self._year_combo.currentIndexChanged.connect(
             self._year_changed
         )
+
+    def _show_title_changed(self, checked: bool) -> None:
+        settings = dict(self._instance.settings)
+        calendar_settings = dict(settings.get("calendar_index", {}))
+        calendar_settings["show_title"] = bool(checked)
+        settings["calendar_index"] = calendar_settings
+        self._instance = replace(self._instance, settings=settings)
+        self.instance_changed.emit()
+        self._render_preview()
 
     def _save_year(
         self,
@@ -270,6 +289,9 @@ class CalendarIndexSettingsWidget(
         self,
     ) -> None:
         year = self._year_combo.currentData()
+        if self._usage == "year_divider":
+            years = available_calendar_years(self._photos)
+            year = years[0] if years else None
 
         pixmap = QPixmap(
             self.PREVIEW_WIDTH,
@@ -316,6 +338,7 @@ class CalendarIndexSettingsWidget(
                 translator=self._translator,
                 page_width_mm=self._page_format.width_mm,
                 page_height_mm=self._page_format.height_mm,
+                show_title=self._show_title_checkbox.isChecked(),
             )
 
         painter.end()

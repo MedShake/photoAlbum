@@ -81,6 +81,7 @@ class AlbumSettingsWidget(QWidget):
 
         self._month_divider_instance: PageInstance | None = None
         self._year_divider_instance: PageInstance | None = None
+        self._photo_page_instance: PageInstance | None = None
 
         self._year_dividers_available = False
 
@@ -794,9 +795,40 @@ class AlbumSettingsWidget(QWidget):
             TemplateKind.PHOTO_PAGE
         )
 
+        template_container = QWidget()
+        template_layout = QHBoxLayout(
+            template_container
+        )
+        template_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        template_layout.addWidget(
+            self._photo_page_combo,
+            1,
+        )
+
+        self._photo_page_settings_button = QPushButton(
+            self._translator.tr(
+                "album.settings"
+            )
+        )
+
+        self._photo_page_settings_button.clicked.connect(
+            lambda checked=False:
+            self._configure_photo_page_instance()
+        )
+
+        template_layout.addWidget(
+            self._photo_page_settings_button
+        )
+
         form.addRow(
             self._translator.tr("album.template"),
-            self._photo_page_combo,
+            template_container,
         )
 
         self._caption_datetime_checkbox = QCheckBox(
@@ -816,6 +848,74 @@ class AlbumSettingsWidget(QWidget):
         )
 
         return group
+
+    def _photo_instance(
+        self,
+    ) -> PageInstance:
+        template_id = self._template_id(
+            self._photo_page_combo
+        )
+
+        if (
+            self._photo_page_instance is None
+            or self._photo_page_instance.template_id
+            != template_id
+        ):
+            self._photo_page_instance = PageInstance(
+                template_id=template_id
+            )
+
+        return self._photo_page_instance
+
+    def _configure_photo_page_instance(
+        self,
+    ) -> None:
+        instance = self._photo_instance()
+
+        photos = (
+            self._photo_provider()
+            if self._photo_provider is not None
+            else []
+        )
+
+        dialog = PageInstanceDialog(
+            instance,
+            photos,
+            translator=self._translator,
+            render_service=self._render_service,
+            page_format=page_format_from_id(
+                str(
+                    self._page_format_combo.currentData()
+                )
+            ),
+            template_pack_settings=(
+                self._template_pack_settings
+            ),
+            parent=self,
+        )
+
+        result = dialog.exec()
+
+        if not result:
+            return
+
+        self._photo_page_instance = (
+            dialog.instance()
+        )
+
+        self._template_pack_settings = (
+            dialog.template_pack_settings()
+        )
+
+        if (
+            result
+            == PageInstanceDialog.THEME_REQUESTED
+        ):
+            if self._open_msb_theme_dialog():
+                self._emit_settings_changed()
+            return
+
+        self._emit_settings_changed()
 
     def _create_page_numbers_group(self) -> QGroupBox:
         group = QGroupBox(
@@ -1056,6 +1156,10 @@ class AlbumSettingsWidget(QWidget):
             self._year_divider_combo,
             DEFAULT_TEMPLATES.year_divider,
         )
+        self._set_combo_template(
+            self._month_divider_combo,
+            DEFAULT_TEMPLATES.month_divider,
+        )
 
         self._set_placement(
             self._month_placement_combo,
@@ -1096,6 +1200,7 @@ class AlbumSettingsWidget(QWidget):
         # A new project must never inherit instance-specific
         # state (scatter seeds/history, template options...).
         self._cover_instances.clear()
+        self._photo_page_instance = None
 
         self._front_matter_list.clear()
         self._back_matter_list.clear()
@@ -1192,9 +1297,7 @@ class AlbumSettingsWidget(QWidget):
                 ),
             ),
             photo_pages=PhotoPageSettings(
-                template_id=self._template_id(
-                    self._photo_page_combo
-                ),
+                page=self._photo_instance(),
                 caption=PhotoCaptionSettings(
                     show_datetime=(
                         self._caption_datetime_checkbox.isChecked()
@@ -1329,6 +1432,10 @@ class AlbumSettingsWidget(QWidget):
             self._set_combo_template(
                 self._photo_page_combo,
                 settings.photo_pages.template_id,
+            )
+
+            self._photo_page_instance = (
+                settings.photo_pages.page
             )
 
             self._caption_datetime_checkbox.setChecked(
