@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photo-album"
-version = "0.1.0b1"
+version = "0.1.0b2"
 description = "A multilingual desktop application for creating chronological photo albums"
 readme = "README.md"
 requires-python = ">=3.11"
