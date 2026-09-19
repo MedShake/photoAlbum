@@ -9,7 +9,10 @@
     }
   ],
   "description": "Templates historiques fournis avec Photo Album.",
-  "documentation": "README.md",
+  "documentation": {
+    "en": "docs/help.en.html",
+    "fr": "docs/help.fr.html"
+  }
   "templates": [
     {
       "id": "year-photo-scatter",

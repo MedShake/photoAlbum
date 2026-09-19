@@ -9,7 +9,10 @@
     }
   ],
   "description": "Simple full-page photographic templates.",
-  "documentation": "README.md",
+  "documentation": {
+    "en": "docs/help.en.html",
+    "fr": "docs/help.fr.html"
+  },
   "templates": [
     {
       "id": "simplex-full-photo-cover",

@@ -49,6 +49,23 @@ class TemplatePack:
     authors: tuple[str, ...]
     templates: tuple[TemplateDefinition, ...]
     modules: tuple[str, ...]
+    documentation_paths: dict[str, Path] | None = None
+
+    def documentation_path(
+        self,
+        language: str,
+    ) -> Path | None:
+        paths = self.documentation_paths or {}
+
+        language = str(language or "en").lower()
+        language = language.split("-", 1)[0]
+        language = language.split("_", 1)[0]
+
+        return (
+            paths.get(language)
+            or paths.get("en")
+            or next(iter(paths.values()), None)
+        )
 
 
 @dataclass(frozen=True)
@@ -207,6 +224,56 @@ def _template_from_data(
     return definition, module
 
 
+def _documentation_paths(
+    pack_path: Path,
+    value: object,
+) -> dict[str, Path]:
+    """
+    Resolve localized documentation supplied by a template pack.
+
+    Documentation files must remain inside the pack directory.
+    """
+    if value is None:
+        return {}
+
+    if isinstance(value, str):
+        entries = {"en": value}
+    elif isinstance(value, dict):
+        entries = value
+    else:
+        raise ValueError(
+            "Template pack documentation must be a path "
+            "or a language/path mapping"
+        )
+
+    pack_root = pack_path.resolve()
+    result: dict[str, Path] = {}
+
+    for language, raw_path in entries.items():
+        language = str(language).strip().lower()
+        relative = str(raw_path).strip()
+
+        if not language or not relative:
+            continue
+
+        candidate = (pack_path / relative).resolve()
+
+        try:
+            candidate.relative_to(pack_root)
+        except ValueError:
+            raise ValueError(
+                "Template pack documentation must remain inside "
+                f"the pack directory: {relative!r}"
+            ) from None
+
+        # A localized file may deliberately be absent while a pack is
+        # being translated. Runtime selection will fall back to EN.
+        if candidate.is_file():
+            result[language] = candidate
+
+    return result
+
+
 def load_template_pack(
     manifest_path: Path,
 ) -> TemplatePack:
@@ -292,6 +359,10 @@ def load_template_pack(
         authors=tuple(authors),
         templates=tuple(definitions),
         modules=tuple(dict.fromkeys(modules)),
+        documentation_paths=_documentation_paths(
+            manifest_path.parent,
+            data.get("documentation"),
+        ),
     )
 
 

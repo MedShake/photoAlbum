@@ -20,6 +20,9 @@ from PySide6.QtWidgets import (
 from photoalbum import __version__
 from photoalbum.app import ProjectService
 from photoalbum.gui.help_dialog import HelpDialog
+from photoalbum.gui.template_pack_help_dialog import (
+    TemplatePackHelpDialog,
+)
 
 from photoalbum.album import (
     AlbumBuilder,
@@ -131,6 +134,14 @@ class MainWindow(QMainWindow):
         self._help_action = QAction(self._translator.tr('main.quick_help'), self)
         self._help_action.triggered.connect(self._show_help_dialog)
 
+        self._template_help_action = QAction(
+            self._translator.tr("main.template_help"),
+            self,
+        )
+        self._template_help_action.triggered.connect(
+            self._show_template_help_dialog
+        )
+
         self._about_action = QAction(self._translator.tr('main.about'), self)
         self._about_action.triggered.connect(self._show_about_dialog)
 
@@ -145,12 +156,21 @@ class MainWindow(QMainWindow):
 
         help_menu = self.menuBar().addMenu(self._translator.tr('main.help'))
         help_menu.addAction(self._help_action)
+        help_menu.addAction(self._template_help_action)
         help_menu.addSeparator()
         help_menu.addAction(self._about_action)
 
     def _show_help_dialog(self) -> None:
         """Display the localized quick help dialog."""
         dialog = HelpDialog(self._translator, self)
+        dialog.exec()
+
+    def _show_template_help_dialog(self) -> None:
+        """Display documentation supplied by template packs."""
+        dialog = TemplatePackHelpDialog(
+            self._translator,
+            self,
+        )
         dialog.exec()
 
     def _show_about_dialog(self) -> None:

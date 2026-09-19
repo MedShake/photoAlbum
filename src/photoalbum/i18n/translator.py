@@ -355,6 +355,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.file": "File",
         "main.help": "Help",
         "main.quick_help": "Photo Album Help…",
+        "main.template_help": "Template documentation…",
+        "template_help.window_title": "Template documentation",
+        "template_help.no_documentation": (
+            "No template-pack documentation is available."
+        ),
         "main.about": "About Photo Album…",
         "help.window_title": "Photo Album — Quick Help",
         "help.content": (
@@ -1111,6 +1116,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.file": "Fichier",
         "main.help": "Aide",
         "main.quick_help": "Aide de Photo Album…",
+        "main.template_help": "Documentation des modèles…",
+        "template_help.window_title": "Documentation des modèles",
+        "template_help.no_documentation": (
+            "Aucune documentation de pack de modèles n’est disponible."
+        ),
         "main.about": "À propos de Photo Album…",
         "help.window_title": "Photo Album — Aide rapide",
         "help.content": (
