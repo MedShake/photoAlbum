@@ -101,7 +101,7 @@ def test_calendar_index_is_reusable():
     )
 
 
-def test_dedication_is_special_page_only():
+def test_dedication_supports_special_page_and_cover():
     registry = create_template_registry()
 
     template = registry.get(
@@ -127,4 +127,3 @@ def test_builtin_template_ids_are_unique():
     ]
 
     assert len(ids) == len(set(ids))
-

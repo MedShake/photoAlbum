@@ -229,3 +229,39 @@ def test_third_party_pack_is_discovered_from_directory(
     assert pack.authors == ("Example Author",)
     assert pack.description == "Example template pack."
     assert pack.templates == ()
+
+def test_msb_dedication_usage_contract():
+    """Dedication is a special page and a restricted cover template."""
+    registry = create_template_registry()
+    target = TemplateTarget(
+        "a4",
+        PageOrientation.PORTRAIT,
+    )
+
+    dedication = registry.get("dedication")
+    assert dedication is not None
+
+    special_pages = registry.list_for_target(
+        TemplateKind.SPECIAL_PAGE,
+        target,
+    )
+    assert dedication in special_pages
+
+    covers = registry.list_for_target(
+        TemplateKind.COVER,
+        target,
+    )
+    assert dedication in covers
+
+    assert not dedication.supports_cover_position(
+        CoverPosition.FRONT
+    )
+    assert dedication.supports_cover_position(
+        CoverPosition.INSIDE_FRONT
+    )
+    assert dedication.supports_cover_position(
+        CoverPosition.INSIDE_BACK
+    )
+    assert dedication.supports_cover_position(
+        CoverPosition.BACK
+    )

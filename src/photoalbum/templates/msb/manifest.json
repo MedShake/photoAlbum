@@ -12,7 +12,7 @@
   "documentation": {
     "en": "docs/help.en.html",
     "fr": "docs/help.fr.html"
-  }
+  },
   "templates": [
     {
       "id": "year-photo-scatter",
@@ -239,7 +239,9 @@
         }
       ],
       "cover_positions": [
-        "inside_back"
+        "inside_front",
+        "inside_back",
+        "back"
       ]
     },
     {
