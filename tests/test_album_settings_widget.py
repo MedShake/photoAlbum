@@ -80,7 +80,7 @@ def test_year_dividers_are_available_for_multiple_years():
     assert settings.year_dividers.enabled
 
 
-def test_landscape_unavailable_label_is_translated():
+def test_a4_landscape_is_available():
     widget = create_widget()
 
     widget._refresh_orientation_availability()
@@ -88,6 +88,29 @@ def test_landscape_unavailable_label_is_translated():
     model = widget._orientation_combo.model()
     item = model.item(1)
 
+    assert item.isEnabled()
+    assert item.text() == "Landscape"
+    assert item.toolTip() == ""
+
+
+def test_letter_landscape_unavailable_label_is_translated():
+    widget = create_widget()
+
+    # A4 is the default first format. Select US Letter,
+    # whose landscape target is intentionally unavailable.
+    for index in range(widget._page_format_combo.count()):
+        if widget._page_format_combo.itemData(index) == "us-letter":
+            widget._page_format_combo.setCurrentIndex(index)
+            break
+    else:
+        raise AssertionError("US Letter format not found")
+
+    widget._refresh_orientation_availability()
+
+    model = widget._orientation_combo.model()
+    item = model.item(1)
+
+    assert not item.isEnabled()
     assert item.text() == (
         "Landscape — templates unavailable for this orientation"
     )
@@ -147,3 +170,61 @@ def test_settings_can_be_restored():
     widget.set_settings(original)
 
     assert widget.settings() == original
+
+
+def test_target_changes_emit_once_with_compatible_selections():
+    widget = create_widget()
+    snapshots = []
+    widget.settings_changed.connect(lambda: snapshots.append(widget.settings()))
+    for combo, value in [
+        (widget._orientation_combo, "landscape"),
+        (widget._orientation_combo, "portrait"),
+        (widget._page_format_combo, "us-letter"),
+        (widget._page_format_combo, "a4"),
+    ]:
+        snapshots.clear()
+        combo.setCurrentIndex(combo.findData(value))
+        assert len(snapshots) == 1
+        settings = snapshots[0]
+        target = widget._target()
+        for cover in settings.covers.values():
+            assert widget._registry.get(cover.template_id).supports_target(target)
+        assert widget._registry.get(settings.photo_pages.template_id).supports_target(target)
+    widget.close()
+
+
+def test_loading_landscape_settings_does_not_emit_or_discard_local_options():
+    from dataclasses import replace
+    from photoalbum.album import PageOrientation, PageInstance
+
+    widget = create_widget()
+    widget._page_format_combo.setCurrentIndex(widget._page_format_combo.findData("us-letter"))
+    original = widget.settings()
+    photo_page = PageInstance(template_id="photo-page-1", settings={"custom": "preserve"})
+    settings = replace(original, page_format="a4", orientation=PageOrientation.LANDSCAPE,
+                       photo_pages=PhotoPageSettings(page=photo_page))
+    notifications = []
+    widget.settings_changed.connect(lambda: notifications.append(True))
+    widget.set_settings(settings)
+    assert notifications == []
+    restored = widget.settings()
+    assert restored.page_format == "a4"
+    assert restored.orientation == PageOrientation.LANDSCAPE
+    assert restored.photo_pages.page == photo_page
+    assert not widget._loading_settings
+    widget.close()
+
+
+def test_format_change_selects_supported_orientation_in_one_transaction():
+    from photoalbum.album import PageOrientation
+
+    widget = create_widget()
+    widget._orientation_combo.setCurrentIndex(widget._orientation_combo.findData("landscape"))
+    changed = []
+    widget.settings_changed.connect(lambda: changed.append(widget.settings()))
+    widget._page_format_combo.setCurrentIndex(widget._page_format_combo.findData("us-letter"))
+    assert len(changed) == 1
+    assert changed[0].orientation == PageOrientation.PORTRAIT
+    for cover in changed[0].covers.values():
+        assert widget._registry.get(cover.template_id).supports_target(widget._target())
+    widget.close()

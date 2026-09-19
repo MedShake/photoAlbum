@@ -105,11 +105,17 @@ def test_msb_does_not_claim_a5():
         )
 
 
-def test_msb_does_not_claim_landscape():
+def test_msb_landscape_availability_is_restricted_to_a4():
     registry = create_template_registry()
 
+    assert registry.album_target_available(
+        TemplateTarget(
+            "a4",
+            PageOrientation.LANDSCAPE,
+        )
+    )
+
     for format_id in (
-        "a4",
         "a5",
         "us-letter",
     ):
@@ -265,3 +271,63 @@ def test_msb_dedication_usage_contract():
     assert dedication.supports_cover_position(
         CoverPosition.BACK
     )
+
+
+def test_msb_selected_templates_support_a4_landscape():
+    registry = create_template_registry()
+    target = TemplateTarget(
+        "a4",
+        PageOrientation.LANDSCAPE,
+    )
+
+    cover_ids = {
+        template.template_id
+        for template in registry.list_for_target(
+            TemplateKind.COVER,
+            target,
+        )
+    }
+
+    special_page_ids = {
+        template.template_id
+        for template in registry.list_for_target(
+            TemplateKind.SPECIAL_PAGE,
+            target,
+        )
+    }
+
+    photo_page_ids = {
+        template.template_id
+        for template in registry.list_for_target(
+            TemplateKind.PHOTO_PAGE,
+            target,
+        )
+    }
+
+    assert "year-photo-scatter" in cover_ids
+    assert "geographic-word-cloud" in special_page_ids
+    assert "photo-page-1" in photo_page_ids
+
+
+def test_msb_other_photo_pages_do_not_support_a4_landscape():
+    registry = create_template_registry()
+    target = TemplateTarget(
+        "a4",
+        PageOrientation.LANDSCAPE,
+    )
+
+    photo_page_ids = {
+        template.template_id
+        for template in registry.list_for_target(
+            TemplateKind.PHOTO_PAGE,
+            target,
+        )
+    }
+
+    assert "photo-page-1" in photo_page_ids
+
+    assert not {
+        "photo-page-2",
+        "photo-page-3",
+        "photo-page-4",
+    } & photo_page_ids

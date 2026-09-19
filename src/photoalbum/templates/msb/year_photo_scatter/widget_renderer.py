@@ -146,6 +146,8 @@ class YearPhotoScatterWidgetRenderer:
                 effective_photos,
                 width=width,
                 height=height,
+                page_width_mm=page_width_mm,
+                page_height_mm=page_height_mm,
             )
 
             if set_waiting_key is not None:
@@ -163,6 +165,8 @@ class YearPhotoScatterWidgetRenderer:
                     effective_photos,
                     width=width,
                     height=height,
+                    page_width_mm=page_width_mm,
+                    page_height_mm=page_height_mm,
                 )
 
                 painter.setPen(

@@ -24,6 +24,27 @@ parent manages their lifetime and dialog placement; it is never used to access
 private window fields. Each thread owner retains its worker until the thread
 finishes, then releases its references and the Qt object.
 
+Paper format and orientation belong to the host. It resolves them into physical
+page dimensions before creating settings editors, previews, and PDF exports.
+Template compatibility is declared in the pack manifest; rendering must use
+the supplied dimensions rather than a paper-format name.
+
+`PageTemplateSettingsWidget` provides the shared settings layout: scrollable
+controls beside a top-aligned preview title and page. Its preview factory keeps
+the physical aspect ratio within screen bounds. `PageInstanceDialog` sizes to
+its contents; templates supply their controls and rendering without rebuilding
+the preview column.
+
+Format and orientation changes refresh compatible choices as one settings
+transaction. Loading settings emits no change; a user action emits one change
+after all dependent selections have been restored or replaced.
+
+The asynchronous preview cache includes physical page dimensions and derives
+its canonical raster aspect ratio from them. The scatter backend excludes title
+styling from its background signature: changing the title only repaints the
+lightweight overlay, while changing the seed or page geometry requests a new
+background.
+
 `tests/test_main_window_components.py` checks component connections, a real scan
 of a temporary folder, metadata editing and restoration, selection after sorting,
 and background task execution.

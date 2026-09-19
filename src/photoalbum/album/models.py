@@ -63,6 +63,38 @@ def page_format_from_id(
         ) from None
 
 
+def oriented_page_format(
+    page_format: PageFormat,
+    orientation: object,
+) -> PageFormat:
+    """
+    Return the effective physical page geometry for an orientation.
+
+    PageFormat describes canonical paper dimensions. Rendering code
+    consumes the effective physical dimensions after orientation has
+    been applied.
+    """
+    orientation_value = getattr(
+        orientation,
+        "value",
+        orientation,
+    )
+
+    if orientation_value == "landscape":
+        return PageFormat(
+            name=page_format.name,
+            width_mm=page_format.height_mm,
+            height_mm=page_format.width_mm,
+        )
+
+    if orientation_value == "portrait":
+        return page_format
+
+    raise ValueError(
+        f"Unsupported page orientation: {orientation_value}"
+    )
+
+
 @dataclass(frozen=True)
 class PrintProfile:
     name: str

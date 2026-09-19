@@ -106,6 +106,8 @@ class YearPhotoScatterPreviewBackend(
         photos,
         width: int,
         height: int,
+        page_width_mm: float,
+        page_height_mm: float,
         translator: Translator,
     ) -> PreviewJob:
         composition = compose_cover_scatter(
@@ -116,6 +118,8 @@ class YearPhotoScatterPreviewBackend(
             month_name=(
                 translator.month_name
             ),
+            page_width_mm=page_width_mm,
+            page_height_mm=page_height_mm,
         )
 
         worker = CoverRenderWorker(

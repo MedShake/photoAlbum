@@ -24,6 +24,7 @@ from photoalbum.app import ProjectService
 from photoalbum.album import (
     AlbumBuilder,
     PrintConstraints,
+    oriented_page_format,
     page_format_from_id,
 )
 from photoalbum.export import (
@@ -665,8 +666,11 @@ def run_pdf(
         )
 
         try:
-            page_format = page_format_from_id(
-                settings.page_format
+            page_format = oriented_page_format(
+                page_format_from_id(
+                    settings.page_format
+                ),
+                settings.orientation,
             )
         except ValueError as exc:
             print(
@@ -677,18 +681,6 @@ def run_pdf(
 
         width_mm = page_format.width_mm
         height_mm = page_format.height_mm
-
-        orientation = getattr(
-            settings.orientation,
-            "value",
-            settings.orientation,
-        )
-
-        if orientation == "landscape":
-            width_mm, height_mm = (
-                height_mm,
-                width_mm,
-            )
 
         metadata = PdfMetadata(
             title=args.title,

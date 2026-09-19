@@ -92,3 +92,23 @@ def test_templates_do_not_hardcode_legacy_font_families():
         "Hard-coded legacy font families found:\n"
         + "\n".join(violations)
     )
+
+
+def test_font_palette_is_reused_and_invalidated_when_qt_fonts_change(monkeypatch):
+    from unittest.mock import Mock
+    from photoalbum.rendering import fonts
+
+    families = Mock(return_value=[DEFAULT_SANS_FONT])
+    monkeypatch.setattr(fonts.QFontDatabase, "families", families)
+    fonts._invalidate_font_palette()
+    try:
+        assert available_photo_album_fonts() == (DEFAULT_SANS_FONT,)
+        for _ in range(5):
+            assert resolve_font_family(DEFAULT_SANS_FONT) == DEFAULT_SANS_FONT
+        assert families.call_count == 1
+        families.return_value = [DEFAULT_SERIF_FONT]
+        _app.fontDatabaseChanged.emit()
+        assert available_photo_album_fonts() == (DEFAULT_SERIF_FONT,)
+        assert families.call_count == 2
+    finally:
+        fonts._invalidate_font_palette()

@@ -10,7 +10,7 @@ from photoalbum.templates.msb.settings_base import MsbTemplateSettingsWidget
 
 
 class MonthDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
-    PREVIEW_WIDTH=420; PREVIEW_HEIGHT=594
+    PREVIEW_WIDTH=420
     SAMPLE_CITIES = (
         "Bussy-lès-Daours",
         "Amiens",
@@ -28,14 +28,14 @@ class MonthDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         left=QWidget(); ll=QVBoxLayout(left); ll.setContentsMargins(0,0,0,0); ll.setSpacing(12)
         ll.addWidget(self.create_page_settings_title()); ll.addWidget(self.create_no_page_settings_label())
         note=QLabel(self._translator.tr("month_divider.sample_cities_note")); note.setWordWrap(True); ll.addWidget(note); ll.addSpacing(12); ll.addWidget(self.create_msb_theme_group())
-        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8); rl.addWidget(self.create_preview_title())
-        self._preview=self.create_preview_label(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT)
-        rl.addWidget(self._preview,alignment=Qt.AlignmentFlag.AlignTop); root.addWidget(left,1); root.addWidget(right,0); self._render_preview()
+        self._preview = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview)
+        self._render_preview()
 
     def _render_preview(self):
         self._preview.setPixmap(
             self.render_template_preview(
-                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT, photos=(),
+                width=self._preview.width(), height=self._preview.height(), photos=(),
                 kind=PlanItemKind.MONTH_DIVIDER,
                 page_attributes={"year": 2025, "month": 6, "cities": self.SAMPLE_CITIES},
             )

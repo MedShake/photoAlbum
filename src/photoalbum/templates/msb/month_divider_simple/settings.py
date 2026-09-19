@@ -31,8 +31,6 @@ class MonthDividerSimpleSettingsWidget(
     MsbTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
-    PREVIEW_HEIGHT = 594
-
     def __init__(
         self,
         instance: PageInstance,
@@ -104,26 +102,8 @@ class MonthDividerSimpleSettingsWidget(
             self.create_msb_theme_group()
         )
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-        right_layout.addWidget(
-            self.create_preview_title()
-        )
-
-        self._preview = self.create_preview_label(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
-
-        right_layout.addWidget(
-            self._preview,
-            alignment=Qt.AlignmentFlag.AlignTop,
-        )
-
-        root.addWidget(left, 1)
-        root.addWidget(right, 0)
+        self._preview = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview)
 
     def _connect_change_signals(self) -> None:
         self._font.currentIndexChanged.connect(
@@ -187,8 +167,7 @@ class MonthDividerSimpleSettingsWidget(
     def _render_preview(self) -> None:
         self._preview.setPixmap(
             self.render_template_preview(
-                width=self.PREVIEW_WIDTH,
-                height=self.PREVIEW_HEIGHT,
+                width=self._preview.width(), height=self._preview.height(),
                 photos=(),
                 kind=PlanItemKind.MONTH_DIVIDER,
                 page_attributes={

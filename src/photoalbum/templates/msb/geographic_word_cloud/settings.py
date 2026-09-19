@@ -39,8 +39,6 @@ class GeographicWordCloudSettingsWidget(
     MsbTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
-    PREVIEW_HEIGHT = 594
-
     def __init__(
         self,
         instance: PageInstance,
@@ -154,54 +152,13 @@ class GeographicWordCloudSettingsWidget(
             self.create_msb_theme_group()
         )
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-
-        right_layout.addWidget(
-            self.create_preview_title()
-        )
-
-        self._preview_label = QLabel()
-        self._update_preview_size()
-
-        self._preview_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-        self._preview_label.setStyleSheet(
-            "border: 1px solid #888;"
-            "background: white;"
-        )
-
-        right_layout.addWidget(
-            self._preview_label,
-            alignment=Qt.AlignmentFlag.AlignTop,
-        )
-
-        root.addWidget(left, 1)
-        root.addWidget(right, 0)
+        self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview_label)
 
     def msb_theme_changed(
         self,
     ) -> None:
         self._render_preview()
-
-    def _update_preview_size(
-        self,
-    ) -> None:
-        width = self.PREVIEW_WIDTH
-
-        height = round(
-            width
-            * self._page_format.height_mm
-            / self._page_format.width_mm
-        )
-
-        self._preview_label.setFixedSize(
-            width,
-            height,
-        )
 
     def _load_state(
         self,
@@ -441,7 +398,6 @@ class GeographicWordCloudSettingsWidget(
         self._render_preview()
 
     def _render_preview(self) -> None:
-        self._update_preview_size()
         self._preview_label.setPixmap(
             self.render_template_preview(
                 width=self._preview_label.width(),

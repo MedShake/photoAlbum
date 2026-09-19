@@ -264,3 +264,13 @@ def test_plan_cover_template_name_includes_pack_name():
     )
 
     assert name.startswith("MSB — ")
+
+
+def test_empty_caption_diagnostics_are_not_recomputed(monkeypatch):
+    from unittest.mock import Mock
+    widget = create_widget()
+    collect = Mock(return_value={})
+    monkeypatch.setattr(widget, "_collect_caption_overflows", collect)
+    widget.set_result(create_result())
+    assert collect.call_count == 1
+    widget.close()

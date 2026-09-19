@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from photoalbum.i18n import Translator
 from photoalbum.album.composition import PageComposer
-from photoalbum.album.models import page_format_from_id
+from photoalbum.album.models import (
+    oriented_page_format,
+    page_format_from_id,
+)
 
 from photoalbum.gui.template_labels import template_display_name
 
@@ -330,10 +333,12 @@ class AlbumPlanWidget(QWidget):
     def _collect_caption_overflows(self, result, settings):
         if result is None or settings is None:
             return {}
-        page_format = page_format_from_id(settings.page_format)
-        width_mm, height_mm = page_format.width_mm, page_format.height_mm
-        if settings.orientation.value == "landscape":
-            width_mm, height_mm = height_mm, width_mm
+        page_format = oriented_page_format(
+            page_format_from_id(settings.page_format),
+            settings.orientation,
+        )
+        width_mm = page_format.width_mm
+        height_mm = page_format.height_mm
         composer = PageComposer()
         pages = tuple(result.pagination.pages)
         found = {}
@@ -362,7 +367,8 @@ class AlbumPlanWidget(QWidget):
         return found
 
     def _caption_warning_lines(self, result, settings) -> list[str]:
-        diagnostics = self._caption_overflows or self._collect_caption_overflows(result, settings)
+        # An empty result is a completed diagnostic, not a cache miss.
+        diagnostics = self._caption_overflows
         return [
             self._translator.tr(
                 "plan.caption_overflow", page=page_number, photo=photo,

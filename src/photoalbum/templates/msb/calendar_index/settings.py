@@ -33,8 +33,6 @@ class CalendarIndexSettingsWidget(
     MsbTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
-    PREVIEW_HEIGHT = 594
-
     def __init__(
         self,
         instance: PageInstance,
@@ -101,27 +99,8 @@ class CalendarIndexSettingsWidget(
             self.create_msb_theme_group()
         )
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-
-        right_layout.addWidget(
-            self.create_preview_title()
-        )
-
-        self._preview_label = self.create_preview_label(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
-
-        right_layout.addWidget(
-            self._preview_label,
-            alignment=Qt.AlignmentFlag.AlignTop,
-        )
-
-        root.addWidget(left, 1)
-        root.addWidget(right, 0)
+        self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview_label)
 
     def msb_theme_changed(
         self,
@@ -279,7 +258,7 @@ class CalendarIndexSettingsWidget(
             return
         self._preview_label.setPixmap(
             self.render_template_preview(
-                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT,
+                width=self._preview_label.width(), height=self._preview_label.height(),
                 photos=self._photos, page_attributes={"year": year},
             )
         )

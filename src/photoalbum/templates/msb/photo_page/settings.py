@@ -68,8 +68,6 @@ class PhotoPageSettingsWidget(
     """Settings entry point shared by photo-page-1..4."""
 
     PREVIEW_WIDTH = 360
-    PREVIEW_HEIGHT = 510
-
     _ORDER_LABELS = {
         "caption": "Légende utilisateur",
         "datetime": "Date et heure",
@@ -193,28 +191,8 @@ class PhotoPageSettingsWidget(
         )
         left_layout.addStretch()
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(12)
-
-        right_layout.addWidget(
-            self.create_preview_title()
-        )
-
-        self._preview_label = self.create_preview_label(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
-
-        right_layout.addWidget(
-            self._preview_label,
-            alignment=Qt.AlignmentFlag.AlignTop,
-        )
-        right_layout.addStretch()
-
-        root.addWidget(left, 1)
-        root.addWidget(right, 0)
+        self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview_label)
 
         self._show_caption.toggled.connect(
             self._changed
@@ -376,7 +354,7 @@ class PhotoPageSettingsWidget(
         )
         self._preview_label.setPixmap(
             self.render_composition_preview(
-                composition, width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT,
+                composition, width=self._preview_label.width(), height=self._preview_label.height(),
                 project_photos=photos, show_empty_slots=True,
             )
         )

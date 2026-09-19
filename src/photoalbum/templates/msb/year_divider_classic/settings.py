@@ -26,8 +26,6 @@ from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
 class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
     DEFAULT_TITLE_COLOR = "#d0d0d0"
     PREVIEW_WIDTH = 420
-    PREVIEW_HEIGHT = 594
-
     def __init__(self, instance: PageInstance, photos, *, translator, render_service=None,
                  page_format: PageFormat = A4, template_pack_settings=None, parent=None) -> None:
         super().__init__(instance, photos, translator=translator, render_service=render_service,
@@ -72,9 +70,8 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
         ll.addLayout(form)
         ll.addSpacing(12)
         ll.addWidget(self.create_msb_theme_group())
-        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8); rl.addWidget(self.create_preview_title())
-        self._preview=self.create_preview_label(self.PREVIEW_WIDTH,self.PREVIEW_HEIGHT)
-        rl.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignTop); root.addWidget(left,1); root.addWidget(right,0)
+        self._preview = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview)
     def _connect_change_signals(self):
         self._font.currentIndexChanged.connect(self._changed)
         self._size.valueChanged.connect(self._changed)
@@ -162,7 +159,7 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
     def _render_preview(self):
         self._preview.setPixmap(
             self.render_template_preview(
-                width=self.PREVIEW_WIDTH, height=self.PREVIEW_HEIGHT, photos=(),
+                width=self._preview.width(), height=self._preview.height(), photos=(),
                 kind=PlanItemKind.YEAR_DIVIDER,
                 page_attributes={"year": 2025},
             )

@@ -31,6 +31,7 @@ from photoalbum.album import (
     PageFormat,
     PageSide,
     page_format_from_id,
+    oriented_page_format,
     PlanItemKind,
     TemplateRegistry,
 )
@@ -942,8 +943,8 @@ class AlbumPreviewWidget(QWidget):
         self._current_result = result
 
         if page_format is None:
-            page_format = page_format_from_id(
-                settings.page_format
+            page_format = oriented_page_format(
+                page_format_from_id(settings.page_format), settings.orientation,
             )
 
         # Row 0: outer front cover, right side.

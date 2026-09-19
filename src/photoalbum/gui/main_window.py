@@ -27,6 +27,7 @@ from photoalbum.gui.template_pack_help_dialog import (
 from photoalbum.album import (
     AlbumBuilder,
     page_format_from_id,
+    oriented_page_format,
     PrintConstraints,
 )
 from photoalbum.gui.widgets import (
@@ -643,6 +644,11 @@ class MainWindow(QMainWindow):
         expose a different ordering.
         """
 
+        page_format = oriented_page_format(
+            page_format_from_id(settings.page_format),
+            settings.orientation,
+        )
+
         project_photos = []
         seen_paths = set()
 
@@ -686,6 +692,8 @@ class MainWindow(QMainWindow):
                 project_photos,
                 width=PREVIEW_RENDER_WIDTH,
                 height=PREVIEW_RENDER_HEIGHT,
+                page_width_mm=page_format.width_mm,
+                page_height_mm=page_format.height_mm,
             )
 
     def _refresh_album_plan(self) -> None:
@@ -722,9 +730,16 @@ class MainWindow(QMainWindow):
 
             self._album_plan_widget.set_result(result, settings)
 
-            page_format = page_format_from_id(settings.page_format)
+            page_format = oriented_page_format(
+                page_format_from_id(settings.page_format),
+                settings.orientation,
+            )
 
-            self._album_preview_widget.set_result(result, settings, page_format=page_format)
+            self._album_preview_widget.set_result(
+                result,
+                settings,
+                page_format=page_format,
+            )
 
             # Preview prewarming is strictly optional.
             #

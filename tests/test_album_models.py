@@ -5,7 +5,9 @@ from photoalbum.album import (
     A5,
     US_LETTER,
     CoverPosition,
+    PageOrientation,
     page_format_from_id,
+    oriented_page_format,
     PrintProfile,
 )
 
@@ -60,6 +62,32 @@ def test_page_format_from_id():
     assert page_format_from_id("a4") == A4
     assert page_format_from_id("a5") == A5
     assert page_format_from_id("us-letter") == US_LETTER
+
+
+def test_oriented_page_format_portrait_keeps_canonical_dimensions():
+    page_format = oriented_page_format(A4, PageOrientation.PORTRAIT)
+
+    assert page_format.name == A4.name
+    assert page_format.width_mm == 210.0
+    assert page_format.height_mm == 297.0
+
+
+def test_oriented_page_format_landscape_swaps_physical_dimensions():
+    page_format = oriented_page_format(A4, PageOrientation.LANDSCAPE)
+
+    assert page_format.name == A4.name
+    assert page_format.width_mm == 297.0
+    assert page_format.height_mm == 210.0
+
+
+def test_oriented_page_format_is_not_a4_specific():
+    page_format = oriented_page_format(
+        US_LETTER,
+        PageOrientation.LANDSCAPE,
+    )
+
+    assert page_format.width_mm == US_LETTER.height_mm
+    assert page_format.height_mm == US_LETTER.width_mm
 
 
 def test_unknown_page_format_is_rejected():

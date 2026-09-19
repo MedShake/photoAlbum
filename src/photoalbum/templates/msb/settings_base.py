@@ -81,22 +81,6 @@ class MsbTemplateSettingsWidget(
             )
         )
 
-    def create_preview_label(
-        self,
-        width: int,
-        height: int,
-    ) -> QLabel:
-        label = QLabel()
-        label.setFixedSize(width, height)
-        label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-        label.setStyleSheet(
-            "border: 1px solid #888;"
-            "background: white;"
-        )
-        return label
-
     def create_msb_theme_group(
         self,
     ) -> QWidget:

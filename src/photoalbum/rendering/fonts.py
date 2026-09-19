@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtGui import QFontDatabase, QGuiApplication
 
 
 DEFAULT_SANS_FONT = "DejaVu Sans"
@@ -17,21 +17,32 @@ PHOTO_ALBUM_FONTS = (
     "Liberation Mono",
 )
 
+_font_palette: tuple[str, ...] | None = None
+_font_application: QGuiApplication | None = None
+
+
+def _invalidate_font_palette() -> None:
+    global _font_palette
+    _font_palette = None
+
 
 def available_photo_album_fonts() -> tuple[str, ...]:
     """
     Return the Photo Album font palette that is actually
     available to Qt on the current system.
     """
-    installed = set(
-        QFontDatabase.families()
-    )
+    global _font_palette, _font_application
+    application = QGuiApplication.instance()
+    if application is not _font_application:
+        _font_application = application
+        _invalidate_font_palette()
+        if application is not None:
+            application.fontDatabaseChanged.connect(_invalidate_font_palette)
 
-    return tuple(
-        family
-        for family in PHOTO_ALBUM_FONTS
-        if family in installed
-    )
+    if _font_palette is None:
+        installed = set(QFontDatabase.families())
+        _font_palette = tuple(family for family in PHOTO_ALBUM_FONTS if family in installed)
+    return _font_palette
 
 
 def resolve_font_family(

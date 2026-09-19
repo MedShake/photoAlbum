@@ -157,31 +157,8 @@ class SimplexFullPhotoCoverSettingsWidget(
 
         left_layout.addStretch()
 
-        # Right column: live preview.
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-
-        self._preview_label = QLabel(self)
-        self._preview_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-        self._preview_label.setStyleSheet(
-            "border: 1px solid #888;"
-            "background: white;"
-        )
-
-        self._update_preview_size()
-
-        right_layout.addWidget(
-            self._preview_label,
-            alignment=Qt.AlignmentFlag.AlignTop,
-        )
-        right_layout.addStretch()
-
-        root.addWidget(left, 1)
-        root.addWidget(right, 0)
+        self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview_label)
 
         self._photo_combo.currentIndexChanged.connect(
             self._selection_changed
@@ -194,30 +171,6 @@ class SimplexFullPhotoCoverSettingsWidget(
         )
         self._browse_button.clicked.connect(
             self._browse_external_photo
-        )
-
-    def _update_preview_size(self) -> None:
-        width = self.PREVIEW_WIDTH
-
-        page_width = float(
-            self._page_format.width_mm
-        )
-        page_height = float(
-            self._page_format.height_mm
-        )
-
-        if page_width <= 0 or page_height <= 0:
-            height = width
-        else:
-            height = round(
-                width
-                * page_height
-                / page_width
-            )
-
-        self._preview_label.setFixedSize(
-            width,
-            height,
         )
 
     def _load_photos(self) -> None:
@@ -411,8 +364,6 @@ class SimplexFullPhotoCoverSettingsWidget(
         self._render_preview()
 
     def _render_preview(self) -> None:
-        self._update_preview_size()
-
         self._preview_label.setPixmap(
             self.render_template_preview(
                 width=self._preview_label.width(),

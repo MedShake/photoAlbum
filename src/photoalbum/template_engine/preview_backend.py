@@ -81,6 +81,8 @@ class TemplatePreviewBackend(ABC):
         photos,
         width: int,
         height: int,
+        page_width_mm: float,
+        page_height_mm: float,
         translator: Translator,
     ) -> PreviewJob:
         raise NotImplementedError

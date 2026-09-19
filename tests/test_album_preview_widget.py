@@ -42,6 +42,18 @@ def create_widget() -> AlbumPreviewWidget:
     )
 
 
+def test_preview_default_geometry_respects_landscape():
+    from photoalbum.album import PageOrientation
+
+    widget = create_widget()
+    widget.set_result(make_result(), replace(make_settings(), orientation=PageOrientation.LANDSCAPE))
+    pages = widget.findChildren(AlbumCoverPreview) + widget.findChildren(AlbumPagePreview)
+    assert pages
+    for page in pages:
+        assert (page._page_format.width_mm, page._page_format.height_mm) == (297.0, 210.0)
+    widget.close()
+
+
 def make_settings() -> AlbumStructureSettings:
     return AlbumStructureSettings(
         covers={

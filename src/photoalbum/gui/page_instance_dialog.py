@@ -81,8 +81,11 @@ class PageInstanceDialog(QDialog):
             self.resize(420, 220)
             return
 
-        target_width = 1100
-        target_height = 720
+        # Size to the controls and oriented preview, rather than reserving
+        # portrait-height whitespace for every landscape settings dialog.
+        hint = self.sizeHint()
+        target_width = hint.width()
+        target_height = hint.height()
         screen = self.screen()
         if screen is not None:
             available = screen.availableGeometry()

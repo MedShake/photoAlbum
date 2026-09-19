@@ -10,7 +10,12 @@ from PySide6.QtWidgets import (
     QPlainTextEdit, QFileDialog, QMessageBox,
 )
 
-from photoalbum.album import AlbumBuildResult, AlbumStructureSettings, page_format_from_id
+from photoalbum.album import (
+    AlbumBuildResult,
+    AlbumStructureSettings,
+    oriented_page_format,
+    page_format_from_id,
+)
 from photoalbum.app import ProjectService
 from photoalbum.export import PdfExportContent, PdfExportService, PdfMetadata
 from photoalbum.gui.workers import PdfExportWorker
@@ -233,16 +238,16 @@ class PdfExportWidget(QWidget):
         except Exception:
             return
 
-        page_format = page_format_from_id(settings.page_format)
+        page_format = oriented_page_format(
+            page_format_from_id(settings.page_format),
+            settings.orientation,
+        )
 
         format_name = page_format.name
         width_mm = page_format.width_mm
         height_mm = page_format.height_mm
 
         orientation = settings.orientation.value
-
-        if orientation == "landscape":
-            width_mm, height_mm = (height_mm, width_mm)
 
         dpi = int(self._pdf_dpi_combo.currentData())
 
@@ -311,13 +316,13 @@ class PdfExportWidget(QWidget):
         try:
             settings = self._settings_provider()
 
-            page_format = page_format_from_id(settings.page_format)
+            page_format = oriented_page_format(
+                page_format_from_id(settings.page_format),
+                settings.orientation,
+            )
 
             width_mm = page_format.width_mm
             height_mm = page_format.height_mm
-
-            if settings.orientation.value == 'landscape':
-                width_mm, height_mm = (height_mm, width_mm)
 
             dpi = int(self._pdf_dpi_combo.currentData())
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSignalBlocker
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -29,6 +29,7 @@ from photoalbum.template_engine.discovery import pack_settings_editor
 from photoalbum.album import (
     PAGE_FORMATS,
     page_format_from_id,
+    oriented_page_format,
     AlbumStructureSettings,
     CoverPosition,
     CoverScatterSettings,
@@ -127,9 +128,14 @@ class AlbumSettingsWidget(QWidget):
         layout.addStretch()
 
     def _connect_settings_signals(self) -> None:
+        # Page format and orientation are deliberately excluded here.
+        #
+        # A physical target change refreshes all compatible template
+        # choices through _refresh_template_choices(), which emits one
+        # consolidated settings_changed signal when the refresh is
+        # complete. Connecting them here as well would rebuild the album
+        # once before/alongside that refresh.
         combos = [
-            self._page_format_combo,
-            self._orientation_combo,
             self._front_cover_combo,
             self._inside_front_cover_combo,
             self._inside_back_cover_combo,
@@ -365,6 +371,17 @@ class AlbumSettingsWidget(QWidget):
                     )
                 )
 
+        current = model.item(self._orientation_combo.currentIndex())
+        if current is None or not current.isEnabled():
+            # A format may support only one orientation. Choose a valid target
+            # before repopulating templates, without starting a second refresh.
+            with QSignalBlocker(self._orientation_combo):
+                for index in range(self._orientation_combo.count()):
+                    item = model.item(index)
+                    if item is not None and item.isEnabled():
+                        self._orientation_combo.setCurrentIndex(index)
+                        break
+
         self._refresh_template_choices()
 
     def _refresh_template_choices(self) -> None:
@@ -429,22 +446,36 @@ class AlbumSettingsWidget(QWidget):
             ),
         )
 
-        for combo, kind, cover_position in combos:
-            selected = combo.currentData()
+        # Repopulating the selectors changes their current indexes.
+        # Those index changes must not each be interpreted as a user
+        # settings change: a physical target change is one transaction
+        # and must cause one album rebuild.
+        was_loading = self._loading_settings
+        self._loading_settings = True
 
-            self._populate_template_combo(
-                combo,
-                kind,
-                cover_position=cover_position,
-            )
+        try:
+            for combo, kind, cover_position in combos:
+                selected = combo.currentData()
 
-            if selected is not None:
-                index = combo.findData(selected)
+                self._populate_template_combo(
+                    combo,
+                    kind,
+                    cover_position=cover_position,
+                )
 
-                if index >= 0:
-                    combo.setCurrentIndex(index)
+                if selected is not None:
+                    index = combo.findData(selected)
 
-        self.settings_changed.emit()
+                    if index >= 0:
+                        combo.setCurrentIndex(index)
+        finally:
+            self._loading_settings = was_loading
+
+        # During load_settings(), the surrounding load operation owns
+        # notification. For an actual user target change, emit exactly
+        # once after every selector is coherent with the new target.
+        if not was_loading:
+            self.settings_changed.emit()
 
 
     def _create_covers_group(self) -> QGroupBox:
@@ -606,11 +637,7 @@ class AlbumSettingsWidget(QWidget):
             photos,
             translator=self._translator,
             render_service=self._render_service,
-            page_format=page_format_from_id(
-                str(
-                    self._page_format_combo.currentData()
-                )
-            ),
+            page_format=self._oriented_page_format(),
             template_pack_settings=(
                 self._template_pack_settings
             ),
@@ -785,11 +812,7 @@ class AlbumSettingsWidget(QWidget):
             photos,
             translator=self._translator,
             render_service=self._render_service,
-            page_format=page_format_from_id(
-                str(
-                    self._page_format_combo.currentData()
-                )
-            ),
+            page_format=self._oriented_page_format(),
             template_pack_settings=(
                 self._template_pack_settings
             ),
@@ -908,11 +931,7 @@ class AlbumSettingsWidget(QWidget):
             photos,
             translator=self._translator,
             render_service=self._render_service,
-            page_format=page_format_from_id(
-                str(
-                    self._page_format_combo.currentData()
-                )
-            ),
+            page_format=self._oriented_page_format(),
             template_pack_settings=(
                 self._template_pack_settings
             ),
@@ -1309,7 +1328,24 @@ class AlbumSettingsWidget(QWidget):
             template_id=template_id,
         )
 
+    def _oriented_page_format(self):
+        return oriented_page_format(
+            page_format_from_id(
+                str(self._page_format_combo.currentData())
+            ),
+            PageOrientation(
+                self._orientation_combo.currentData()
+            ),
+        )
+
     def settings(self) -> AlbumStructureSettings:
+        # Keep replacement instances stable across persistence and rebuilding.
+        self._month_divider_instance = self._divider_instance(
+            self._month_divider_instance, self._month_divider_combo,
+        )
+        self._year_divider_instance = self._divider_instance(
+            self._year_divider_instance, self._year_divider_combo,
+        )
         return AlbumStructureSettings(
             page_format=str(
                 self._page_format_combo.currentData()
@@ -1348,20 +1384,14 @@ class AlbumSettingsWidget(QWidget):
                 enabled=(
                     self._month_dividers_checkbox.isChecked()
                 ),
-                page=self._divider_instance(
-                    self._month_divider_instance,
-                    self._month_divider_combo,
-                ),
+                page=self._month_divider_instance,
                 placement=self._placement(
                     self._month_placement_combo
                 ),
             ),
             year_dividers=DividerSettings(
                 enabled=self._year_dividers_checkbox.isChecked(),
-                page=self._divider_instance(
-                    self._year_divider_instance,
-                    self._year_divider_combo,
-                ),
+                page=self._year_divider_instance,
                 placement=self._placement(
                     self._year_placement_combo
                 ),
@@ -1689,11 +1719,7 @@ class AlbumSettingsWidget(QWidget):
             photos,
             translator=self._translator,
             render_service=self._render_service,
-            page_format=page_format_from_id(
-                str(
-                    self._page_format_combo.currentData()
-                )
-            ),
+            page_format=self._oriented_page_format(),
             template_pack_settings=(
                 self._template_pack_settings
             ),
@@ -1958,4 +1984,3 @@ class AlbumSettingsWidget(QWidget):
 
         if index >= 0:
             combo.setCurrentIndex(index)
-

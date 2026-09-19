@@ -24,10 +24,10 @@ from photoalbum.template_engine.preview_backend import (
 from photoalbum.i18n import Translator
 
 
-# Canonical raster size for expensive preview rendering.
+# Canonical portrait raster size for expensive preview rendering.
 #
-# Every consumer uses the same size, so a background-prewarmed
-# image can be reused by widgets of different display sizes.
+# The long edge is fixed; the aspect ratio follows physical page dimensions.
+# Consumers can reuse a background regardless of their display size.
 PREVIEW_RENDER_WIDTH = 420
 PREVIEW_RENDER_HEIGHT = 594
 
@@ -40,6 +40,8 @@ class PreviewRenderKey:
     photos_signature: str
     width: int
     height: int
+    page_width_mm: float
+    page_height_mm: float
 
 
 class PreviewRenderService(QObject):
@@ -220,6 +222,14 @@ class PreviewRenderService(QObject):
                 b"\0"
             )
 
+            # Metadata edits can change ordering or image geometry without
+            # changing the source file's modification time.
+            digest.update(repr((
+                photo.filename, photo.capture_datetime,
+                photo.width, photo.height, photo.orientation,
+            )).encode("utf-8", errors="replace"))
+            digest.update(b"\0")
+
         return digest.hexdigest()
 
 
@@ -246,15 +256,22 @@ class PreviewRenderService(QObject):
         *,
         width: int | None = None,
         height: int | None = None,
+        page_width_mm: float,
+        page_height_mm: float,
     ) -> PreviewRenderKey:
         photos = self.effective_photos(
             instance,
             photos,
         )
 
-        # Expensive previews are always generated at one
-        # canonical raster size. Widget display dimensions must
-        # never create another cache entry for the same page.
+        # Keep one canonical resolution per physical geometry, independent
+        # of widget size. A portrait raster stretched onto a landscape page
+        # would distort photographs even with correctly composed positions.
+        page_width_mm = float(page_width_mm)
+        page_height_mm = float(page_height_mm)
+        if page_width_mm <= 0 or page_height_mm <= 0:
+            raise ValueError("Preview page dimensions must be positive.")
+        scale = PREVIEW_RENDER_HEIGHT / max(page_width_mm, page_height_mm)
         return PreviewRenderKey(
             template_id=(
                 instance.template_id
@@ -272,8 +289,10 @@ class PreviewRenderService(QObject):
                     photos
                 )
             ),
-            width=PREVIEW_RENDER_WIDTH,
-            height=PREVIEW_RENDER_HEIGHT,
+            width=max(1, round(page_width_mm * scale)),
+            height=max(1, round(page_height_mm * scale)),
+            page_width_mm=float(page_width_mm),
+            page_height_mm=float(page_height_mm),
         )
 
 
@@ -305,6 +324,8 @@ class PreviewRenderService(QObject):
         *,
         width: int,
         height: int,
+        page_width_mm: float,
+        page_height_mm: float,
     ) -> PreviewRenderKey:
         extension = (
             template_extension_registry.get(
@@ -328,6 +349,8 @@ class PreviewRenderService(QObject):
             photos,
             width=width,
             height=height,
+            page_width_mm=page_width_mm,
+            page_height_mm=page_height_mm,
         )
 
         if key in self._cache:
@@ -353,6 +376,8 @@ class PreviewRenderService(QObject):
             photos=photos,
             width=key.width,
             height=key.height,
+            page_width_mm=key.page_width_mm,
+            page_height_mm=key.page_height_mm,
             translator=self._translator,
         )
 

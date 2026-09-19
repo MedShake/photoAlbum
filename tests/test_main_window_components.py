@@ -54,6 +54,40 @@ def test_window_wires_six_tabs_and_status_bar(window):
     assert window.statusBar().currentMessage() == 'Scanning'
 
 
+def test_format_and_orientation_persist_and_rebuild_once(window, tmp_path, monkeypatch):
+    from photoalbum.album import oriented_page_format, page_format_from_id
+
+    service = window._project_service
+    service.create(tmp_path / "orientation.photoalbum")
+    widget = window._album_settings_widget
+    widget.set_settings(widget.settings())
+    persist = Mock(wraps=service.set_album_structure_settings)
+    build = Mock(wraps=window._album_builder.build)
+    plan, preview, prewarm = Mock(), Mock(), Mock()
+    monkeypatch.setattr(service, "set_album_structure_settings", persist)
+    monkeypatch.setattr(window._album_builder, "build", build)
+    monkeypatch.setattr(window._album_plan_widget, "set_result", plan)
+    monkeypatch.setattr(window._album_preview_widget, "set_result", preview)
+    monkeypatch.setattr(window, "_prewarm_expensive_previews", prewarm)
+    for combo, value in [
+        (widget._orientation_combo, "landscape"),
+        (widget._page_format_combo, "us-letter"),
+        (widget._page_format_combo, "a4"),
+        (widget._orientation_combo, "landscape"),
+        (widget._orientation_combo, "portrait"),
+    ]:
+        for spy in (persist, build, plan, preview, prewarm):
+            spy.reset_mock()
+        combo.setCurrentIndex(combo.findData(value))
+        for spy in (persist, build, plan, preview, prewarm):
+            assert spy.call_count == 1
+        settings = widget.settings()
+        assert service.get_album_structure_settings() == settings
+        assert preview.call_args.kwargs["page_format"] == oriented_page_format(
+            page_format_from_id(settings.page_format), settings.orientation,
+        )
+
+
 def test_photo_controls_forward_signals_and_selection_respects_sort(app, tmp_path):
     view = PhotoSourcesWidget(Translator('en'))
     source, scan, recursive = Mock(), Mock(), Mock()
@@ -185,7 +219,10 @@ def test_scan_without_project_reports_error(app):
 
 
 @pytest.mark.parametrize('failure', [False, True])
-def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_path, monkeypatch, failure):
+@pytest.mark.parametrize('orientation', ['portrait', 'landscape'])
+def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_path, monkeypatch, failure, orientation):
+    from dataclasses import replace
+    from photoalbum.album import PageOrientation
     from photoalbum.gui.widgets import pdf_export_widget as module
     from photoalbum.export import PdfExportContent
 
@@ -203,6 +240,9 @@ def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_p
 
     monkeypatch.setattr(module, 'PdfExportService', ExportService)
     window._project_service.create(tmp_path / 'project.photoalbum')
+    window._album_settings_widget.set_settings(replace(
+        window._album_settings_widget.settings(), orientation=PageOrientation(orientation),
+    ))
     window._album_build_result = SimpleNamespace(pagination=SimpleNamespace(pages=[object()]), total_page_count=5)
     widget = window._pdf_widget
     window._tabs.setTabEnabled(5, True)
@@ -223,6 +263,9 @@ def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_p
     assert received[0]['content'] == PdfExportContent.COVERS
     assert received[0]['metadata'].title == 'Test title'
     assert received[0]['dpi'] == 96
+    assert (received[0]['page_width_mm'], received[0]['page_height_mm']) == (
+        (297.0, 210.0) if orientation == 'landscape' else (210.0, 297.0)
+    )
     assert received[0]['output_path'].suffix == '.pdf'
     if failure:
         assert 'test export failure' in widget._pdf_log_view.toPlainText()

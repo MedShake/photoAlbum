@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QDoubleSpinBox,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -48,8 +49,6 @@ class YearPhotoScatterSettingsWidget(
     MsbTemplateSettingsWidget
 ):
     PREVIEW_WIDTH = 420
-    PREVIEW_HEIGHT = 594
-
     DEFAULT_TITLE_COLOR = "#d0d0d0"
 
     def __init__(
@@ -214,7 +213,7 @@ class YearPhotoScatterSettingsWidget(
             proposal_controls
         )
 
-        color_controls = QHBoxLayout()
+        color_controls = QFormLayout()
 
         self._title_color_button = QPushButton()
 
@@ -277,22 +276,9 @@ class YearPhotoScatterSettingsWidget(
             self._title_font_size_spin
         )
 
-        color_controls.addWidget(
-            self._title_color_button
-        )
-        color_controls.addWidget(
-            font_label
-        )
-        color_controls.addWidget(
-            self._title_font_combo
-        )
-        color_controls.addWidget(
-            size_label
-        )
-        color_controls.addWidget(
-            self._title_font_size_spin
-        )
-        color_controls.addStretch()
+        color_controls.addRow(self._title_color_button)
+        color_controls.addRow(font_label, self._title_font_combo)
+        color_controls.addRow(size_label, self._title_font_size_spin)
 
         layout.addLayout(
             color_controls
@@ -306,32 +292,13 @@ class YearPhotoScatterSettingsWidget(
             self._change_title_font_size
         )
 
-        self._preview_label = self.create_preview_label(
-            self.PREVIEW_WIDTH,
-            self.PREVIEW_HEIGHT,
-        )
-
         layout.addSpacing(12)
         layout.addWidget(
             self.create_msb_theme_group()
         )
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-
-        right_layout.addWidget(
-            self.create_preview_title()
-        )
-
-        right_layout.addWidget(
-            self._preview_label,
-            alignment=Qt.AlignmentFlag.AlignTop,
-        )
-
-        root.addWidget(left, 1)
-        root.addWidget(right, 0)
+        self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
+        self.add_settings_columns(root, left, self._preview_label)
 
     def msb_theme_changed(
         self,
@@ -520,8 +487,7 @@ class YearPhotoScatterSettingsWidget(
 
         self._preview_label.setPixmap(
             self.render_template_preview(
-                width=self.PREVIEW_WIDTH,
-                height=self.PREVIEW_HEIGHT,
+                width=self._preview_label.width(), height=self._preview_label.height(),
                 photos=self._photos,
                 set_waiting_key=set_waiting_key,
             )
