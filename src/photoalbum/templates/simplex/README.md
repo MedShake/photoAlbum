@@ -3,18 +3,24 @@
 Simplex is a built-in Photo Album template pack focused on minimal
 photographic layouts.
 
-## Full-page photo cover
+Its `manifest.json` file is the source of truth for template
+availability, page kinds, cover positions, physical formats and
+orientations.
 
-The initial Simplex template is a front cover made from one project photo.
+The pack currently provides a full-page photographic cover. Its image
+source may be either a project photo or an external file.
 
-- A4 and US Letter
-- portrait and landscape
-- no margins
-- no printed border
-- image aspect ratio is preserved
-- the image is scaled to cover the whole page
-- overflow is cropped symmetrically
-- the source photo is selected in the page settings
+## Documentation
 
-The crop is currently centered. Future versions may expose crop positioning
-without changing the persisted photo-selection setting.
+User documentation embedded in Photo Album is stored in:
+
+    docs/help.en.html
+    docs/help.fr.html
+
+Developer documentation is available in:
+
+    docs/simplex-template-pack.md
+
+For the general template-pack architecture, see:
+
+    docs/template-packs.md
