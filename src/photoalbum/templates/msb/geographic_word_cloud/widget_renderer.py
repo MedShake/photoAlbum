@@ -4,7 +4,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter
 
 from photoalbum.album import (
-    A4,
     PageInstance,
 )
 from .painter import (
@@ -71,13 +70,11 @@ class GeographicWordCloudWidgetRenderer:
             for month in range(1, 13)
         )
 
-        # Keep the historical A4 cloud geometry even when the
-        # physical page is wider (for example US Letter).
         cloud = compose_geographic_word_cloud(
             list(photos),
             year=year,
-            page_width_mm=A4.width_mm,
-            page_height_mm=A4.height_mm,
+            page_width_mm=page_width_mm,
+            page_height_mm=page_height_mm,
             palette=palette,
         )
 
