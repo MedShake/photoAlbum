@@ -12,6 +12,7 @@ from photoalbum.template_engine.discovery import (
     discover_templates,
     load_template_pack,
     register_discovered_template_extensions,
+    register_discovered_layouts,
 )
 
 
@@ -25,6 +26,7 @@ __all__ = [
     "discover_templates",
     "load_template_pack",
     "register_discovered_template_extensions",
+    "register_discovered_layouts",
     "register_template_extension",
     "template_extension_registry",
 ]

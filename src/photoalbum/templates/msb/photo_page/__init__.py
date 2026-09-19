@@ -42,3 +42,9 @@ __all__ = [
     "PHOTO_PAGE_TEMPLATE_IDS",
     "register",
 ]
+
+
+def register_layouts(registry) -> None:
+    from .layout import register_layouts as register_photo_layouts
+
+    register_photo_layouts(registry)

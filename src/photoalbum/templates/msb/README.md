@@ -1,25 +1,25 @@
 # MSB
 
-MSB est le modèle historique fourni avec Photo Album.
+MSB is the original template pack bundled with Photo Album.
 
-## Formats actuellement proposés
+To create another pack, see the [template pack guide](../../../../docs/template-packs.md)
+in the repository (`docs/template-packs.md`).
+
+## Currently supported formats
 
 - A4 — portrait
 - US Letter — portrait
 
-Le modèle MSB ne déclare actuellement ni A5 ni orientation
-paysage. Ces possibilités restent supportables par Photo Album
-lorsqu'un autre modèle fournit les templates nécessaires.
+MSB currently declares neither A5 nor landscape support. Photo Album can support
+these options when another pack provides the required templates.
 
 ## Templates
 
-Le manifeste `manifest.json` constitue la source de vérité du
-catalogue MSB.
+The `manifest.json` file is the source of truth for the MSB catalog.
 
-Un album peut mélanger librement des templates MSB avec ceux
-d'autres modèles installés.
+An album can freely mix MSB templates with those from other installed packs.
 
-## Captures
+## Screenshots
 
-Le répertoire `screenshots/` est réservé aux futures captures
-destinées au catalogue intégré de Photo Album.
+The `screenshots/` directory is reserved for future screenshots intended for
+Photo Album's built-in catalog.

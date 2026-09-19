@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from importlib import import_module
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol
 
 from photoalbum.album.models import (
     CoverPosition,
@@ -17,6 +18,23 @@ from photoalbum.album.templates import (
     TemplateTarget,
 )
 
+
+if TYPE_CHECKING:
+    from photoalbum.album.composition import TemplateLayoutRegistry
+    from photoalbum.i18n import Translator
+    from PySide6.QtWidgets import QWidget
+
+
+class PackSettingsEditor(Protocol):
+    def __call__(
+        self,
+        settings: dict[str, object],
+        *,
+        translator: Translator,
+        parent: QWidget | None = None,
+    ) -> dict[str, object] | None:
+        """Return updated pack settings, or None on cancellation."""
+        ...
 
 MANIFEST_FILENAME = "manifest.json"
 
@@ -323,7 +341,8 @@ def discover_templates(
 def register_discovered_template_extensions(
     packs: tuple[TemplatePack, ...] | None = None,
 ) -> tuple[TemplatePack, ...]:
-    packs = packs or discover_template_packs()
+    if packs is None:
+        packs = discover_template_packs()
 
     for pack in packs:
         for module_name in pack.modules:
@@ -347,3 +366,30 @@ def register_discovered_template_extensions(
 
 def create_template_registry() -> TemplateRegistry:
     return discover_templates().registry
+
+
+def register_discovered_layouts(
+    registry: TemplateLayoutRegistry,
+    packs: tuple[TemplatePack, ...] | None = None,
+) -> None:
+    """Load pack-owned composition without initializing settings widgets."""
+    if packs is None:
+        packs = discover_template_packs()
+    for pack in packs:
+        for module_name in pack.modules:
+            module = import_module(
+                f"photoalbum.templates.{pack.pack_id}.{module_name}"
+            )
+            register = getattr(module, "register_layouts", None)
+            if register is not None:
+                register(registry)
+        for template in pack.templates:
+            if TemplateKind.PHOTO_PAGE in template.allowed_kinds:
+                # Fail early with the missing template ID, before rendering.
+                registry.get(template.template_id)
+
+
+def pack_settings_editor(pack_id: str) -> PackSettingsEditor | None:
+    """Return the optional pack-owned settings dialog callback."""
+    module = import_module(f"photoalbum.templates.{pack_id}")
+    return getattr(module, "edit_settings", None)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from inspect import signature
 from pathlib import Path
 from typing import Callable
 
@@ -286,7 +287,12 @@ class PdfExportService:
 
                 begin_output_page()
 
+                paint_kwargs = {}
+                if "template_pack_settings" in signature(renderer.paint).parameters:
+                    paint_kwargs["template_pack_settings"] = settings.template_pack_settings
+
                 renderer.paint(
+                    **paint_kwargs,
                     painter=painter,
                     instance=cover.page,
                     photos=project_photos,

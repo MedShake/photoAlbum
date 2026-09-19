@@ -42,10 +42,12 @@ where = ["src"]
 "photoalbum.resources" = [
     "icons/*.svg",
 ]
-"photoalbum.templates.msb" = [
+"*" = [
     "manifest.json",
     "README.md",
     "screenshots/*",
+    "assets/*",
+    "assets/**/*",
 ]
 
 [project.scripts]

@@ -155,7 +155,12 @@ class _PreviewPageBase(QWidget):
             self.rect(),
             Qt.GlobalColor.white,
         )
+        self._paint_border(painter)
 
+    def _paint_border(self, painter: QPainter) -> None:
+        # Full-page template images can cover the initial paper outline.
+        painter.save()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(
             QPen(Qt.GlobalColor.gray, 1)
         )
@@ -168,6 +173,7 @@ class _PreviewPageBase(QWidget):
                 -1,
             )
         )
+        painter.restore()
 
 
 class AlbumCoverPreview(_PreviewPageBase):
@@ -249,6 +255,7 @@ class AlbumCoverPreview(_PreviewPageBase):
                     self._template_pack_settings
                 ),
             )
+            self._paint_border(painter)
             return
 
 
@@ -505,6 +512,7 @@ class AlbumPagePreview(_PreviewPageBase):
                     self._paint_non_photo_page
                 ),
             )
+            self._paint_border(painter)
         finally:
             painter.end()
 

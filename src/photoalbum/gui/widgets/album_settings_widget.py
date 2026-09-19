@@ -25,13 +25,7 @@ from photoalbum.template_engine.defaults import (
 from photoalbum.i18n import Translator
 from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
-from photoalbum.templates.msb.theme import (
-    msb_theme_from_pack_settings,
-    pack_settings_with_msb_theme,
-)
-from photoalbum.templates.msb.theme_dialog import (
-    MsbThemeDialog,
-)
+from photoalbum.template_engine.discovery import pack_settings_editor
 from photoalbum.album import (
     PAGE_FORMATS,
     page_format_from_id,
@@ -511,31 +505,21 @@ class AlbumSettingsWidget(QWidget):
 
         return instance
 
-    def _open_msb_theme_dialog(
-        self,
-    ) -> bool:
-        current_theme = (
-            msb_theme_from_pack_settings(
-                self._template_pack_settings
-            )
-        )
-
-        dialog = MsbThemeDialog(
-            current_theme,
+    def _open_pack_settings_dialog(self, template_id: str) -> bool:
+        definition = self._registry.get(template_id)
+        if definition.pack_id is None:
+            return False
+        editor = pack_settings_editor(definition.pack_id)
+        if editor is None:
+            return False
+        updated = editor(
+            self._template_pack_settings,
             translator=self._translator,
             parent=self,
         )
-
-        if not dialog.exec():
+        if updated is None:
             return False
-
-        self._template_pack_settings = (
-            pack_settings_with_msb_theme(
-                self._template_pack_settings,
-                dialog.theme(),
-            )
-        )
-
+        self._template_pack_settings = updated
         return True
 
     def _configure_cover_instance(
@@ -587,7 +571,7 @@ class AlbumSettingsWidget(QWidget):
             result
             == PageInstanceDialog.THEME_REQUESTED
         ):
-            if self._open_msb_theme_dialog():
+            if self._open_pack_settings_dialog(dialog.instance().template_id):
                 self._emit_settings_changed()
             return
 
@@ -774,7 +758,7 @@ class AlbumSettingsWidget(QWidget):
             result
             == PageInstanceDialog.THEME_REQUESTED
         ):
-            if self._open_msb_theme_dialog():
+            if self._open_pack_settings_dialog(dialog.instance().template_id):
                 self._emit_settings_changed()
             return
 
@@ -889,7 +873,7 @@ class AlbumSettingsWidget(QWidget):
             result
             == PageInstanceDialog.THEME_REQUESTED
         ):
-            if self._open_msb_theme_dialog():
+            if self._open_pack_settings_dialog(dialog.instance().template_id):
                 self._emit_settings_changed()
             return
 
@@ -1632,7 +1616,7 @@ class AlbumSettingsWidget(QWidget):
             result
             == PageInstanceDialog.THEME_REQUESTED
         ):
-            if self._open_msb_theme_dialog():
+            if self._open_pack_settings_dialog(dialog.instance().template_id):
                 self._emit_settings_changed()
             return
 
