@@ -50,6 +50,12 @@ def _parse_arguments() -> argparse.Namespace:
             "language is used, with English as fallback"
         ),
     )
+    parser.add_argument(
+        "project",
+        nargs="?",
+        type=Path,
+        help="Photo Album project to open",
+    )
 
     return parser.parse_args()
 
@@ -72,6 +78,10 @@ def main() -> int:
     window = MainWindow(
         language=language
     )
+
+    if args.project is not None:
+        window._open_project_path(args.project)
+
     window.show()
 
     return application.exec()

@@ -424,7 +424,6 @@ class MainWindow(QMainWindow):
         self._update_project_state()
 
     def _open_project(self) -> None:
-        self._preview_render_service.clear()
         path, _ = QFileDialog.getOpenFileName(
             self,
             self._translator.tr("main.open_project_title"),
@@ -435,8 +434,14 @@ class MainWindow(QMainWindow):
         if not path:
             return
 
+        self._open_project_path(Path(path))
+
+    def _open_project_path(self, path: Path) -> None:
+        """Open an existing project from an explicit path."""
+        self._preview_render_service.clear()
+
         try:
-            self._project_service.open(Path(path))
+            self._project_service.open(path)
         except Exception as exc:
             self._show_error(str(exc))
             return
