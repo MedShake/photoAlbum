@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "simplex",
+  "name": "Simplex",
+  "version": "1.0",
+  "authors": [
+    {
+      "name": "Photo Album"
+    }
+  ],
+  "description": "Simple full-page photographic templates.",
+  "documentation": "README.md",
+  "templates": [
+    {
+      "id": "simplex-full-photo-cover",
+      "name": "Full-page photo cover",
+      "module": "full_photo_cover",
+      "kinds": [
+        "cover"
+      ],
+      "cover_positions": [
+        "front"
+      ],
+      "targets": [
+        {
+          "format": "a4",
+          "orientation": "portrait"
+        },
+        {
+          "format": "a4",
+          "orientation": "landscape"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "portrait"
+        },
+        {
+          "format": "us-letter",
+          "orientation": "landscape"
+        }
+      ]
+    }
+  ]
+}

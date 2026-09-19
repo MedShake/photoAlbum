@@ -369,18 +369,80 @@ class AlbumSettingsWidget(QWidget):
 
     def _refresh_template_choices(self) -> None:
         """
-        Refresh availability after a physical target change.
+        Refresh template choices after a physical target change.
 
-        Existing template combos are rebuilt lazily by the same
-        helpers used by the widget.  The important invariant here
-        is that the selected album target itself can never become
-        a target for which no complete template set exists.
+        Keep an existing selection when it is still compatible with
+        the new target. Cover selectors are additionally filtered by
+        their physical cover position.
         """
         if not hasattr(
             self,
             "_photo_page_combo",
         ):
             return
+
+        combos = (
+            (
+                self._front_cover_combo,
+                TemplateKind.COVER,
+                CoverPosition.FRONT,
+            ),
+            (
+                self._inside_front_cover_combo,
+                TemplateKind.COVER,
+                CoverPosition.INSIDE_FRONT,
+            ),
+            (
+                self._inside_back_cover_combo,
+                TemplateKind.COVER,
+                CoverPosition.INSIDE_BACK,
+            ),
+            (
+                self._back_cover_combo,
+                TemplateKind.COVER,
+                CoverPosition.BACK,
+            ),
+            (
+                self._month_divider_combo,
+                TemplateKind.MONTH_DIVIDER,
+                None,
+            ),
+            (
+                self._year_divider_combo,
+                TemplateKind.YEAR_DIVIDER,
+                None,
+            ),
+            (
+                self._photo_page_combo,
+                TemplateKind.PHOTO_PAGE,
+                None,
+            ),
+            (
+                self._front_matter_combo,
+                TemplateKind.SPECIAL_PAGE,
+                None,
+            ),
+            (
+                self._back_matter_combo,
+                TemplateKind.SPECIAL_PAGE,
+                None,
+            ),
+        )
+
+        for combo, kind, cover_position in combos:
+            selected = combo.currentData()
+
+            self._populate_template_combo(
+                combo,
+                kind,
+                cover_position=cover_position,
+            )
+
+            if selected is not None:
+                index = combo.findData(selected)
+
+                if index >= 0:
+                    combo.setCurrentIndex(index)
 
         self.settings_changed.emit()
 
@@ -423,7 +485,8 @@ class AlbumSettingsWidget(QWidget):
             attribute_name,
         ) in rows:
             combo = self._create_template_combo(
-                TemplateKind.COVER
+                TemplateKind.COVER,
+                cover_position=position,
             )
 
             setattr(
@@ -1051,17 +1114,64 @@ class AlbumSettingsWidget(QWidget):
             self._translator,
         )
 
+    def _template_available_for_selection(
+        self,
+        template,
+        *,
+        cover_position: CoverPosition | None = None,
+    ) -> bool:
+        if not template.supports_target(self._target()):
+            return False
+
+        if (
+            cover_position is not None
+            and not template.supports_cover_position(
+                cover_position
+            )
+        ):
+            return False
+
+        return True
+
+    def _populate_template_combo(
+        self,
+        combo: QComboBox,
+        kind: TemplateKind,
+        *,
+        cover_position: CoverPosition | None = None,
+    ) -> None:
+        combo.blockSignals(True)
+
+        try:
+            combo.clear()
+
+            for template in self._registry.list_by_kind(kind):
+                if not self._template_available_for_selection(
+                    template,
+                    cover_position=cover_position,
+                ):
+                    continue
+
+                combo.addItem(
+                    self._template_display_name(template),
+                    template.template_id,
+                )
+        finally:
+            combo.blockSignals(False)
+
     def _create_template_combo(
         self,
         kind: TemplateKind,
+        *,
+        cover_position: CoverPosition | None = None,
     ) -> QComboBox:
         combo = QComboBox()
 
-        for template in self._registry.list_by_kind(kind):
-            combo.addItem(
-                self._template_display_name(template),
-                template.template_id,
-            )
+        self._populate_template_combo(
+            combo,
+            kind,
+            cover_position=cover_position,
+        )
 
         return combo
 

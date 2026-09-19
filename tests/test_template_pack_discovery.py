@@ -13,9 +13,13 @@ from photoalbum.template_engine import (
 def test_msb_pack_is_discovered():
     packs = discover_template_packs()
 
-    assert [pack.pack_id for pack in packs] == [
-        "msb"
-    ]
+    pack_ids = {
+        pack.pack_id
+        for pack in packs
+    }
+
+    assert "msb" in pack_ids
+    assert "simplex" in pack_ids
     assert packs[0].name == "MSB"
 
 
@@ -38,17 +42,33 @@ def test_msb_templates_are_discovered():
         "photo-page-4",
         "dedication",
         "blank",
+        "simplex-full-photo-cover",
     }
 
 
 def test_msb_templates_have_pack_identity():
     registry = create_template_registry()
 
-    assert all(
-        template.pack_id == "msb"
-        and template.pack_name == "MSB"
+    msb_templates = [
+        template
         for template in registry.list_all()
+        if template.pack_id == "msb"
+    ]
+
+    assert msb_templates
+
+    assert all(
+        template.pack_name == "MSB"
+        for template in msb_templates
     )
+
+    simplex = registry.get(
+        "simplex-full-photo-cover"
+    )
+
+    assert simplex is not None
+    assert simplex.pack_id == "simplex"
+    assert simplex.pack_name == "Simplex"
 
 
 def test_msb_supports_a4_portrait_album():

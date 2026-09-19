@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from inspect import signature
+from inspect import Parameter, signature
 
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QFont, QPainter
@@ -239,7 +239,13 @@ class PageRenderer:
             renderer.paint
         ).parameters
 
-        if "template_pack_settings" in parameters:
+        if (
+            "template_pack_settings" in parameters
+            or any(
+                parameter.kind is Parameter.VAR_KEYWORD
+                for parameter in parameters.values()
+            )
+        ):
             paint_kwargs["template_pack_settings"] = (
                 template_pack_settings or {}
             )
