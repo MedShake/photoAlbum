@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,12 @@ from photoalbum.scanner import (
 from photoalbum.app import ProjectService
 from photoalbum.album import (
     AlbumBuilder,
+    CoverPosition,
+    PAGE_FORMATS,
+    PageOrientation,
     PrintConstraints,
+    TemplateKind,
+    TemplateTarget,
     oriented_page_format,
     page_format_from_id,
 )
@@ -47,6 +53,14 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(
         dest="command",
         required=True,
+    )
+
+    templates_parser = subparsers.add_parser(
+        "templates", help="List discovered templates and their declared compatibility.",
+    )
+    templates_parser.add_argument(
+        "--format", choices=("table", "json"), default="table",
+        help="Output format (default: table). One row per template and paper format.",
     )
 
     scan_parser = subparsers.add_parser(
@@ -737,9 +751,74 @@ def run_pdf(
         service.close()
 
 
+def collect_template_compatibilities() -> list[dict[str, object]]:
+    """Read compatibility through the same registry used by the application."""
+    rows = []
+    for template in sorted(create_template_registry().list_all(), key=lambda item: item.template_id):
+        # An empty target declaration is unrestricted in the domain model.
+        formats = sorted({target.format_id for target in template.supported_targets} or PAGE_FORMATS)
+        for format_id in formats:
+            rows.append({
+                "id": template.template_id,
+                "pack": template.pack_id,
+                "kinds": sorted(kind.value for kind in template.allowed_kinds),
+                "format": format_id,
+                **{
+                    orientation.value: template.supports_target(TemplateTarget(format_id, orientation))
+                    for orientation in PageOrientation
+                },
+                **{
+                    position.value: (
+                        template.supports_cover_position(position)
+                        if template.supports(TemplateKind.COVER) else None
+                    )
+                    for position in CoverPosition
+                },
+                "interior": any(
+                    template.supports(kind) for kind in TemplateKind if kind != TemplateKind.COVER
+                ),
+            })
+    return rows
+
+
+def run_templates(args: argparse.Namespace) -> int:
+    try:
+        rows = collect_template_compatibilities()
+    except (OSError, ValueError) as exc:
+        print(f"Unable to discover templates: {exc}", file=sys.stderr)
+        return 2
+    if args.format == "json":
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return 0
+
+    columns = [("id", "ID"), ("pack", "Pack"), ("kinds", "Type"), ("format", "Format")]
+    columns += [(item.value, item.value.replace("_", " ").title()) for item in PageOrientation]
+    columns += [(item.value, item.value.replace("_", " ").title()) for item in CoverPosition]
+    columns += [("interior", "Interior")]
+
+    def cell(value: object) -> str:
+        if value is None:
+            return "-"
+        if isinstance(value, bool):
+            return "yes" if value else "no"
+        if isinstance(value, list):
+            return ",".join(value)
+        return str(value)
+
+    table = [[label for _, label in columns]]
+    table.extend([[cell(row[key]) for key, _ in columns] for row in rows])
+    widths = [max(len(row[index]) for row in table) for index in range(len(columns))]
+    for row in table:
+        print(" | ".join(value.ljust(width) for value, width in zip(row, widths)).rstrip())
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.command == "templates":
+        return run_templates(args)
 
     if args.command == "pdf":
         return run_pdf(args)
