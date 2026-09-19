@@ -5,6 +5,11 @@ from random import Random
 
 from photoalbum.models import Photo
 
+from .text_metrics import (
+    physical_line_height_mm,
+    physical_text_width_mm,
+)
+
 
 from photoalbum.templates.msb.theme import (
     DEFAULT_MONTH_COLORS,
@@ -174,18 +179,17 @@ def _word_size_mm(
     # The word cloud uses a controlled monospace font.
     # 0.60 em is kept as the historical width approximation
     # used by the placement algorithm.
-    point_mm = 25.4 / 72.0
 
-    height = (
+    # Use the physical line height of the same controlled
+    # font that the painter renders. This leaves room for
+    # ascenders and descenders without arbitrary padding.
+    height = physical_line_height_mm(
         font_size_pt
-        * point_mm
     )
 
-    width = (
-        len(text)
-        * font_size_pt
-        * 0.60
-        * point_mm
+    width = physical_text_width_mm(
+        text,
+        font_size_pt,
     )
 
     return width, height

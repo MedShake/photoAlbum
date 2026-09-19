@@ -160,3 +160,70 @@ def test_cloud_is_reproducible():
     )
 
     assert first == second
+
+
+def test_word_cloud_reserves_font_line_height():
+    """Word boxes leave room for font ascenders and descenders."""
+    from PySide6.QtGui import (
+        QGuiApplication,
+    )
+
+    from photoalbum.templates.msb.geographic_word_cloud.composition import (
+        _word_size_mm,
+    )
+    from photoalbum.templates.msb.geographic_word_cloud.text_metrics import (
+        physical_line_height_mm,
+    )
+
+    app = (
+        QGuiApplication.instance()
+        or QGuiApplication([])
+    )
+
+    font_size_pt = 72.0
+
+    _, height = _word_size_mm(
+        "Sydney",
+        font_size_pt,
+    )
+
+    one_em_mm = (
+        font_size_pt
+        * 25.4
+        / 72.0
+    )
+
+    assert height > one_em_mm
+    assert height == physical_line_height_mm(
+        font_size_pt
+    )
+
+
+def test_word_cloud_uses_rendered_text_width():
+    """Word boxes use the rendered font advance width."""
+    from PySide6.QtGui import QGuiApplication
+
+    from photoalbum.templates.msb.geographic_word_cloud.composition import (
+        _word_size_mm,
+    )
+    from photoalbum.templates.msb.geographic_word_cloud.text_metrics import (
+        physical_text_width_mm,
+    )
+
+    app = (
+        QGuiApplication.instance()
+        or QGuiApplication([])
+    )
+
+    text = "Saint-Sébastien-sur-Loire"
+    font_size_pt = 72.0
+
+    width, _ = _word_size_mm(
+        text,
+        font_size_pt,
+    )
+
+    assert width == physical_text_width_mm(
+        text,
+        font_size_pt,
+    )

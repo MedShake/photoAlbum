@@ -6,16 +6,12 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
-    QFont,
+    QFontMetricsF,
     QPainter,
 )
 
-from photoalbum.rendering.fonts import (
-    DEFAULT_MONOSPACE_FONT,
-    resolve_font_family,
-)
-
 from .composition import GeographicWordCloud
+from .text_metrics import word_cloud_font
 
 
 def paint_geographic_word_cloud(
@@ -47,23 +43,14 @@ def paint_geographic_word_cloud(
             ),
         )
 
-        font = QFont(
-            resolve_font_family(
-                DEFAULT_MONOSPACE_FONT,
-                fallback=DEFAULT_MONOSPACE_FONT,
-            )
-        )
-
-        font.setBold(
-            True
-        )
-
-        pixel_size = font_pixel_size(
+        font = word_cloud_font(
             word.font_size_pt
         )
 
         font.setPixelSize(
-            pixel_size
+            font_pixel_size(
+                word.font_size_pt
+            )
         )
 
         painter.setFont(
@@ -76,11 +63,19 @@ def paint_geographic_word_cloud(
             )
         )
 
+        metrics = QFontMetricsF(font)
+
+        baseline_y = (
+            rect.center().y()
+            + (
+                metrics.ascent()
+                - metrics.descent()
+            )
+            / 2.0
+        )
+
         painter.drawText(
-            rect,
-            (
-                Qt.AlignmentFlag.AlignLeft
-                | Qt.AlignmentFlag.AlignVCenter
-            ),
+            rect.left(),
+            baseline_y,
             word.text,
         )
