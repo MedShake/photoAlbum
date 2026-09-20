@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from uuid import uuid4
 
-from .models import CoverPosition
+from math import isfinite
+
+from .models import CoverPosition, PageFormat, page_format_from_id, oriented_page_format
 
 
 class PageOrientation(str, Enum):
@@ -306,6 +308,18 @@ class AlbumStructureSettings:
     template_pack_settings: dict[str, object] = field(
         default_factory=dict
     )
+
+    custom_width_mm: float = 210.0
+    custom_height_mm: float = 297.0
+
+    def effective_page_format(self) -> PageFormat:
+        """Resolve host choices; custom dimensions are already oriented."""
+        if self.page_format == "custom":
+            dimensions = (self.custom_width_mm, self.custom_height_mm)
+            if any(not isfinite(value) or value <= 0 for value in dimensions):
+                raise ValueError("Custom page dimensions must be positive and finite.")
+            return PageFormat("Custom", *dimensions)
+        return oriented_page_format(page_format_from_id(self.page_format), self.orientation)
 
     def year_dividers_available(
         self,

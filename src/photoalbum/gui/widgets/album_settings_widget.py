@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QSpinBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -28,6 +30,7 @@ from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 from photoalbum.template_engine.discovery import pack_settings_editor
 from photoalbum.album import (
     PAGE_FORMATS,
+    PageFormat,
     page_format_from_id,
     oriented_page_format,
     AlbumStructureSettings,
@@ -45,7 +48,6 @@ from photoalbum.album import (
     SpecialPage,
     TemplateKind,
     TemplateRegistry,
-    TemplateTarget,
 )
 
 
@@ -195,6 +197,29 @@ class AlbumSettingsWidget(QWidget):
                 format_id,
             )
 
+        self._page_format_combo.addItem(self._translator.tr("album.custom_format"), "custom")
+        self._custom_dimensions = (210.0, 297.0)
+        self._custom_format_controls = QWidget()
+        custom_form = QHBoxLayout(self._custom_format_controls)
+        custom_form.setContentsMargins(0, 0, 0, 0)
+        self._custom_width_spin = QDoubleSpinBox()
+        self._custom_height_spin = QDoubleSpinBox()
+        for spin, value in zip((self._custom_width_spin, self._custom_height_spin), self._custom_dimensions):
+            spin.setRange(50.0, 2000.0)
+            spin.setDecimals(2)
+            spin.setSuffix(" mm")
+            spin.setValue(value)
+        for key, spin in (("album.custom_width", self._custom_width_spin),
+                          ("album.custom_height", self._custom_height_spin)):
+            label = QLabel(self._translator.tr(key))
+            label.setBuddy(spin)
+            custom_form.addWidget(label)
+            custom_form.addWidget(spin)
+        self._custom_apply_button = QPushButton(self._translator.tr("album.apply_format"))
+        self._custom_apply_button.clicked.connect(self._apply_custom_format)
+        custom_form.addWidget(self._custom_apply_button)
+        custom_form.addStretch()
+
         self._orientation_combo = QComboBox()
         self._orientation_combo.addItem(
             self._translator.tr(
@@ -229,15 +254,16 @@ class AlbumSettingsWidget(QWidget):
             self._orientation_combo,
         )
 
+        form.addRow(self._custom_format_controls)
         self._refresh_format_availability()
 
         return group
 
-    def _target(
+    def _page_geometry(
         self,
         format_id: str | None = None,
         orientation: PageOrientation | None = None,
-    ) -> TemplateTarget:
+    ) -> tuple[float, float]:
         if format_id is None:
             format_id = str(
                 self._page_format_combo.currentData()
@@ -248,24 +274,30 @@ class AlbumSettingsWidget(QWidget):
                 self._orientation_combo.currentData()
             )
 
-        return TemplateTarget(
-            format_id=format_id,
-            orientation=orientation,
-        )
+        if format_id == "custom":
+            return self._custom_dimensions
+        page = oriented_page_format(page_format_from_id(format_id), orientation)
+        return page.width_mm, page.height_mm
 
     def _format_has_available_orientation(
         self,
         format_id: str,
     ) -> bool:
         return any(
-            self._registry.album_target_available(
-                self._target(
+            self._registry.album_page_available(
+                *self._page_geometry(
                     format_id=format_id,
                     orientation=orientation,
                 )
             )
             for orientation in PageOrientation
         )
+
+    def _apply_custom_format(self) -> None:
+        dimensions = (self._custom_width_spin.value(), self._custom_height_spin.value())
+        if dimensions != self._custom_dimensions:
+            self._custom_dimensions = dimensions
+            self._refresh_orientation_availability()
 
     def _refresh_format_availability(self) -> None:
         model = self._page_format_combo.model()
@@ -288,6 +320,10 @@ class AlbumSettingsWidget(QWidget):
             )
 
             item.setEnabled(available)
+
+            if format_id == "custom":
+                item.setEnabled(True)
+                continue
 
             page_format = PAGE_FORMATS[format_id]
             base = (
@@ -320,6 +356,16 @@ class AlbumSettingsWidget(QWidget):
             self._page_format_combo.currentData()
         )
 
+        custom = format_id == "custom"
+        self._custom_format_controls.setVisible(custom)
+        self._orientation_combo.setEnabled(not custom)
+        if custom:
+            with QSignalBlocker(self._orientation_combo):
+                orientation = "landscape" if self._custom_dimensions[0] > self._custom_dimensions[1] else "portrait"
+                self._orientation_combo.setCurrentIndex(self._orientation_combo.findData(orientation))
+            self._refresh_template_choices()
+            return
+
         model = self._orientation_combo.model()
 
         for index in range(
@@ -335,8 +381,8 @@ class AlbumSettingsWidget(QWidget):
                 continue
 
             available = (
-                self._registry.album_target_available(
-                    self._target(
+                self._registry.album_page_available(
+                    *self._page_geometry(
                         format_id=format_id,
                         orientation=orientation,
                     )
@@ -468,6 +514,12 @@ class AlbumSettingsWidget(QWidget):
 
                     if index >= 0:
                         combo.setCurrentIndex(index)
+            for list_widget in (self._front_matter_list, self._back_matter_list):
+                for index in range(list_widget.count()):
+                    item = list_widget.item(index)
+                    page = item.data(Qt.ItemDataRole.UserRole)
+                    if isinstance(page, PageInstance):
+                        self._install_special_page_row_widget(list_widget, item, page)
         finally:
             self._loading_settings = was_loading
 
@@ -1139,7 +1191,7 @@ class AlbumSettingsWidget(QWidget):
         *,
         cover_position: CoverPosition | None = None,
     ) -> bool:
-        if not template.supports_target(self._target()):
+        if not template.is_compatible_with_page(*self._page_geometry()):
             return False
 
         if (
@@ -1329,14 +1381,10 @@ class AlbumSettingsWidget(QWidget):
         )
 
     def _oriented_page_format(self):
-        return oriented_page_format(
-            page_format_from_id(
-                str(self._page_format_combo.currentData())
-            ),
-            PageOrientation(
-                self._orientation_combo.currentData()
-            ),
-        )
+        width, height = self._page_geometry()
+        format_id = str(self._page_format_combo.currentData())
+        name = "Custom" if format_id == "custom" else PAGE_FORMATS[format_id].name
+        return PageFormat(name, width, height)
 
     def settings(self) -> AlbumStructureSettings:
         # Keep replacement instances stable across persistence and rebuilding.
@@ -1347,6 +1395,8 @@ class AlbumSettingsWidget(QWidget):
             self._year_divider_instance, self._year_divider_combo,
         )
         return AlbumStructureSettings(
+            custom_width_mm=self._custom_dimensions[0],
+            custom_height_mm=self._custom_dimensions[1],
             page_format=str(
                 self._page_format_combo.currentData()
             ),
@@ -1458,6 +1508,9 @@ class AlbumSettingsWidget(QWidget):
         )
 
         try:
+            self._custom_dimensions = (settings.custom_width_mm, settings.custom_height_mm)
+            for spin, value in zip((self._custom_width_spin, self._custom_height_spin), self._custom_dimensions):
+                spin.setValue(value)
             page_format_index = (
                 self._page_format_combo.findData(
                     settings.page_format
@@ -1479,6 +1532,8 @@ class AlbumSettingsWidget(QWidget):
                 self._orientation_combo.setCurrentIndex(
                     orientation_index
                 )
+
+            self._refresh_orientation_availability()
 
             self._set_combo_template(
                 self._front_cover_combo,
@@ -1657,6 +1712,14 @@ class AlbumSettingsWidget(QWidget):
             )
         )
 
+        compatible = template.is_compatible_with_page(*self._page_geometry())
+        settings_button.setEnabled(compatible)
+        if not compatible:
+            warning = self._translator.tr("album.special_page_incompatible")
+            label.setText(f"⚠ {label.text()} — {warning}")
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            row_widget.setToolTip(warning)
+
         settings_button.clicked.connect(
             lambda checked=False,
             lw=list_widget,
@@ -1706,6 +1769,9 @@ class AlbumSettingsWidget(QWidget):
             value,
             PageInstance,
         ):
+            return
+
+        if not self._registry.get(value.template_id).is_compatible_with_page(*self._page_geometry()):
             return
 
         photos = (

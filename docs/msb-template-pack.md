@@ -10,21 +10,15 @@ The pack is identified by `msb`. Its catalog is declared in:
     src/photoalbum/templates/msb/manifest.json
 
 The manifest is the source of truth for template availability,
-supported page kinds, cover positions, physical formats, orientations,
+supported page kinds, cover positions, optional physical page bounds,
 and photo capacities.
 
-## Supported formats
+## Physical page compatibility
 
-MSB currently supports:
-
-- A4 — portrait;
-- US Letter — portrait.
-
-MSB does not currently declare landscape or A5 targets.
-
-This limitation belongs to the MSB pack rather than to the general
-Photo Album template architecture. Other packs may provide templates
-for other formats and orientations.
+Most MSB templates declare no geometric bounds. The classic month divider requires
+at least 130 × 145 mm; the calendar index requires at least 110 × 260 mm. The host supplies physical
+page dimensions, including the chosen orientation. Named formats do not restrict
+template compatibility. Cover-position and page-kind restrictions still apply.
 
 An album can mix templates from MSB with templates supplied by other
 installed packs.
@@ -331,3 +325,20 @@ For the general template-pack architecture, see:
 For a smaller independent pack example, see:
 
 - `docs/simplex-template-pack.md`.
+
+### Minimum page dimensions
+
+The classic month divider requires width ≥ 130 mm and height ≥ 145 mm.
+Its 32 pt month/year heading needs about 105.5 mm for the longest default
+French/English label, plus two 10 mm margins. The city area begins at 40 mm
+and occupies 65% of page height: 145 mm retains a bottom margin of at least
+10 mm (below 114.3 mm the rectangle exceeds the page).
+
+The calendar index requires width ≥ 110 mm and height ≥ 260 mm. It uses two
+columns and six rows, a 28 mm title band, 10 mm margins, 8 mm column spacing,
+and fixed 4 mm day cells. Each month can need 33 mm for its heading, weekday
+header and six weeks; 260 mm provides over 2 mm between these blocks. The
+110 mm width keeps weekday labels and typical month/page headings readable.
+These bounds cover default typography and ordinary content; unusually long
+city lists or custom large fonts may still need a larger page. No bounds were
+added to the photo scatter template.

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from math import isfinite
 
 from .models import CoverPosition
-from .settings import PageOrientation
 
 
 class TemplateKind(str, Enum):
@@ -15,16 +15,40 @@ class TemplateKind(str, Enum):
     SPECIAL_PAGE = "special_page"
 
 
-@dataclass(frozen=True, order=True)
-class TemplateTarget:
-    """
-    Physical album target supported by a template.
+@dataclass(frozen=True)
+class PageConstraints:
+    """Optional inclusive physical bounds, in millimetres."""
 
-    format_id is one of the canonical IDs from PAGE_FORMATS.
-    """
+    min_width_mm: float | None = None
+    max_width_mm: float | None = None
+    min_height_mm: float | None = None
+    max_height_mm: float | None = None
 
-    format_id: str
-    orientation: PageOrientation
+    def __post_init__(self) -> None:
+        for name, value in vars(self).items():
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                or not isfinite(value) or value <= 0
+            ):
+                raise ValueError(f"{name} must be a positive finite number or null.")
+        for axis in ("width", "height"):
+            minimum = getattr(self, f"min_{axis}_mm")
+            maximum = getattr(self, f"max_{axis}_mm")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"Minimum {axis} exceeds maximum {axis}.")
+
+    def accepts(self, width_mm: float, height_mm: float) -> bool:
+        for value, minimum, maximum in (
+            (width_mm, self.min_width_mm, self.max_width_mm),
+            (height_mm, self.min_height_mm, self.max_height_mm),
+        ):
+            if not isfinite(value) or value <= 0:
+                return False
+            if minimum is not None and value < minimum:
+                return False
+            if maximum is not None and value > maximum:
+                return False
+        return True
 
 
 @dataclass(frozen=True)
@@ -37,9 +61,7 @@ class TemplateDefinition:
     pack_id: str | None = None
     pack_name: str | None = None
 
-    supported_targets: frozenset[TemplateTarget] = field(
-        default_factory=frozenset
-    )
+    page_constraints: PageConstraints = field(default_factory=PageConstraints)
 
     cover_positions: frozenset[CoverPosition] = field(
         default_factory=frozenset
@@ -124,17 +146,8 @@ class TemplateDefinition:
     ) -> bool:
         return kind in self.allowed_kinds
 
-    def supports_target(
-        self,
-        target: TemplateTarget,
-    ) -> bool:
-        # Empty targets preserve the lightweight TemplateDefinition
-        # contract used by domain-level unit tests and third-party
-        # code that does not participate in pack discovery.
-        return (
-            not self.supported_targets
-            or target in self.supported_targets
-        )
+    def is_compatible_with_page(self, width_mm: float, height_mm: float) -> bool:
+        return self.page_constraints.accepts(width_mm, height_mm)
 
     def supports_cover_position(
         self,
@@ -195,20 +208,22 @@ class TemplateRegistry:
             if template.supports(kind)
         ]
 
-    def list_for_target(
+    def list_for_page(
         self,
         kind: TemplateKind,
-        target: TemplateTarget,
+        width_mm: float,
+        height_mm: float,
     ) -> list[TemplateDefinition]:
         return [
             template
             for template in self.list_by_kind(kind)
-            if template.supports_target(target)
+            if template.is_compatible_with_page(width_mm, height_mm)
         ]
 
-    def album_target_available(
+    def album_page_available(
         self,
-        target: TemplateTarget,
+        width_mm: float,
+        height_mm: float,
     ) -> bool:
         """
         A target is usable when all four cover positions and at
@@ -216,17 +231,17 @@ class TemplateRegistry:
 
         Templates may come from different packs.
         """
-        photo_pages = self.list_for_target(
+        photo_pages = self.list_for_page(
             TemplateKind.PHOTO_PAGE,
-            target,
+            width_mm, height_mm,
         )
 
         if not photo_pages:
             return False
 
-        covers = self.list_for_target(
+        covers = self.list_for_page(
             TemplateKind.COVER,
-            target,
+            width_mm, height_mm,
         )
 
         return all(
@@ -235,19 +250,4 @@ class TemplateRegistry:
                 for template in covers
             )
             for position in CoverPosition
-        )
-
-    def available_targets(
-        self,
-    ) -> frozenset[TemplateTarget]:
-        candidates = {
-            target
-            for template in self._templates.values()
-            for target in template.supported_targets
-        }
-
-        return frozenset(
-            target
-            for target in candidates
-            if self.album_target_available(target)
         )

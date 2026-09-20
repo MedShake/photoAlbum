@@ -5,14 +5,12 @@ MSB is the original template pack bundled with Photo Album.
 Its `manifest.json` file is the source of truth for the template
 catalog.
 
-## Currently supported formats
+## Physical page compatibility
 
-- A4 — portrait
-- US Letter — portrait
-
-MSB currently declares neither A5 nor landscape support. Photo Album
-can support these options when another pack provides the required
-templates.
+Most MSB templates declare no geometric bounds. The classic month divider requires
+at least 130 × 145 mm; the calendar index requires at least 110 × 260 mm. The application resolves
+paper format and orientation into physical dimensions; templates do not restrict
+named formats or orientations. Page kinds and cover positions remain enforced.
 
 An album can freely mix MSB templates with templates from other
 installed packs.

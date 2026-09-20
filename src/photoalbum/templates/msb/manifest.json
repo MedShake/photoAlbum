@@ -27,20 +27,6 @@
         "inside_front",
         "inside_back",
         "back"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "a4",
-          "orientation": "landscape"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
       ]
     },
     {
@@ -56,20 +42,6 @@
         "inside_front",
         "inside_back",
         "back"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "a4",
-          "orientation": "landscape"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
       ]
     },
     {
@@ -87,16 +59,10 @@
         "inside_back",
         "back"
       ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
-      ]
+      "page_constraints": {
+        "min_width_mm": 110,
+        "min_height_mm": 260
+      }
     },
     {
       "id": "year-divider-classic",
@@ -104,20 +70,6 @@
       "module": "year_divider_classic",
       "kinds": [
         "year_divider"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        },
-        {
-          "format": "a4",
-          "orientation": "landscape"
-        }
       ]
     },
     {
@@ -127,20 +79,10 @@
       "kinds": [
         "month_divider"
       ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        },
-        {
-          "format": "a4",
-          "orientation": "landscape"
-        }
-      ]
+      "page_constraints": {
+        "min_width_mm": 130,
+        "min_height_mm": 145
+      }
     },
     {
       "id": "month-divider-simple",
@@ -148,16 +90,6 @@
       "module": "month_divider_simple",
       "kinds": [
         "month_divider"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
       ]
     },
     {
@@ -167,21 +99,7 @@
       "kinds": [
         "photo_page"
       ],
-      "photo_capacity": 1,
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "a4",
-          "orientation": "landscape"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
-      ]
+      "photo_capacity": 1
     },
     {
       "id": "photo-page-2",
@@ -190,17 +108,7 @@
       "kinds": [
         "photo_page"
       ],
-      "photo_capacity": 2,
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
-      ]
+      "photo_capacity": 2
     },
     {
       "id": "photo-page-3",
@@ -209,17 +117,7 @@
       "kinds": [
         "photo_page"
       ],
-      "photo_capacity": 3,
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
-      ]
+      "photo_capacity": 3
     },
     {
       "id": "photo-page-4",
@@ -228,17 +126,7 @@
       "kinds": [
         "photo_page"
       ],
-      "photo_capacity": 4,
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
-      ]
+      "photo_capacity": 4
     },
     {
       "id": "dedication",
@@ -247,16 +135,6 @@
       "kinds": [
         "special_page",
         "cover"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
       ],
       "cover_positions": [
         "inside_front",
@@ -270,16 +148,6 @@
       "module": "blank",
       "kinds": [
         "special_page"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        }
       ]
     }
   ]

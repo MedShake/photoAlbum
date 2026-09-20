@@ -109,6 +109,8 @@ def album_settings_to_json(
         },
 
         "page_format": settings.page_format,
+        "custom_width_mm": settings.custom_width_mm,
+        "custom_height_mm": settings.custom_height_mm,
         "orientation": settings.orientation.value,
 
         "print_settings": {
@@ -229,6 +231,8 @@ def album_settings_from_json(
             ),
         ),
 
+        custom_width_mm=float(data.get("custom_width_mm", 210.0)),
+        custom_height_mm=float(data.get("custom_height_mm", 297.0)),
         page_format=str(
             data["page_format"]
         ),

@@ -581,6 +581,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
 
         "album.page_format": "Page format",
+        "album.special_page_incompatible": "Incompatible page format (excluded from rendering)",
+        "album.custom_format": "Custom",
+        "album.custom_width": "Width",
+        "album.custom_height": "Height",
+        "album.apply_format": "Apply",
         "album.paper_format": "Format",
         "album.paper_format_a5_development": (
             "A5 — 148 × 210 mm — in development"
@@ -1348,6 +1353,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
 
         "album.page_format": "Format de page",
+        "album.special_page_incompatible": "Format de page incompatible (exclue des rendus)",
+        "album.custom_format": "Personnalisé",
+        "album.custom_width": "Largeur",
+        "album.custom_height": "Hauteur",
+        "album.apply_format": "Appliquer",
         "album.paper_format": "Format",
         "album.paper_format_a5_development": (
             "A5 — 148 × 210 mm — en développement"

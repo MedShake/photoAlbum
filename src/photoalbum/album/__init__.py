@@ -29,7 +29,7 @@ from .templates import (
     TemplateDefinition,
     TemplateKind,
     TemplateRegistry,
-    TemplateTarget,
+    PageConstraints,
 )
 
 from .validation import AlbumSettingsValidator
@@ -95,7 +95,7 @@ __all__ = [
     "TemplateDefinition",
     "TemplateKind",
     "TemplateRegistry",
-    "TemplateTarget",
+    "PageConstraints",
     "AlbumSettingsValidator",
     "AlbumPlan",
     "AlbumPlanner",

@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from photoalbum.i18n import Translator
 from photoalbum.album.composition import PageComposer
-from photoalbum.album.models import (
-    oriented_page_format,
-    page_format_from_id,
-)
 
 from photoalbum.gui.template_labels import template_display_name
 
@@ -333,10 +329,7 @@ class AlbumPlanWidget(QWidget):
     def _collect_caption_overflows(self, result, settings):
         if result is None or settings is None:
             return {}
-        page_format = oriented_page_format(
-            page_format_from_id(settings.page_format),
-            settings.orientation,
-        )
+        page_format = settings.effective_page_format()
         width_mm = page_format.width_mm
         height_mm = page_format.height_mm
         composer = PageComposer()

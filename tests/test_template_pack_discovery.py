@@ -1,8 +1,14 @@
+def geometry(format_id, orientation):
+    page = oriented_page_format(page_format_from_id(format_id), orientation)
+    return page.width_mm, page.height_mm
+
+
 from photoalbum.album import (
     CoverPosition,
     PageOrientation,
     TemplateKind,
-    TemplateTarget,
+    oriented_page_format,
+    page_format_from_id,
 )
 from photoalbum.template_engine import (
     create_template_registry,
@@ -74,8 +80,8 @@ def test_msb_templates_have_pack_identity():
 def test_msb_supports_a4_portrait_album():
     registry = create_template_registry()
 
-    assert registry.album_target_available(
-        TemplateTarget(
+    assert registry.album_page_available(*
+        geometry(
             "a4",
             PageOrientation.PORTRAIT,
         )
@@ -85,31 +91,31 @@ def test_msb_supports_a4_portrait_album():
 def test_msb_supports_us_letter_portrait_album():
     registry = create_template_registry()
 
-    assert registry.album_target_available(
-        TemplateTarget(
+    assert registry.album_page_available(*
+        geometry(
             "us-letter",
             PageOrientation.PORTRAIT,
         )
     )
 
 
-def test_msb_does_not_claim_a5():
+def test_templates_accept_a5():
     registry = create_template_registry()
 
     for orientation in PageOrientation:
-        assert not registry.album_target_available(
-            TemplateTarget(
+        assert registry.album_page_available(*
+            geometry(
                 "a5",
                 orientation,
             )
         )
 
 
-def test_msb_landscape_availability_is_restricted_to_a4():
+def test_templates_accept_landscape_across_host_formats():
     registry = create_template_registry()
 
-    assert registry.album_target_available(
-        TemplateTarget(
+    assert registry.album_page_available(*
+        geometry(
             "a4",
             PageOrientation.LANDSCAPE,
         )
@@ -119,8 +125,8 @@ def test_msb_landscape_availability_is_restricted_to_a4():
         "a5",
         "us-letter",
     ):
-        assert not registry.album_target_available(
-            TemplateTarget(
+        assert registry.album_page_available(*
+            geometry(
                 format_id,
                 PageOrientation.LANDSCAPE,
             )
@@ -129,14 +135,14 @@ def test_msb_landscape_availability_is_restricted_to_a4():
 
 def test_msb_cover_templates_cover_all_positions():
     registry = create_template_registry()
-    target = TemplateTarget(
+    target = geometry(
         "a4",
         PageOrientation.PORTRAIT,
     )
 
-    covers = registry.list_for_target(
+    covers = registry.list_for_page(
         TemplateKind.COVER,
-        target,
+        *target,
     )
 
     for position in CoverPosition:
@@ -150,14 +156,14 @@ def test_msb_cover_templates_cover_all_positions():
 
 def test_msb_has_photo_page_for_supported_target():
     registry = create_template_registry()
-    target = TemplateTarget(
+    target = geometry(
         "a4",
         PageOrientation.PORTRAIT,
     )
 
-    assert registry.list_for_target(
+    assert registry.list_for_page(
         TemplateKind.PHOTO_PAGE,
-        target,
+        *target,
     )
 
 def test_third_party_pack_is_discovered_from_directory(
@@ -239,7 +245,7 @@ def test_third_party_pack_is_discovered_from_directory(
 def test_msb_dedication_usage_contract():
     """Dedication is a special page and a restricted cover template."""
     registry = create_template_registry()
-    target = TemplateTarget(
+    target = geometry(
         "a4",
         PageOrientation.PORTRAIT,
     )
@@ -247,15 +253,15 @@ def test_msb_dedication_usage_contract():
     dedication = registry.get("dedication")
     assert dedication is not None
 
-    special_pages = registry.list_for_target(
+    special_pages = registry.list_for_page(
         TemplateKind.SPECIAL_PAGE,
-        target,
+        *target,
     )
     assert dedication in special_pages
 
-    covers = registry.list_for_target(
+    covers = registry.list_for_page(
         TemplateKind.COVER,
-        target,
+        *target,
     )
     assert dedication in covers
 
@@ -275,32 +281,32 @@ def test_msb_dedication_usage_contract():
 
 def test_msb_selected_templates_support_a4_landscape():
     registry = create_template_registry()
-    target = TemplateTarget(
+    target = geometry(
         "a4",
         PageOrientation.LANDSCAPE,
     )
 
     cover_ids = {
         template.template_id
-        for template in registry.list_for_target(
+        for template in registry.list_for_page(
             TemplateKind.COVER,
-            target,
+            *target,
         )
     }
 
     special_page_ids = {
         template.template_id
-        for template in registry.list_for_target(
+        for template in registry.list_for_page(
             TemplateKind.SPECIAL_PAGE,
-            target,
+            *target,
         )
     }
 
     photo_page_ids = {
         template.template_id
-        for template in registry.list_for_target(
+        for template in registry.list_for_page(
             TemplateKind.PHOTO_PAGE,
-            target,
+            *target,
         )
     }
 
@@ -309,25 +315,25 @@ def test_msb_selected_templates_support_a4_landscape():
     assert "photo-page-1" in photo_page_ids
 
 
-def test_msb_other_photo_pages_do_not_support_a4_landscape():
+def test_all_photo_pages_support_landscape():
     registry = create_template_registry()
-    target = TemplateTarget(
+    target = geometry(
         "a4",
         PageOrientation.LANDSCAPE,
     )
 
     photo_page_ids = {
         template.template_id
-        for template in registry.list_for_target(
+        for template in registry.list_for_page(
             TemplateKind.PHOTO_PAGE,
-            target,
+            *target,
         )
     }
 
     assert "photo-page-1" in photo_page_ids
 
-    assert not {
+    assert {
         "photo-page-2",
         "photo-page-3",
         "photo-page-4",
-    } & photo_page_ids
+    } <= photo_page_ids

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from photoalbum.models import Photo
 
@@ -57,6 +57,21 @@ class AlbumBuilder:
             self._registry
         ).validate(settings)
 
+        # Keep saved selections intact; only the effective album omits pages
+        # that cannot fit the current physical geometry.
+        page_format = settings.effective_page_format()
+
+        def compatible(page):
+            return self._registry.get(page.template_id).is_compatible_with_page(
+                page_format.width_mm, page_format.height_mm,
+            )
+
+        settings = replace(
+            settings,
+            front_matter=[page for page in settings.front_matter if compatible(page)],
+            back_matter=[page for page in settings.back_matter if compatible(page)],
+        )
+
         plan = AlbumPlanner().plan(
             photos,
             settings,
@@ -79,4 +94,3 @@ class AlbumBuilder:
             pagination=pagination,
             print_diagnostic=print_diagnostic,
         )
-

@@ -23,24 +23,6 @@
       ],
       "cover_positions": [
         "front"
-      ],
-      "targets": [
-        {
-          "format": "a4",
-          "orientation": "portrait"
-        },
-        {
-          "format": "a4",
-          "orientation": "landscape"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "portrait"
-        },
-        {
-          "format": "us-letter",
-          "orientation": "landscape"
-        }
       ]
     }
   ]

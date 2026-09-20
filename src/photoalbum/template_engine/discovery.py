@@ -8,14 +8,12 @@ from typing import TYPE_CHECKING, Protocol
 
 from photoalbum.album.models import (
     CoverPosition,
-    PAGE_FORMATS,
 )
-from photoalbum.album.settings import PageOrientation
 from photoalbum.album.templates import (
     TemplateDefinition,
     TemplateKind,
     TemplateRegistry,
-    TemplateTarget,
+    PageConstraints,
 )
 
 
@@ -88,37 +86,13 @@ def _manifest_paths(
     )
 
 
-def _target_from_data(
-    value: object,
-) -> TemplateTarget:
+def _constraints_from_data(value: object) -> PageConstraints:
     if not isinstance(value, dict):
-        raise ValueError("Template target must be an object.")
-
-    format_id = str(value.get("format", ""))
-    orientation_value = str(
-        value.get("orientation", "")
-    )
-
-    if format_id not in PAGE_FORMATS:
-        raise ValueError(
-            f"Unknown page format in template manifest: "
-            f"{format_id!r}"
-        )
-
-    try:
-        orientation = PageOrientation(
-            orientation_value
-        )
-    except ValueError:
-        raise ValueError(
-            "Unknown page orientation in template manifest: "
-            f"{orientation_value!r}"
-        ) from None
-
-    return TemplateTarget(
-        format_id=format_id,
-        orientation=orientation,
-    )
+        raise ValueError("Template page_constraints must be an object.")
+    unknown = value.keys() - PageConstraints.__dataclass_fields__.keys()
+    if unknown:
+        raise ValueError(f"Unknown page constraints: {sorted(unknown)}")
+    return PageConstraints(**value)
 
 
 def _template_from_data(
@@ -159,10 +133,9 @@ def _template_from_data(
             f"Template {template_id!r} has an unknown kind."
         ) from exc
 
-    targets = frozenset(
-        _target_from_data(item)
-        for item in value.get("targets", [])
-    )
+    if "targets" in value:
+        raise ValueError("Template targets are obsolete; use optional page_constraints instead.")
+    constraints = _constraints_from_data(value.get("page_constraints", {}))
 
     try:
         cover_positions = frozenset(
@@ -208,7 +181,7 @@ def _template_from_data(
         ),
         pack_id=pack_id,
         pack_name=pack_name,
-        supported_targets=targets,
+        page_constraints=constraints,
         cover_positions=cover_positions,
         localized_names={
             str(key): str(item)

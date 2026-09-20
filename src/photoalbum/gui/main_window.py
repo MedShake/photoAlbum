@@ -26,8 +26,6 @@ from photoalbum.gui.template_pack_help_dialog import (
 
 from photoalbum.album import (
     AlbumBuilder,
-    page_format_from_id,
-    oriented_page_format,
     PrintConstraints,
 )
 from photoalbum.gui.widgets import (
@@ -644,10 +642,7 @@ class MainWindow(QMainWindow):
         expose a different ordering.
         """
 
-        page_format = oriented_page_format(
-            page_format_from_id(settings.page_format),
-            settings.orientation,
-        )
+        page_format = settings.effective_page_format()
 
         project_photos = []
         seen_paths = set()
@@ -673,10 +668,9 @@ class MainWindow(QMainWindow):
                 instances.append(page)
 
         # Special-page instances.
-        for page in (
-            list(settings.front_matter) + list(settings.back_matter)
-        ):
-            if self._preview_render_service.supports(page.template_id):
+        for item in result.plan.items:
+            page = item.page_instance
+            if page is not None and self._preview_render_service.supports(page.template_id):
                 instances.append(page)
 
         seen_instances = set()
@@ -730,10 +724,7 @@ class MainWindow(QMainWindow):
 
             self._album_plan_widget.set_result(result, settings)
 
-            page_format = oriented_page_format(
-                page_format_from_id(settings.page_format),
-                settings.orientation,
-            )
+            page_format = settings.effective_page_format()
 
             self._album_preview_widget.set_result(
                 result,

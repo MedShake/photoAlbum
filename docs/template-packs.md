@@ -37,8 +37,7 @@ the pack name avoids collisions.
     "localized_names": {"fr": "Une photo", "en": "One photo"},
     "module": "photo",
     "kinds": ["photo_page"],
-    "photo_capacity": 1,
-    "targets": [{"format": "a4", "orientation": "portrait"}]
+    "photo_capacity": 1
   }]
 }
 ```
@@ -47,6 +46,37 @@ A pack can provide only some page types, with MSB providing the others. Availabl
 types are `photo_page`, `cover`, `special_page`, `month_divider`, and
 `year_divider`. For covers, specify `cover_positions`: `front`, `inside_front`,
 `inside_back`, and `back`. See the MSB manifest for a complete example.
+
+## Physical page compatibility
+
+The host owns named paper formats and orientation. It resolves these choices
+into width and height in millimetres before checking a template or rendering it.
+Templates do not declare format names or orientation whitelists. The former
+`targets` field is rejected; remove it when migrating a pack.
+
+A template can optionally declare `page_constraints` with independently optional
+`min_width_mm`, `max_width_mm`, `min_height_mm`, and `max_height_mm` fields.
+For example, a hypothetical template with a measured width limitation could use:
+
+```json
+"page_constraints": {"min_width_mm": 180, "max_width_mm": 320}
+```
+
+Bounds are inclusive, positive finite numbers; a minimum must not exceed its
+corresponding maximum. Omitted or null bounds impose no restriction. Omitting
+`page_constraints` entirely leaves the template geometrically unrestricted.
+There is no aspect-ratio constraint. Most bundled templates omit bounds; add a restriction only after a real
+limitation has been established. See the MSB pack documentation for its measured minima.
+
+`TemplateDefinition.is_compatible_with_page(width_mm, height_mm)` delegates to
+`PageConstraints.accepts`, the single geometric decision point. The registry
+provides `list_for_page` and `album_page_available` using this same check.
+Kinds and cover positions remain independent restrictions.
+
+`photo-album-cli templates` lists one row per discovered template, including the
+four bounds in millimetres and album usage. `-` denotes an absent bound or a
+non-applicable cover position. `--format json` exposes the same collected data,
+using null for absent bounds and non-applicable positions.
 
 ## Registering behavior
 

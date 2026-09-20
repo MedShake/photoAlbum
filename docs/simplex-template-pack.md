@@ -10,12 +10,8 @@ photographic front cover.
 
 The template is available for the **front cover** only.
 
-Supported physical targets:
-
-- A4 portrait
-- A4 landscape
-- US Letter portrait
-- US Letter landscape
+The template declares no geometric bounds. The host supplies physical page
+width and height; named formats and orientations do not restrict compatibility.
 
 The image fills the complete page without margins. Its aspect ratio
 is preserved. When the image and page ratios differ, the image is

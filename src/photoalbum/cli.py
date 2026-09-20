@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -25,13 +26,8 @@ from photoalbum.app import ProjectService
 from photoalbum.album import (
     AlbumBuilder,
     CoverPosition,
-    PAGE_FORMATS,
-    PageOrientation,
     PrintConstraints,
     TemplateKind,
-    TemplateTarget,
-    oriented_page_format,
-    page_format_from_id,
 )
 from photoalbum.export import (
     PdfExportService,
@@ -60,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     templates_parser.add_argument(
         "--format", choices=("table", "json"), default="table",
-        help="Output format (default: table). One row per template and paper format.",
+        help="Output format (default: table). One row per template.",
     )
 
     scan_parser = subparsers.add_parser(
@@ -680,12 +676,7 @@ def run_pdf(
         )
 
         try:
-            page_format = oriented_page_format(
-                page_format_from_id(
-                    settings.page_format
-                ),
-                settings.orientation,
-            )
+            page_format = settings.effective_page_format()
         except ValueError as exc:
             print(
                 f"Error: {exc}",
@@ -754,30 +745,23 @@ def run_pdf(
 def collect_template_compatibilities() -> list[dict[str, object]]:
     """Read compatibility through the same registry used by the application."""
     rows = []
-    for template in sorted(create_template_registry().list_all(), key=lambda item: item.template_id):
-        # An empty target declaration is unrestricted in the domain model.
-        formats = sorted({target.format_id for target in template.supported_targets} or PAGE_FORMATS)
-        for format_id in formats:
-            rows.append({
-                "id": template.template_id,
-                "pack": template.pack_id,
-                "kinds": sorted(kind.value for kind in template.allowed_kinds),
-                "format": format_id,
-                **{
-                    orientation.value: template.supports_target(TemplateTarget(format_id, orientation))
-                    for orientation in PageOrientation
-                },
-                **{
-                    position.value: (
-                        template.supports_cover_position(position)
-                        if template.supports(TemplateKind.COVER) else None
-                    )
-                    for position in CoverPosition
-                },
-                "interior": any(
-                    template.supports(kind) for kind in TemplateKind if kind != TemplateKind.COVER
-                ),
-            })
+    for template in sorted(create_template_registry().list_all(), key=lambda item: (item.pack_id or "", item.template_id)):
+        rows.append({
+            "id": template.template_id,
+            "pack": template.pack_id,
+            "kinds": sorted(kind.value for kind in template.allowed_kinds),
+            **asdict(template.page_constraints),
+            **{
+                position.value: (
+                    template.supports_cover_position(position)
+                    if template.supports(TemplateKind.COVER) else None
+                )
+                for position in CoverPosition
+            },
+            "interior": any(
+                template.supports(kind) for kind in TemplateKind if kind != TemplateKind.COVER
+            ),
+        })
     return rows
 
 
@@ -791,8 +775,11 @@ def run_templates(args: argparse.Namespace) -> int:
         print(json.dumps(rows, indent=2, ensure_ascii=False))
         return 0
 
-    columns = [("id", "ID"), ("pack", "Pack"), ("kinds", "Type"), ("format", "Format")]
-    columns += [(item.value, item.value.replace("_", " ").title()) for item in PageOrientation]
+    columns = [("id", "ID"), ("pack", "Pack"), ("kinds", "Type")]
+    columns += [
+        ("min_width_mm", "Min Width (mm)"), ("max_width_mm", "Max Width (mm)"),
+        ("min_height_mm", "Min Height (mm)"), ("max_height_mm", "Max Height (mm)"),
+    ]
     columns += [(item.value, item.value.replace("_", " ").title()) for item in CoverPosition]
     columns += [("interior", "Interior")]
 
