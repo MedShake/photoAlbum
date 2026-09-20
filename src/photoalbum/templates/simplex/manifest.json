@@ -19,10 +19,14 @@
       "name": "Full-page photo cover",
       "module": "full_photo_cover",
       "kinds": [
-        "cover"
+        "cover",
+        "special_page"
       ],
       "cover_positions": [
-        "front"
+        "front",
+        "inside_front",
+        "inside_back",
+        "back"
       ]
     }
   ]

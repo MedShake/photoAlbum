@@ -758,9 +758,6 @@ def collect_template_compatibilities() -> list[dict[str, object]]:
                 )
                 for position in CoverPosition
             },
-            "interior": any(
-                template.supports(kind) for kind in TemplateKind if kind != TemplateKind.COVER
-            ),
         })
     return rows
 
@@ -781,7 +778,6 @@ def run_templates(args: argparse.Namespace) -> int:
         ("min_height_mm", "Min Height (mm)"), ("max_height_mm", "Max Height (mm)"),
     ]
     columns += [(item.value, item.value.replace("_", " ").title()) for item in CoverPosition]
-    columns += [("interior", "Interior")]
 
     def cell(value: object) -> str:
         if value is None:

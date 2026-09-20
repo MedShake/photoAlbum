@@ -41,7 +41,7 @@ def test_templates_discovers_new_pack_and_preserves_declared_compatibility(tmp_p
         "id": "note", "pack": "example", "kinds": ["special_page"],
         "min_width_mm": None, "max_width_mm": None, "min_height_mm": None, "max_height_mm": None,
         "front": None, "inside_front": None,
-        "inside_back": None, "back": None, "interior": True,
+        "inside_back": None, "back": None,
     }]
 
     write_pack(tmp_path, "newcomer", [definition(
@@ -59,17 +59,16 @@ def test_templates_discovers_new_pack_and_preserves_declared_compatibility(tmp_p
         assert row["pack"] == "newcomer"
         assert row["front"] and row["back"]
         assert not row["inside_front"] and not row["inside_back"]
-        assert not row["interior"]
 
     table = invoke(monkeypatch, capsys)
     lines = [[cell.strip() for cell in line.split("|")] for line in table.splitlines()]
     assert lines[0] == [
         "ID", "Pack", "Type", "Min Width (mm)", "Max Width (mm)", "Min Height (mm)", "Max Height (mm)",
-        "Front", "Inside Front", "Inside Back", "Back", "Interior",
+        "Front", "Inside Front", "Inside Back", "Back",
     ]
     assert lines[1:] == [
-        ["note", "example", "special_page", "-", "-", "-", "-", "-", "-", "-", "-", "yes"],
-        ["jacket", "newcomer", "cover", "180", "-", "-", "320", "yes", "no", "no", "yes", "no"],
+        ["note", "example", "special_page", "-", "-", "-", "-", "-", "-", "-", "-"],
+        ["jacket", "newcomer", "cover", "180", "-", "-", "320", "yes", "no", "no", "yes"],
     ]
 
 
@@ -83,7 +82,7 @@ def test_templates_uses_domain_defaults_and_multiple_kinds(tmp_path, monkeypatch
     for row in rows:
         assert row["kinds"] == ["cover", "special_page"]
         assert all(row[key] is True for key in (
-            "front", "inside_front", "inside_back", "back", "interior",
+            "front", "inside_front", "inside_back", "back",
         ))
 
 
