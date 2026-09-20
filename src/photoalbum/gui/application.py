@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QLocale
+from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -32,6 +33,27 @@ def _system_language() -> str:
     # English is both a supported language and the fallback for
     # every system language for which no translation exists yet.
     return "en"
+
+
+def _install_qt_translation(application: QApplication, language: str) -> QTranslator | None:
+    """Localize Qt-owned UI using catalogs supplied by the installed Qt runtime."""
+    locale = QLocale(language)
+    QLocale.setDefault(locale)
+    if language == "en":
+        # English is Qt's source language and needs no catalog.
+        return None
+
+    translator = QTranslator(application)
+    translations_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if translator.load(locale, "qtbase", "_", translations_path):
+        application.installTranslator(translator)
+        return translator
+
+    logging.getLogger(__name__).warning(
+        "Qt translation for %s could not be loaded from %s; Qt labels will use English.",
+        language, translations_path,
+    )
+    return None
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -74,6 +96,9 @@ def main() -> int:
         if args.language is not None
         else _system_language()
     )
+
+    # Keep the translator alive for the entire application event loop.
+    qt_translator = _install_qt_translation(application, language)
 
     window = MainWindow(
         language=language
