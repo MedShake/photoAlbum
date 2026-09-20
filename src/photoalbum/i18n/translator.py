@@ -629,8 +629,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.page_multiple_4": "Require page count to be a multiple of 4",
         "album.template": "Template:",
 
-        "album.front_matter": "Pages after inside front cover",
-        "album.back_matter": "Pages before inside back cover",
+        "album.front_matter": "Special pages after inside front cover",
+        "album.back_matter": "Special pages before inside back cover",
 
         "album.add": "Add",
         "album.up": "Up",
@@ -1399,8 +1399,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.page_multiple_4": "Imposer un nombre de pages multiple de 4",
         "album.template": "Modèle :",
 
-        "album.front_matter": "Pages après la 2e de couverture",
-        "album.back_matter": "Pages avant la 3e de couverture",
+        "album.front_matter": "Pages spéciales après la 2e de couverture",
+        "album.back_matter": "Pages spéciales avant la 3e de couverture",
 
         "album.add": "Ajouter",
         "album.up": "Monter",
