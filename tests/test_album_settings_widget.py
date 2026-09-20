@@ -39,12 +39,18 @@ def test_incompatible_special_pages_remain_saved_but_leave_rendered_album():
     notifications = []
     widget.settings_changed.connect(lambda: notifications.append(True))
 
-    for orientation, expected, enabled in [
-        ("landscape", [blank, blank], False),
-        ("portrait", [calendar, blank, blank, calendar], True),
+    widget._page_format_combo.setCurrentIndex(
+        widget._page_format_combo.findData("custom")
+    )
+
+    for width, height, expected, enabled in [
+        (179.0, 180.0, [blank, blank], False),
+        (180.0, 180.0, [calendar, blank, blank, calendar], True),
     ]:
         notifications.clear()
-        widget._orientation_combo.setCurrentIndex(widget._orientation_combo.findData(orientation))
+        widget._custom_width_spin.setValue(width)
+        widget._custom_height_spin.setValue(height)
+        widget._custom_apply_button.click()
         assert len(notifications) == 1
         saved = widget.settings()
         assert saved.front_matter == original.front_matter
@@ -129,8 +135,8 @@ def test_custom_minimum_and_small_page_template_filtering():
     widget._custom_height_spin.setValue(145)
     widget._custom_apply_button.click()
     assert widget._month_divider_combo.findData("month-divider-classic") >= 0
-    widget._custom_width_spin.setValue(110)
-    widget._custom_height_spin.setValue(260)
+    widget._custom_width_spin.setValue(180)
+    widget._custom_height_spin.setValue(180)
     widget._custom_apply_button.click()
     assert widget._year_divider_combo.findData("calendar-index") >= 0
     widget.show()

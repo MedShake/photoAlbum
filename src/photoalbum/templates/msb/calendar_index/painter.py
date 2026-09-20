@@ -95,15 +95,23 @@ def paint_calendar_index(
         )
 
     margin = 10.0
-    column_spacing = 8.0
+    portrait = page_height_mm > page_width_mm
 
-    columns = 2
-    rows = 6
+    if portrait:
+        columns = 2
+        rows = 6
+        column_spacing = 8.0
+        week_column_width = 8.0
+    else:
+        columns = 4
+        rows = 3
+        column_spacing = 5.0
+        week_column_width = 6.0
 
     page_area_width = (
         page_width_mm
         - 2 * margin
-        - column_spacing
+        - (columns - 1) * column_spacing
     )
 
     calendar_top = margin + title_band_mm
@@ -143,8 +151,8 @@ def paint_calendar_index(
     for index, month in enumerate(
         composition.months
     ):
-        column = index % 2
-        row = index // 2
+        column = index % columns
+        row = index // columns
 
         x = (
             margin
@@ -210,7 +218,6 @@ def paint_calendar_index(
         # Weekday header.
         # ----------------------------------------------------
 
-        week_column_width = 8.0
         day_width = (
             month_width
             - week_column_width

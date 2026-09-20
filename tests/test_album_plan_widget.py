@@ -19,7 +19,7 @@ from photoalbum.i18n import Translator
 
 def test_excluded_special_page_warnings_follow_build_result(monkeypatch):
     from dataclasses import replace
-    from photoalbum.album import AlbumBuilder, PageInstance, PageOrientation, TemplateDefinition
+    from photoalbum.album import AlbumBuilder, PageInstance, TemplateDefinition
     from photoalbum.gui.widgets import AlbumSettingsWidget
     from photoalbum.gui.template_labels import template_display_name
 
@@ -32,9 +32,16 @@ def test_excluded_special_page_warnings_follow_build_result(monkeypatch):
     builder = AlbumBuilder(registry)
     for language in ("fr", "en"):
         widget = AlbumPlanWidget(registry, translator=Translator(language))
-        for orientation, excluded in [(PageOrientation.LANDSCAPE, (first, second)),
-                                      (PageOrientation.PORTRAIT, ())]:
-            current = replace(settings, orientation=orientation)
+        for width, height, excluded in [
+            (179.0, 180.0, (first, second)),
+            (180.0, 180.0, ()),
+        ]:
+            current = replace(
+                settings,
+                page_format="custom",
+                custom_width_mm=width,
+                custom_height_mm=height,
+            )
             result = builder.build([], current)
             assert result.excluded_special_pages == excluded
             # The Plan must consume the diagnostic, never reevaluate geometry.

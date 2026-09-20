@@ -101,7 +101,7 @@ def test_production_templates_only_have_documented_geometric_restrictions():
     for template in registry.list_all():
         documented = {
             "month-divider-classic": PageConstraints(min_width_mm=130, min_height_mm=145),
-            "calendar-index": PageConstraints(min_width_mm=110, min_height_mm=260),
+            "calendar-index": PageConstraints(min_width_mm=180, min_height_mm=180),
         }
         assert template.page_constraints == documented.get(template.template_id, PageConstraints())
         for width, height in [(210, 297), (297, 210), (148, 210), (279.4, 215.9), (123, 456), (456, 123)]:
