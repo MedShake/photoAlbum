@@ -11,7 +11,7 @@ from .print_diagnostics import (
     PrintDiagnostic,
     PrintDiagnostics,
 )
-from .settings import AlbumStructureSettings
+from .settings import AlbumStructureSettings, PageInstance
 from .templates import TemplateRegistry
 from .validation import AlbumSettingsValidator
 
@@ -21,6 +21,7 @@ class AlbumBuildResult:
     plan: AlbumPlan
     pagination: PaginationResult
     print_diagnostic: PrintDiagnostic
+    excluded_special_pages: tuple[PageInstance, ...] = ()
 
     # pagination.pages contains the physical interior pages
     # of the album. Covers are rendered separately and are
@@ -60,11 +61,15 @@ class AlbumBuilder:
         # Keep saved selections intact; only the effective album omits pages
         # that cannot fit the current physical geometry.
         page_format = settings.effective_page_format()
+        excluded_special_pages = []
 
         def compatible(page):
-            return self._registry.get(page.template_id).is_compatible_with_page(
+            accepted = self._registry.get(page.template_id).is_compatible_with_page(
                 page_format.width_mm, page_format.height_mm,
             )
+            if not accepted:
+                excluded_special_pages.append(page)
+            return accepted
 
         settings = replace(
             settings,
@@ -93,4 +98,5 @@ class AlbumBuilder:
             plan=plan,
             pagination=pagination,
             print_diagnostic=print_diagnostic,
+            excluded_special_pages=tuple(excluded_special_pages),
         )

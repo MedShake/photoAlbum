@@ -271,6 +271,13 @@ class AlbumPlanWidget(QWidget):
                 )
             )
 
+        for page in result.excluded_special_pages:
+            warning_lines.append(self._translator.tr(
+                "plan.special_page_excluded",
+                template=(template_display_name(self._registry.get(page.template_id), self._translator)
+                          if self._registry is not None else page.template_id),
+            ))
+
         warning_lines.extend(
             self._caption_warning_lines(
                 result,

@@ -17,6 +17,45 @@ from photoalbum.gui.widgets import AlbumPlanWidget
 from photoalbum.i18n import Translator
 
 
+def test_excluded_special_page_warnings_follow_build_result(monkeypatch):
+    from dataclasses import replace
+    from photoalbum.album import AlbumBuilder, PageInstance, PageOrientation, TemplateDefinition
+    from photoalbum.gui.widgets import AlbumSettingsWidget
+    from photoalbum.gui.template_labels import template_display_name
+
+    app = QApplication.instance() or QApplication([])
+    registry = create_template_registry()
+    editor = AlbumSettingsWidget(registry)
+    first = PageInstance(template_id="calendar-index")
+    second = PageInstance(template_id="calendar-index", settings={"calendar_index": {"show_title": False}})
+    settings = replace(editor.settings(), front_matter=[first], back_matter=[second])
+    builder = AlbumBuilder(registry)
+    for language in ("fr", "en"):
+        widget = AlbumPlanWidget(registry, translator=Translator(language))
+        for orientation, excluded in [(PageOrientation.LANDSCAPE, (first, second)),
+                                      (PageOrientation.PORTRAIT, ())]:
+            current = replace(settings, orientation=orientation)
+            result = builder.build([], current)
+            assert result.excluded_special_pages == excluded
+            # The Plan must consume the diagnostic, never reevaluate geometry.
+            with monkeypatch.context() as patch:
+                def unexpected_check(*args):
+                    raise AssertionError("Plan must not check compatibility")
+                patch.setattr(TemplateDefinition, "is_compatible_with_page", unexpected_check)
+                widget.set_result(result, current)
+            lines = widget._warnings_label.text().splitlines()
+            assert len(lines) == len(excluded)
+            if excluded:
+                name = template_display_name(registry.get(first.template_id), Translator(language))
+                assert all(name in line for line in lines)
+                assert not widget._warnings_group.isHidden()
+            else:
+                assert widget._warnings_group.isHidden()
+        widget.close()
+    assert settings.front_matter == [first] and settings.back_matter == [second]
+    editor.close()
+
+
 def create_widget() -> AlbumPlanWidget:
     application = QApplication.instance()
 

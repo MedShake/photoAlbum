@@ -679,6 +679,7 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "plan.summary": "Summary",
         "plan.warnings": "Warnings",
+        "plan.special_page_excluded": "Special page “{template}” is incompatible with the current page dimensions and is excluded from the album.",
         "plan.optimizations": "Possible optimizations",
         "plan.structure": "Document structure",
         "plan.album_body": "Album body",
@@ -1449,6 +1450,7 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "plan.summary": "Résumé",
         "plan.warnings": "Avertissements",
+        "plan.special_page_excluded": "La page spéciale « {template} » est incompatible avec les dimensions actuelles de page et est exclue de l’album.",
         "plan.optimizations": "Optimisations possibles",
         "plan.structure": "Structure du document",
         "plan.album_body": "Corps de l’album",
