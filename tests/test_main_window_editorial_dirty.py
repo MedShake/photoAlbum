@@ -50,7 +50,7 @@ def test_leaving_places_tab_flushes_editorial_changes_once():
     assert window._editorial_album_dirty is False
     assert window._previous_tab_index == 2
 
-    window._preview_render_service.clear.assert_called_once_with()
+    window._preview_render_service.clear.assert_not_called()
     window._refresh_album_plan.assert_called_once_with()
     window._update_pdf_summary.assert_called_once_with()
 
@@ -64,7 +64,7 @@ def test_tab_change_without_new_editorial_change_does_not_refresh():
     window._main_tab_changed(1)
     window._main_tab_changed(2)
 
-    window._preview_render_service.clear.assert_called_once_with()
+    window._preview_render_service.clear.assert_not_called()
     window._refresh_album_plan.assert_called_once_with()
     window._update_pdf_summary.assert_called_once_with()
 
@@ -79,3 +79,42 @@ def test_staying_on_places_tab_does_not_flush():
     window._preview_render_service.clear.assert_not_called()
     window._refresh_album_plan.assert_not_called()
     window._update_pdf_summary.assert_not_called()
+
+
+def test_open_project_clears_image_cache_before_loading_new_preview():
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    events = []
+    window = SimpleNamespace(
+        _preview_render_service=Mock(),
+        _project_service=Mock(),
+        _album_preview_widget=Mock(),
+        _load_project_settings=lambda: events.append("settings"),
+        _load_project_photos=lambda: events.append("photos"),
+        _update_project_state=Mock(),
+        _photos_widget=Mock(),
+        _scan_controller=Mock(),
+        _show_error=Mock(),
+    )
+    window._album_preview_widget.clear.side_effect = lambda: events.append("clear")
+    window._photos_widget.source_edit.text.return_value = ""
+    MainWindow._open_project_path(window, Path("other.photoalbum"))
+    assert events == ["clear", "settings", "photos"]
+    window._show_error.assert_not_called()
+
+
+def test_failed_project_open_does_not_discard_current_image_cache():
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    window = SimpleNamespace(
+        _preview_render_service=Mock(),
+        _project_service=Mock(),
+        _album_preview_widget=Mock(),
+        _show_error=Mock(),
+    )
+    window._project_service.open.side_effect = OSError("Cannot open project")
+    MainWindow._open_project_path(window, Path("missing.photoalbum"))
+    window._album_preview_widget.clear.assert_not_called()
+    window._show_error.assert_called_once()

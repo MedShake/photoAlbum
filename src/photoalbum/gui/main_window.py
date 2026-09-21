@@ -346,7 +346,8 @@ class MainWindow(QMainWindow):
             self._editorial_album_dirty = False
             return
 
-        self._preview_render_service.clear()
+        # Raster keys track their own inputs; editorial text only needs
+        # the album composition and widgets to be refreshed.
         self._refresh_album_plan()
         self._update_pdf_summary()
         self._editorial_album_dirty = False
@@ -445,6 +446,7 @@ class MainWindow(QMainWindow):
             self._show_error(str(exc))
             return
 
+        self._album_preview_widget.clear()
         self._load_project_settings()
         self._load_project_photos()
         self._update_project_state()

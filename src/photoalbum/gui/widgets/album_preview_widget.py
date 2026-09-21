@@ -822,6 +822,10 @@ class AlbumPreviewWidget(QWidget):
         layout.addWidget(self._scroll)
 
     def clear(self) -> None:
+        self._clear_pages()
+        self._thumbnail_cache.clear()
+
+    def _clear_pages(self) -> None:
         while self._pages_grid.count():
             item = self._pages_grid.takeAt(0)
 
@@ -831,7 +835,6 @@ class AlbumPreviewWidget(QWidget):
                 widget.deleteLater()
 
         self._page_widgets.clear()
-        self._thumbnail_cache.clear()
 
     def _add_page_widget(
         self,
@@ -937,7 +940,8 @@ class AlbumPreviewWidget(QWidget):
         *,
         page_format: PageFormat | None = None,
     ) -> None:
-        self.clear()
+        self._clear_pages()
+        self._thumbnail_cache.invalidate_changed_sources()
         self._current_result = result
 
         if page_format is None:

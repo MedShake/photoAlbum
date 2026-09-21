@@ -358,3 +358,64 @@ def test_preview_uses_page_format_from_settings():
     )
 
     assert preview._page_format == US_LETTER
+
+
+def test_rebuilding_pages_preserves_decoded_sizes(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+    from photoalbum.rendering import image_cache
+
+    widget = create_widget()
+    path = tmp_path / "photo.jpg"
+    Image.new("RGB", (80, 40), "red").save(path)
+    reader = Mock(wraps=image_cache.QImageReader)
+    monkeypatch.setattr(image_cache, "QImageReader", reader)
+    cache = widget._thumbnail_cache
+    first = cache.load(path, QSize(30, 20))
+    second = cache.load(path, QSize(60, 40))
+    settings = make_settings()
+    widget.set_result(make_result(), settings)
+    old_pages = tuple(widget._page_widgets)
+    result = make_result()
+    result.pagination.pages[0].photos[0].caption = "New caption"
+    result.pagination.pages[0].photos[0].location_text = "New location"
+    widget.set_result(result, settings)
+    assert tuple(widget._page_widgets) != old_pages
+    assert cache.load(path, QSize(30, 20)) is first
+    assert cache.load(path, QSize(60, 40)) is second
+    assert reader.call_count == 2
+    widget.clear()
+    assert cache.load(path, QSize(30, 20)) is not first
+    assert reader.call_count == 3
+    widget.close()
+
+
+def test_rebuilding_pages_invalidates_only_changed_sources(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+    from photoalbum.rendering import image_cache
+
+    widget = create_widget()
+    path = tmp_path / "changed.jpg"
+    stable = tmp_path / "stable.jpg"
+    missing = tmp_path / "missing.jpg"
+    for source in (path, stable):
+        Image.new("RGB", (80, 40), "red").save(source)
+    reader = Mock(wraps=image_cache.QImageReader)
+    monkeypatch.setattr(image_cache, "QImageReader", reader)
+    cache = widget._thumbnail_cache
+    old = [cache.load(path, size) for size in (QSize(30, 20), QSize(60, 40))]
+    unchanged = cache.load(stable, QSize(30, 20))
+    assert cache.load(missing, QSize(30, 20)).isNull()
+    Image.new("RGB", (160, 100), "blue").save(path)
+    Image.new("RGB", (80, 40), "green").save(missing)
+    widget.set_result(make_result(), make_settings())
+    for size, previous in zip((QSize(30, 20), QSize(60, 40)), old):
+        current = cache.load(path, size)
+        assert current is not previous
+        assert current.toImage().pixelColor(0, 0).blue() > 200
+    assert cache.load(stable, QSize(30, 20)) is unchanged
+    assert not cache.load(missing, QSize(30, 20)).isNull()
+    assert reader.call_count == 7
+    path.unlink()
+    widget.set_result(make_result(), make_settings())
+    assert cache.load(path, QSize(30, 20)).isNull()
+    widget.close()

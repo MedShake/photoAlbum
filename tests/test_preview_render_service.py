@@ -277,3 +277,33 @@ def test_scatter_requests_reuse_title_changes_and_propagate_oriented_geometry():
     changed_seed = replace(instance, settings={"scatter": {"seeds": [13]}})
     assert service.request(changed_seed, photos, **geometry) != first
     assert service._thread_pool.start.call_count == 3
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_editorial_changes_reuse_pending_or_completed_raster(completed):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from PySide6.QtGui import QPixmap
+    from photoalbum.models import LocationComponent
+
+    ensure_app()
+    register_discovered_template_extensions()
+    service = PreviewRenderService(Translator("en"))
+    service._thread_pool = SimpleNamespace(start=Mock())
+    instance = PageInstance(template_id="year-photo-scatter")
+    original = photo("1.jpg", dated=True)
+    geometry = dict(width=420, height=594, page_width_mm=210, page_height_mm=297)
+    key = service.request(instance, [original], **geometry)
+    if completed:
+        request_id = next(iter(service._request_jobs))
+        raster = QPixmap(10, 10)
+        raster.fill()
+        service._request_jobs[request_id] = SimpleNamespace(finalize=lambda data: raster)
+        service._render_finished(request_id, b"")
+        assert service.cached(key) is not None
+    changed = replace(original, caption="New caption", location_text="Paris",
+                      selected_location_components=(LocationComponent(key="city", value="Paris"),),
+                      location_selection_edited=True, latitude=48.8, longitude=2.3)
+    assert service.request(instance, [changed], **geometry) == key
+    assert service._thread_pool.start.call_count == 1

@@ -25,8 +25,37 @@ class RenderImageCache:
             QPixmap,
         ] = {}
 
+        self._source_signatures: dict[str, tuple[int, int] | None] = {}
+
+    @staticmethod
+    def _source_signature(path: str) -> tuple[int, int] | None:
+        try:
+            stat = Path(path).stat()
+        except OSError:
+            return None
+        return stat.st_mtime_ns, stat.st_size
+
     def clear(self) -> None:
         self._cache.clear()
+        self._source_signatures.clear()
+
+    def invalidate_changed_sources(self) -> None:
+        """Check once per source on album refresh, never on every paint.
+
+        Keep all requested sizes for unchanged files. Like the scanner,
+        use file modification time and size to detect replaced images.
+        """
+        changed = {
+            path for path, signature in self._source_signatures.items()
+            if self._source_signature(path) != signature
+        }
+        if not changed:
+            return
+        for key in list(self._cache):
+            if key[0] in changed:
+                del self._cache[key]
+        for path in changed:
+            del self._source_signatures[path]
 
     def load(
         self,
@@ -46,6 +75,8 @@ class RenderImageCache:
         if cached is not None:
             return cached
 
+        if path not in self._source_signatures:
+            self._source_signatures[path] = self._source_signature(path)
         reader = QImageReader(path)
         reader.setAutoTransform(True)
 
