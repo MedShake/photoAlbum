@@ -48,6 +48,7 @@ where = ["src"]
     "screenshots/*",
     "assets/*",
     "assets/**/*",
+    "docs/*",
 ]
 
 [project.scripts]
