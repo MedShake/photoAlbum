@@ -327,9 +327,7 @@ class PhotoPlacesWidget(QWidget):
         self._caption_editors: dict[str, QLineEdit] = {}
         self._thumbnail_labels: dict[QLabel, Photo] = {}
 
-        # Pixmaps already decoded by the normal lazy thumbnail loader.
-        # The batch-edit dialog may reuse them, but must never trigger
-        # an additional JPEG decode itself.
+        # Pixmaps shared by the tree and batch dialog lazy loader.
         self._thumbnail_cache: dict[str, QPixmap] = {}
 
         self._editor_rows: dict[
@@ -1655,6 +1653,8 @@ class PhotoPlacesWidget(QWidget):
     def _create_thumbnail_label(
         self,
         photo: Photo,
+        *,
+        hover_preview: bool = True,
     ) -> QLabel:
         label = QLabel()
         label.setAlignment(
@@ -1671,8 +1671,9 @@ class PhotoPlacesWidget(QWidget):
         label.setText("…")
 
         label.setToolTip(photo.filename)
-        label.setMouseTracking(True)
-        label.installEventFilter(self)
+        if hover_preview:
+            label.setMouseTracking(True)
+            label.installEventFilter(self)
 
         self._thumbnail_labels[label] = photo
         self._queue_thumbnail(
@@ -1718,6 +1719,11 @@ class PhotoPlacesWidget(QWidget):
         label: QLabel,
         photo: Photo,
     ) -> None:
+        cached = self._thumbnail_cache.get(str(photo.path))
+        if cached is not None:
+            label.setPixmap(cached)
+            return
+
         self._thumbnail_queue.append(
             (label, photo)
         )
@@ -1750,9 +1756,9 @@ class PhotoPlacesWidget(QWidget):
 
         # The row may have disappeared after a filter/project change.
         if label in self._thumbnail_labels:
-            pixmap = self._thumbnail_pixmap(
-                photo.path
-            )
+            pixmap = self._thumbnail_cache.get(str(photo.path))
+            if pixmap is None:
+                pixmap = self._thumbnail_pixmap(photo.path)
 
             if pixmap is not None:
                 # Keep the already-decoded pixmap available for other
@@ -3421,6 +3427,18 @@ class PhotoPlacesWidget(QWidget):
 
             return "replace"
 
+        batch_thumbnails: set[QLabel] = set()
+
+        def clear_batch_thumbnails() -> None:
+            for label in batch_thumbnails:
+                self._thumbnail_labels.pop(label, None)
+            self._thumbnail_queue[:] = [
+                (label, photo)
+                for label, photo in self._thumbnail_queue
+                if label not in batch_thumbnails
+            ]
+            batch_thumbnails.clear()
+
         def rebuild_candidates() -> None:
             action = current_action()
 
@@ -3467,6 +3485,7 @@ class PhotoPlacesWidget(QWidget):
             table.blockSignals(True)
 
             try:
+                clear_batch_thumbnails()
                 table.clearContents()
                 table.setRowCount(
                     len(candidates)
@@ -3493,11 +3512,7 @@ class PhotoPlacesWidget(QWidget):
                         check_item,
                     )
 
-                    # Photo cell: reuse an already-decoded thumbnail.
-                    #
-                    # IMPORTANT: do not call _thumbnail_pixmap() here.
-                    # Opening the batch dialog must not start JPEG
-                    # decoding for every candidate.
+                    # Share the deferred, cache-aware thumbnail loader.
                     photo_widget = QWidget()
                     photo_layout = QVBoxLayout(
                         photo_widget
@@ -3507,30 +3522,15 @@ class PhotoPlacesWidget(QWidget):
                     )
                     photo_layout.setSpacing(3)
 
-                    thumbnail = QLabel()
-                    thumbnail.setAlignment(
-                        Qt.AlignmentFlag.AlignCenter
+                    thumbnail = self._create_thumbnail_label(
+                        photo, hover_preview=False
                     )
-                    thumbnail.setFixedSize(
-                        self.THUMBNAIL_WIDTH,
-                        self.THUMBNAIL_HEIGHT,
+                    batch_thumbnails.add(thumbnail)
+                    photo_layout.addWidget(
+                        thumbnail,
+                        0,
+                        Qt.AlignmentFlag.AlignHCenter,
                     )
-
-                    cached_pixmap = (
-                        self._thumbnail_cache.get(
-                            str(photo.path)
-                        )
-                    )
-
-                    if cached_pixmap is not None:
-                        thumbnail.setPixmap(
-                            cached_pixmap
-                        )
-                        photo_layout.addWidget(
-                            thumbnail,
-                            0,
-                            Qt.AlignmentFlag.AlignHCenter,
-                        )
 
                     filename = QLabel(
                         photo.filename
@@ -3553,16 +3553,10 @@ class PhotoPlacesWidget(QWidget):
                         photo_widget,
                     )
 
-                    if cached_pixmap is not None:
-                        table.setRowHeight(
-                            row,
-                            self.THUMBNAIL_HEIGHT + 42,
-                        )
-                    else:
-                        table.setRowHeight(
-                            row,
-                            34,
-                        )
+                    table.setRowHeight(
+                        row,
+                        self.THUMBNAIL_HEIGHT + 42,
+                    )
 
                     date_text = ""
 
@@ -3695,7 +3689,10 @@ class PhotoPlacesWidget(QWidget):
             position_header_checkbox,
         )
 
-        result = dialog.exec()
+        try:
+            result = dialog.exec()
+        finally:
+            clear_batch_thumbnails()
 
         checkbox.setProperty(
             "group_edit_pending",
