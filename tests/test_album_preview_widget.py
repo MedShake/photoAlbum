@@ -360,62 +360,88 @@ def test_preview_uses_page_format_from_settings():
     assert preview._page_format == US_LETTER
 
 
-def test_rebuilding_pages_preserves_decoded_sizes(tmp_path, monkeypatch):
-    from unittest.mock import Mock
-    from photoalbum.rendering import image_cache
+def _finish_images(cache, paths):
+    import time
+    cache.prioritize(paths)
+    deadline = time.monotonic() + 3
+    while cache._active or cache._queue:
+        QApplication.processEvents()
+        assert time.monotonic() < deadline
+        time.sleep(0.001)
 
+
+def test_rebuilding_pages_preserves_preview_image(tmp_path):
     widget = create_widget()
     path = tmp_path / "photo.jpg"
     Image.new("RGB", (80, 40), "red").save(path)
-    reader = Mock(wraps=image_cache.QImageReader)
-    monkeypatch.setattr(image_cache, "QImageReader", reader)
     cache = widget._thumbnail_cache
+    _finish_images(cache, [path])
     first = cache.load(path, QSize(30, 20))
-    second = cache.load(path, QSize(60, 40))
-    settings = make_settings()
-    widget.set_result(make_result(), settings)
+    assert not first.isNull()
+    widget.set_result(make_result(), make_settings())
     old_pages = tuple(widget._page_widgets)
     result = make_result()
     result.pagination.pages[0].photos[0].caption = "New caption"
-    result.pagination.pages[0].photos[0].location_text = "New location"
-    widget.set_result(result, settings)
+    widget.set_result(result, make_settings())
     assert tuple(widget._page_widgets) != old_pages
-    assert cache.load(path, QSize(30, 20)) is first
-    assert cache.load(path, QSize(60, 40)) is second
-    assert reader.call_count == 2
+    assert cache.load(path, QSize(60, 40)) is first
     widget.clear()
-    assert cache.load(path, QSize(30, 20)) is not first
-    assert reader.call_count == 3
+    assert cache.load(path, QSize(30, 20)).isNull()
     widget.close()
 
 
-def test_rebuilding_pages_invalidates_only_changed_sources(tmp_path, monkeypatch):
-    from unittest.mock import Mock
-    from photoalbum.rendering import image_cache
-
+def test_rebuilding_pages_invalidates_only_changed_sources(tmp_path):
     widget = create_widget()
-    path = tmp_path / "changed.jpg"
-    stable = tmp_path / "stable.jpg"
-    missing = tmp_path / "missing.jpg"
+    path, stable, missing = [tmp_path / name for name in ("changed.jpg", "stable.jpg", "missing.jpg")]
     for source in (path, stable):
         Image.new("RGB", (80, 40), "red").save(source)
-    reader = Mock(wraps=image_cache.QImageReader)
-    monkeypatch.setattr(image_cache, "QImageReader", reader)
     cache = widget._thumbnail_cache
-    old = [cache.load(path, size) for size in (QSize(30, 20), QSize(60, 40))]
+    _finish_images(cache, [path, stable, missing])
     unchanged = cache.load(stable, QSize(30, 20))
     assert cache.load(missing, QSize(30, 20)).isNull()
     Image.new("RGB", (160, 100), "blue").save(path)
     Image.new("RGB", (80, 40), "green").save(missing)
     widget.set_result(make_result(), make_settings())
-    for size, previous in zip((QSize(30, 20), QSize(60, 40)), old):
-        current = cache.load(path, size)
-        assert current is not previous
-        assert current.toImage().pixelColor(0, 0).blue() > 200
+    widget._image_request_timer.stop()
+    _finish_images(cache, [path, stable, missing])
+    assert cache.load(path, QSize(30, 20)).toImage().pixelColor(0, 0).blue() > 200
     assert cache.load(stable, QSize(30, 20)) is unchanged
     assert not cache.load(missing, QSize(30, 20)).isNull()
-    assert reader.call_count == 7
     path.unlink()
     widget.set_result(make_result(), make_settings())
     assert cache.load(path, QSize(30, 20)).isNull()
+    widget.clear()
+    widget.close()
+
+
+def test_preview_prioritizes_visible_pages_and_reuses_resize_requests(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    widget = create_widget()
+    result = make_result()
+    base = result.pagination.pages[0]
+    result.pagination.pages[:] = [
+        replace(base, number=index + 1, photos=(Photo(
+            path=Path(f"/photo-{index}.jpg"), filename=f"photo-{index}.jpg",
+        ),)) for index in range(6)
+    ]
+    widget.set_result(result, make_settings())
+    cache = widget._thumbnail_cache
+    cache._pool = SimpleNamespace(start=Mock())
+    pages = [p for p in widget._page_widgets if isinstance(p, AlbumPagePreview)]
+    height = widget._scroll.viewport().height()
+    for index, page in enumerate(pages):
+        page.move(0, index * (height + page.height() + 10))
+    monkeypatch.setattr(widget, "isVisible", lambda: True)
+    widget._request_page_images()
+    assert cache._pool.start.call_args_list[0].args[0].path == "/photo-0.jpg"
+    assert "/photo-5.jpg" not in cache._queue
+    for width in (310, 400, 550, 320):
+        for page in pages:
+            page.set_page_width(width)
+        widget._request_page_images()
+    assert cache._pool.start.call_count <= 2
+    assert {worker.edge for worker in cache._active.values()} == {cache._edge}
+    widget.clear()
     widget.close()

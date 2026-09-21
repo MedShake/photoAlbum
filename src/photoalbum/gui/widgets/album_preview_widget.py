@@ -43,6 +43,8 @@ from photoalbum.album.composition import (
 )
 from photoalbum.rendering.fonts import resolve_font_family
 
+from photoalbum.gui.preview_image_cache import PreviewImageCache
+
 from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
@@ -782,11 +784,18 @@ class AlbumPreviewWidget(QWidget):
         )
 
         self._composer = PageComposer()
-        self._thumbnail_cache = PreviewThumbnailCache()
+        self._thumbnail_cache = PreviewImageCache(self)
         self._page_widgets: list[_PreviewPageBase] = []
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
+        self._image_request_timer = QTimer(self)
+        self._image_request_timer.setSingleShot(True)
+        self._image_request_timer.timeout.connect(self._request_page_images)
+        self._scroll.verticalScrollBar().valueChanged.connect(
+            lambda: self._image_request_timer.start(0)
+        )
+        self._thumbnail_cache.ready.connect(self._image_ready)
 
         # The scroll viewport is the real source of the width
         # available to a two-page spread. Its geometry may change
@@ -822,6 +831,7 @@ class AlbumPreviewWidget(QWidget):
         layout.addWidget(self._scroll)
 
     def clear(self) -> None:
+        self._image_request_timer.stop()
         self._clear_pages()
         self._thumbnail_cache.clear()
 
@@ -876,6 +886,47 @@ class AlbumPreviewWidget(QWidget):
             ),
         )
 
+    def _image_ready(self, path: str) -> None:
+        for page in self._page_widgets:
+            if isinstance(page, AlbumPagePreview) and any(
+                str(photo.path) == path for photo in page._composition.page.photos
+            ):
+                page.update()
+
+    def event(self, event) -> bool:
+        if (event.type() == QEvent.Type.DevicePixelRatioChange
+                and hasattr(self, "_image_request_timer")):
+            self._image_request_timer.start(0)
+        return super().event(event)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._image_request_timer.start(0)
+
+    def _request_page_images(self) -> None:
+        pages = [p for p in self._page_widgets if isinstance(p, AlbumPagePreview)]
+        if not pages:
+            return
+        maximum_height = max(PREVIEW_PAGE_MAX_WIDTH * p._page_ratio for p in pages)
+        self._thumbnail_cache.set_resolution(
+            PREVIEW_PAGE_MAX_WIDTH, maximum_height, self.devicePixelRatioF(),
+        )
+        top = self._scroll.verticalScrollBar().value()
+        height = self._scroll.viewport().height()
+        visible, nearby = [], []
+        for page in pages:
+            rect = page.geometry()
+            if rect.bottom() >= top and rect.top() <= top + height:
+                visible.append(page)
+            elif rect.bottom() >= top - height and rect.top() <= top + 2 * height:
+                nearby.append(page)
+        # Hidden tabs may not yet have a usable layout: prepare the first pages.
+        selected = visible + nearby if self.isVisible() else pages[:3]
+        self._thumbnail_cache.prioritize(
+            photo.path for page in selected
+            for photo in page._composition.page.photos[:len(page._composition.photo_slots)]
+        )
+
     def _resize_page_widgets(
         self,
     ) -> None:
@@ -906,7 +957,10 @@ class AlbumPreviewWidget(QWidget):
             ),
         )
 
+        self._image_request_timer.start(0)
         for widget in self._page_widgets:
+            if widget.width() == page_width:
+                continue
             widget.set_page_width(
                 page_width
             )

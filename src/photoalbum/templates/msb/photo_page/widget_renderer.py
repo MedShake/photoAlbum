@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -128,38 +128,23 @@ class PhotoPageWidgetRenderer:
                 rect,
                 Qt.AlignmentFlag.AlignCenter,
                 translator.tr(
-                    "preview.image_unavailable"
+                    "page_settings.calculating"
+                    if getattr(thumbnail_cache, "is_loading", lambda path: False)(path)
+                    else "preview.image_unavailable"
                 ),
             )
             return
 
-        scaled = pixmap.scaled(
-            target_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+        size = pixmap.size().scaled(target_size, Qt.AspectRatioMode.KeepAspectRatio)
+        destination = QRect(
+            rect.x() + (rect.width() - size.width()) // 2,
+            rect.y() + (rect.height() - size.height()) // 2,
+            size.width(), size.height(),
         )
-
-        x = (
-            rect.x()
-            + (
-                rect.width()
-                - scaled.width()
-            ) // 2
-        )
-
-        y = (
-            rect.y()
-            + (
-                rect.height()
-                - scaled.height()
-            ) // 2
-        )
-
-        painter.drawPixmap(
-            x,
-            y,
-            scaled,
-        )
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(destination, pixmap, pixmap.rect())
+        painter.restore()
 
     @staticmethod
     def _paint_empty_slot(
