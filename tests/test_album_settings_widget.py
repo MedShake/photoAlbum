@@ -181,6 +181,24 @@ def test_year_divider_is_available_for_one_year():
     assert settings.year_dividers.enabled
     assert widget._year_dividers_checkbox.isEnabled()
 
+def test_detected_year_count_uses_correct_singular_and_plural():
+    widget = create_widget()
+
+    widget._translator.set_language("fr")
+    widget.set_available_years({2025})
+    assert widget._year_divider_hint.text() == "1 année détectée."
+
+    widget.set_available_years({2025, 2026})
+    assert widget._year_divider_hint.text() == "2 années détectées."
+
+    widget._translator.set_language("en")
+    widget.set_available_years({2025})
+    assert widget._year_divider_hint.text() == "1 year detected."
+
+    widget.set_available_years({2025, 2026})
+    assert widget._year_divider_hint.text() == "2 years detected."
+
+
 def test_year_dividers_are_used_for_one_year():
     widget = create_widget()
 

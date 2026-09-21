@@ -643,6 +643,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Right page with blank facing page"
         ),
 
+        "album.year_detected": "{count} year detected.",
         "album.years_detected": "{count} years detected.",
         "album.year_unavailable": (
             "Year separators are unavailable: "
@@ -1413,6 +1414,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Page droite avec page gauche laissée blanche"
         ),
 
+        "album.year_detected": "{count} année détectée.",
         "album.years_detected": "{count} années détectées.",
         "album.year_unavailable": (
             "Séparateurs d’année indisponibles : "

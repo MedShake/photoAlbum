@@ -1322,10 +1322,15 @@ class AlbumSettingsWidget(QWidget):
         )
 
         if self._year_dividers_available:
+            count = len(years)
             self._year_divider_hint.setText(
                 self._translator.tr(
-                    "album.years_detected",
-                    count=len(years),
+                    (
+                        "album.year_detected"
+                        if count == 1
+                        else "album.years_detected"
+                    ),
+                    count=count,
                 )
             )
         else:
