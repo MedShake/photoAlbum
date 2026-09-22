@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+from PySide6.QtCore import QEvent
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QCheckBox, QDialog, QLabel, QRadioButton, QTableWidget
 
@@ -77,4 +78,33 @@ def test_closing_batch_dialog_cancels_pending_thumbnails(tmp_path, monkeypatch):
     decode.assert_not_called()
     assert not widget._thumbnail_queue
     assert not widget._thumbnail_labels
+    widget.close()
+
+
+def test_batch_dialog_thumbnails_use_the_shared_hover_preview(tmp_path, monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    hover_preview = Mock()
+    widget = PhotoPlacesWidget(hover_preview=hover_preview)
+    path = tmp_path / "photo.jpg"
+    image = QImage(40, 30, QImage.Format.Format_RGB32)
+    image.fill(0xFF123456)
+    assert image.save(str(path))
+    photo = Photo(path=path, filename=path.name)
+    widget._photos = [photo]
+    monkeypatch.setattr(widget, "_group_location_candidates", lambda *args: [photo])
+    checkbox = QCheckBox()
+    checkbox.setProperty("location_key", "city")
+    checkbox.setProperty("location_value", "Paris")
+
+    def check_dialog(dialog):
+        table = dialog.findChild(QTableWidget)
+        thumbnail = table.cellWidget(0, 1).findChildren(QLabel)[0]
+        app.sendEvent(thumbnail, QEvent(QEvent.Type.Enter))
+        hover_preview.schedule.assert_called_once()
+        assert hover_preview.schedule.call_args.args[0] == path
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, "exec", check_dialog)
+    widget._open_group_location_dialog(photo, checkbox)
+    hover_preview.cancel.assert_called()
     widget.close()

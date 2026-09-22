@@ -144,14 +144,27 @@ def test_hover_preview_clears_on_model_reset_and_tab_hide(app, tmp_path):
     view.show()
     view._source_preview_row = 0
     view._show_pending_source_photo_preview()
-    assert view._source_preview is not None
+    wait_until(app, lambda: view._hover_preview.preview is not None)
     view.model.clear()
-    assert view._source_preview is None
+    assert view._hover_preview.preview is None
     assert view._source_preview_row is None
-    view._source_preview_timer.start()
+    view.model.set_photos([Photo(path=path, filename=path.name)])
+    view._source_preview_row = 0
+    view._show_pending_source_photo_preview()
+    assert view._hover_preview._timer.isActive()
     view.hide()
-    assert not view._source_preview_timer.isActive()
+    assert not view._hover_preview._timer.isActive()
     view.close()
+
+
+def test_main_window_shares_only_the_hover_preview_cache(window):
+    assert window._photos_widget._hover_preview is window._hover_photo_preview
+    assert window._photos_places_widget._hover_preview is window._hover_photo_preview
+    assert window._hover_photo_preview._cache is window._hover_preview_cache
+    assert (
+        window._hover_preview_cache
+        is not window._album_preview_widget._thumbnail_cache
+    )
 
 
 @pytest.mark.parametrize('action', ['save', 'restore', 'cancel'])

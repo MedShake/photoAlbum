@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QPoint, QSortFilterProxyModel, QTimer, Qt, Signal
-from PySide6.QtGui import QImageReader, QPixmap
+from PySide6.QtCore import QEvent, QPoint, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QFrame, QHBoxLayout, QHeaderView,
+    QAbstractItemView, QCheckBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton,
     QSplitter, QTableView, QVBoxLayout, QWidget,
 )
 
 from photoalbum.gui.models import PhotoTableModel
+from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
+from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.gui.widgets.photo_actions_delegate import PhotoActionsDelegate
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
@@ -24,9 +25,18 @@ class PhotoSourcesWidget(QWidget):
     edit_gps_requested = Signal(object)
     open_photo_requested = Signal(object)
 
-    def __init__(self, translator: Translator, parent=None) -> None:
+    def __init__(
+        self,
+        translator: Translator,
+        parent=None,
+        *,
+        hover_preview: HoverPhotoPreview | None = None,
+    ) -> None:
         super().__init__(parent)
         self._translator = translator
+        self._hover_preview = hover_preview or HoverPhotoPreview(
+            PreviewImageCache(self), self
+        )
         self._create_content()
         self.model.modelAboutToBeReset.connect(self._cancel_source_photo_preview)
         self.proxy_model.layoutAboutToBeChanged.connect(self._cancel_source_photo_preview)
@@ -95,14 +105,8 @@ class PhotoSourcesWidget(QWidget):
         self.table = QTableView()
         self.table.setModel(self.proxy_model)
 
-        self._source_preview = None
         self._source_preview_row = None
         self._source_preview_position = QPoint()
-
-        self._source_preview_timer = QTimer(self)
-        self._source_preview_timer.setSingleShot(True)
-        self._source_preview_timer.setInterval(350)
-        self._source_preview_timer.timeout.connect(self._show_pending_source_photo_preview)
 
         self.table.setMouseTracking(True)
         self.table.viewport().installEventFilter(self)
@@ -192,18 +196,18 @@ class PhotoSourcesWidget(QWidget):
 
                 if index.isValid() and index.column() == 0:
                     row = index.row()
+                    self._source_preview_position = (
+                        event.globalPosition().toPoint()
+                    )
 
                     if row != self._source_preview_row:
                         self._cancel_source_photo_preview()
                         self._source_preview_row = row
-
-                    self._source_preview_position = event.globalPosition().toPoint()
-
-                    if (
-                        self._source_preview is None
-                        and not self._source_preview_timer.isActive()
-                    ):
-                        self._source_preview_timer.start()
+                        self._schedule_source_photo_preview()
+                    else:
+                        self._hover_preview.update_position(
+                            self._source_preview_position
+                        )
                 else:
                     self._cancel_source_photo_preview()
 
@@ -216,7 +220,7 @@ class PhotoSourcesWidget(QWidget):
 
         return super().eventFilter(watched, event)
 
-    def _show_pending_source_photo_preview(self) -> None:
+    def _schedule_source_photo_preview(self) -> None:
         if self._source_preview_row is None:
             return
 
@@ -232,39 +236,15 @@ class PhotoSourcesWidget(QWidget):
         if photo is None:
             return
 
-        reader = QImageReader(str(photo.path))
-        reader.setAutoTransform(True)
-
-        image = reader.read()
-
-        if image.isNull():
-            return
-
-        pixmap = QPixmap.fromImage(image).scaled(
-            420,
-            320,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+        self._hover_preview.schedule(
+            photo.path,
+            self._source_preview_position,
         )
 
-        preview = QLabel(None, Qt.WindowType.ToolTip)
-        preview.setPixmap(pixmap)
-        preview.setFrameShape(QFrame.Shape.Box)
-        preview.setContentsMargins(4, 4, 4, 4)
-        preview.adjustSize()
-
-        preview.move(self._source_preview_position + QPoint(16, 20))
-        preview.show()
-
-        self._source_preview = preview
-
-    def _hide_source_photo_preview(self) -> None:
-        if self._source_preview is not None:
-            self._source_preview.close()
-            self._source_preview.deleteLater()
-            self._source_preview = None
+    def _show_pending_source_photo_preview(self) -> None:
+        """Compatibility helper used by tests and non-mouse callers."""
+        self._schedule_source_photo_preview()
 
     def _cancel_source_photo_preview(self) -> None:
-        self._source_preview_timer.stop()
-        self._hide_source_photo_preview()
+        self._hover_preview.cancel()
         self._source_preview_row = None

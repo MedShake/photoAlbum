@@ -88,6 +88,7 @@ def test_open_project_clears_image_cache_before_loading_new_preview():
     events = []
     window = SimpleNamespace(
         _preview_render_service=Mock(),
+        _hover_photo_preview=Mock(),
         _project_service=Mock(),
         _album_preview_widget=Mock(),
         _load_project_settings=lambda: events.append("settings"),
@@ -101,6 +102,7 @@ def test_open_project_clears_image_cache_before_loading_new_preview():
     window._photos_widget.source_edit.text.return_value = ""
     MainWindow._open_project_path(window, Path("other.photoalbum"))
     assert events == ["clear", "settings", "photos"]
+    window._hover_photo_preview.clear.assert_called_once_with()
     window._show_error.assert_not_called()
 
 
@@ -110,6 +112,7 @@ def test_failed_project_open_does_not_discard_current_image_cache():
 
     window = SimpleNamespace(
         _preview_render_service=Mock(),
+        _hover_photo_preview=Mock(),
         _project_service=Mock(),
         _album_preview_widget=Mock(),
         _show_error=Mock(),
@@ -117,4 +120,7 @@ def test_failed_project_open_does_not_discard_current_image_cache():
     window._project_service.open.side_effect = OSError("Cannot open project")
     MainWindow._open_project_path(window, Path("missing.photoalbum"))
     window._album_preview_widget.clear.assert_not_called()
+    # ProjectService.open closes the previous project before attempting the
+    # replacement, so its in-flight hover results must no longer be accepted.
+    window._hover_photo_preview.clear.assert_called_once_with()
     window._show_error.assert_called_once()

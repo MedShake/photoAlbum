@@ -46,6 +46,8 @@ from PySide6.QtWidgets import (
 from photoalbum.geocoding.location_caption_builder import (
     LocationCaptionBuilder,
 )
+from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
+from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.i18n import Translator
 from photoalbum.i18n.date_formatter import (
     format_datetime,
@@ -311,6 +313,7 @@ class PhotoPlacesWidget(QWidget):
         ]
         | None = None,
         parent=None,
+        hover_preview: HoverPhotoPreview | None = None,
     ) -> None:
         super().__init__(parent)
 
@@ -319,6 +322,9 @@ class PhotoPlacesWidget(QWidget):
         self._save_caption = save_caption
         self._save_locations = save_locations
         self._edit_source_photo = edit_source_photo
+        self._hover_preview = hover_preview or HoverPhotoPreview(
+            PreviewImageCache(self), self
+        )
 
         self._caption_builder = LocationCaptionBuilder()
         self._photos: list[Photo] = []
@@ -363,16 +369,8 @@ class PhotoPlacesWidget(QWidget):
         self._thumbnail_loading = False
         self._thumbnail_generation = 0
 
-        self._preview = None
         self._preview_photo: Photo | None = None
         self._preview_position = QPoint()
-
-        self._preview_timer = QTimer(self)
-        self._preview_timer.setSingleShot(True)
-        self._preview_timer.setInterval(350)
-        self._preview_timer.timeout.connect(
-            self._show_pending_photo_preview
-        )
 
         self._create_ui()
 
@@ -384,6 +382,8 @@ class PhotoPlacesWidget(QWidget):
         self,
         photos: Sequence[Photo],
     ) -> None:
+        self._cancel_photo_preview()
+        self._hover_preview.invalidate_changed_sources()
         self._photos = sorted(
             photos,
             key=lambda photo: (
@@ -416,6 +416,10 @@ class PhotoPlacesWidget(QWidget):
         self._tree.clear()
         self._clear_undated_panel()
         self._update_counter(0)
+
+    def hideEvent(self, event) -> None:
+        self._cancel_photo_preview()
+        super().hideEvent(event)
 
     # --------------------------------------------------------
     # UI
@@ -1841,7 +1845,10 @@ class PhotoPlacesWidget(QWidget):
                         )
                     )
                 )
-                self._preview_timer.start()
+                self._hover_preview.schedule(
+                    photo.path,
+                    self._preview_position,
+                )
 
             elif event.type() in (
                 QEvent.Type.Leave,
@@ -1861,62 +1868,15 @@ class PhotoPlacesWidget(QWidget):
 
         if photo is None:
             return
-
-        reader = QImageReader(
-            str(photo.path)
+        self._hover_preview.schedule(
+            photo.path,
+            self._preview_position,
         )
-        reader.setAutoTransform(True)
-
-        size = reader.size()
-
-        if size.isValid():
-            size.scale(
-                550,
-                550,
-                Qt.AspectRatioMode.KeepAspectRatio,
-            )
-            reader.setScaledSize(size)
-
-        image = reader.read()
-
-        if image.isNull():
-            return
-
-        pixmap = QPixmap.fromImage(image)
-
-        preview = QLabel(
-            None,
-            Qt.WindowType.ToolTip,
-        )
-        preview.setPixmap(pixmap)
-        preview.setFrameShape(
-            QFrame.Shape.Box
-        )
-        preview.setContentsMargins(
-            4,
-            4,
-            4,
-            4,
-        )
-        preview.adjustSize()
-        preview.move(
-            self._preview_position
-            + QPoint(16, 20)
-        )
-        preview.show()
-
-        self._preview = preview
 
     def _cancel_photo_preview(
         self,
     ) -> None:
-        self._preview_timer.stop()
-
-        if self._preview is not None:
-            self._preview.close()
-            self._preview.deleteLater()
-            self._preview = None
-
+        self._hover_preview.cancel()
         self._preview_photo = None
 
     def _install_date_widget(
@@ -3430,6 +3390,7 @@ class PhotoPlacesWidget(QWidget):
         batch_thumbnails: set[QLabel] = set()
 
         def clear_batch_thumbnails() -> None:
+            self._cancel_photo_preview()
             for label in batch_thumbnails:
                 self._thumbnail_labels.pop(label, None)
             self._thumbnail_queue[:] = [
@@ -3522,9 +3483,7 @@ class PhotoPlacesWidget(QWidget):
                     )
                     photo_layout.setSpacing(3)
 
-                    thumbnail = self._create_thumbnail_label(
-                        photo, hover_preview=False
-                    )
+                    thumbnail = self._create_thumbnail_label(photo)
                     batch_thumbnails.add(thumbnail)
                     photo_layout.addWidget(
                         thumbnail,

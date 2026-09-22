@@ -84,7 +84,7 @@ def test_real_decode_runs_off_gui_thread_and_applies_exif(tmp_path, monkeypatch)
     path = tmp_path / "rotated.jpg"
     exif = Image.Exif()
     exif[274] = 6
-    Image.new("RGB", (80, 40), "red").save(path, exif=exif)
+    Image.new("RGB", (800, 400), "red").save(path, exif=exif)
     threads = []
     original_reader = preview_image_cache.QImageReader
 
@@ -94,6 +94,7 @@ def test_real_decode_runs_off_gui_thread_and_applies_exif(tmp_path, monkeypatch)
 
     monkeypatch.setattr(preview_image_cache, "QImageReader", reader)
     service = PreviewImageCache()
+    service.set_resolution(550, 550, 1)
     finished_on_gui = []
     service.ready.connect(lambda path: finished_on_gui.append(QThread.currentThread() == app.thread()))
     service.prioritize([path])
@@ -103,7 +104,7 @@ def test_real_decode_runs_off_gui_thread_and_applies_exif(tmp_path, monkeypatch)
         assert time.monotonic() < deadline
         time.sleep(0.001)
     pixmap = service.load(path, QSize(40, 40))
-    assert pixmap.height() > pixmap.width()
+    assert pixmap.size() == QSize(275, 550)
     assert threads == [False]
     assert finished_on_gui == [True]
 

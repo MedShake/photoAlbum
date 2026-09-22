@@ -39,6 +39,8 @@ from photoalbum.gui.preview_render_service import (
     PREVIEW_RENDER_WIDTH,
     PreviewRenderService,
 )
+from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
+from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.template_engine import (
     create_template_registry,
     register_discovered_template_extensions,
@@ -62,6 +64,11 @@ class MainWindow(QMainWindow):
         self._translator = Translator(self._language)
 
         self._preview_render_service = PreviewRenderService(self._translator, self)
+        self._hover_preview_cache = PreviewImageCache(self)
+        self._hover_photo_preview = HoverPhotoPreview(
+            self._hover_preview_cache,
+            self,
+        )
 
         self._template_registry = create_template_registry()
 
@@ -114,6 +121,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
 
+        self._hover_photo_preview.clear()
         self._project_service.close()
         super().closeEvent(event)
 
@@ -244,7 +252,11 @@ class MainWindow(QMainWindow):
         # Photos
         # ----------------------------------------------------
 
-        self._photos_widget = PhotoSourcesWidget(self._translator, self)
+        self._photos_widget = PhotoSourcesWidget(
+            self._translator,
+            self,
+            hover_preview=self._hover_photo_preview,
+        )
         self._scan_controller = ScanController(
             self._project_service, self._photos_widget, self._translator,
             language=self._language, parent=self,
@@ -274,6 +286,7 @@ class MainWindow(QMainWindow):
             save_locations=self._save_photo_editorial_locations,
             edit_source_photo=self._go_to_source_photo,
             parent=self,
+            hover_preview=self._hover_photo_preview,
         )
 
         self._photos_places_index = (
@@ -383,6 +396,10 @@ class MainWindow(QMainWindow):
         if project_path.suffix != ".photoalbum":
             project_path = project_path.with_suffix('.photoalbum')
 
+        # Creating a project replaces the current one. Invalidate in-flight
+        # hover decodes before ProjectService closes the existing database.
+        self._hover_photo_preview.clear()
+
         try:
             # QFileDialog already asked the user whether the
             # existing file may be replaced. Honour that choice.
@@ -439,6 +456,9 @@ class MainWindow(QMainWindow):
     def _open_project_path(self, path: Path) -> None:
         """Open an existing project from an explicit path."""
         self._preview_render_service.clear()
+        # ProjectService.open() closes the current project even when opening
+        # the replacement subsequently fails.
+        self._hover_photo_preview.clear()
 
         try:
             self._project_service.open(path)
@@ -460,6 +480,7 @@ class MainWindow(QMainWindow):
 
     def _close_project(self) -> None:
         self._preview_render_service.clear()
+        self._hover_photo_preview.clear()
         self._album_build_result = None
         self._project_service.close()
 
