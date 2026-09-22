@@ -339,6 +339,8 @@ def test_custom_title_is_retained_when_switching_modes(
 def test_title_position_combo_exposes_seven_ordered_positions(
     monkeypatch,
 ):
+    from photoalbum.template_engine import discover_template_packs
+
     monkeypatch.setattr(
         YearPhotoScatterSettingsWidget,
         "_request_preview",
@@ -348,7 +350,10 @@ def test_title_position_combo_exposes_seven_ordered_positions(
     editor = YearPhotoScatterSettingsWidget(
         PageInstance(template_id="year-photo-scatter"),
         [],
-        translator=Translator("fr"),
+        translator=next(
+            pack for pack in discover_template_packs()
+            if pack.pack_id == "msb"
+        ).translator(Translator("fr")),
     )
 
     assert [

@@ -82,6 +82,12 @@ def test_simplex_legacy_settings_default_to_project_source():
 
 
 def test_simplex_translations_are_present_in_english_and_french():
+    from photoalbum.template_engine import discover_template_packs
+
+    simplex = next(
+        pack for pack in discover_template_packs()
+        if pack.pack_id == "simplex"
+    )
     expected = {
         "en": {
             "template.simplex-full-photo-cover":
@@ -134,7 +140,7 @@ def test_simplex_translations_are_present_in_english_and_french():
     }
 
     for language, translations in expected.items():
-        translator = Translator(language)
+        translator = simplex.translator(Translator(language))
 
         for key, value in translations.items():
             assert translator.tr(key) == value

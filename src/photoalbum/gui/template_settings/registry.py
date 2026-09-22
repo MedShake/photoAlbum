@@ -10,6 +10,7 @@ from photoalbum.album import (
 from photoalbum.i18n import Translator
 from photoalbum.template_engine import (
     template_extension_registry,
+    translator_for_template,
 )
 
 from .base import PageTemplateSettingsWidget
@@ -38,7 +39,9 @@ def create_template_settings_editor(
         return None
 
     kwargs = {
-        "translator": translator,
+        "translator": translator_for_template(
+            template_id, translator
+        ),
         "render_service": render_service,
         "page_format": page_format,
         "parent": parent,

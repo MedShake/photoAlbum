@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from photoalbum.album import TemplateDefinition
 from photoalbum.i18n import Translator
+from photoalbum.template_engine.translations import translator_for_template
 
 
 def _base_template_display_name(
@@ -16,6 +17,10 @@ def _base_template_display_name(
     2. built-in application translation
     3. TemplateDefinition.name fallback
     """
+
+    translator = translator_for_template(
+        template.template_id, translator
+    )
 
     provider_name = template.localized_names.get(
         translator.language

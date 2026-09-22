@@ -17,6 +17,7 @@ from photoalbum.rendering.cover_render_worker import (
 )
 from photoalbum.template_engine import (
     template_extension_registry,
+    translator_for_template,
 )
 from photoalbum.template_engine.preview_backend import (
     PreviewJob,
@@ -378,7 +379,9 @@ class PreviewRenderService(QObject):
             height=key.height,
             page_width_mm=key.page_width_mm,
             page_height_mm=key.page_height_mm,
-            translator=self._translator,
+            translator=translator_for_template(
+                instance.template_id, self._translator
+            ),
         )
 
         worker = job.worker

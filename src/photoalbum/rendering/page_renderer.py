@@ -11,7 +11,10 @@ from photoalbum.rendering.fonts import resolve_font_family
 from photoalbum.album.composition import PageComposition
 from photoalbum.album.planning import PlanItemKind
 from photoalbum.i18n import Translator
-from photoalbum.template_engine import template_extension_registry
+from photoalbum.template_engine import (
+    template_extension_registry,
+    translator_for_template,
+)
 
 
 class PageRenderer:
@@ -157,7 +160,9 @@ class PageRenderer:
             target_rect=target_rect,
             width=width,
             height=height,
-            translator=self._translator,
+            translator=translator_for_template(
+                instance.template_id, self._translator
+            ),
             render_service=render_service,
             set_waiting_key=set_waiting_key,
             font_pixel_size=font_pixel_size,
@@ -223,7 +228,9 @@ class PageRenderer:
             target_rect=target_rect,
             width=width,
             height=height,
-            translator=self._translator,
+            translator=translator_for_template(
+                page.template_id, self._translator
+            ),
             render_service=render_service,
             set_waiting_key=set_waiting_key,
             font_pixel_size=font_pixel_size,

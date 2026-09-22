@@ -21,6 +21,7 @@ from photoalbum.gui.template_settings import (
     create_template_settings_editor,
 )
 from photoalbum.i18n import Translator
+from photoalbum.template_engine import translator_for_template
 
 
 class PageInstanceDialog(QDialog):
@@ -103,7 +104,10 @@ class PageInstanceDialog(QDialog):
             f"{self._instance.template_id}"
         )
 
-        translated = self._translator.tr(
+        translated = translator_for_template(
+            self._instance.template_id,
+            self._translator,
+        ).tr(
             key
         )
 

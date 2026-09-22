@@ -15,6 +15,12 @@ from photoalbum.album.templates import (
     TemplateRegistry,
     PageConstraints,
 )
+from photoalbum.template_engine.translations import (
+    PackTranslator,
+    load_pack_catalogs,
+    replace_registered_pack_catalogs,
+    translator_for_pack,
+)
 
 
 if TYPE_CHECKING:
@@ -48,6 +54,10 @@ class TemplatePack:
     templates: tuple[TemplateDefinition, ...]
     modules: tuple[str, ...]
     documentation_paths: dict[str, Path] | None = None
+    translation_catalogs: dict[str, dict[str, str]] | None = None
+
+    def translator(self, base) -> PackTranslator:
+        return PackTranslator(base, self.translation_catalogs or {})
 
     def documentation_path(
         self,
@@ -336,6 +346,7 @@ def load_template_pack(
             manifest_path.parent,
             data.get("documentation"),
         ),
+        translation_catalogs=load_pack_catalogs(manifest_path.parent),
     )
 
 
@@ -372,7 +383,6 @@ def discover_templates(
             )
 
         seen_pack_ids.add(pack.pack_id)
-
         for template in pack.templates:
             registry.register(template)
 
@@ -382,11 +392,39 @@ def discover_templates(
     )
 
 
+def replace_active_template_packs(
+    packs: tuple[TemplatePack, ...],
+) -> None:
+    """Replace the pack catalogs active in the application process."""
+    pack_catalogs: dict[str, dict[str, dict[str, str]]] = {}
+    template_packs: dict[str, str] = {}
+
+    for pack in packs:
+        if pack.pack_id in pack_catalogs:
+            raise ValueError(
+                f"Duplicate active template pack ID: {pack.pack_id}"
+            )
+        pack_catalogs[pack.pack_id] = pack.translation_catalogs or {}
+
+        for template in pack.templates:
+            previous_pack_id = template_packs.get(template.template_id)
+            if previous_pack_id is not None:
+                raise ValueError(
+                    f"Duplicate active template ID: {template.template_id} "
+                    f"(packs {previous_pack_id} and {pack.pack_id})"
+                )
+            template_packs[template.template_id] = pack.pack_id
+
+    replace_registered_pack_catalogs(pack_catalogs, template_packs)
+
+
 def register_discovered_template_extensions(
     packs: tuple[TemplatePack, ...] | None = None,
 ) -> tuple[TemplatePack, ...]:
     if packs is None:
         packs = discover_template_packs()
+
+    replace_active_template_packs(packs)
 
     for pack in packs:
         for module_name in pack.modules:
@@ -436,4 +474,15 @@ def register_discovered_layouts(
 def pack_settings_editor(pack_id: str) -> PackSettingsEditor | None:
     """Return the optional pack-owned settings dialog callback."""
     module = import_module(f"photoalbum.templates.{pack_id}")
-    return getattr(module, "edit_settings", None)
+    editor = getattr(module, "edit_settings", None)
+    if editor is None:
+        return None
+
+    def localized_editor(settings, *, translator, parent=None):
+        return editor(
+            settings,
+            translator=translator_for_pack(pack_id, translator),
+            parent=parent,
+        )
+
+    return localized_editor

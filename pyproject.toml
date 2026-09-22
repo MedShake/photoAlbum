@@ -49,6 +49,7 @@ where = ["src"]
     "assets/*",
     "assets/**/*",
     "docs/*",
+    "i18n/*.json",
 ]
 
 [project.scripts]
