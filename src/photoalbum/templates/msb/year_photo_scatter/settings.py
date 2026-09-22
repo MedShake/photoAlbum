@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -155,6 +156,28 @@ class YearPhotoScatterSettingsWidget(
             )
         )
 
+        title_mode = str(
+            scatter.get(
+                "title_mode",
+                "automatic",
+            )
+        )
+        self._title_mode = (
+            title_mode
+            if title_mode in {
+                "automatic",
+                "custom",
+            }
+            else "automatic"
+        )
+
+        self._title_text = str(
+            scatter.get(
+                "title_text",
+                "",
+            )
+        )
+
         title_position = str(
             scatter.get(
                 "title_position",
@@ -274,6 +297,86 @@ class YearPhotoScatterSettingsWidget(
         )
         title_layout.addWidget(
             self._title_visible_check
+        )
+
+        title_mode_controls = QFormLayout()
+
+        mode_label = QLabel(
+            self._translator.tr(
+                "page_settings.scatter_title_mode"
+            )
+        )
+
+        self._title_mode_combo = QComboBox()
+        self._title_mode_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_mode_automatic"
+            ),
+            "automatic",
+        )
+        self._title_mode_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_mode_custom"
+            ),
+            "custom",
+        )
+
+        mode_index = self._title_mode_combo.findData(
+            self._title_mode
+        )
+        if mode_index >= 0:
+            self._title_mode_combo.setCurrentIndex(
+                mode_index
+            )
+
+        mode_label.setBuddy(
+            self._title_mode_combo
+        )
+        title_mode_controls.addRow(
+            mode_label,
+            self._title_mode_combo,
+        )
+
+        self._title_text_label = QLabel(
+            self._translator.tr(
+                "page_settings.scatter_custom_title"
+            )
+        )
+
+        self._title_text_edit = QTextEdit()
+        self._title_text_edit.setPlainText(
+            self._title_text
+        )
+        self._title_text_edit.setPlaceholderText(
+            self._translator.tr(
+                "page_settings.scatter_custom_title_placeholder"
+            )
+        )
+        line_height = (
+            self._title_text_edit.fontMetrics().lineSpacing()
+        )
+        document_margin = (
+            self._title_text_edit.document().documentMargin()
+        )
+        frame_width = (
+            self._title_text_edit.frameWidth()
+        )
+        three_line_height = int(
+            3 * line_height
+            + 2 * document_margin
+            + 2 * frame_width
+        )
+        self._title_text_edit.setFixedHeight(
+            three_line_height
+        )
+
+        title_mode_controls.addRow(
+            self._title_text_label,
+            self._title_text_edit,
+        )
+
+        title_layout.addLayout(
+            title_mode_controls
         )
 
         title_position_controls = QFormLayout()
@@ -428,6 +531,14 @@ class YearPhotoScatterSettingsWidget(
             self._change_title_visibility
         )
 
+        self._title_mode_combo.currentIndexChanged.connect(
+            self._change_title_mode
+        )
+
+        self._title_text_edit.textChanged.connect(
+            self._change_title_text
+        )
+
         self._title_position_combo.currentIndexChanged.connect(
             self._change_title_position
         )
@@ -476,6 +587,12 @@ class YearPhotoScatterSettingsWidget(
             ),
             "title_visible": (
                 self._title_visible
+            ),
+            "title_mode": (
+                self._title_mode
+            ),
+            "title_text": (
+                self._title_text
             ),
             "title_position": (
                 self._title_position
@@ -583,6 +700,26 @@ class YearPhotoScatterSettingsWidget(
         self,
     ) -> None:
         enabled = self._title_visible
+        custom_enabled = (
+            enabled
+            and self._title_mode == "custom"
+        )
+
+        self._title_mode_combo.setEnabled(
+            enabled
+        )
+        self._title_text_label.setEnabled(
+            custom_enabled
+        )
+        self._title_text_label.setVisible(
+            self._title_mode == "custom"
+        )
+        self._title_text_edit.setEnabled(
+            custom_enabled
+        )
+        self._title_text_edit.setVisible(
+            self._title_mode == "custom"
+        )
 
         self._title_position_combo.setEnabled(
             enabled
@@ -605,6 +742,33 @@ class YearPhotoScatterSettingsWidget(
             checked
         )
         self._update_title_controls_enabled()
+        self._save_state()
+        self._request_preview()
+
+    def _change_title_mode(
+        self,
+        index: int,
+    ) -> None:
+        mode = self._title_mode_combo.itemData(
+            index
+        )
+        if mode not in {
+            "automatic",
+            "custom",
+        }:
+            return
+
+        self._title_mode = str(mode)
+        self._update_title_controls_enabled()
+        self._save_state()
+        self._request_preview()
+
+    def _change_title_text(
+        self,
+    ) -> None:
+        self._title_text = (
+            self._title_text_edit.toPlainText()
+        )
         self._save_state()
         self._request_preview()
 

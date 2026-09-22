@@ -85,7 +85,9 @@ class PageInstanceDialog(QDialog):
         # portrait-height whitespace for every landscape settings dialog.
         hint = self.sizeHint()
         target_width = hint.width()
-        target_height = hint.height()
+        # Leave a small vertical reserve for controls whose height can
+        # increase after Qt resolves the final dialog width.
+        target_height = hint.height() + 24
         screen = self.screen()
         if screen is not None:
             available = screen.availableGeometry()

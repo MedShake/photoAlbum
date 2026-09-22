@@ -201,6 +201,141 @@ def test_title_visibility_and_position_defaults(monkeypatch):
     editor.close()
 
 
+def test_title_defaults_to_automatic_mode(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(template_id="year-photo-scatter"),
+        [],
+        translator=Translator("fr"),
+    )
+
+    assert editor._title_mode == "automatic"
+    assert editor._title_text == ""
+    assert (
+        editor._title_mode_combo.currentData()
+        == "automatic"
+    )
+    assert not editor._title_text_edit.isEnabled()
+    assert editor._title_text_label.isHidden()
+    assert editor._title_text_edit.isHidden()
+
+    editor.close()
+
+
+def test_custom_title_markdown_is_persisted(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(template_id="year-photo-scatter"),
+        [],
+        translator=Translator("fr"),
+    )
+
+    custom_index = (
+        editor._title_mode_combo.findData(
+            "custom"
+        )
+    )
+    assert custom_index >= 0
+
+    editor._title_mode_combo.setCurrentIndex(
+        custom_index
+    )
+    editor._title_text_edit.setPlainText(
+        "**Voyage** *en famille*"
+    )
+
+    scatter = editor._instance.settings["scatter"]
+
+    assert scatter["title_mode"] == "custom"
+    assert (
+        scatter["title_text"]
+        == "**Voyage** *en famille*"
+    )
+    assert editor._title_text_edit.isEnabled()
+    assert not editor._title_text_label.isHidden()
+    assert not editor._title_text_edit.isHidden()
+
+    editor.close()
+
+
+def test_custom_title_is_retained_when_switching_modes(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(
+            template_id="year-photo-scatter",
+            settings={
+                "scatter": {
+                    "title_mode": "custom",
+                    "title_text": "**Souvenir**",
+                }
+            },
+        ),
+        [],
+        translator=Translator("fr"),
+    )
+
+    automatic_index = (
+        editor._title_mode_combo.findData(
+            "automatic"
+        )
+    )
+    assert automatic_index >= 0
+
+    editor._title_mode_combo.setCurrentIndex(
+        automatic_index
+    )
+
+    scatter = editor._instance.settings["scatter"]
+
+    assert scatter["title_mode"] == "automatic"
+    assert scatter["title_text"] == "**Souvenir**"
+    assert not editor._title_text_edit.isEnabled()
+    assert editor._title_text_label.isHidden()
+    assert editor._title_text_edit.isHidden()
+
+    custom_index = (
+        editor._title_mode_combo.findData(
+            "custom"
+        )
+    )
+    assert custom_index >= 0
+
+    editor._title_mode_combo.setCurrentIndex(
+        custom_index
+    )
+
+    assert (
+        editor._title_text_edit.toPlainText()
+        == "**Souvenir**"
+    )
+    assert editor._title_text_edit.isEnabled()
+    assert not editor._title_text_label.isHidden()
+    assert not editor._title_text_edit.isHidden()
+
+    editor.close()
+
+
 def test_title_position_combo_exposes_seven_ordered_positions(
     monkeypatch,
 ):

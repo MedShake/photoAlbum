@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import (
+    QTextCharFormat,
+    QTextCursor,
+    QTextDocument,
     QColor,
     QFont,
     QPainter,
@@ -83,6 +86,44 @@ class YearPhotoScatterWidgetRenderer:
         )
 
         return seeds[index]
+
+    def _title_mode(
+        self,
+        instance: PageInstance,
+    ) -> str:
+        mode = str(
+            self._scatter_settings(
+                instance
+            ).get(
+                "title_mode",
+                "automatic",
+            )
+        )
+        return (
+            mode
+            if mode in {
+                "automatic",
+                "custom",
+            }
+            else "automatic"
+        )
+
+    def _title_text(
+        self,
+        instance: PageInstance,
+        automatic_title: str,
+    ) -> str:
+        if self._title_mode(instance) != "custom":
+            return automatic_title
+
+        return str(
+            self._scatter_settings(
+                instance
+            ).get(
+                "title_text",
+                "",
+            )
+        )
 
     def _title_visible(
         self,
@@ -285,6 +326,15 @@ class YearPhotoScatterWidgetRenderer:
         if self._title_visible(
             instance
         ):
+            title_text = self._title_text(
+                instance,
+                composition.title,
+            )
+            custom_title = (
+                self._title_mode(instance)
+                == "custom"
+            )
+
             font = QFont(
                 title_font_family(
                     instance.settings
@@ -292,12 +342,12 @@ class YearPhotoScatterWidgetRenderer:
             )
 
             font.setBold(
-                True
+                not custom_title
             )
 
             title_font_pt = title_font_size(
                 instance.settings,
-                composition.title,
+                title_text,
             )
 
             font.setPixelSize(
@@ -323,13 +373,47 @@ class YearPhotoScatterWidgetRenderer:
                 -15,
             )
 
-            metrics = painter.fontMetrics()
-            text_height = max(
-                1,
-                metrics.boundingRect(
-                    composition.title
-                ).height(),
-            )
+            if custom_title:
+                document = QTextDocument()
+                document.setDefaultFont(font)
+                document.setDocumentMargin(0.0)
+                document.setMarkdown(title_text)
+
+                cursor = QTextCursor(document)
+                cursor.select(
+                    QTextCursor.SelectionType.Document
+                )
+
+                block_format = cursor.blockFormat()
+                block_format.setAlignment(
+                    Qt.AlignmentFlag.AlignHCenter
+                )
+                cursor.mergeBlockFormat(block_format)
+
+                char_format = QTextCharFormat()
+                char_format.setForeground(
+                    self._title_color(instance)
+                )
+                cursor.mergeCharFormat(char_format)
+
+                document.setTextWidth(
+                    title_rect.width()
+                )
+
+                text_height = max(
+                    1,
+                    int(
+                        document.size().height()
+                    ),
+                )
+            else:
+                metrics = painter.fontMetrics()
+                text_height = max(
+                    1,
+                    metrics.boundingRect(
+                        title_text
+                    ).height(),
+                )
 
             available_travel = max(
                 0,
@@ -366,11 +450,27 @@ class YearPhotoScatterWidgetRenderer:
                 )
             )
 
-            painter.drawText(
-                positioned_title_rect,
-                (
-                    Qt.AlignmentFlag.AlignHCenter
-                    | Qt.AlignmentFlag.AlignVCenter
-                ),
-                composition.title,
-            )
+            if custom_title:
+                painter.save()
+                painter.translate(
+                    positioned_title_rect.topLeft()
+                )
+                document.drawContents(
+                    painter,
+                    QRectF(
+                        0.0,
+                        0.0,
+                        positioned_title_rect.width(),
+                        positioned_title_rect.height(),
+                    ),
+                )
+                painter.restore()
+            else:
+                painter.drawText(
+                    positioned_title_rect,
+                    (
+                        Qt.AlignmentFlag.AlignHCenter
+                        | Qt.AlignmentFlag.AlignVCenter
+                    ),
+                    title_text,
+                )

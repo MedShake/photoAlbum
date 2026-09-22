@@ -134,6 +134,9 @@ class PageTemplateSettingsWidget(QWidget):
         controls.layout().setAlignment(Qt.AlignmentFlag.AlignTop)
         controls_area = _SettingsControlsArea()
         controls_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        controls_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         controls_area.setWidgetResizable(True)
         controls_area.setWidget(controls)
 
