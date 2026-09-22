@@ -736,7 +736,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "without increasing the number of pages before the next period."
         ),
 
-        "plan.other_pages": "Other pages",
         "plan.page": "Page",
         "plan.photos_page": "Photos",
         "plan.month_divider": "Month divider",
@@ -1511,7 +1510,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "avant la période suivante."
         ),
 
-        "plan.other_pages": "Autres pages",
         "plan.page": "Page",
         "plan.photos_page": "Photos",
         "plan.month_divider": "Séparateur de mois",

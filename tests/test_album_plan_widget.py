@@ -3,12 +3,18 @@ from PySide6.QtWidgets import QApplication
 from photoalbum.album import (
     AlbumBuildResult,
     AlbumPlan,
+    AlbumStructureSettings,
     BlankPageReason,
+    CoverPosition,
+    CoverSettings,
+    DividerSettings,
+    PageInstance,
     PageSide,
     PaginationResult,
     PeriodEndCapacity,
     PlanItemKind,
     PlannedPage,
+    PhotoPageSettings,
     PrintDiagnostic,
 )
 from photoalbum.template_engine import create_template_registry
@@ -130,6 +136,253 @@ def create_result() -> AlbumBuildResult:
     )
 
 
+def create_structure_settings() -> AlbumStructureSettings:
+    return AlbumStructureSettings(
+        covers={
+            position: CoverSettings(
+                position=position,
+                template_id=f"{position.value}-template",
+            )
+            for position in CoverPosition
+        },
+        month_dividers=DividerSettings(
+            enabled=True,
+            template_id="month-divider-classic",
+        ),
+        year_dividers=DividerSettings(
+            enabled=True,
+            template_id="year-divider-classic",
+        ),
+        photo_pages=PhotoPageSettings(
+            template_id="photo-page-2",
+        ),
+    )
+
+
+def result_with_pages(pages: list[PlannedPage]) -> AlbumBuildResult:
+    return AlbumBuildResult(
+        plan=AlbumPlan(),
+        pagination=PaginationResult(pages=pages),
+        print_diagnostic=PrintDiagnostic(
+            page_count=len(pages),
+            compatible=True,
+            pages_to_add=0,
+        ),
+    )
+
+
+def page_numbers_in_visual_order(item) -> list[int]:
+    numbers = []
+    # Production does not currently attach PlannedPage (or a dedicated role)
+    # to the item. A real page is nevertheless the only leaf whose page-count
+    # column is exactly 1; covers use an em dash and structural nodes have
+    # children. Only the number extraction remains tied to the rendered label.
+    if item.childCount() == 0 and item.text(1) == "1":
+        number_label = item.text(0).split(" — ", 1)[0]
+        numbers.append(int(number_label.rsplit(" ", 1)[1]))
+    for index in range(item.childCount()):
+        numbers.extend(page_numbers_in_visual_order(item.child(index)))
+    return numbers
+
+
+def structure_labels(item) -> list[str]:
+    labels = [item.text(0)]
+    for index in range(item.childCount()):
+        labels.extend(structure_labels(item.child(index)))
+    return labels
+
+
+def test_unscoped_technical_blank_keeps_physical_position_in_album_body():
+    widget = create_widget()
+    result = result_with_pages(
+        [
+            PlannedPage(
+                number=1,
+                side=PageSide.RIGHT,
+                kind=PlanItemKind.YEAR_DIVIDER,
+                template_id="year-divider-classic",
+                year=2025,
+            ),
+            PlannedPage(
+                number=2,
+                side=PageSide.LEFT,
+                kind=None,
+                template_id=None,
+                blank_reason=BlankPageReason.TECHNICAL,
+            ),
+            PlannedPage(
+                number=3,
+                side=PageSide.RIGHT,
+                kind=PlanItemKind.MONTH_DIVIDER,
+                template_id="month-divider-classic",
+                year=2025,
+                month=3,
+            ),
+        ]
+    )
+
+    widget.set_result(result, create_structure_settings())
+
+    body = next(
+        widget._tree.topLevelItem(index)
+        for index in range(widget._tree.topLevelItemCount())
+        if widget._tree.topLevelItem(index).text(0) == "Album body"
+    )
+    year = next(
+        body.child(index)
+        for index in range(body.childCount())
+        if body.child(index).text(0) == "2025"
+    )
+
+    assert [
+        year.child(index).text(0)
+        for index in range(year.childCount())
+    ] == [
+        "Page 1 — Year divider",
+        "Page 2 — Technical blank",
+        "March",
+    ]
+    assert all(
+        body.child(index).text(0) != "Other pages"
+        for index in range(body.childCount())
+    )
+    widget.close()
+
+
+def test_unscoped_page_without_shared_context_stays_in_physical_position():
+    widget = create_widget()
+    result = result_with_pages(
+        [
+            PlannedPage(
+                number=1,
+                side=PageSide.RIGHT,
+                kind=None,
+                template_id=None,
+                blank_reason=BlankPageReason.TECHNICAL,
+            ),
+            PlannedPage(
+                number=2,
+                side=PageSide.LEFT,
+                kind=PlanItemKind.YEAR_DIVIDER,
+                template_id="year-divider-classic",
+                year=2025,
+            ),
+        ]
+    )
+
+    widget.set_result(result, create_structure_settings())
+
+    body = next(
+        widget._tree.topLevelItem(index)
+        for index in range(widget._tree.topLevelItemCount())
+        if widget._tree.topLevelItem(index).text(0) == "Album body"
+    )
+    assert [
+        body.child(index).text(0)
+        for index in range(body.childCount())
+    ] == [
+        "Page 1 — Technical blank",
+        "2025",
+    ]
+    widget.close()
+
+
+def test_structured_plan_recursive_page_order_matches_physical_document():
+    widget = create_widget()
+    settings = create_structure_settings()
+    front = PageInstance(template_id="calendar-index")
+    back = PageInstance(template_id="calendar-index")
+    settings.front_matter = [front]
+    settings.back_matter = [back]
+    pages = [
+        PlannedPage(1, PageSide.RIGHT, PlanItemKind.SPECIAL_PAGE,
+                    "calendar-index", page_instance=front),
+        PlannedPage(2, PageSide.LEFT, None, None,
+                    blank_reason=BlankPageReason.TECHNICAL),
+        PlannedPage(3, PageSide.RIGHT, PlanItemKind.YEAR_DIVIDER,
+                    "year-divider-classic", year=2025),
+        PlannedPage(4, PageSide.LEFT, PlanItemKind.MONTH_DIVIDER,
+                    "month-divider-classic", year=2025, month=3),
+        PlannedPage(5, PageSide.RIGHT, None, None,
+                    blank_reason=BlankPageReason.EDITORIAL),
+        PlannedPage(6, PageSide.LEFT, PlanItemKind.PHOTO_GROUP,
+                    "photo-page-2", year=2025, month=3),
+        PlannedPage(7, PageSide.RIGHT, None, None,
+                    blank_reason=BlankPageReason.TECHNICAL),
+        PlannedPage(8, PageSide.LEFT, PlanItemKind.MONTH_DIVIDER,
+                    "month-divider-classic", year=2025, month=4),
+        PlannedPage(9, PageSide.RIGHT, None, None,
+                    blank_reason=BlankPageReason.TECHNICAL),
+        PlannedPage(10, PageSide.LEFT, PlanItemKind.SPECIAL_PAGE,
+                    "calendar-index", page_instance=back),
+    ]
+
+    widget.set_result(result_with_pages(pages), settings)
+
+    numbers = []
+    labels = []
+    for index in range(widget._tree.topLevelItemCount()):
+        item = widget._tree.topLevelItem(index)
+        numbers.extend(page_numbers_in_visual_order(item))
+        labels.extend(structure_labels(item))
+
+    assert numbers == list(range(1, 11))
+    assert "Other pages" not in labels
+    assert [
+        widget._tree.topLevelItem(index).text(0)
+        for index in range(widget._tree.topLevelItemCount())
+    ] == [
+        "Front cover:",
+        "Inside front cover:",
+        "Special pages after inside front cover",
+        "Album body",
+        "Special pages before inside back cover",
+        "Inside back cover:",
+        "Back cover:",
+    ]
+    widget.close()
+
+
+def test_reentering_period_creates_new_groups_instead_of_reordering_pages():
+    widget = create_widget()
+    pages = [
+        PlannedPage(1, PageSide.RIGHT, PlanItemKind.PHOTO_GROUP,
+                    "photo-page-2", year=2025, month=3),
+        PlannedPage(2, PageSide.LEFT, None, None,
+                    blank_reason=BlankPageReason.TECHNICAL),
+        PlannedPage(3, PageSide.RIGHT, PlanItemKind.PHOTO_GROUP,
+                    "photo-page-2", year=2026, month=4),
+        PlannedPage(4, PageSide.LEFT, PlanItemKind.PHOTO_GROUP,
+                    "photo-page-2", year=2025, month=3),
+    ]
+
+    widget.set_result(result_with_pages(pages), create_structure_settings())
+
+    body = next(
+        widget._tree.topLevelItem(index)
+        for index in range(widget._tree.topLevelItemCount())
+        if widget._tree.topLevelItem(index).text(0) == "Album body"
+    )
+    assert [
+        body.child(index).text(0)
+        for index in range(body.childCount())
+    ] == [
+        "2025",
+        "Page 2 — Technical blank",
+        "2026",
+        "2025",
+    ]
+
+    first_2025 = body.child(0)
+    second_2025 = body.child(3)
+    assert first_2025.childCount() == 1
+    assert second_2025.childCount() == 1
+    assert first_2025.child(0).text(0) == "March"
+    assert second_2025.child(0).text(0) == "March"
+    assert page_numbers_in_visual_order(body) == [1, 2, 3, 4]
+    widget.close()
+
+
 def test_plan_widget_starts_empty():
     widget = create_widget()
 
@@ -243,8 +496,10 @@ def test_plan_widget_groups_pages_by_year_and_month():
         )
     ]
 
-    assert "2025" in labels
-    assert "Other pages" in labels
+    assert labels == [
+        "Page 1 — Special page",
+        "2025",
+    ]
 
 
 def test_month_group_contains_page_details():

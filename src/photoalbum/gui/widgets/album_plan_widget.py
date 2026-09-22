@@ -383,122 +383,108 @@ class AlbumPlanWidget(QWidget):
         result: AlbumBuildResult,
     ) -> None:
         self._tree.clear()
-
-        year_items: dict[
-            int,
-            QTreeWidgetItem,
-        ] = {}
-
-        month_items: dict[
-            tuple[int, int],
-            QTreeWidgetItem,
-        ] = {}
-
-        other_root = QTreeWidgetItem(
-            [
-                self._translator.tr(
-                    "plan.other_pages"
-                ),
-                "",
-                "",
-                "",
-            ]
+        self._append_chronological_pages(
+            list(result.pagination.pages),
+            root=None,
         )
-
-        has_other_pages = False
-
-        for page in result.pagination.pages:
-            parent = None
-
-            if page.year is not None:
-                parent = year_items.get(
-                    page.year
-                )
-
-                if parent is None:
-                    parent = QTreeWidgetItem(
-                        [
-                            str(page.year),
-                            "",
-                            "",
-                            "",
-                        ]
-                    )
-
-                    self._tree.addTopLevelItem(
-                        parent
-                    )
-
-                    year_items[
-                        page.year
-                    ] = parent
-
-            if (
-                page.year is not None
-                and page.month is not None
-            ):
-                key = (
-                    page.year,
-                    page.month,
-                )
-
-                month_item = (
-                    month_items.get(
-                        key
-                    )
-                )
-
-                if month_item is None:
-                    month_name = (
-                        self._translator.month_name(
-                            page.month
-                        )
-                    )
-
-                    if month_name:
-                        month_name = (
-                            month_name[0].upper()
-                            + month_name[1:]
-                        )
-
-                    month_item = QTreeWidgetItem(
-                        [
-                            month_name,
-                            "",
-                            "",
-                            "",
-                        ]
-                    )
-
-                    assert parent is not None
-
-                    parent.addChild(
-                        month_item
-                    )
-
-                    month_items[
-                        key
-                    ] = month_item
-
-                parent = month_item
-
-            if parent is None:
-                parent = other_root
-                has_other_pages = True
-
-            parent.addChild(
-                self._page_item(
-                    page
-                )
-            )
-
-        if has_other_pages:
-            self._tree.addTopLevelItem(
-                other_root
-            )
 
         self._update_group_totals()
         self._tree.collapseAll()
+
+    def _append_chronological_pages(
+        self,
+        pages: list,
+        *,
+        root: QTreeWidgetItem | None,
+    ) -> None:
+        """Append physical pages without letting grouping reorder them."""
+        previous_scoped = []
+        previous = None
+
+        for page in pages:
+            previous_scoped.append(previous)
+            if page.year is not None:
+                previous = page
+
+        next_scoped = [None] * len(pages)
+        following = None
+
+        for index in range(len(pages) - 1, -1, -1):
+            next_scoped[index] = following
+            if pages[index].year is not None:
+                following = pages[index]
+
+        scopes: list[tuple[int | None, int | None]] = []
+
+        for index, page in enumerate(pages):
+            year = page.year
+            month = page.month
+
+            if year is None:
+                before = previous_scoped[index]
+                after = next_scoped[index]
+
+                if (
+                    before is not None
+                    and after is not None
+                    and before.year == after.year
+                ):
+                    year = before.year
+
+                    if (
+                        before.month is not None
+                        and before.month == after.month
+                    ):
+                        month = before.month
+
+            scopes.append((year, month))
+
+        current_year = None
+        current_month = None
+        year_item = None
+        month_item = None
+
+        def append(parent, item) -> None:
+            if parent is None:
+                self._tree.addTopLevelItem(item)
+            else:
+                parent.addChild(item)
+
+        for page, (year, month) in zip(pages, scopes):
+            if year is None:
+                append(root, self._page_item(page))
+                current_year = None
+                current_month = None
+                year_item = None
+                month_item = None
+                continue
+
+            if year_item is None or current_year != year:
+                year_item = QTreeWidgetItem(
+                    [str(year), "", "", ""]
+                )
+                append(root, year_item)
+                current_year = year
+                current_month = None
+                month_item = None
+
+            if month is None:
+                year_item.addChild(self._page_item(page))
+                current_month = None
+                month_item = None
+                continue
+
+            if month_item is None or current_month != month:
+                month_name = self._translator.month_name(month)
+                if month_name:
+                    month_name = month_name[0].upper() + month_name[1:]
+                month_item = QTreeWidgetItem(
+                    [month_name, "", "", ""]
+                )
+                year_item.addChild(month_item)
+                current_month = month
+
+            month_item.addChild(self._page_item(page))
 
     def _set_structure(
         self,
@@ -680,125 +666,12 @@ class AlbumPlanWidget(QWidget):
             ]
         )
 
-        year_items: dict[
-            int,
-            QTreeWidgetItem,
-        ] = {}
-
-        month_items: dict[
-            tuple[int, int],
-            QTreeWidgetItem,
-        ] = {}
-
-        other_body_root = QTreeWidgetItem(
-            [
-                self._translator.tr(
-                    "plan.other_pages"
-                ),
-                "",
-                "",
-                "",
-            ]
+        self._append_chronological_pages(
+            body_pages,
+            root=body_root,
         )
 
-        has_body = False
-        has_other_body = False
-
-        for page in body_pages:
-            has_body = True
-
-            parent: QTreeWidgetItem | None = None
-
-            if page.year is not None:
-                parent = year_items.get(
-                    page.year
-                )
-
-                if parent is None:
-                    parent = QTreeWidgetItem(
-                        [
-                            str(page.year),
-                            "",
-                            "",
-                            "",
-                        ]
-                    )
-
-                    body_root.addChild(
-                        parent
-                    )
-
-                    year_items[
-                        page.year
-                    ] = parent
-
-            if (
-                page.year is not None
-                and page.month is not None
-            ):
-                key = (
-                    page.year,
-                    page.month,
-                )
-
-                month_item = (
-                    month_items.get(
-                        key
-                    )
-                )
-
-                if month_item is None:
-                    month_name = (
-                        self._translator.month_name(
-                            page.month
-                        )
-                    )
-
-                    # Month separators use a capitalized month
-                    # name in the rest of the application.
-                    if month_name:
-                        month_name = (
-                            month_name[0].upper()
-                            + month_name[1:]
-                        )
-
-                    month_item = QTreeWidgetItem(
-                        [
-                            month_name,
-                            "",
-                            "",
-                            "",
-                        ]
-                    )
-
-                    assert parent is not None
-
-                    parent.addChild(
-                        month_item
-                    )
-
-                    month_items[
-                        key
-                    ] = month_item
-
-                parent = month_item
-
-            if parent is None:
-                parent = other_body_root
-                has_other_body = True
-
-            parent.addChild(
-                self._page_item(
-                    page
-                )
-            )
-
-        if has_other_body:
-            body_root.addChild(
-                other_body_root
-            )
-
-        if has_body:
+        if body_pages:
             self._tree.addTopLevelItem(
                 body_root
             )
