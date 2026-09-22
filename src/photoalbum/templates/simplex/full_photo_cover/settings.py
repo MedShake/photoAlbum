@@ -3,15 +3,20 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
-    QRadioButton,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -19,7 +24,22 @@ from PySide6.QtWidgets import (
 from photoalbum.gui.template_settings.base import (
     PageTemplateSettingsWidget,
 )
+from photoalbum.rendering.fonts import (
+    available_photo_album_fonts,
+)
 
+from .title import (
+    DEFAULT_TITLE_COLOR,
+    TITLE_POSITIONS,
+    automatic_title,
+    custom_title_text,
+    title_color,
+    title_font_family,
+    title_font_size,
+    title_mode,
+    title_position,
+    title_visible,
+)
 from .widget_renderer import (
     EXTERNAL_PATH_KEY,
     PHOTO_PATH_KEY,
@@ -71,6 +91,7 @@ class SimplexFullPhotoCoverSettingsWidget(
 
         self._create_content()
         self._load_photos()
+        self._load_title_controls()
         self._render_preview()
 
     def _create_content(self) -> None:
@@ -83,40 +104,47 @@ class SimplexFullPhotoCoverSettingsWidget(
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(12)
 
-        form = QFormLayout()
+        self._photo_group = QGroupBox(
+            self._translator.tr(
+                "simplex.full-photo-cover.photo-group"
+            ),
+            self,
+        )
+        form = QFormLayout(
+            self._photo_group
+        )
 
-        self._project_source_radio = QRadioButton(
+        self._source_combo = QComboBox(self)
+        self._source_combo.addItem(
             self._translator.tr(
                 "simplex.full-photo-cover.source-project"
             ),
-            self,
+            SOURCE_PROJECT,
         )
-        self._external_source_radio = QRadioButton(
+        self._source_combo.addItem(
             self._translator.tr(
                 "simplex.full-photo-cover.source-external"
             ),
-            self,
+            SOURCE_EXTERNAL,
         )
-
-        source_widget = QWidget(self)
-        source_layout = QVBoxLayout(source_widget)
-        source_layout.setContentsMargins(0, 0, 0, 0)
-        source_layout.addWidget(self._project_source_radio)
-        source_layout.addWidget(self._external_source_radio)
 
         form.addRow(
             self._translator.tr(
                 "simplex.full-photo-cover.source"
             ),
-            source_widget,
+            self._source_combo,
         )
 
         self._photo_combo = QComboBox(self)
 
-        form.addRow(
+        self._photo_label = QLabel(
             self._translator.tr(
                 "simplex.full-photo-cover.photo"
             ),
+            self,
+        )
+        form.addRow(
+            self._photo_label,
             self._photo_combo,
         )
 
@@ -136,14 +164,21 @@ class SimplexFullPhotoCoverSettingsWidget(
         external_layout.addWidget(self._external_path, 1)
         external_layout.addWidget(self._browse_button)
 
-        form.addRow(
+        self._external_label = QLabel(
             self._translator.tr(
                 "simplex.full-photo-cover.file"
             ),
-            external_widget,
+            self,
+        )
+        self._external_widget = external_widget
+        form.addRow(
+            self._external_label,
+            self._external_widget,
         )
 
-        left_layout.addLayout(form)
+        left_layout.addWidget(
+            self._photo_group
+        )
 
         self._no_photo_label = QLabel(
             self._translator.tr(
@@ -155,6 +190,8 @@ class SimplexFullPhotoCoverSettingsWidget(
         self._no_photo_label.hide()
         left_layout.addWidget(self._no_photo_label)
 
+        self._create_title_controls(left_layout)
+
         left_layout.addStretch()
 
         self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
@@ -163,14 +200,401 @@ class SimplexFullPhotoCoverSettingsWidget(
         self._photo_combo.currentIndexChanged.connect(
             self._selection_changed
         )
-        self._project_source_radio.toggled.connect(
-            self._source_changed
-        )
-        self._external_source_radio.toggled.connect(
+        self._source_combo.currentIndexChanged.connect(
             self._source_changed
         )
         self._browse_button.clicked.connect(
             self._browse_external_photo
+        )
+
+    def _create_title_controls(
+        self,
+        layout,
+    ) -> None:
+        self._title_group = QGroupBox(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-group"
+            ),
+            self,
+        )
+        title_layout = QVBoxLayout(
+            self._title_group
+        )
+
+        self._title_visible_check = QCheckBox(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-visible"
+            ),
+            self._title_group,
+        )
+        title_layout.addWidget(
+            self._title_visible_check
+        )
+
+        form = QFormLayout()
+
+        self._title_mode_combo = QComboBox(
+            self._title_group
+        )
+        self._title_mode_combo.addItem(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-mode-automatic"
+            ),
+            "automatic",
+        )
+        self._title_mode_combo.addItem(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-mode-custom"
+            ),
+            "custom",
+        )
+        form.addRow(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-mode"
+            ),
+            self._title_mode_combo,
+        )
+
+        self._title_text_label = QLabel(
+            self._translator.tr(
+                "simplex.full-photo-cover.custom-title"
+            ),
+            self._title_group,
+        )
+        self._title_text_edit = QTextEdit(
+            self._title_group
+        )
+        self._title_text_edit.setPlaceholderText(
+            self._translator.tr(
+                "simplex.full-photo-cover.custom-title-placeholder"
+            )
+        )
+
+        metrics = self._title_text_edit.fontMetrics()
+        margin = int(
+            self._title_text_edit.document().documentMargin()
+        )
+        frame = self._title_text_edit.frameWidth()
+        self._title_text_edit.setFixedHeight(
+            metrics.lineSpacing() * 3
+            + margin * 2
+            + frame * 2
+        )
+
+        form.addRow(
+            self._title_text_label,
+            self._title_text_edit,
+        )
+
+        self._title_position_combo = QComboBox(
+            self._title_group
+        )
+
+        position_keys = {
+            "very_high": "simplex.full-photo-cover.title-position-very-high",
+            "high": "simplex.full-photo-cover.title-position-high",
+            "upper_middle": "simplex.full-photo-cover.title-position-upper-middle",
+            "center": "simplex.full-photo-cover.title-position-center",
+            "lower_middle": "simplex.full-photo-cover.title-position-lower-middle",
+            "low": "simplex.full-photo-cover.title-position-low",
+            "very_low": "simplex.full-photo-cover.title-position-very-low",
+        }
+
+        for position in TITLE_POSITIONS:
+            self._title_position_combo.addItem(
+                self._translator.tr(
+                    position_keys[position]
+                ),
+                position,
+            )
+
+        form.addRow(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-position"
+            ),
+            self._title_position_combo,
+        )
+
+        self._title_color_button = QPushButton(
+            self._title_group
+        )
+        form.addRow(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-color"
+            ),
+            self._title_color_button,
+        )
+
+        self._title_font_combo = QComboBox(
+            self._title_group
+        )
+        for family in available_photo_album_fonts():
+            self._title_font_combo.addItem(
+                family,
+                family,
+            )
+
+        form.addRow(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-font"
+            ),
+            self._title_font_combo,
+        )
+
+        self._title_font_size_spin = QDoubleSpinBox(
+            self._title_group
+        )
+        self._title_font_size_spin.setRange(
+            1,
+            300,
+        )
+        self._title_font_size_spin.setDecimals(1)
+        self._title_font_size_spin.setSuffix(" pt")
+
+        form.addRow(
+            self._translator.tr(
+                "simplex.full-photo-cover.title-size"
+            ),
+            self._title_font_size_spin,
+        )
+
+        title_layout.addLayout(form)
+        layout.addWidget(self._title_group)
+
+        self._title_visible_check.toggled.connect(
+            self._title_visibility_changed
+        )
+        self._title_mode_combo.currentIndexChanged.connect(
+            self._title_mode_changed
+        )
+        self._title_text_edit.textChanged.connect(
+            self._title_text_changed
+        )
+        self._title_position_combo.currentIndexChanged.connect(
+            self._title_position_changed
+        )
+        self._title_color_button.clicked.connect(
+            self._choose_title_color
+        )
+        self._title_font_combo.currentIndexChanged.connect(
+            self._title_font_changed
+        )
+        self._title_font_size_spin.valueChanged.connect(
+            self._title_size_changed
+        )
+
+    def _load_title_controls(self) -> None:
+        settings = self._instance.settings
+
+        self._title_visible_check.blockSignals(True)
+        self._title_mode_combo.blockSignals(True)
+        self._title_text_edit.blockSignals(True)
+        self._title_position_combo.blockSignals(True)
+        self._title_font_combo.blockSignals(True)
+        self._title_font_size_spin.blockSignals(True)
+
+        self._title_visible_check.setChecked(
+            title_visible(settings)
+        )
+
+        mode_index = self._title_mode_combo.findData(
+            title_mode(settings)
+        )
+        self._title_mode_combo.setCurrentIndex(
+            max(0, mode_index)
+        )
+
+        self._title_text_edit.setPlainText(
+            custom_title_text(settings)
+        )
+
+        position_index = (
+            self._title_position_combo.findData(
+                title_position(settings)
+            )
+        )
+        self._title_position_combo.setCurrentIndex(
+            max(0, position_index)
+        )
+
+        family_index = self._title_font_combo.findData(
+            title_font_family(settings)
+        )
+        if family_index >= 0:
+            self._title_font_combo.setCurrentIndex(
+                family_index
+            )
+
+        automatic = automatic_title(
+            self._photos,
+            self._translator.month_name,
+        )
+        self._title_font_size_spin.setValue(
+            title_font_size(
+                settings,
+                automatic,
+            )
+        )
+
+        self._title_visible_check.blockSignals(False)
+        self._title_mode_combo.blockSignals(False)
+        self._title_text_edit.blockSignals(False)
+        self._title_position_combo.blockSignals(False)
+        self._title_font_combo.blockSignals(False)
+        self._title_font_size_spin.blockSignals(False)
+
+        self._update_title_color_button()
+        self._update_title_controls()
+
+    def _update_title_controls(self) -> None:
+        enabled = self._title_visible_check.isChecked()
+        custom = (
+            self._title_mode_combo.currentData()
+            == "custom"
+        )
+
+        self._title_mode_combo.setEnabled(enabled)
+
+        self._title_text_label.setVisible(custom)
+        self._title_text_edit.setVisible(custom)
+        self._title_text_label.setEnabled(
+            enabled and custom
+        )
+        self._title_text_edit.setEnabled(
+            enabled and custom
+        )
+
+        self._title_position_combo.setEnabled(enabled)
+        self._title_color_button.setEnabled(enabled)
+        self._title_font_combo.setEnabled(enabled)
+        self._title_font_size_spin.setEnabled(enabled)
+
+    def _update_title_color_button(self) -> None:
+        color = title_color(
+            self._instance.settings
+        )
+        self._title_color_button.setText(color)
+        self._title_color_button.setStyleSheet(
+            f"background-color: {color};"
+        )
+
+    def _save_title_settings(
+        self,
+        **changes,
+    ) -> None:
+        settings = dict(
+            self._instance.settings
+        )
+        current = settings.get(
+            "title",
+            {},
+        )
+        if not isinstance(current, dict):
+            current = {}
+
+        settings["title"] = {
+            **current,
+            **changes,
+        }
+
+        self._instance = (
+            self._instance.with_settings(
+                settings
+            )
+        )
+
+        self.instance_changed.emit()
+        self._render_preview()
+
+    def _title_visibility_changed(
+        self,
+        checked: bool,
+    ) -> None:
+        self._save_title_settings(
+            visible=bool(checked)
+        )
+        self._update_title_controls()
+
+    def _title_mode_changed(
+        self,
+        index: int,
+    ) -> None:
+        mode = self._title_mode_combo.itemData(
+            index
+        )
+        if mode not in {
+            "automatic",
+            "custom",
+        }:
+            return
+
+        self._save_title_settings(
+            mode=str(mode)
+        )
+        self._update_title_controls()
+
+    def _title_text_changed(self) -> None:
+        self._save_title_settings(
+            text=self._title_text_edit.toPlainText()
+        )
+
+    def _title_position_changed(
+        self,
+        index: int,
+    ) -> None:
+        position = (
+            self._title_position_combo.itemData(
+                index
+            )
+        )
+        if position not in TITLE_POSITIONS:
+            return
+
+        self._save_title_settings(
+            position=str(position)
+        )
+
+    def _choose_title_color(self) -> None:
+        color = QColorDialog.getColor(
+            QColor(
+                title_color(
+                    self._instance.settings
+                )
+            ),
+            self,
+            self._translator.tr(
+                "simplex.full-photo-cover.choose-title-color"
+            ),
+        )
+
+        if not color.isValid():
+            return
+
+        self._save_title_settings(
+            color=color.name()
+        )
+        self._update_title_color_button()
+
+    def _title_font_changed(
+        self,
+        index: int,
+    ) -> None:
+        family = self._title_font_combo.itemData(
+            index
+        )
+        if not family:
+            return
+
+        self._save_title_settings(
+            font_family=str(family)
+        )
+
+    def _title_size_changed(
+        self,
+        value: float,
+    ) -> None:
+        self._save_title_settings(
+            font_size=float(value)
         )
 
     def _load_photos(self) -> None:
@@ -259,44 +683,70 @@ class SimplexFullPhotoCoverSettingsWidget(
             )
         )
 
-        self._project_source_radio.blockSignals(True)
-        self._external_source_radio.blockSignals(True)
+        self._source_combo.blockSignals(True)
 
-        if source_type == SOURCE_EXTERNAL:
-            self._external_source_radio.setChecked(True)
-        else:
-            self._project_source_radio.setChecked(True)
+        source_index = self._source_combo.findData(
+            source_type
+        )
+        if source_index < 0:
+            source_index = self._source_combo.findData(
+                SOURCE_PROJECT
+            )
 
-        self._project_source_radio.blockSignals(False)
-        self._external_source_radio.blockSignals(False)
+        self._source_combo.setCurrentIndex(
+            source_index
+        )
+        self._source_combo.blockSignals(False)
 
         self._update_source_controls()
 
     def _update_source_controls(self) -> None:
         project_source = (
-            self._project_source_radio.isChecked()
+            self._source_combo.currentData()
+            == SOURCE_PROJECT
+        )
+        has_project_photos = (
+            self._photo_combo.count() > 0
         )
 
+        self._photo_label.setVisible(
+            project_source
+            and has_project_photos
+        )
+        self._photo_combo.setVisible(
+            project_source
+            and has_project_photos
+        )
         self._photo_combo.setEnabled(
             project_source
-            and self._photo_combo.count() > 0
+            and has_project_photos
         )
+
         self._no_photo_label.setVisible(
             project_source
-            and self._photo_combo.count() == 0
+            and not has_project_photos
         )
-        self._external_path.setEnabled(
+
+        self._external_label.setVisible(
             not project_source
         )
-        self._browse_button.setEnabled(
+        self._external_widget.setVisible(
             not project_source
         )
 
-    def _source_changed(self) -> None:
-        if self._external_source_radio.isChecked():
-            source_type = SOURCE_EXTERNAL
-        else:
-            source_type = SOURCE_PROJECT
+    def _source_changed(
+        self,
+        index: int,
+    ) -> None:
+        source_type = self._source_combo.itemData(
+            index
+        )
+
+        if source_type not in {
+            SOURCE_PROJECT,
+            SOURCE_EXTERNAL,
+        }:
+            return
 
         settings = dict(self._instance.settings)
         settings[SOURCE_TYPE_KEY] = source_type
@@ -334,8 +784,17 @@ class SimplexFullPhotoCoverSettingsWidget(
             settings
         )
 
-        self._external_source_radio.setChecked(True)
+        source_index = self._source_combo.findData(
+            SOURCE_EXTERNAL
+        )
+        if source_index >= 0:
+            self._source_combo.blockSignals(True)
+            self._source_combo.setCurrentIndex(
+                source_index
+            )
+            self._source_combo.blockSignals(False)
 
+        self._update_source_controls()
         self.instance_changed.emit()
         self._render_preview()
 

@@ -2,10 +2,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, QSize
-from PySide6.QtGui import QImageReader, QPixmap
+from PySide6.QtCore import QRect, QRectF, QSize, Qt
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QImageReader,
+    QPixmap,
+    QTextCharFormat,
+    QTextCursor,
+    QTextDocument,
+)
 
 from .geometry import centered_cover_crop
+from .title import (
+    effective_title,
+    title_color,
+    title_font_family,
+    title_font_size,
+    title_position_index,
+    title_visible,
+)
 
 
 PHOTO_PATH_KEY = "photo_path"
@@ -172,6 +188,189 @@ class SimplexFullPhotoCoverRenderer:
                 pixmap,
                 source,
             )
+        finally:
+            painter.restore()
+
+        if not title_visible(
+            instance.settings
+        ):
+            return
+
+        text = effective_title(
+            instance.settings,
+            photos,
+            translator.month_name,
+        )
+
+        if not text.strip():
+            return
+
+        font = QFont(
+            title_font_family(
+                instance.settings
+            )
+        )
+        font.setPointSizeF(
+            title_font_size(
+                instance.settings,
+                text,
+            )
+        )
+
+        custom = (
+            str(
+                instance.settings.get(
+                    "title",
+                    {},
+                ).get(
+                    "mode",
+                    "automatic",
+                )
+            )
+            == "custom"
+        )
+
+        if not custom:
+            font.setBold(True)
+
+        color = QColor(
+            title_color(
+                instance.settings
+            )
+        )
+
+        horizontal_margin = (
+            destination.width() * 0.06
+        )
+        vertical_margin = (
+            destination.height() * 0.06
+        )
+
+        content_width = max(
+            1.0,
+            destination.width()
+            - horizontal_margin * 2,
+        )
+
+        painter.save()
+
+        try:
+            if custom:
+                document = QTextDocument()
+                document.setDefaultFont(font)
+                document.setDocumentMargin(0.0)
+                document.setMarkdown(text)
+
+                cursor = QTextCursor(document)
+                cursor.select(
+                    QTextCursor.SelectionType.Document
+                )
+
+                block_format = cursor.blockFormat()
+                block_format.setAlignment(
+                    Qt.AlignmentFlag.AlignHCenter
+                )
+                cursor.mergeBlockFormat(
+                    block_format
+                )
+
+                char_format = QTextCharFormat()
+                char_format.setForeground(color)
+                cursor.mergeCharFormat(
+                    char_format
+                )
+
+                document.setTextWidth(
+                    content_width
+                )
+
+                title_height = min(
+                    document.size().height(),
+                    max(
+                        1.0,
+                        destination.height()
+                        - vertical_margin * 2,
+                    ),
+                )
+            else:
+                painter.setFont(font)
+                metrics = painter.fontMetrics()
+                bounds = metrics.boundingRect(
+                    QRect(
+                        0,
+                        0,
+                        max(
+                            1,
+                            round(content_width),
+                        ),
+                        max(
+                            1,
+                            round(destination.height()),
+                        ),
+                    ),
+                    int(
+                        Qt.AlignmentFlag.AlignHCenter
+                        | Qt.AlignmentFlag.AlignVCenter
+                        | Qt.TextFlag.TextWordWrap
+                    ),
+                    text,
+                )
+                title_height = max(
+                    1.0,
+                    bounds.height(),
+                )
+
+            available_travel = max(
+                0.0,
+                destination.height()
+                - vertical_margin * 2
+                - title_height,
+            )
+
+            index = title_position_index(
+                instance.settings
+            )
+
+            top = (
+                destination.top()
+                + vertical_margin
+                + available_travel
+                * index
+                / 6.0
+            )
+
+            title_rect = QRectF(
+                destination.left()
+                + horizontal_margin,
+                top,
+                content_width,
+                title_height,
+            )
+
+            if custom:
+                painter.translate(
+                    title_rect.topLeft()
+                )
+                document.drawContents(
+                    painter,
+                    QRectF(
+                        0.0,
+                        0.0,
+                        title_rect.width(),
+                        title_rect.height(),
+                    ),
+                )
+            else:
+                painter.setPen(color)
+                painter.drawText(
+                    title_rect,
+                    int(
+                        Qt.AlignmentFlag.AlignHCenter
+                        | Qt.AlignmentFlag.AlignVCenter
+                        | Qt.TextFlag.TextWordWrap
+                    ),
+                    text,
+                )
         finally:
             painter.restore()
 

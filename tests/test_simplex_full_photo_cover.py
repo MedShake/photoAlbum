@@ -7,6 +7,16 @@ from photoalbum.album import PageInstance
 from photoalbum.templates.simplex.full_photo_cover.geometry import (
     centered_cover_crop,
 )
+from photoalbum.templates.simplex.full_photo_cover.title import (
+    DEFAULT_TITLE_COLOR,
+    automatic_title,
+    default_title_font_size,
+    title_color,
+    title_font_size,
+    title_mode,
+    title_position,
+    title_visible,
+)
 from photoalbum.templates.simplex.full_photo_cover.widget_renderer import (
     selected_photo,
 )
@@ -175,3 +185,131 @@ def test_simplex_extension_is_registered():
     assert extension is not None
     assert extension.settings_editor_type is not None
     assert extension.widget_renderer is not None
+
+
+def _dated_photo(value):
+    from datetime import datetime
+
+    return SimpleNamespace(
+        capture_datetime=datetime.fromisoformat(value)
+    )
+
+
+def test_simplex_automatic_title_without_dated_photo_is_empty():
+    photos = [
+        SimpleNamespace(capture_datetime=None),
+    ]
+
+    assert automatic_title(
+        photos,
+        lambda month: "unused",
+    ) == ""
+
+
+def test_simplex_automatic_title_for_single_month():
+    months = {
+        5: "mai",
+    }
+
+    photos = [
+        _dated_photo("2024-05-02T10:00:00"),
+        _dated_photo("2024-05-29T18:00:00"),
+    ]
+
+    assert automatic_title(
+        photos,
+        months.get,
+    ) == "Mai 2024"
+
+
+def test_simplex_automatic_title_for_single_year():
+    photos = [
+        _dated_photo("2024-01-02T10:00:00"),
+        _dated_photo("2024-11-29T18:00:00"),
+    ]
+
+    assert automatic_title(
+        photos,
+        lambda month: str(month),
+    ) == "2024"
+
+
+def test_simplex_automatic_title_for_year_range():
+    photos = [
+        _dated_photo("2022-12-31T10:00:00"),
+        _dated_photo("2025-01-01T18:00:00"),
+    ]
+
+    assert automatic_title(
+        photos,
+        lambda month: str(month),
+    ) == "2022–2025"
+
+
+def test_simplex_title_defaults():
+    settings = {}
+
+    assert title_visible(settings) is True
+    assert title_mode(settings) == "automatic"
+    assert title_position(settings) == "center"
+    assert title_color(settings) == DEFAULT_TITLE_COLOR
+
+
+def test_simplex_invalid_title_mode_and_position_use_defaults():
+    settings = {
+        "title": {
+            "mode": "invalid",
+            "position": "invalid",
+        }
+    }
+
+    assert title_mode(settings) == "automatic"
+    assert title_position(settings) == "center"
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("2024", 72.0),
+        ("2022–2025", 52.0),
+        ("2022-2025", 52.0),
+        ("Mai 2024", 44.0),
+    ],
+)
+def test_simplex_default_title_font_size(title, expected):
+    assert default_title_font_size(title) == expected
+
+
+def test_simplex_persisted_title_font_size_is_preserved():
+    settings = {
+        "title": {
+            "font_size": 63.5,
+        }
+    }
+
+    assert title_font_size(
+        settings,
+        "2024",
+    ) == 63.5
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "invalid",
+        0,
+        301,
+        float("inf"),
+    ],
+)
+def test_simplex_invalid_title_font_size_uses_automatic_default(value):
+    settings = {
+        "title": {
+            "font_size": value,
+        }
+    }
+
+    assert title_font_size(
+        settings,
+        "2024",
+    ) == 72.0

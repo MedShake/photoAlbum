@@ -96,6 +96,16 @@ def test_simplex_translations_are_present_in_english_and_french():
                 "File",
             "simplex.full-photo-cover.browse":
                 "Browse…",
+            "simplex.full-photo-cover.title-group":
+                "Title",
+            "simplex.full-photo-cover.title-visible":
+                "Show title",
+            "simplex.full-photo-cover.title-mode-automatic":
+                "Automatic",
+            "simplex.full-photo-cover.title-mode-custom":
+                "Custom",
+            "simplex.full-photo-cover.title-position-center":
+                "Centered",
         },
         "fr": {
             "template.simplex-full-photo-cover":
@@ -110,6 +120,16 @@ def test_simplex_translations_are_present_in_english_and_french():
                 "Fichier",
             "simplex.full-photo-cover.browse":
                 "Parcourir…",
+            "simplex.full-photo-cover.title-group":
+                "Titre",
+            "simplex.full-photo-cover.title-visible":
+                "Afficher le titre",
+            "simplex.full-photo-cover.title-mode-automatic":
+                "Automatique",
+            "simplex.full-photo-cover.title-mode-custom":
+                "Personnalisé",
+            "simplex.full-photo-cover.title-position-center":
+                "Centrée",
         },
     }
 
