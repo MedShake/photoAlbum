@@ -84,6 +84,47 @@ class YearPhotoScatterWidgetRenderer:
 
         return seeds[index]
 
+    def _title_visible(
+        self,
+        instance: PageInstance,
+    ) -> bool:
+        settings = self._scatter_settings(
+            instance
+        )
+        return bool(
+            settings.get(
+                "title_visible",
+                True,
+            )
+        )
+
+    def _title_position_index(
+        self,
+        instance: PageInstance,
+    ) -> int:
+        settings = self._scatter_settings(
+            instance
+        )
+        position = str(
+            settings.get(
+                "title_position",
+                "center",
+            )
+        )
+
+        return {
+            "very_high": 0,
+            "high": 1,
+            "upper_middle": 2,
+            "center": 3,
+            "lower_middle": 4,
+            "low": 5,
+            "very_low": 6,
+        }.get(
+            position,
+            3,
+        )
+
     def _title_color(
         self,
         instance: PageInstance,
@@ -241,41 +282,95 @@ class YearPhotoScatterWidgetRenderer:
                 image_cache=thumbnail_cache,
             )
 
-        font = QFont(
-            title_font_family(
-                instance.settings
+        if self._title_visible(
+            instance
+        ):
+            font = QFont(
+                title_font_family(
+                    instance.settings
+                )
             )
-        )
 
-        font.setBold(
-            True
-        )
-
-        title_font_pt = title_font_size(instance.settings, composition.title)
-
-        font.setPixelSize(
-            font_pixel_size(
-                title_font_pt
+            font.setBold(
+                True
             )
-        )
 
-        painter.setFont(
-            font
-        )
-
-        painter.setPen(
-            self._title_color(
-                instance
+            title_font_pt = title_font_size(
+                instance.settings,
+                composition.title,
             )
-        )
 
-        painter.drawText(
-            target_rect.adjusted(
+            font.setPixelSize(
+                font_pixel_size(
+                    title_font_pt
+                )
+            )
+
+            painter.setFont(
+                font
+            )
+
+            painter.setPen(
+                self._title_color(
+                    instance
+                )
+            )
+
+            title_rect = target_rect.adjusted(
                 15,
                 15,
                 -15,
                 -15,
-            ),
-            Qt.AlignmentFlag.AlignCenter,
-            composition.title,
-        )
+            )
+
+            metrics = painter.fontMetrics()
+            text_height = max(
+                1,
+                metrics.boundingRect(
+                    composition.title
+                ).height(),
+            )
+
+            available_travel = max(
+                0,
+                title_rect.height()
+                - text_height,
+            )
+
+            position_index = (
+                self._title_position_index(
+                    instance
+                )
+            )
+
+            title_top = (
+                title_rect.top()
+                + round(
+                    available_travel
+                    * position_index
+                    / 6
+                )
+            )
+
+            positioned_title_rect = (
+                title_rect.adjusted(
+                    0,
+                    title_top - title_rect.top(),
+                    0,
+                    -(
+                        title_rect.bottom()
+                        - title_top
+                        - text_height
+                        + 1
+                    ),
+                )
+            )
+
+            painter.drawText(
+                positioned_title_rect,
+                (
+                    Qt.AlignmentFlag.AlignHCenter
+                    | Qt.AlignmentFlag.AlignVCenter
+                ),
+                composition.title,
+            )

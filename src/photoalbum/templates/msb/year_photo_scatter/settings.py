@@ -9,9 +9,11 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QColorDialog,
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -146,6 +148,33 @@ class YearPhotoScatterSettingsWidget(
                 self.DEFAULT_TITLE_COLOR
             )
 
+        self._title_visible = bool(
+            scatter.get(
+                "title_visible",
+                True,
+            )
+        )
+
+        title_position = str(
+            scatter.get(
+                "title_position",
+                "center",
+            )
+        )
+        self._title_position = (
+            title_position
+            if title_position in {
+                "very_high",
+                "high",
+                "upper_middle",
+                "center",
+                "lower_middle",
+                "low",
+                "very_low",
+            }
+            else "center"
+        )
+
     def _create_content(
         self,
     ) -> None:
@@ -161,9 +190,18 @@ class YearPhotoScatterSettingsWidget(
             self.create_page_settings_title()
         )
 
+        proposal_group = QGroupBox(
+            self._translator.tr(
+                "page_settings.scatter_proposal_group"
+            )
+        )
+        proposal_layout = QVBoxLayout(
+            proposal_group
+        )
+
         self._proposal_label = QLabel()
 
-        layout.addWidget(
+        proposal_layout.addWidget(
             self._proposal_label
         )
 
@@ -209,8 +247,106 @@ class YearPhotoScatterSettingsWidget(
             self._next_button
         )
 
-        layout.addLayout(
+        proposal_layout.addLayout(
             proposal_controls
+        )
+
+        layout.addWidget(
+            proposal_group
+        )
+
+        title_group = QGroupBox(
+            self._translator.tr(
+                "page_settings.scatter_title_group"
+            )
+        )
+        title_layout = QVBoxLayout(
+            title_group
+        )
+
+        self._title_visible_check = QCheckBox(
+            self._translator.tr(
+                "page_settings.scatter_show_title"
+            )
+        )
+        self._title_visible_check.setChecked(
+            self._title_visible
+        )
+        title_layout.addWidget(
+            self._title_visible_check
+        )
+
+        title_position_controls = QFormLayout()
+
+        position_label = QLabel(
+            self._translator.tr(
+                "page_settings.scatter_title_position"
+            )
+        )
+
+        self._title_position_combo = QComboBox()
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_very_high"
+            ),
+            "very_high",
+        )
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_high"
+            ),
+            "high",
+        )
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_upper_middle"
+            ),
+            "upper_middle",
+        )
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_center"
+            ),
+            "center",
+        )
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_lower_middle"
+            ),
+            "lower_middle",
+        )
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_low"
+            ),
+            "low",
+        )
+        self._title_position_combo.addItem(
+            self._translator.tr(
+                "page_settings.scatter_title_position_very_low"
+            ),
+            "very_low",
+        )
+
+        position_index = (
+            self._title_position_combo.findData(
+                self._title_position
+            )
+        )
+        if position_index >= 0:
+            self._title_position_combo.setCurrentIndex(
+                position_index
+            )
+
+        position_label.setBuddy(
+            self._title_position_combo
+        )
+        title_position_controls.addRow(
+            position_label,
+            self._title_position_combo,
+        )
+        title_layout.addLayout(
+            title_position_controls
         )
 
         color_controls = QFormLayout()
@@ -280,8 +416,20 @@ class YearPhotoScatterSettingsWidget(
         color_controls.addRow(font_label, self._title_font_combo)
         color_controls.addRow(size_label, self._title_font_size_spin)
 
-        layout.addLayout(
+        title_layout.addLayout(
             color_controls
+        )
+
+        layout.addWidget(
+            title_group
+        )
+
+        self._title_visible_check.toggled.connect(
+            self._change_title_visibility
+        )
+
+        self._title_position_combo.currentIndexChanged.connect(
+            self._change_title_position
         )
 
         self._title_font_combo.currentIndexChanged.connect(
@@ -291,6 +439,8 @@ class YearPhotoScatterSettingsWidget(
         self._title_font_size_spin.valueChanged.connect(
             self._change_title_font_size
         )
+
+        self._update_title_controls_enabled()
 
         layout.addSpacing(12)
         layout.addWidget(
@@ -323,6 +473,12 @@ class YearPhotoScatterSettingsWidget(
             ),
             "title_color": (
                 self._title_color
+            ),
+            "title_visible": (
+                self._title_visible
+            ),
+            "title_position": (
+                self._title_position
             ),
         }
 
@@ -422,6 +578,61 @@ class YearPhotoScatterSettingsWidget(
                 color=self._title_color,
             )
         )
+
+    def _update_title_controls_enabled(
+        self,
+    ) -> None:
+        enabled = self._title_visible
+
+        self._title_position_combo.setEnabled(
+            enabled
+        )
+        self._title_color_button.setEnabled(
+            enabled
+        )
+        self._title_font_combo.setEnabled(
+            enabled
+        )
+        self._title_font_size_spin.setEnabled(
+            enabled
+        )
+
+    def _change_title_visibility(
+        self,
+        checked: bool,
+    ) -> None:
+        self._title_visible = bool(
+            checked
+        )
+        self._update_title_controls_enabled()
+        self._save_state()
+        self._request_preview()
+
+    def _change_title_position(
+        self,
+        index: int,
+    ) -> None:
+        position = (
+            self._title_position_combo.itemData(
+                index
+            )
+        )
+        if position not in {
+            "very_high",
+            "high",
+            "upper_middle",
+            "center",
+            "lower_middle",
+            "low",
+            "very_low",
+        }:
+            return
+
+        self._title_position = str(
+            position
+        )
+        self._save_state()
+        self._request_preview()
 
     def _choose_title_color(
         self,

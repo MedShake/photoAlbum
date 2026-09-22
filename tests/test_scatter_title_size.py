@@ -173,3 +173,168 @@ def test_title_editor_preserves_and_reloads_settings(monkeypatch):
 
     editor.close()
     reopened.close()
+
+
+def test_title_visibility_and_position_defaults(monkeypatch):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(template_id="year-photo-scatter"),
+        [],
+        translator=Translator("fr"),
+    )
+
+    assert editor._title_visible_check.isChecked()
+    assert (
+        editor._title_position_combo.currentData()
+        == "center"
+    )
+    assert editor._title_position_combo.isEnabled()
+    assert editor._title_color_button.isEnabled()
+    assert editor._title_font_combo.isEnabled()
+    assert editor._title_font_size_spin.isEnabled()
+
+    editor.close()
+
+
+def test_title_position_combo_exposes_seven_ordered_positions(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(template_id="year-photo-scatter"),
+        [],
+        translator=Translator("fr"),
+    )
+
+    assert [
+        editor._title_position_combo.itemData(index)
+        for index in range(
+            editor._title_position_combo.count()
+        )
+    ] == [
+        "very_high",
+        "high",
+        "upper_middle",
+        "center",
+        "lower_middle",
+        "low",
+        "very_low",
+    ]
+
+    assert [
+        editor._title_position_combo.itemText(index)
+        for index in range(
+            editor._title_position_combo.count()
+        )
+    ] == [
+        "Très haute",
+        "Haute",
+        "Mi-haute",
+        "Centrée",
+        "Mi-basse",
+        "Basse",
+        "Très basse",
+    ]
+
+    editor.close()
+
+
+def test_title_visibility_preserves_style_and_position(monkeypatch):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(
+            template_id="year-photo-scatter",
+            settings={
+                "scatter": {
+                    "title_color": "#123456",
+                    "title_font_size": 38.5,
+                    "title_position": "very_low",
+                }
+            },
+        ),
+        [],
+        translator=Translator("fr"),
+    )
+
+    editor._title_visible_check.setChecked(False)
+
+    settings = editor.instance().settings["scatter"]
+
+    assert settings["title_visible"] is False
+    assert settings["title_position"] == "very_low"
+    assert settings["title_color"] == "#123456"
+    assert settings["title_font_size"] == 38.5
+
+    assert not editor._title_position_combo.isEnabled()
+    assert not editor._title_color_button.isEnabled()
+    assert not editor._title_font_combo.isEnabled()
+    assert not editor._title_font_size_spin.isEnabled()
+
+    editor._title_visible_check.setChecked(True)
+
+    settings = editor.instance().settings["scatter"]
+    assert settings["title_visible"] is True
+    assert settings["title_position"] == "very_low"
+    assert settings["title_color"] == "#123456"
+    assert settings["title_font_size"] == 38.5
+
+    editor.close()
+
+
+def test_title_position_is_persisted_and_reloaded(monkeypatch):
+    monkeypatch.setattr(
+        YearPhotoScatterSettingsWidget,
+        "_request_preview",
+        lambda self: None,
+    )
+
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance(template_id="year-photo-scatter"),
+        [],
+        translator=Translator("fr"),
+    )
+
+    index = editor._title_position_combo.findData(
+        "very_high"
+    )
+    assert index >= 0
+
+    editor._title_position_combo.setCurrentIndex(
+        index
+    )
+
+    assert (
+        editor.instance().settings["scatter"][
+            "title_position"
+        ]
+        == "very_high"
+    )
+
+    reopened = YearPhotoScatterSettingsWidget(
+        editor.instance(),
+        [],
+        translator=Translator("fr"),
+    )
+
+    assert (
+        reopened._title_position_combo.currentData()
+        == "very_high"
+    )
+
+    editor.close()
+    reopened.close()

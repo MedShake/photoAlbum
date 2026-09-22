@@ -120,6 +120,8 @@ def test_scatter_title_style_does_not_invalidate_raster_cache_key():
                 "title_font_size": 72,
                 "title_font_family": "Sans Serif",
                 "title_color": "#ffffff",
+                "title_visible": True,
+                "title_position": "very_high",
             }
         },
     )
@@ -134,6 +136,8 @@ def test_scatter_title_style_does_not_invalidate_raster_cache_key():
                 "title_font_size": 38.5,
                 "title_font_family": "Serif",
                 "title_color": "#000000",
+                "title_visible": False,
+                "title_position": "very_low",
             }
         },
     )
