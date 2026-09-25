@@ -1,5 +1,6 @@
 from photoalbum.album.settings import AlbumStructureSettings, DividerSettings
-from photoalbum.template_engine.defaults import DEFAULT_TEMPLATES
+from photoalbum.template_engine.defaults import default_template_choices
+from photoalbum.template_engine import create_template_registry
 
 def _settings(enabled=True):
     value = object.__new__(AlbumStructureSettings)
@@ -10,7 +11,7 @@ def _settings(enabled=True):
     return value
 
 def test_default_year_divider_is_calendar_index():
-    assert DEFAULT_TEMPLATES.year_divider == "calendar-index"
+    assert default_template_choices(create_template_registry()).year_divider == "calendar-index"
 
 def test_year_divider_is_available_for_single_year():
     settings = _settings()

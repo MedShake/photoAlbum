@@ -37,10 +37,6 @@ class PlannedPage:
     photos: tuple[Photo, ...] = ()
     photo_capacity: int = 0
 
-    # Editorial metadata used by divider templates.
-    # Filled from the photos belonging to the same period.
-    cities: tuple[str, ...] = ()
-
     # Original configurable occurrence when this page comes
     # from a PageInstance.
     page_instance: PageInstance | None = None
@@ -119,71 +115,7 @@ class PaginationEngine:
             result
         )
 
-        self._populate_month_divider_cities(
-            result
-        )
-
         return result
-
-    @staticmethod
-    def _populate_month_divider_cities(
-        result: PaginationResult,
-    ) -> None:
-        from dataclasses import replace
-
-        cities_by_period: dict[
-            tuple[int, int],
-            list[str],
-        ] = {}
-
-        for page in result.pages:
-            if (
-                page.kind != PlanItemKind.PHOTO_GROUP
-                or page.year is None
-                or page.month is None
-            ):
-                continue
-
-            key = (
-                page.year,
-                page.month,
-            )
-
-            cities = cities_by_period.setdefault(
-                key,
-                [],
-            )
-
-            for photo in page.photos:
-                city = (
-                    photo.city.strip()
-                    if photo.city
-                    else None
-                )
-
-                if city and city not in cities:
-                    cities.append(city)
-
-        for index, page in enumerate(result.pages):
-            if (
-                page.kind != PlanItemKind.MONTH_DIVIDER
-                or page.year is None
-                or page.month is None
-            ):
-                continue
-
-            result.pages[index] = replace(
-                page,
-                cities=tuple(
-                    cities_by_period.get(
-                        (
-                            page.year,
-                            page.month,
-                        ),
-                        [],
-                    )
-                ),
-            )
 
     def _append_photo_pages(
         self,

@@ -43,6 +43,7 @@ def routed_pack(monkeypatch):
         authors=(),
         templates=(definition,),
         modules=(),
+        settings_editor="routing_options:edit_settings",
         translation_catalogs={"fr": {
             TRANSLATION_KEY: "Nom traduit",
             "routing.probe": "Traduction reçue",
@@ -104,7 +105,8 @@ def test_page_renderer_receives_its_pack_translator(routed_pack):
         photo_slots=(),
     )
 
-    rendered = PageRenderer(translator=Translator("fr"))._paint_template_page(
+    rendered = PageRenderer(translator=Translator("fr")).paint_template(
+        instance=composition.page.page_instance,
         painter=None,
         composition=composition,
         target_rect=None,
@@ -167,7 +169,7 @@ def test_template_label_comes_from_its_pack_catalog(routed_pack):
 def test_pack_settings_editor_receives_its_pack_translator(
     routed_pack, monkeypatch
 ):
-    module_name = f"photoalbum.templates.{PACK_ID}"
+    module_name = "routing_options"
     module = ModuleType(module_name)
 
     def edit_settings(settings, *, translator, parent=None):

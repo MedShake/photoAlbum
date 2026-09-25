@@ -23,24 +23,6 @@ class DividerPlacement(str, Enum):
 
 
 @dataclass(frozen=True)
-class CoverScatterSettings:
-    seeds: tuple[int, ...] = (0,)
-    selected_seed_index: int = 0
-
-    @property
-    def seed(self) -> int:
-        if not self.seeds:
-            return 0
-
-        return self.seeds[
-            min(
-                max(self.selected_seed_index, 0),
-                len(self.seeds) - 1,
-            )
-        ]
-
-
-@dataclass(frozen=True)
 class PageInstance:
     template_id: str
 
@@ -64,46 +46,6 @@ class PageInstance:
         )
 
 
-def scatter_settings_from_instance(
-    instance: PageInstance,
-) -> CoverScatterSettings:
-    data = instance.settings.get("scatter", {})
-
-    if not isinstance(data, dict):
-        data = {}
-
-    seeds = tuple(
-        int(value)
-        for value in data.get("seeds", [0])
-    ) or (0,)
-
-    return CoverScatterSettings(
-        seeds=seeds,
-        selected_seed_index=int(
-            data.get(
-                "selected_seed_index",
-                0,
-            )
-        ),
-    )
-
-
-def instance_with_scatter_settings(
-    instance: PageInstance,
-    scatter: CoverScatterSettings,
-) -> PageInstance:
-    settings = dict(instance.settings)
-
-    settings["scatter"] = {
-        "seeds": list(scatter.seeds),
-        "selected_seed_index": (
-            scatter.selected_seed_index
-        ),
-    }
-
-    return instance.with_settings(settings)
-
-
 @dataclass(frozen=True, init=False)
 class CoverSettings:
     position: CoverPosition
@@ -115,7 +57,6 @@ class CoverSettings:
         template_id: str | None = None,
         *,
         page: PageInstance | None = None,
-        scatter: CoverScatterSettings | None = None,
     ) -> None:
         if page is None:
             if template_id is None:
@@ -126,12 +67,6 @@ class CoverSettings:
             page = PageInstance(
                 template_id=template_id,
             )
-
-            if scatter is not None:
-                page = instance_with_scatter_settings(
-                    page,
-                    scatter,
-                )
 
         object.__setattr__(
             self,
@@ -151,13 +86,6 @@ class CoverSettings:
     @property
     def instance_id(self) -> str:
         return self.page.instance_id
-
-    @property
-    def scatter(self) -> CoverScatterSettings:
-        return scatter_settings_from_instance(
-            self.page
-        )
-
 
 # A special page is now a real independent page occurrence.
 SpecialPage = PageInstance
@@ -212,21 +140,13 @@ class DividerSettings:
         return self.page.instance_id
 
 
-@dataclass(frozen=True)
-class PhotoCaptionSettings:
-    show_datetime: bool = True
-    show_location: bool = True
-
-
 @dataclass(frozen=True, init=False)
 class PhotoPageSettings:
     page: PageInstance
-    caption: PhotoCaptionSettings
 
     def __init__(
         self,
         template_id: str | None = None,
-        caption: PhotoCaptionSettings | None = None,
         *,
         page: PageInstance | None = None,
     ) -> None:
@@ -240,18 +160,10 @@ class PhotoPageSettings:
                 template_id=template_id
             )
 
-        if caption is None:
-            caption = PhotoCaptionSettings()
-
         object.__setattr__(
             self,
             "page",
             page,
-        )
-        object.__setattr__(
-            self,
-            "caption",
-            caption,
         )
 
     @property

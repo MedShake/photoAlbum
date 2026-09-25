@@ -1,282 +1,77 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from inspect import Parameter, signature
-
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPainter
 
-from photoalbum.rendering.fonts import resolve_font_family
-
 from photoalbum.album.composition import PageComposition
-from photoalbum.album.planning import PlanItemKind
-from photoalbum.i18n import Translator
-from photoalbum.template_engine import (
-    template_extension_registry,
-    translator_for_template,
-)
+from photoalbum.rendering.fonts import resolve_font_family
+from photoalbum.template_engine import template_extension_registry, translator_for_template
+from photoalbum.template_engine.instances import create_template_instance
 
 
 class PageRenderer:
-    """
-    Common QPainter renderer for an album page.
+    """One template rendering contract for settings previews, album previews and PDF."""
 
-    It contains the rendering orchestration shared by the GUI
-    preview and the future PDF exporter.
-
-    Device-specific concerns remain injected by the caller:
-    geometry, image cache and optional special-page render service.
-    """
-
-    def __init__(
-        self,
-        *,
-        translator: Translator,
-    ) -> None:
+    def __init__(self, *, translator):
         self._translator = translator
 
-    def paint(
-        self,
-        *,
-        painter: QPainter,
-        composition: PageComposition,
-        target_rect: QRect,
-        width: int,
-        height: int,
-        page_width_mm: float,
-        page_height_mm: float,
-        font_pixel_size: Callable[[float], int],
-        pixel_rect: Callable,
-        thumbnail_cache,
-        project_photos=(),
-        album_pages=(),
-        template_pack_settings=None,
-        render_service=None,
-        set_waiting_key=None,
-        paint_fallback=None,
-        show_empty_slots: bool = True,
-    ) -> None:
-        page = composition.page
-
-        rendered = False
-
-        if (
-            page.kind == PlanItemKind.SPECIAL_PAGE
-            and page.page_instance is not None
-        ):
-            rendered = self._paint_special_page(
-                painter=painter,
-                composition=composition,
-                target_rect=target_rect,
-                width=width,
-                height=height,
-                page_width_mm=page_width_mm,
-                page_height_mm=page_height_mm,
-                font_pixel_size=font_pixel_size,
-                project_photos=project_photos,
-                album_pages=album_pages,
-                template_pack_settings=template_pack_settings,
-                render_service=render_service,
-                set_waiting_key=set_waiting_key,
-                thumbnail_cache=thumbnail_cache,
-            )
-
-        elif page.kind in (
-            PlanItemKind.PHOTO_GROUP,
-            PlanItemKind.MONTH_DIVIDER,
-            PlanItemKind.YEAR_DIVIDER,
-        ):
-            rendered = self._paint_template_page(
-                painter=painter,
-                composition=composition,
-                target_rect=target_rect,
-                width=width,
-                height=height,
-                page_width_mm=page_width_mm,
-                page_height_mm=page_height_mm,
-                font_pixel_size=font_pixel_size,
-                pixel_rect=pixel_rect,
-                thumbnail_cache=thumbnail_cache,
-                album_pages=album_pages,
-                template_pack_settings=template_pack_settings,
-                render_service=render_service,
-                set_waiting_key=set_waiting_key,
-                show_empty_slots=show_empty_slots,
-                project_photos=project_photos,
-            )
-
-        if not rendered and paint_fallback is not None:
-            paint_fallback(
-                painter
-            )
-
-        self._paint_page_number(
-            painter=painter,
-            composition=composition,
-            font_pixel_size=font_pixel_size,
-            pixel_rect=pixel_rect,
-        )
-
-    def _paint_special_page(
-        self,
-        *,
-        painter,
-        composition,
-        target_rect,
-        width,
-        height,
-        page_width_mm,
-        page_height_mm,
-        font_pixel_size,
-        project_photos,
-        album_pages,
-        template_pack_settings,
-        render_service,
-        set_waiting_key,
-        thumbnail_cache,
+    def paint_template(
+        self, *, instance, painter, target_rect, width, height,
+        page_width_mm, page_height_mm, font_pixel_size,
+        photos=(), project_photos=None, composition=None,
+        pixel_rect=None, thumbnail_cache=None, album_pages=(),
+        template_pack_settings=None, render_service=None,
+        set_waiting_key=None, show_empty_slots=True,
     ) -> bool:
-        instance = composition.page.page_instance
-
         if instance is None:
             return False
-
-        extension = template_extension_registry.get(
-            instance.template_id
-        )
-
-        renderer = (
-            extension.widget_renderer
-            if extension is not None
-            else None
-        )
-
-        if renderer is None:
+        extension = template_extension_registry.get(instance.template_id)
+        if extension is None or extension.widget_renderer is None:
             return False
-
-        paint_kwargs = dict(
-            painter=painter,
-            instance=instance,
-            photos=project_photos,
-            target_rect=target_rect,
-            width=width,
-            height=height,
-            translator=translator_for_template(
-                instance.template_id, self._translator
-            ),
-            render_service=render_service,
-            set_waiting_key=set_waiting_key,
-            font_pixel_size=font_pixel_size,
-            page_width_mm=page_width_mm,
-            page_height_mm=page_height_mm,
-            album_pages=album_pages,
-            thumbnail_cache=thumbnail_cache,
+        project_photos = photos if project_photos is None else project_photos
+        extension.widget_renderer.paint(
+            painter=painter, instance=instance,
+            photos=project_photos if extension.photo_scope == "album" else photos,
+            project_photos=project_photos, composition=composition,
+            target_rect=target_rect, width=width, height=height,
+            page_width_mm=page_width_mm, page_height_mm=page_height_mm,
+            font_pixel_size=font_pixel_size, pixel_rect=pixel_rect,
+            thumbnail_cache=thumbnail_cache, album_pages=album_pages,
+            template_pack_settings=template_pack_settings or {},
+            translator=translator_for_template(instance.template_id, self._translator),
+            render_service=render_service, set_waiting_key=set_waiting_key,
+            show_empty_slots=show_empty_slots,
         )
-
-        if (
-            "template_pack_settings"
-            in signature(renderer.paint).parameters
-        ):
-            paint_kwargs["template_pack_settings"] = (
-                template_pack_settings or {}
-            )
-
-        renderer.paint(
-            **paint_kwargs
-        )
-
         return True
 
-    def _paint_template_page(
-        self,
-        *,
-        painter,
-        composition,
-        target_rect,
-        width,
-        height,
-        page_width_mm,
-        page_height_mm,
-        font_pixel_size,
-        pixel_rect,
-        thumbnail_cache,
-        album_pages,
-        template_pack_settings,
-        render_service,
-        set_waiting_key,
-        show_empty_slots,
-        project_photos=None,
-    ) -> bool:
+    def paint(
+        self, *, painter, composition, target_rect, width, height,
+        page_width_mm, page_height_mm, font_pixel_size, pixel_rect,
+        thumbnail_cache, project_photos=(), album_pages=(),
+        template_pack_settings=None, render_service=None,
+        set_waiting_key=None, paint_fallback=None, show_empty_slots=True,
+    ) -> None:
         page = composition.page
-
-        extension = template_extension_registry.get(
-            page.template_id
+        instance = page.page_instance
+        if instance is None and page.template_id is not None:
+            instance = create_template_instance(page.template_id)
+        rendered = self.paint_template(
+            instance=instance, painter=painter, composition=composition,
+            target_rect=target_rect, width=width, height=height,
+            page_width_mm=page_width_mm, page_height_mm=page_height_mm,
+            font_pixel_size=font_pixel_size, pixel_rect=pixel_rect,
+            photos=page.photos, project_photos=project_photos,
+            thumbnail_cache=thumbnail_cache, album_pages=album_pages,
+            template_pack_settings=template_pack_settings,
+            render_service=render_service, set_waiting_key=set_waiting_key,
+            show_empty_slots=show_empty_slots,
         )
-
-        renderer = (
-            extension.widget_renderer
-            if extension is not None
-            else None
+        if not rendered and paint_fallback is not None:
+            paint_fallback(painter)
+        self._paint_page_number(
+            painter=painter, composition=composition,
+            font_pixel_size=font_pixel_size, pixel_rect=pixel_rect,
         )
-
-        if renderer is None:
-            return False
-
-        paint_kwargs = dict(
-            painter=painter,
-            instance=page.page_instance,
-            photos=page.photos,
-            target_rect=target_rect,
-            width=width,
-            height=height,
-            translator=translator_for_template(
-                page.template_id, self._translator
-            ),
-            render_service=render_service,
-            set_waiting_key=set_waiting_key,
-            font_pixel_size=font_pixel_size,
-            page_width_mm=page_width_mm,
-            page_height_mm=page_height_mm,
-            album_pages=album_pages,
-            composition=composition,
-            thumbnail_cache=thumbnail_cache,
-            pixel_rect=pixel_rect,
-        )
-
-        parameters = signature(
-            renderer.paint
-        ).parameters
-
-        if (
-            "template_pack_settings" in parameters
-            or any(
-                parameter.kind is Parameter.VAR_KEYWORD
-                for parameter in parameters.values()
-            )
-        ):
-            paint_kwargs["template_pack_settings"] = (
-                template_pack_settings or {}
-            )
-
-        if "project_photos" in parameters:
-            paint_kwargs["project_photos"] = (
-                project_photos
-                if project_photos is not None
-                else page.photos
-            )
-
-        # Empty slots only concern photo-page renderers.
-        # Other template renderers must keep their existing
-        # paint() contract.
-        if composition.photo_slots:
-            paint_kwargs["show_empty_slots"] = (
-                show_empty_slots
-            )
-
-        renderer.paint(
-            **paint_kwargs
-        )
-
-        return True
 
     @staticmethod
     def _paint_page_number(

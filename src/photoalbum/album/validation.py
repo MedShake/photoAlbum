@@ -15,6 +15,16 @@ class AlbumSettingsValidator:
         self,
         settings: AlbumStructureSettings,
     ) -> None:
+        from photoalbum.template_engine.instances import validate_template_instance
+
+        instances = [cover.page for cover in settings.covers.values()]
+        instances.extend((settings.month_dividers.page, settings.year_dividers.page,
+                          settings.photo_pages.page))
+        instances.extend(settings.front_matter)
+        instances.extend(settings.back_matter)
+        for instance in instances:
+            validate_template_instance(instance)
+
         for cover in settings.covers.values():
             self._require_kind(
                 cover.template_id,
@@ -60,4 +70,3 @@ class AlbumSettingsValidator:
                 f"Template {template_id!r} cannot be used as "
                 f"{expected_kind.value!r}."
             )
-

@@ -11,7 +11,9 @@ class MonthDividerSimpleWidgetRenderer:
     def paint(self, *, painter: QPainter, instance, photos, target_rect, width: int, height: int,
               translator, render_service, set_waiting_key, font_pixel_size, page_width_mm: float=210.0,
               page_height_mm: float=297.0, album_pages=(), composition=None, thumbnail_cache=None,
-              pixel_rect=None, template_pack_settings=None) -> None:
+              pixel_rect=None, template_pack_settings=None,
+        **kwargs,
+    ) -> None:
         page=getattr(composition,"page",None) if composition is not None else None
         month=getattr(page,"month",None)
         if month is None: return

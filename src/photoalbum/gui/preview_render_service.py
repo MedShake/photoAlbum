@@ -6,15 +6,13 @@ from uuid import uuid4
 
 from PySide6.QtCore import (
     QObject,
+    QRunnable,
     QThreadPool,
     Signal,
 )
 from PySide6.QtGui import QPixmap
 
 from photoalbum.album import PageInstance
-from photoalbum.rendering.cover_render_worker import (
-    CoverRenderWorker,
-)
 from photoalbum.template_engine import (
     template_extension_registry,
     translator_for_template,
@@ -50,8 +48,8 @@ class PreviewRenderService(QObject):
     Shared asynchronous preview cache.
 
     Important:
-    CoverRenderWorker request_id remains a plain str because
-    its Qt signals are typed for a string identifier.
+    Worker request_id remains a plain str because the preview
+    protocol uses Qt signals with a string identifier.
 
     PreviewRenderKey never crosses the worker Qt signal.
     """
@@ -81,7 +79,7 @@ class PreviewRenderService(QObject):
 
         self._workers: dict[
             str,
-            CoverRenderWorker,
+            QRunnable,
         ] = {}
 
         self._request_keys: dict[

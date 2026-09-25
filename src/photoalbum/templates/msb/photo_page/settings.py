@@ -37,7 +37,6 @@ from photoalbum.album.pagination import (
 )
 from photoalbum.album.planning import PlanItemKind
 from photoalbum.album.settings import (
-    PhotoCaptionSettings,
     PhotoPageSettings,
 )
 from photoalbum.rendering.fonts import (
@@ -342,10 +341,6 @@ class PhotoPageSettingsWidget(
         )
         photo_settings = PhotoPageSettings(
             page=self._instance,
-            caption=PhotoCaptionSettings(
-                show_datetime=caption_show_datetime(self._instance.settings),
-                show_location=caption_show_location(self._instance.settings),
-            ),
         )
         composition = PageComposer().compose(
             page, photo_settings, PageNumberSettings(enabled=False),

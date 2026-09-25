@@ -1,3 +1,4 @@
+from photoalbum.templates.msb.month_divider_classic.layout import month_cities
 from datetime import datetime
 from pathlib import Path
 
@@ -805,7 +806,7 @@ def test_month_divider_collects_unique_cities():
         if page.kind == PlanItemKind.MONTH_DIVIDER
     )
 
-    assert divider.cities == (
+    assert month_cities(divider, result.pages) == (
         "Paris",
         "Lyon",
     )
@@ -847,5 +848,5 @@ def test_month_divider_accepts_month_without_city():
         if page.kind == PlanItemKind.MONTH_DIVIDER
     )
 
-    assert divider.cities == ()
+    assert month_cities(divider, result.pages) == ()
 

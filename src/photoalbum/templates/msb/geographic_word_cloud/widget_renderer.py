@@ -40,6 +40,7 @@ class GeographicWordCloudWidgetRenderer:
         thumbnail_cache=None,
         pixel_rect=None,
         template_pack_settings=None,
+        **kwargs,
     ) -> None:
         settings = instance.settings.get(
             "geographic_word_cloud",

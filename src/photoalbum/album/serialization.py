@@ -11,7 +11,6 @@ from .settings import (
     PageInstance,
     PageNumberSettings,
     PageOrientation,
-    PhotoCaptionSettings,
     PhotoPageSettings,
     PrintSettings,
 )
@@ -39,29 +38,11 @@ def _instance_from_data(
     )
 
 
-def _divider_instance_from_data(
-    data: dict,
-) -> PageInstance:
-    page_data = data.get("page")
-
-    if isinstance(page_data, dict):
-        return _instance_from_data(
-            page_data
-        )
-
-    # Projects written before divider pages became
-    # independent PageInstance objects.
-    return PageInstance(
-        template_id=str(
-            data["template_id"]
-        )
-    )
-
-
 def album_settings_to_json(
     settings: AlbumStructureSettings,
 ) -> str:
     data = {
+        "schema_version": 2,
         "covers": {
             position.value: _instance_to_data(
                 cover.page
@@ -94,14 +75,6 @@ def album_settings_to_json(
             "page": _instance_to_data(
                 settings.photo_pages.page
             ),
-            "caption": {
-                "show_datetime": (
-                    settings.photo_pages.caption.show_datetime
-                ),
-                "show_location": (
-                    settings.photo_pages.caption.show_location
-                ),
-            },
         },
 
         "page_numbers": {
@@ -142,39 +115,12 @@ def album_settings_to_json(
 
 
 
-def _photo_page_settings_from_data(
-    photo_data: dict,
-    caption_data: dict,
-) -> PhotoPageSettings:
-    if isinstance(photo_data.get("page"), dict):
-        page = _instance_from_data(photo_data["page"])
-    else:
-        page = PageInstance(
-            template_id=str(photo_data["template_id"])
-        )
-
-    return PhotoPageSettings(
-        page=page,
-        caption=PhotoCaptionSettings(
-            show_datetime=bool(
-                caption_data.get(
-                    "show_datetime",
-                    True,
-                )
-            ),
-            show_location=bool(
-                caption_data.get(
-                    "show_location",
-                    True,
-                )
-            ),
-        ),
-    )
-
 def album_settings_from_json(
     value: str,
 ) -> AlbumStructureSettings:
     data = json.loads(value)
+    if data.get("schema_version") != 2:
+        raise ValueError("Unsupported album settings schema; recreate this beta album's settings.")
 
     covers = {
         position: CoverSettings(
@@ -189,7 +135,6 @@ def album_settings_from_json(
     month_data = data["month_dividers"]
     year_data = data["year_dividers"]
     photo_data = data["photo_pages"]
-    caption_data = photo_data.get("caption", {})
     page_number_data = data["page_numbers"]
     print_data = data["print_settings"]
 
@@ -200,9 +145,7 @@ def album_settings_from_json(
             enabled=bool(
                 month_data["enabled"]
             ),
-            page=_divider_instance_from_data(
-                month_data
-            ),
+            page=_instance_from_data(month_data["page"]),
             placement=DividerPlacement(
                 month_data["placement"]
             ),
@@ -212,18 +155,13 @@ def album_settings_from_json(
             enabled=bool(
                 year_data["enabled"]
             ),
-            page=_divider_instance_from_data(
-                year_data
-            ),
+            page=_instance_from_data(year_data["page"]),
             placement=DividerPlacement(
                 year_data["placement"]
             ),
         ),
 
-        photo_pages=_photo_page_settings_from_data(
-            photo_data,
-            caption_data,
-        ),
+        photo_pages=PhotoPageSettings(page=_instance_from_data(photo_data["page"])),
 
         page_numbers=PageNumberSettings(
             enabled=bool(

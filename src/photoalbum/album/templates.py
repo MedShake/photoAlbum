@@ -168,6 +168,7 @@ class TemplateRegistry:
         templates: list[TemplateDefinition] | None = None,
     ) -> None:
         self._templates: dict[str, TemplateDefinition] = {}
+        self.pack_defaults: dict[str, dict[str, str]] = {}
 
         for template in templates or []:
             self.register(template)

@@ -1,10 +1,10 @@
+from photoalbum.templates.msb.photo_page.caption_style import caption_show_datetime, caption_show_location
 from dataclasses import replace
 
 from PySide6.QtWidgets import QApplication
 
 from photoalbum.album import (
     PageNumberSettings,
-    PhotoCaptionSettings,
 )
 from photoalbum.template_engine import create_template_registry
 
@@ -29,8 +29,8 @@ def test_display_options_are_enabled_by_default():
 
     settings = widget.settings()
 
-    assert settings.photo_pages.caption.show_datetime
-    assert settings.photo_pages.caption.show_location
+    assert caption_show_datetime(settings.photo_pages.page.settings)
+    assert caption_show_location(settings.photo_pages.page.settings)
     assert settings.page_numbers.enabled
 
 
@@ -43,10 +43,7 @@ def test_display_options_can_be_restored():
         original,
         photo_pages=replace(
             original.photo_pages,
-            caption=PhotoCaptionSettings(
-                show_datetime=False,
-                show_location=True,
-            ),
+            page=original.photo_pages.page.with_settings({"photo_caption": {"show_datetime": False, "show_location": True}}),
         ),
         page_numbers=PageNumberSettings(
             enabled=False,
@@ -67,6 +64,6 @@ def test_reset_restores_display_defaults():
 
     settings = widget.settings()
 
-    assert settings.photo_pages.caption.show_datetime
-    assert settings.photo_pages.caption.show_location
+    assert caption_show_datetime(settings.photo_pages.page.settings)
+    assert caption_show_location(settings.photo_pages.page.settings)
     assert settings.page_numbers.enabled

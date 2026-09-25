@@ -19,7 +19,7 @@ User documentation embedded in Photo Album is stored in:
 
 Developer documentation is available in:
 
-    docs/simplex-template-pack.md
+    docs/developer.md
 
 For the general template-pack architecture, see:
 

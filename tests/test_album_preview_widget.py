@@ -1,3 +1,4 @@
+from photoalbum.album import PageInstance
 from dataclasses import replace
 from pathlib import Path
 
@@ -16,7 +17,6 @@ from photoalbum.album import (
     PageNumberSettings,
     PageSide,
     PaginationResult,
-    PhotoCaptionSettings,
     PhotoPageSettings,
     PlanItemKind,
     PlannedPage,
@@ -71,13 +71,7 @@ def make_settings() -> AlbumStructureSettings:
             enabled=True,
             template_id="year-divider-classic",
         ),
-        photo_pages=PhotoPageSettings(
-            template_id="photo-page-1",
-            caption=PhotoCaptionSettings(
-                show_datetime=True,
-                show_location=True,
-            ),
-        ),
+        photo_pages=PhotoPageSettings(page=PageInstance(template_id='photo-page-1', settings={'photo_caption': {'show_datetime': True, 'show_location': True}})),
         page_numbers=PageNumberSettings(
             enabled=True,
         ),

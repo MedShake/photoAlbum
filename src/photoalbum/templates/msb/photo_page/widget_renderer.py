@@ -47,7 +47,8 @@ class PhotoPageWidgetRenderer:
         pixel_rect=None,
         show_empty_slots: bool = True,
             template_pack_settings=None,
-) -> None:
+        **kwargs,
+    ) -> None:
         if (
             composition is None
             or thumbnail_cache is None

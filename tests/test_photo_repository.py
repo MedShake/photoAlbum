@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from photoalbum.album.composition import photo_location_text
+from photoalbum.templates.msb.photo_page.composition import photo_location_text
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import (
     DateSource,

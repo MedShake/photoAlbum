@@ -1,9 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.album.composition import (
-    build_photo_caption,
-)
+from photoalbum.templates.msb.photo_page.composition import build_photo_caption
 from photoalbum.album.settings import (
     PhotoPageSettings,
 )
@@ -83,9 +81,7 @@ def test_editorial_caption_is_part_of_album_caption():
     assert content.line_count >= 1
 
 def test_caption_and_datetime_share_one_display_line():
-    from photoalbum.album.composition import (
-        PhotoCaptionContent,
-    )
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent
 
     content = PhotoCaptionContent(
         capture_datetime=datetime(
@@ -103,9 +99,7 @@ def test_caption_and_datetime_share_one_display_line():
 
 
 def test_caption_without_location_uses_one_display_line():
-    from photoalbum.album.composition import (
-        PhotoCaptionContent,
-    )
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent
 
     content = PhotoCaptionContent(
         capture_datetime=datetime(
@@ -122,9 +116,7 @@ def test_caption_without_location_uses_one_display_line():
 
 
 def test_caption_without_datetime_still_uses_first_line():
-    from photoalbum.album.composition import (
-        PhotoCaptionContent,
-    )
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent
 
     content = PhotoCaptionContent(
         location_text="Saint-Malo",

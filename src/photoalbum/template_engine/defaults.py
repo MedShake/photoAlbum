@@ -1,10 +1,11 @@
-from __future__ import annotations
-
+"""Application policy and pack-declared initial album roles."""
 from dataclasses import dataclass
+
+DEFAULT_TEMPLATE_PACK = "msb"
 
 
 @dataclass(frozen=True)
-class BuiltinTemplateDefaults:
+class AlbumTemplateDefaults:
     front_cover: str
     inside_front_cover: str
     inside_back_cover: str
@@ -14,12 +15,13 @@ class BuiltinTemplateDefaults:
     month_divider: str
 
 
-DEFAULT_TEMPLATES = BuiltinTemplateDefaults(
-    front_cover="year-photo-scatter",
-    inside_front_cover="geographic-word-cloud",
-    inside_back_cover="dedication",
-    back_cover="geographic-word-cloud",
-    photo_page="photo-page-2",
-    year_divider="calendar-index",
-    month_divider="month-divider-classic",
-)
+def default_template_choices(registry) -> AlbumTemplateDefaults:
+    choices = registry.pack_defaults.get(DEFAULT_TEMPLATE_PACK)
+    if choices is None:
+        raise ValueError(f"Default template pack {DEFAULT_TEMPLATE_PACK!r} is missing.")
+    try:
+        return AlbumTemplateDefaults(**choices)
+    except TypeError as exc:
+        raise ValueError(
+            f"Default template pack {DEFAULT_TEMPLATE_PACK!r} must declare all album roles."
+        ) from exc

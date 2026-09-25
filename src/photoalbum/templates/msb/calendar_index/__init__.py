@@ -17,6 +17,7 @@ def register() -> None:
     register_template_extension(
         PageTemplateExtension(
             template_id="calendar-index",
+            photo_scope="album",
             settings_editor_type=(
                 CalendarIndexSettingsWidget
             ),

@@ -45,6 +45,7 @@ class SimpleLabelWidgetRenderer:
         composition=None,
         thumbnail_cache=None,
         pixel_rect=None,
+        **kwargs,
     ) -> None:
         painter.setPen(
             Qt.GlobalColor.darkGray

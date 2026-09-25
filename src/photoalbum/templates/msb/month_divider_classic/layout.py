@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .composition import NormalizedRect
+from photoalbum.album.composition import NormalizedRect
 
 
 @dataclass(frozen=True)
@@ -66,3 +66,21 @@ def classic_month_divider_layout(
             height=0.65,
         ),
     )
+
+
+def month_cities(page, album_pages):
+    """Ordered, unique cities from the photographs printed in this period."""
+    sample = getattr(page, "cities", None)
+    if sample is not None:
+        return tuple(sample)
+    from photoalbum.album.planning import PlanItemKind
+    cities = []
+    for candidate in album_pages:
+        if (candidate.kind != PlanItemKind.PHOTO_GROUP
+                or candidate.year != page.year or candidate.month != page.month):
+            continue
+        for photo in candidate.photos:
+            city = photo.city.strip() if photo.city else None
+            if city and city not in cities:
+                cities.append(city)
+    return tuple(cities)

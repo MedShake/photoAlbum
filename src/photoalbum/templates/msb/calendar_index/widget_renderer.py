@@ -38,6 +38,7 @@ class CalendarIndexWidgetRenderer:
         pixel_rect=None,
         template_pack_settings=None,
         project_photos=None,
+        **kwargs,
     ) -> None:
         photos = tuple(
             project_photos

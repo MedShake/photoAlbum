@@ -25,6 +25,7 @@ class YearPhotoScatterRenderer:
         composition,
         target_rect: QRect,
         image_cache,
+        **kwargs,
     ) -> None:
         width = target_rect.width()
         height = target_rect.height()

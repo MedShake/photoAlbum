@@ -322,10 +322,6 @@ For the general template-pack architecture, see:
 - `docs/template-packs.md`;
 - `docs/gui-architecture.md`.
 
-For a smaller independent pack example, see:
-
-- `docs/simplex-template-pack.md`.
-
 ### Minimum page dimensions
 
 The classic month divider requires width ≥ 130 mm and height ≥ 145 mm.

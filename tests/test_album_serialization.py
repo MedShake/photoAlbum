@@ -29,6 +29,18 @@ def test_custom_format_roundtrip_and_legacy_defaults():
     assert (legacy.custom_width_mm, legacy.custom_height_mm) == (210, 297)
 
 
+def test_old_unversioned_album_settings_are_rejected():
+    import json
+    import pytest
+
+    data = json.loads(album_settings_to_json(create_settings()))
+    assert data['schema_version'] == 2
+    assert set(data['photo_pages']) == {'page'}
+    data.pop('schema_version')
+    with pytest.raises(ValueError, match='Unsupported album settings schema'):
+        album_settings_from_json(json.dumps(data))
+
+
 def create_settings() -> AlbumStructureSettings:
     return AlbumStructureSettings(
         covers={

@@ -257,8 +257,8 @@ class PageInstanceDialog(QDialog):
         Return the template-pack context produced by the editor.
 
         A template settings editor may change both its local
-        PageInstance and pack-wide settings such as the shared
-        MSB theme.
+        PageInstance and pack-wide settings such as a shared
+        theme.
         """
         if self._editor is None:
             return dict(

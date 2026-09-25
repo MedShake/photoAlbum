@@ -1,3 +1,5 @@
+from photoalbum.templates.msb.photo_page.caption_style import caption_show_datetime, caption_show_location
+from photoalbum.album import PageInstance
 import json
 
 from photoalbum.album import (
@@ -6,7 +8,6 @@ from photoalbum.album import (
     CoverSettings,
     DividerSettings,
     PageNumberSettings,
-    PhotoCaptionSettings,
     PhotoPageSettings,
     album_settings_from_json,
     album_settings_to_json,
@@ -30,13 +31,7 @@ def make_settings() -> AlbumStructureSettings:
             enabled=True,
             template_id="year",
         ),
-        photo_pages=PhotoPageSettings(
-            template_id="photo-page-2",
-            caption=PhotoCaptionSettings(
-                show_datetime=False,
-                show_location=True,
-            ),
-        ),
+        photo_pages=PhotoPageSettings(page=PageInstance(template_id='photo-page-2', settings={'photo_caption': {'show_datetime': False, 'show_location': True}})),
         page_numbers=PageNumberSettings(
             enabled=False,
         ),
@@ -50,11 +45,8 @@ def test_caption_settings_round_trip():
         album_settings_to_json(original)
     )
 
-    assert restored.photo_pages.caption == (
-        PhotoCaptionSettings(
-            show_datetime=False,
-            show_location=True,
-        )
+    assert restored.photo_pages.page.settings["photo_caption"] == (
+        {"show_datetime": False, "show_location": True}
     )
 
 
@@ -73,8 +65,8 @@ def test_photo_page_settings_default_caption():
         template_id="photo-page-2"
     )
 
-    assert settings.caption.show_datetime
-    assert settings.caption.show_location
+    assert caption_show_datetime(settings.page.settings)
+    assert caption_show_location(settings.page.settings)
 
 
 def test_page_number_settings_default_enabled():

@@ -55,6 +55,12 @@ class PageTemplateSettingsWidget(QWidget):
             photos
         )
         self._translator = translator
+        if render_service is None:
+            # Standalone editors receive the same host infrastructure as editors
+            # opened by MainWindow, with a lifetime owned by this widget.
+            from photoalbum.gui.preview_render_service import PreviewRenderService
+
+            render_service = PreviewRenderService(translator, parent=self)
         self._render_service = render_service
         self._page_format = page_format
         self._template_pack_settings = dict(

@@ -12,8 +12,8 @@ from photoalbum.templates.msb.theme import (
     msb_theme_from_pack_settings,
 )
 
-from photoalbum.album.month_divider_layout import (
-    classic_month_divider_layout,
+from photoalbum.templates.msb.month_divider_classic.layout import (
+    classic_month_divider_layout, month_cities,
 )
 
 
@@ -45,6 +45,7 @@ class MonthDividerClassicWidgetRenderer:
         thumbnail_cache=None,
         pixel_rect=None,
         template_pack_settings=None,
+        **kwargs,
     ) -> None:
         if (
             composition is None
@@ -130,7 +131,8 @@ class MonthDividerClassicWidgetRenderer:
             title,
         )
 
-        if not page.cities:
+        cities = month_cities(page, album_pages)
+        if not cities:
             return
 
         painter.setPen(
@@ -165,6 +167,6 @@ class MonthDividerClassicWidgetRenderer:
                 | Qt.TextFlag.TextWordWrap
             ),
             "\n".join(
-                page.cities
+                cities
             ),
         )

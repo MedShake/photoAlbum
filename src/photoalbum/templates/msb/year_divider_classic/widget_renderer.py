@@ -15,7 +15,9 @@ class YearDividerClassicWidgetRenderer:
               width: int, height: int, translator, render_service,
               set_waiting_key, font_pixel_size, page_width_mm: float = 210.0,
               page_height_mm: float = 297.0, album_pages=(), composition=None,
-              thumbnail_cache=None, pixel_rect=None, template_pack_settings=None) -> None:
+              thumbnail_cache=None, pixel_rect=None, template_pack_settings=None,
+        **kwargs,
+    ) -> None:
         year = ""
         if composition is not None:
             page = getattr(composition, "page", None)

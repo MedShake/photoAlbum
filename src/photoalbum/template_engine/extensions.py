@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
+from collections.abc import Callable
 
 from photoalbum.template_engine.preview_backend import (
     TemplatePreviewBackend,
@@ -18,7 +21,8 @@ class PageTemplateExtension:
     This extension describes executable behaviour:
     - settings editor
     - expensive/asynchronous preview backend
-    - later: PDF renderer, validator, exporter...
+    - shared preview/PDF renderer and photo scope
+    - optional settings defaults and validation
     """
 
     template_id: str
@@ -26,6 +30,13 @@ class PageTemplateExtension:
     settings_editor_type: type | None = None
     preview_backend: TemplatePreviewBackend | None = None
     widget_renderer: object | None = None
+    photo_scope: str = "page"
+    settings_defaults: Callable[[], dict[str, object]] | None = None
+    validate_settings: Callable[[dict[str, object]], None] | None = None
+
+    def __post_init__(self) -> None:
+        if self.photo_scope not in {"page", "album"}:
+            raise ValueError("photo_scope must be 'page' or 'album'.")
 
 
 class PageTemplateExtensionRegistry:
@@ -34,6 +45,9 @@ class PageTemplateExtensionRegistry:
             str,
             PageTemplateExtension,
         ] = {}
+
+    def replace(self, extensions: dict[str, PageTemplateExtension]) -> None:
+        self._extensions = dict(extensions)
 
     def register(
         self,
@@ -96,9 +110,31 @@ template_extension_registry = (
 )
 
 
+_registration_target: ContextVar[dict[str, PageTemplateExtension] | None] = (
+    ContextVar("template_extension_registration_target", default=None)
+)
+
+
+@contextmanager
+def collect_template_extensions():
+    """Collect a registration pass without changing the active extensions."""
+    extensions: dict[str, PageTemplateExtension] = {}
+    token = _registration_target.set(extensions)
+    try:
+        yield extensions
+    finally:
+        _registration_target.reset(token)
+
+
 def register_template_extension(
     extension: PageTemplateExtension,
 ) -> None:
+    target = _registration_target.get()
+    if target is not None:
+        if extension.template_id in target:
+            raise ValueError(f"Duplicate template extension ID: {extension.template_id}")
+        target[extension.template_id] = extension
+        return
     template_extension_registry.register(
         extension
     )

@@ -39,10 +39,6 @@ from photoalbum.templates.msb.year_photo_scatter.composition import (
     cover_period_title,
 )
 
-from photoalbum.gui.preview_render_service import (
-    PreviewRenderService,
-)
-
 from photoalbum.templates.msb.settings_base import (
     MsbTemplateSettingsWidget,
 )
@@ -75,15 +71,7 @@ class YearPhotoScatterSettingsWidget(
             parent=parent,
         )
 
-        self._shared_render_service = (
-            render_service
-            or PreviewRenderService(
-                self._translator,
-                self,
-            )
-        )
-
-        self._render_service = self._shared_render_service
+        self._shared_render_service = self._render_service
         self._shared_render_key = None
 
         self._shared_render_service.preview_ready.connect(

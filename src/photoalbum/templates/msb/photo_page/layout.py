@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from photoalbum.album.composition import (
-    NormalizedRect, PhotoTemplateLayout, TemplateLayoutRegistry,
+    NormalizedRect, TemplateLayoutRegistry,
 )
+
+from .composition import PhotoTemplateLayout
 
 
 def _grid_cells(

@@ -20,7 +20,7 @@ installed packs.
 The complete documentation for the templates, shared MSB theme,
 settings, rendering architecture, and catalog is available in:
 
-    docs/msb-template-pack.md
+    docs/developer.md
 
 For the general template-pack API and instructions for creating a new
 pack, see:

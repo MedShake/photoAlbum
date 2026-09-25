@@ -21,8 +21,11 @@ from photoalbum.template_engine.translations import (
     translator_for_template,
 )
 
+from photoalbum.template_engine.instances import create_template_instance, validate_template_instance
 
 __all__ = [
+    "create_template_instance",
+    "validate_template_instance",
     "DiscoveredTemplates",
     "PageTemplateExtension",
     "PageTemplateExtensionRegistry",

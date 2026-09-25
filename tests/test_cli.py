@@ -6,7 +6,7 @@ import pytest
 
 from photoalbum import __version__, cli
 from photoalbum.app import project_service
-from photoalbum.album.composition import photo_location_text
+from photoalbum.templates.msb.photo_page.composition import photo_location_text
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.geocoding import GeocodingError
 from photoalbum.models import DateSource, Location, LocationComponent, Photo

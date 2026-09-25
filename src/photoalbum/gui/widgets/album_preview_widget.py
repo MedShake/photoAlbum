@@ -36,10 +36,8 @@ from photoalbum.album import (
 
 
 from photoalbum.album.composition import (
-    HorizontalAlignment,
     PageComposer,
     PageComposition,
-    PhotoSlotComposition,
 )
 from photoalbum.rendering.fonts import resolve_font_family
 
@@ -49,7 +47,7 @@ from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
 from photoalbum.template_engine import (
-    template_extension_registry,
+    translator_for_template,
 )
 from photoalbum.i18n import Translator
 from photoalbum.rendering import (
@@ -203,6 +201,7 @@ class AlbumCoverPreview(_PreviewPageBase):
         self._registry = registry
         self._result = result
         self._cover_settings = cover_settings
+        self._page_composer = PageComposer()
         self._thumbnail_cache = thumbnail_cache
         self._translator = translator
         self._render_service = render_service
@@ -225,40 +224,25 @@ class AlbumCoverPreview(_PreviewPageBase):
         painter = QPainter(self)
         self._paint_paper(painter)
 
-        extension = (
-            template_extension_registry.get(
-                self._template_id
-            )
-        )
-
-        template_renderer = (
-            extension.widget_renderer
-            if extension is not None
-            else None
-        )
-
-        if template_renderer is not None:
-            template_renderer.paint(
-                painter=painter,
-                instance=self._cover_settings.page,
-                photos=self._project_photos(),
-                target_rect=self.rect(),
-                width=self.width(),
-                height=self.height(),
-                translator=self._translator,
-                render_service=self._render_service,
-                set_waiting_key=self._set_template_preview_key,
-                font_pixel_size=self._print_font_pixel_size,
+        rendered = PageRenderer(translator=self._translator).paint_template(
+            instance=self._cover_settings.page, painter=painter,
+            composition=self._page_composer.compose_instance(
+                self._cover_settings.page, self._project_photos(),
                 page_width_mm=self._page_format.width_mm,
                 page_height_mm=self._page_format.height_mm,
-                album_pages=self._result.pagination.pages,
-                template_pack_settings=(
-                    self._template_pack_settings
-                ),
-            )
+            ),
+            photos=self._project_photos(), project_photos=self._project_photos(),
+            target_rect=self.rect(), width=self.width(), height=self.height(),
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+            font_pixel_size=self._print_font_pixel_size, pixel_rect=self._pixel_rect,
+            thumbnail_cache=self._thumbnail_cache, album_pages=self._result.pagination.pages,
+            template_pack_settings=self._template_pack_settings,
+            render_service=self._render_service, set_waiting_key=self._set_template_preview_key,
+        )
+        if rendered:
             self._paint_border(painter)
             return
-
 
         labels = {
             CoverPosition.FRONT: (
@@ -287,9 +271,7 @@ class AlbumCoverPreview(_PreviewPageBase):
             f"template.{template.template_id}"
         )
 
-        template_name = self._translator.tr(
-            template_key
-        )
+        template_name = translator_for_template(self._template_id, self._translator).tr(template_key)
 
         if template_name == template_key:
             template_name = template.name
@@ -446,12 +428,6 @@ class AlbumPagePreview(_PreviewPageBase):
             template_pack_settings or {}
         )
 
-        # Async state for instantiated special-page scatter.
-        self._special_scatter_request_id = None
-        self._special_scatter_cache_key = None
-        self._special_scatter_pixmap = QPixmap()
-        self._special_scatter_loading = False
-        self._special_scatter_title = ""
         self._render_service = render_service
         self._shared_preview_key = None
 
@@ -541,148 +517,6 @@ class AlbumPagePreview(_PreviewPageBase):
             return
 
         self.update()
-
-    def _render_template_special_page(
-        self,
-        painter: QPainter,
-    ) -> bool:
-        page = self._composition.page
-
-        instance = page.page_instance
-
-        if (
-            instance is None
-            or self._render_service is None
-        ):
-            return False
-
-        extension = (
-            template_extension_registry.get(
-                instance.template_id
-            )
-        )
-
-        renderer = (
-            extension.widget_renderer
-            if extension is not None
-            else None
-        )
-
-        if renderer is None:
-            return False
-
-        renderer.paint(
-            painter=painter,
-            instance=instance,
-            photos=self._project_photos,
-            target_rect=self.rect(),
-            width=self.width(),
-            height=self.height(),
-            translator=self._translator,
-            render_service=self._render_service,
-            set_waiting_key=self._set_template_preview_key,
-            font_pixel_size=self._print_font_pixel_size,
-            page_width_mm=self._page_format.width_mm,
-            page_height_mm=self._page_format.height_mm,
-            album_pages=self._album_pages,
-        )
-
-        return True
-
-    def _render_template_page(
-        self,
-        painter: QPainter,
-    ) -> bool:
-        """
-        Generic rendering of a normal album page through its
-        registered template extension.
-
-        The core knows the page kind, never the concrete
-        template implementation.
-        """
-
-        page = self._composition.page
-
-        extension = (
-            template_extension_registry.get(
-                page.template_id
-            )
-        )
-
-        renderer = (
-            extension.widget_renderer
-            if extension is not None
-            else None
-        )
-
-        if renderer is None:
-            return False
-
-        renderer.paint(
-            painter=painter,
-            instance=page.page_instance,
-            photos=page.photos,
-            target_rect=self.rect(),
-            width=self.width(),
-            height=self.height(),
-            translator=self._translator,
-            render_service=self._render_service,
-            set_waiting_key=self._set_template_preview_key,
-            font_pixel_size=self._print_font_pixel_size,
-            page_width_mm=self._page_format.width_mm,
-            page_height_mm=self._page_format.height_mm,
-            album_pages=self._album_pages,
-            composition=self._composition,
-            thumbnail_cache=self._thumbnail_cache,
-            pixel_rect=self._pixel_rect,
-        )
-
-        return True
-
-    def _paint_page_number(
-        self,
-        painter: QPainter,
-    ) -> None:
-        page_number = (
-            self._composition.page_number
-        )
-
-        if page_number is None:
-            return
-
-        rect = self._pixel_rect(
-            page_number.rect
-        )
-
-        if (
-            page_number.alignment
-            == HorizontalAlignment.LEFT
-        ):
-            alignment = Qt.AlignmentFlag.AlignLeft
-        else:
-            alignment = Qt.AlignmentFlag.AlignRight
-
-        font = QFont(
-            resolve_font_family(None)
-        )
-        font.setBold(False)
-        font.setPixelSize(
-            self._print_font_pixel_size(8)
-        )
-        painter.setFont(font)
-
-        painter.setPen(
-            Qt.GlobalColor.black
-        )
-
-        painter.drawText(
-            rect,
-            (
-                alignment
-                | Qt.AlignmentFlag.AlignVCenter
-            ),
-            str(page_number.number),
-        )
 
     def _paint_non_photo_page(
         self,
@@ -1026,7 +860,7 @@ class AlbumPreviewWidget(QWidget):
         pages = result.pagination.pages
 
         # One canonical list of project photos for templates
-        # that operate on the whole album, such as scatter.
+        # that operate on the whole album.
         project_photos = []
         seen_photo_paths = set()
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import import_module
 import json
 from pathlib import Path
@@ -20,6 +20,10 @@ from photoalbum.template_engine.translations import (
     load_pack_catalogs,
     replace_registered_pack_catalogs,
     translator_for_pack,
+)
+from photoalbum.template_engine.extensions import (
+    collect_template_extensions,
+    template_extension_registry,
 )
 
 
@@ -52,9 +56,11 @@ class TemplatePack:
     description: str | None
     authors: tuple[str, ...]
     templates: tuple[TemplateDefinition, ...]
-    modules: tuple[str, ...]
+    modules: tuple[str, ...]  # Absolute import names declared by the manifest.
     documentation_paths: dict[str, Path] | None = None
     translation_catalogs: dict[str, dict[str, str]] | None = None
+    settings_editor: str | None = None
+    default_templates: dict[str, str] = field(default_factory=dict)
 
     def translator(self, base) -> PackTranslator:
         return PackTranslator(base, self.translation_catalogs or {})
@@ -347,7 +353,48 @@ def load_template_pack(
             data.get("documentation"),
         ),
         translation_catalogs=load_pack_catalogs(manifest_path.parent),
+        settings_editor=_settings_editor_reference(data.get("settings_editor")),
+        default_templates=_default_templates(data.get("default_templates", {}), definitions),
     )
+
+
+def _default_templates(value, definitions) -> dict[str, str]:
+    from photoalbum.template_engine.defaults import AlbumTemplateDefaults
+
+    if not isinstance(value, dict):
+        raise ValueError("default_templates must be an object.")
+    definitions = {template.template_id: template for template in definitions}
+    roles = {
+        "front_cover": (TemplateKind.COVER, CoverPosition.FRONT),
+        "inside_front_cover": (TemplateKind.COVER, CoverPosition.INSIDE_FRONT),
+        "inside_back_cover": (TemplateKind.COVER, CoverPosition.INSIDE_BACK),
+        "back_cover": (TemplateKind.COVER, CoverPosition.BACK),
+        "photo_page": (TemplateKind.PHOTO_PAGE, None),
+        "year_divider": (TemplateKind.YEAR_DIVIDER, None),
+        "month_divider": (TemplateKind.MONTH_DIVIDER, None),
+    }
+    for role, template_id in value.items():
+        if role not in AlbumTemplateDefaults.__dataclass_fields__:
+            raise ValueError(f"Unknown default template role: {role}")
+        if not isinstance(template_id, str) or template_id not in definitions:
+            raise ValueError(f"Default {role} must reference a template in its own pack.")
+        kind, position = roles[role]
+        template = definitions[template_id]
+        if not template.supports(kind) or (position and not template.supports_cover_position(position)):
+            raise ValueError(f"Default template {template_id!r} does not support {role}.")
+    return dict(value)
+
+
+def _settings_editor_reference(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        module, separator, attribute = value.partition(":")
+        if separator and module and attribute.isidentifier() and all(
+            part.isidentifier() for part in module.split(".")
+        ):
+            return value
+    raise ValueError("settings_editor must be a 'module:callable' reference or null.")
 
 
 def _builtin_templates_root() -> Path:
@@ -383,6 +430,7 @@ def discover_templates(
             )
 
         seen_pack_ids.add(pack.pack_id)
+        registry.pack_defaults[pack.pack_id] = dict(pack.default_templates)
         for template in pack.templates:
             registry.register(template)
 
@@ -392,10 +440,12 @@ def discover_templates(
     )
 
 
-def replace_active_template_packs(
+_active_packs: dict[str, TemplatePack] = {}
+
+
+def _pack_catalogs_and_owners(
     packs: tuple[TemplatePack, ...],
-) -> None:
-    """Replace the pack catalogs active in the application process."""
+) -> tuple[dict[str, dict[str, dict[str, str]]], dict[str, str]]:
     pack_catalogs: dict[str, dict[str, dict[str, str]]] = {}
     template_packs: dict[str, str] = {}
 
@@ -415,7 +465,22 @@ def replace_active_template_packs(
                 )
             template_packs[template.template_id] = pack.pack_id
 
+    return pack_catalogs, template_packs
+
+
+def replace_active_template_packs(
+    packs: tuple[TemplatePack, ...],
+) -> None:
+    """Activate pack metadata/catalogs and discard previous executable extensions.
+
+    Use register_discovered_template_extensions to also load executable behavior.
+    Layouts remain local to each composer's registry.
+    """
+    global _active_packs
+    pack_catalogs, template_packs = _pack_catalogs_and_owners(packs)
     replace_registered_pack_catalogs(pack_catalogs, template_packs)
+    _active_packs = {pack.pack_id: pack for pack in packs}
+    template_extension_registry.replace({})
 
 
 def register_discovered_template_extensions(
@@ -424,24 +489,29 @@ def register_discovered_template_extensions(
     if packs is None:
         packs = discover_template_packs()
 
-    replace_active_template_packs(packs)
-
+    _pack_catalogs_and_owners(packs)
+    extensions = {}
     for pack in packs:
-        for module_name in pack.modules:
-            module = import_module(
-                f"photoalbum.templates."
-                f"{pack.pack_id}.{module_name}"
-            )
-
-            register = getattr(module, "register", None)
-
-            if not callable(register):
+        with collect_template_extensions() as collected:
+            for module_name in pack.modules:
+                module = import_module(module_name)
+                register = getattr(module, "register", None)
+                if not callable(register):
+                    raise ValueError(
+                        "Template module has no register() function: "
+                        f"{module.__name__}"
+                    )
+                register()
+            undeclared = collected.keys() - {t.template_id for t in pack.templates}
+            if undeclared:
                 raise ValueError(
-                    "Template module has no register() function: "
-                    f"{module.__name__}"
+                    f"Pack {pack.pack_id!r} registered undeclared template IDs: "
+                    f"{sorted(undeclared)}"
                 )
+            extensions.update(collected)
 
-            register()
+    replace_active_template_packs(packs)
+    template_extension_registry.replace(extensions)
 
     return packs
 
@@ -457,13 +527,16 @@ def register_discovered_layouts(
     """Load pack-owned composition without initializing settings widgets."""
     if packs is None:
         packs = discover_template_packs()
+    _pack_catalogs_and_owners(packs)
     for pack in packs:
         for module_name in pack.modules:
-            module = import_module(
-                f"photoalbum.templates.{pack.pack_id}.{module_name}"
-            )
+            module = import_module(module_name)
             register = getattr(module, "register_layouts", None)
             if register is not None:
+                if not callable(register):
+                    raise ValueError(
+                        f"Template module has no callable register_layouts(): {module_name}"
+                    )
                 register(registry)
         for template in pack.templates:
             if TemplateKind.PHOTO_PAGE in template.allowed_kinds:
@@ -473,10 +546,14 @@ def register_discovered_layouts(
 
 def pack_settings_editor(pack_id: str) -> PackSettingsEditor | None:
     """Return the optional pack-owned settings dialog callback."""
-    module = import_module(f"photoalbum.templates.{pack_id}")
-    editor = getattr(module, "edit_settings", None)
-    if editor is None:
+    pack = _active_packs.get(pack_id)
+    if pack is None or pack.settings_editor is None:
         return None
+    module_name, attribute = pack.settings_editor.split(":")
+    module = import_module(module_name)
+    editor = getattr(module, attribute, None)
+    if not callable(editor):
+        raise ValueError(f"Pack settings editor is not callable: {pack.settings_editor}")
 
     def localized_editor(settings, *, translator, parent=None):
         return editor(

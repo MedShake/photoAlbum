@@ -99,7 +99,7 @@ def test_unknown_page_format_is_rejected():
 
 
 def test_month_divider_layout_keeps_physical_margins():
-    from photoalbum.album.month_divider_layout import (
+    from photoalbum.templates.msb.month_divider_classic.layout import (
         classic_month_divider_layout,
     )
 

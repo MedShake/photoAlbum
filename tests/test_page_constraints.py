@@ -115,7 +115,7 @@ def test_production_templates_only_have_documented_geometric_restrictions():
 
 
 def test_classic_month_minimum_keeps_city_rectangle_and_bottom_margin_on_page():
-    from photoalbum.album.month_divider_layout import classic_month_divider_layout
+    from photoalbum.templates.msb.month_divider_classic.layout import classic_month_divider_layout
 
     template = create_template_registry().get("month-divider-classic")
     bounds = template.page_constraints

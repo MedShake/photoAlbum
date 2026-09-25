@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import secrets
-
 from PySide6.QtCore import Qt, Signal, QSignalBlocker
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -22,12 +20,13 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.template_engine.defaults import (
-    DEFAULT_TEMPLATES,
+    default_template_choices,
 )
 from photoalbum.i18n import Translator
 from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 from photoalbum.template_engine.discovery import pack_settings_editor
+from photoalbum.template_engine.instances import create_template_instance
 from photoalbum.album import (
     PAGE_FORMATS,
     PageFormat,
@@ -35,14 +34,12 @@ from photoalbum.album import (
     oriented_page_format,
     AlbumStructureSettings,
     CoverPosition,
-    CoverScatterSettings,
     CoverSettings,
     DividerPlacement,
     DividerSettings,
     PageInstance,
     PageNumberSettings,
     PageOrientation,
-    PhotoCaptionSettings,
     PhotoPageSettings,
     PrintSettings,
     SpecialPage,
@@ -66,6 +63,7 @@ class AlbumSettingsWidget(QWidget):
         self._render_service = render_service
 
         self._registry = registry
+        self._default_templates = default_template_choices(registry)
         self._translator = translator or Translator("en")
         self._loading_settings = False
 
@@ -641,7 +639,7 @@ class AlbumSettingsWidget(QWidget):
             or instance.template_id
             != template_id
         ):
-            instance = PageInstance(
+            instance = create_template_instance(
                 template_id=template_id,
             )
 
@@ -849,7 +847,7 @@ class AlbumSettingsWidget(QWidget):
             instance is None
             or instance.template_id != template_id
         ):
-            instance = PageInstance(
+            instance = create_template_instance(
                 template_id=template_id
             )
 
@@ -960,8 +958,7 @@ class AlbumSettingsWidget(QWidget):
             or self._photo_page_instance.template_id
             != template_id
         ):
-            self._photo_caption_legacy = PhotoCaptionSettings()
-            self._photo_page_instance = PageInstance(
+            self._photo_page_instance = create_template_instance(
                 template_id=template_id
             )
 
@@ -1271,19 +1268,19 @@ class AlbumSettingsWidget(QWidget):
 
         self._set_combo_template(
             self._front_cover_combo,
-            DEFAULT_TEMPLATES.front_cover,
+            self._default_templates.front_cover,
         )
         self._set_combo_template(
             self._inside_front_cover_combo,
-            DEFAULT_TEMPLATES.inside_front_cover,
+            self._default_templates.inside_front_cover,
         )
         self._set_combo_template(
             self._inside_back_cover_combo,
-            DEFAULT_TEMPLATES.inside_back_cover,
+            self._default_templates.inside_back_cover,
         )
         self._set_combo_template(
             self._back_cover_combo,
-            DEFAULT_TEMPLATES.back_cover,
+            self._default_templates.back_cover,
         )
 
         self._month_dividers_checkbox.setChecked(True)
@@ -1291,15 +1288,15 @@ class AlbumSettingsWidget(QWidget):
 
         self._set_combo_template(
             self._photo_page_combo,
-            DEFAULT_TEMPLATES.photo_page,
+            self._default_templates.photo_page,
         )
         self._set_combo_template(
             self._year_divider_combo,
-            DEFAULT_TEMPLATES.year_divider,
+            self._default_templates.year_divider,
         )
         self._set_combo_template(
             self._month_divider_combo,
-            DEFAULT_TEMPLATES.month_divider,
+            self._default_templates.month_divider,
         )
 
         self._set_placement(
@@ -1344,7 +1341,7 @@ class AlbumSettingsWidget(QWidget):
 
     def reset_to_defaults(self) -> None:
         # A new project must never inherit instance-specific
-        # state (scatter seeds/history, template options...).
+        # template-owned state.
         self._cover_instances.clear()
         self._photo_page_instance = None
 
@@ -1381,7 +1378,7 @@ class AlbumSettingsWidget(QWidget):
         ):
             return current
 
-        return PageInstance(
+        return create_template_instance(
             template_id=template_id,
         )
 
@@ -1453,33 +1450,6 @@ class AlbumSettingsWidget(QWidget):
             ),
             photo_pages=PhotoPageSettings(
                 page=self._photo_instance(),
-                caption=(
-                    PhotoCaptionSettings(
-                        show_datetime=bool(
-                            self._photo_instance().settings[
-                                "photo_caption"
-                            ].get(
-                                "show_datetime",
-                                True,
-                            )
-                        ),
-                        show_location=bool(
-                            self._photo_instance().settings[
-                                "photo_caption"
-                            ].get(
-                                "show_location",
-                                True,
-                            )
-                        ),
-                    )
-                    if isinstance(
-                        self._photo_instance().settings.get(
-                            "photo_caption"
-                        ),
-                        dict,
-                    )
-                    else self._photo_caption_legacy
-                ),
             ),
             page_numbers=PageNumberSettings(
                 enabled=self._page_numbers_checkbox.isChecked(),
@@ -1615,9 +1585,6 @@ class AlbumSettingsWidget(QWidget):
 
             self._photo_page_instance = (
                 settings.photo_pages.page
-            )
-            self._photo_caption_legacy = (
-                settings.photo_pages.caption
             )
             self._page_numbers_checkbox.setChecked(
                 settings.page_numbers.enabled
@@ -1761,7 +1728,7 @@ class AlbumSettingsWidget(QWidget):
             value,
             str,
         ):
-            value = PageInstance(
+            value = create_template_instance(
                 template_id=value
             )
 
@@ -1838,7 +1805,7 @@ class AlbumSettingsWidget(QWidget):
             combo
         )
 
-        instance = PageInstance(
+        instance = create_template_instance(
             template_id=template_id
         )
 
@@ -1997,7 +1964,7 @@ class AlbumSettingsWidget(QWidget):
                 value,
                 str,
             ):
-                instance = PageInstance(
+                instance = create_template_instance(
                     template_id=value
                 )
 

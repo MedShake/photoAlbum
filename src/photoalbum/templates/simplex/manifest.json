@@ -17,7 +17,7 @@
     {
       "id": "simplex-full-photo-cover",
       "name": "Full-page photo cover",
-      "module": "full_photo_cover",
+      "module": "photoalbum.templates.simplex.full_photo_cover",
       "kinds": [
         "cover",
         "special_page"

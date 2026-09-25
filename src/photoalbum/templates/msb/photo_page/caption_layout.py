@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtGui import QFont, QFontMetricsF, QGuiApplication
 
 from photoalbum.i18n.date_formatter import format_datetime
-from photoalbum.album.composition import PhotoCaptionContent
+from .composition import PhotoCaptionContent
 from .caption_style import caption_font_family, caption_font_size, caption_lines
 
 _CANONICAL_DPI = 1000.0

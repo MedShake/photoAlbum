@@ -1,3 +1,4 @@
+from photoalbum.album import PageInstance
 import pytest
 
 from datetime import datetime
@@ -6,17 +7,12 @@ from pathlib import Path
 from photoalbum.album import (
     PageNumberSettings,
     PageSide,
-    PhotoCaptionSettings,
     PhotoPageSettings,
     PlanItemKind,
     PlannedPage,
 )
-from photoalbum.album.composition import (
-    HorizontalAlignment,
-    PageComposer,
-    build_photo_caption,
-    photo_location_text,
-)
+from photoalbum.album.composition import HorizontalAlignment, PageComposer
+from photoalbum.templates.msb.photo_page.composition import build_photo_caption, photo_location_text
 from photoalbum.models import Photo
 
 
@@ -57,13 +53,7 @@ def settings(
     show_datetime: bool,
     show_location: bool,
 ) -> PhotoPageSettings:
-    return PhotoPageSettings(
-        template_id="photo-page-2",
-        caption=PhotoCaptionSettings(
-            show_datetime=show_datetime,
-            show_location=show_location,
-        ),
-    )
+    return PhotoPageSettings(page=PageInstance(template_id='photo-page-2', settings={'photo_caption': {'show_datetime': show_datetime, 'show_location': show_location}}))
 
 
 def test_no_caption_options_use_full_photo_cell():
@@ -280,11 +270,8 @@ def test_left_page_number_is_left_aligned():
 
 def test_custom_layout_can_reserve_more_than_three_caption_lines():
     """Caption capacity belongs to the template, not the engine."""
-    from photoalbum.album.composition import (
-        NormalizedRect,
-        PhotoCaptionContent,
-        PhotoTemplateLayout,
-    )
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent, PhotoTemplateLayout
 
     layout = PhotoTemplateLayout(
         cells_factory=lambda _w, _h: (
@@ -333,11 +320,8 @@ def test_builtin_photo_layouts_limit_reserved_caption_height_to_three_lines():
 
 def test_caption_row_reserves_largest_actual_requirement():
     """A row follows its largest real caption requirement."""
-    from photoalbum.album.composition import (
-        NormalizedRect,
-        PhotoCaptionContent,
-        PhotoTemplateLayout,
-    )
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent, PhotoTemplateLayout
 
     layout = PhotoTemplateLayout(
         cells_factory=lambda _w, _h: (
@@ -456,13 +440,7 @@ def test_three_line_caption_stays_above_page_number(
         capacity=capacity,
     )
 
-    settings = PhotoPageSettings(
-        template_id=f"photo-page-{capacity}",
-        caption=PhotoCaptionSettings(
-            show_datetime=True,
-            show_location=True,
-        ),
-    )
+    settings = PhotoPageSettings(page=PageInstance(template_id=f'photo-page-{capacity}', settings={'photo_caption': {'show_datetime': True, 'show_location': True}}))
 
     composition = PageComposer().compose(
         page,
@@ -503,13 +481,7 @@ def test_page_number_toggle_does_not_reflow_photo_geometry(
         capacity=capacity,
     )
 
-    settings = PhotoPageSettings(
-        template_id=f"photo-page-{capacity}",
-        caption=PhotoCaptionSettings(
-            show_datetime=True,
-            show_location=True,
-        ),
-    )
+    settings = PhotoPageSettings(page=PageInstance(template_id=f'photo-page-{capacity}', settings={'photo_caption': {'show_datetime': True, 'show_location': True}}))
 
     with_number = PageComposer().compose(
         page,
@@ -530,11 +502,8 @@ def test_page_number_toggle_does_not_reflow_photo_geometry(
 
 
 def test_captionless_row_gives_complete_cell_to_image():
-    from photoalbum.album.composition import (
-        NormalizedRect,
-        PhotoCaptionContent,
-        PhotoTemplateLayout,
-    )
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent, PhotoTemplateLayout
 
     cell = NormalizedRect(
         x=0.1,
@@ -574,11 +543,8 @@ def test_captionless_row_gives_complete_cell_to_image():
 
 
 def test_one_caption_reserves_actual_requirement_for_entire_row():
-    from photoalbum.album.composition import (
-        NormalizedRect,
-        PhotoCaptionContent,
-        PhotoTemplateLayout,
-    )
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent, PhotoTemplateLayout
 
     left = NormalizedRect(
         x=0.1,
@@ -661,13 +627,7 @@ def test_builtin_page_without_captions_uses_complete_cells(
         capacity=capacity,
     )
 
-    photo_settings = PhotoPageSettings(
-        template_id=f"photo-page-{capacity}",
-        caption=PhotoCaptionSettings(
-            show_datetime=False,
-            show_location=False,
-        ),
-    )
+    photo_settings = PhotoPageSettings(page=PageInstance(template_id=f'photo-page-{capacity}', settings={'photo_caption': {'show_datetime': False, 'show_location': False}}))
 
     composition = PageComposer().compose(
         page,
@@ -695,11 +655,8 @@ def test_builtin_page_without_captions_uses_complete_cells(
 
 
 def test_captionless_and_captioned_rows_are_independent():
-    from photoalbum.album.composition import (
-        NormalizedRect,
-        PhotoCaptionContent,
-        PhotoTemplateLayout,
-    )
+    from photoalbum.album.composition import NormalizedRect
+    from photoalbum.templates.msb.photo_page.composition import PhotoCaptionContent, PhotoTemplateLayout
 
     cells = (
         NormalizedRect(
@@ -909,11 +866,8 @@ def test_spread_reserve_gives_facing_photos_same_height():
 
 
 def test_spread_real_requirement_is_not_clipped_for_diagnostics():
-    from photoalbum.album.composition import (
-        NormalizedRect,
-        PhotoTemplateLayout,
-        TemplateLayoutRegistry,
-    )
+    from photoalbum.album.composition import NormalizedRect, TemplateLayoutRegistry
+    from photoalbum.templates.msb.photo_page.composition import PhotoTemplateLayout
 
     registry = TemplateLayoutRegistry()
 

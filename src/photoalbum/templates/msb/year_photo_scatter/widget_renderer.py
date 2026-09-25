@@ -210,7 +210,8 @@ class YearPhotoScatterWidgetRenderer:
         thumbnail_cache=None,
         pixel_rect=None,
             template_pack_settings=None,
-) -> None:
+        **kwargs,
+    ) -> None:
         photos = tuple(
             photos
         )

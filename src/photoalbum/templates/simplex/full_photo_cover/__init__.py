@@ -22,6 +22,7 @@ def register() -> None:
     register_template_extension(
         PageTemplateExtension(
             template_id=TEMPLATE_ID,
+            photo_scope="album",
             settings_editor_type=(
                 SimplexFullPhotoCoverSettingsWidget
             ),

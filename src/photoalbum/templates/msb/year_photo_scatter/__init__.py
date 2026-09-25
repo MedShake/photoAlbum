@@ -29,6 +29,7 @@ def register() -> None:
     register_template_extension(
         PageTemplateExtension(
             template_id="year-photo-scatter",
+            photo_scope="album",
             settings_editor_type=(
                 YearPhotoScatterSettingsWidget
             ),

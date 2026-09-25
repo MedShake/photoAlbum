@@ -54,6 +54,31 @@ def test_window_wires_six_tabs_and_status_bar(window):
     assert window.statusBar().currentMessage() == 'Scanning'
 
 
+def test_project_without_album_settings_uses_msb_and_existing_settings_survive(window, tmp_path):
+    import json
+    from photoalbum.album import CoverPosition, CoverSettings, album_settings_to_json
+
+    service = window._project_service
+    project = tmp_path / 'defaults.photoalbum'
+    service.create(project)
+    assert service.get_album_structure_settings() is None
+    window._load_project_settings()
+    settings = window._album_settings_widget.settings()
+    assert settings.covers[CoverPosition.FRONT].template_id == 'year-photo-scatter'
+    assert settings.photo_pages.template_id == 'photo-page-2'
+    assert settings.year_dividers.template_id == 'calendar-index'
+    settings.covers[CoverPosition.FRONT] = CoverSettings(
+        position=CoverPosition.FRONT, template_id='simplex-full-photo-cover',
+    )
+    saved = json.loads(album_settings_to_json(settings))
+    saved.pop('template_pack_settings')
+    service._database.set_project_metadata(service.ALBUM_STRUCTURE_SETTINGS_KEY, json.dumps(saved))
+    service.close()
+    service.open(project)
+    window._load_project_settings()
+    assert window._album_settings_widget.settings() == settings
+
+
 def test_custom_dimensions_apply_persist_and_rebuild_once(window, tmp_path, monkeypatch):
     service = window._project_service
     project = tmp_path / "custom.photoalbum"

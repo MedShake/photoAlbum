@@ -17,7 +17,7 @@
     {
       "id": "year-photo-scatter",
       "name": "Year photo scatter",
-      "module": "year_photo_scatter",
+      "module": "photoalbum.templates.msb.year_photo_scatter",
       "kinds": [
         "cover",
         "special_page"
@@ -32,7 +32,7 @@
     {
       "id": "geographic-word-cloud",
       "name": "Geographic word cloud",
-      "module": "geographic_word_cloud",
+      "module": "photoalbum.templates.msb.geographic_word_cloud",
       "kinds": [
         "cover",
         "special_page"
@@ -47,7 +47,7 @@
     {
       "id": "calendar-index",
       "name": "Annual calendar",
-      "module": "calendar_index",
+      "module": "photoalbum.templates.msb.calendar_index",
       "kinds": [
         "cover",
         "special_page",
@@ -67,7 +67,7 @@
     {
       "id": "year-divider-classic",
       "name": "Simple year divider",
-      "module": "year_divider_classic",
+      "module": "photoalbum.templates.msb.year_divider_classic",
       "kinds": [
         "year_divider"
       ]
@@ -75,7 +75,7 @@
     {
       "id": "month-divider-classic",
       "name": "Month divider with city list",
-      "module": "month_divider_classic",
+      "module": "photoalbum.templates.msb.month_divider_classic",
       "kinds": [
         "month_divider"
       ],
@@ -87,7 +87,7 @@
     {
       "id": "month-divider-simple",
       "name": "Simple month divider",
-      "module": "month_divider_simple",
+      "module": "photoalbum.templates.msb.month_divider_simple",
       "kinds": [
         "month_divider"
       ]
@@ -95,7 +95,7 @@
     {
       "id": "photo-page-1",
       "name": "One photo",
-      "module": "photo_page",
+      "module": "photoalbum.templates.msb.photo_page",
       "kinds": [
         "photo_page"
       ],
@@ -104,7 +104,7 @@
     {
       "id": "photo-page-2",
       "name": "Two photos",
-      "module": "photo_page",
+      "module": "photoalbum.templates.msb.photo_page",
       "kinds": [
         "photo_page"
       ],
@@ -113,7 +113,7 @@
     {
       "id": "photo-page-3",
       "name": "Three photos",
-      "module": "photo_page",
+      "module": "photoalbum.templates.msb.photo_page",
       "kinds": [
         "photo_page"
       ],
@@ -122,7 +122,7 @@
     {
       "id": "photo-page-4",
       "name": "Four photos",
-      "module": "photo_page",
+      "module": "photoalbum.templates.msb.photo_page",
       "kinds": [
         "photo_page"
       ],
@@ -131,7 +131,7 @@
     {
       "id": "dedication",
       "name": "Dedication",
-      "module": "dedication",
+      "module": "photoalbum.templates.msb.dedication",
       "kinds": [
         "special_page",
         "cover"
@@ -145,10 +145,20 @@
     {
       "id": "blank",
       "name": "Blank page",
-      "module": "blank",
+      "module": "photoalbum.templates.msb.blank",
       "kinds": [
         "special_page"
       ]
     }
-  ]
+  ],
+  "settings_editor": "photoalbum.templates.msb:edit_settings",
+  "default_templates": {
+    "front_cover": "year-photo-scatter",
+    "inside_front_cover": "geographic-word-cloud",
+    "inside_back_cover": "dedication",
+    "back_cover": "geographic-word-cloud",
+    "photo_page": "photo-page-2",
+    "year_divider": "calendar-index",
+    "month_divider": "month-divider-classic"
+  }
 }

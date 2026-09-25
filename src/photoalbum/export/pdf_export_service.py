@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from inspect import Parameter, signature
 from pathlib import Path
 from typing import Callable
 
@@ -24,7 +23,6 @@ from photoalbum.album.builder import AlbumBuildResult
 from photoalbum.album.composition import PageComposer
 from photoalbum.album.models import CoverPosition
 from photoalbum.album.settings import AlbumStructureSettings
-from photoalbum.template_engine import template_extension_registry
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 from photoalbum.rendering import (
@@ -267,57 +265,23 @@ class PdfExportService:
             ) -> None:
                 cover = settings.covers[position]
 
-                extension = (
-                    template_extension_registry.get(
-                        cover.template_id
-                    )
-                )
-
-                renderer = (
-                    extension.widget_renderer
-                    if extension is not None
-                    else None
-                )
-
-                if renderer is None:
-                    raise RuntimeError(
-                        "No renderer registered for cover "
-                        f"template: {cover.template_id}"
-                    )
-
                 begin_output_page()
-
-                paint_kwargs = {}
-                parameters = signature(renderer.paint).parameters
-
-                if (
-                    "template_pack_settings" in parameters
-                    or any(
-                        parameter.kind is Parameter.VAR_KEYWORD
-                        for parameter in parameters.values()
-                    )
-                ):
-                    paint_kwargs["template_pack_settings"] = settings.template_pack_settings
-
-                renderer.paint(
-                    **paint_kwargs,
-                    painter=painter,
-                    instance=cover.page,
-                    photos=project_photos,
-                    target_rect=target_rect,
-                    width=width,
-                    height=height,
-                    translator=self._translator,
-                    render_service=None,
-                    set_waiting_key=None,
-                    font_pixel_size=(
-                        geometry.font_pixel_size
+                rendered = self._page_renderer.paint_template(
+                    instance=cover.page, painter=painter, photos=project_photos,
+                    composition=self._page_composer.compose_instance(
+                        cover.page, project_photos,
+                        page_width_mm=page_width_mm, page_height_mm=page_height_mm,
                     ),
-                    page_width_mm=page_width_mm,
-                    page_height_mm=page_height_mm,
-                    album_pages=pages,
-                    thumbnail_cache=image_cache,
+                    project_photos=project_photos, target_rect=target_rect,
+                    width=width, height=height,
+                    page_width_mm=page_width_mm, page_height_mm=page_height_mm,
+                    font_pixel_size=geometry.font_pixel_size, pixel_rect=geometry.pixel_rect,
+                    thumbnail_cache=image_cache, album_pages=pages,
+                    template_pack_settings=settings.template_pack_settings,
+                    show_empty_slots=False,
                 )
+                if not rendered:
+                    raise RuntimeError(f"No renderer registered for template: {cover.template_id}")
 
                 cover_labels = {
                     CoverPosition.FRONT:
