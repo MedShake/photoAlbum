@@ -26,12 +26,13 @@ def project_version() -> str:
 
 
 def debian_version(version: str) -> str:
-    # Python pre-release: 0.1.0b1
-    # Debian pre-release: 0.1.0~b1
-    if "b" in version:
-        base, beta = version.rsplit("b", 1)
-        if beta.isdigit():
-            return f"{base}~b{beta}"
+    # Python pre-releases: 0.1.0b1, 0.1.0rc1
+    # Debian pre-releases: 0.1.0~b1, 0.1.0~rc1
+    for marker in ("rc", "b"):
+        if marker in version:
+            base, number = version.rsplit(marker, 1)
+            if number.isdigit():
+                return f"{base}~{marker}{number}"
 
     return version
 
