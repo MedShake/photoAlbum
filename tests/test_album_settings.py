@@ -23,6 +23,7 @@ def create_settings(
 
     return AlbumStructureSettings(
         covers=covers,
+        day_dividers=DividerSettings(enabled=False, template_id="day-divider-simple"),
         month_dividers=DividerSettings(
             enabled=True,
             template_id="month-divider",

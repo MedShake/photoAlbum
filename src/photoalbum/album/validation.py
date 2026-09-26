@@ -19,6 +19,7 @@ class AlbumSettingsValidator:
 
         instances = [cover.page for cover in settings.covers.values()]
         instances.extend((settings.month_dividers.page, settings.year_dividers.page,
+                          settings.day_dividers.page,
                           settings.photo_pages.page))
         instances.extend(settings.front_matter)
         instances.extend(settings.back_matter)
@@ -39,6 +40,11 @@ class AlbumSettingsValidator:
         self._require_kind(
             settings.year_dividers.template_id,
             TemplateKind.YEAR_DIVIDER,
+        )
+
+        self._require_kind(
+            settings.day_dividers.template_id,
+            TemplateKind.DAY_DIVIDER,
         )
 
         self._require_kind(

@@ -23,6 +23,7 @@ def make_settings() -> AlbumStructureSettings:
             )
             for position in CoverPosition
         },
+        day_dividers=DividerSettings(enabled=False, template_id="day-divider-simple"),
         month_dividers=DividerSettings(
             enabled=True,
             template_id="month",

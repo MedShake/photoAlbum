@@ -45,8 +45,8 @@ the pack name avoids collisions.
 ```
 
 A pack can provide only some page types, with MSB providing the others. Available
-types are `photo_page`, `cover`, `special_page`, `month_divider`, and
-`year_divider`. For covers, specify `cover_positions`: `front`, `inside_front`,
+types are `photo_page`, `cover`, `special_page`, `day_divider`,
+`month_divider`, and `year_divider`. For covers, specify `cover_positions`: `front`, `inside_front`,
 `inside_back`, and `back`. See the MSB manifest for a complete example.
 
 ## Physical page compatibility
@@ -243,11 +243,38 @@ do not import an editor merely because it is declared in a manifest.
 The application declares only `DEFAULT_TEMPLATE_PACK = "msb"`. The selected
 pack's optional `default_templates` manifest object maps album roles to its own
 IDs: `front_cover`, `inside_front_cover`, `inside_back_cover`, `back_cover`,
-`photo_page`, `year_divider`, `month_divider`. These seven roles are required for
+`photo_page`, `year_divider`, `month_divider`, `day_divider`. These eight roles are required for
 the default pack and validated against each template's supported uses. They are
 not required for other packs. A missing default pack produces a clear error when
 creating the album settings UI, never an import failure or an order-based choice.
 Incompatible defaults still leave the first available GUI choice selected.
+
+## Day dividers
+
+`day_divider` is an ordinary divider role with its own template and `PageInstance`.
+Its planned items and rendered pages carry `year`, `month`, and `day`. Renderers
+read these values from `composition.page`, just as monthly dividers read their
+month. Packs own date formatting, typography, settings editors, and translations.
+MSB supplies `day-divider-simple` as the application's initial day template.
+Other packs need only declare this kind if they offer a daily divider; their
+optional defaults may map `day_divider` to a template from their own pack.
+
+`AlbumStructureSettings.day_dividers` uses the same `DividerSettings` as month
+and year separators, including natural, right-page, and right-page-with-blank-facing
+placement. With daily separators disabled, photo groups remain monthly. When
+enabled, each represented calendar date gets a divider followed by its photo
+group, within the existing year/month hierarchy. Undated photos remain excluded.
+`PeriodEndCapacity` remains monthly; no daily capacity reports are added.
+
+The GUI initially enables day separators only for a nonempty project whose photos
+are all dated within one calendar month of one year. The initial choice follows
+photo changes until the user changes it or saved settings are loaded. Explicit
+and saved choices remain authoritative. Empty projects, undated photos, and
+multiple calendar months do not trigger automatic activation.
+
+The current album settings JSON requires `day_dividers` with `enabled`, `page`,
+and `placement`. The existing schema version stays unchanged. There is no
+migration or fallback for project settings missing this field.
 
 ## Translations and resources
 

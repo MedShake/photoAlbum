@@ -33,6 +33,7 @@ class PlannedPage:
 
     year: int | None = None
     month: int | None = None
+    day: int | None = None
 
     photos: tuple[Photo, ...] = ()
     photo_capacity: int = 0
@@ -92,6 +93,7 @@ class PaginationEngine:
                 continue
 
             if item.kind in (
+                PlanItemKind.DAY_DIVIDER,
                 PlanItemKind.MONTH_DIVIDER,
                 PlanItemKind.YEAR_DIVIDER,
             ):
@@ -146,6 +148,7 @@ class PaginationEngine:
                     template_id=item.template_id,
                     year=item.year,
                     month=item.month,
+                    day=item.day,
                     photos=photos,
                     photo_capacity=capacity,
                     page_instance=item.page_instance,
@@ -339,6 +342,7 @@ class PaginationEngine:
                 template_id=item.template_id,
                 year=item.year,
                 month=item.month,
+                day=item.day,
                 page_instance=item.page_instance,
             )
         )
@@ -350,6 +354,9 @@ class PaginationEngine:
     ) -> DividerPlacement:
         if settings is None:
             return DividerPlacement.NATURAL
+
+        if item.kind == PlanItemKind.DAY_DIVIDER:
+            return settings.day_dividers.placement
 
         if item.kind == PlanItemKind.MONTH_DIVIDER:
             return settings.month_dividers.placement

@@ -5,7 +5,7 @@ from photoalbum.album.composition import PageComposer
 
 from photoalbum.gui.template_labels import template_display_name
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QDate, QLocale, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHeaderView,
@@ -396,6 +396,7 @@ class AlbumPlanWidget(QWidget):
         pages: list,
         *,
         root: QTreeWidgetItem | None,
+        group_days: bool = False,
     ) -> None:
         """Append physical pages without letting grouping reorder them."""
         previous_scoped = []
@@ -443,6 +444,8 @@ class AlbumPlanWidget(QWidget):
         current_month = None
         year_item = None
         month_item = None
+        current_day = None
+        day_item = None
 
         def append(parent, item) -> None:
             if parent is None:
@@ -457,6 +460,7 @@ class AlbumPlanWidget(QWidget):
                 current_month = None
                 year_item = None
                 month_item = None
+                day_item = None
                 continue
 
             if year_item is None or current_year != year:
@@ -467,11 +471,13 @@ class AlbumPlanWidget(QWidget):
                 current_year = year
                 current_month = None
                 month_item = None
+                day_item = None
 
             if month is None:
                 year_item.addChild(self._page_item(page))
                 current_month = None
                 month_item = None
+                day_item = None
                 continue
 
             if month_item is None or current_month != month:
@@ -483,8 +489,24 @@ class AlbumPlanWidget(QWidget):
                 )
                 year_item.addChild(month_item)
                 current_month = month
+                day_item = None
 
-            month_item.addChild(self._page_item(page))
+            if not group_days or page.day is None:
+                month_item.addChild(self._page_item(page))
+                day_item = None
+                continue
+
+            if day_item is None or current_day != page.day:
+                weekday = QLocale(self._translator.language).dayName(
+                    QDate(year, month, page.day).dayOfWeek()
+                )
+                day_item = QTreeWidgetItem(
+                    [f"{page.day}  {weekday.capitalize()}", "", "", ""]
+                )
+                month_item.addChild(day_item)
+                current_day = page.day
+
+            day_item.addChild(self._page_item(page))
 
     def _set_structure(
         self,
@@ -669,6 +691,7 @@ class AlbumPlanWidget(QWidget):
         self._append_chronological_pages(
             body_pages,
             root=body_root,
+            group_days=settings.day_dividers.enabled,
         )
 
         if body_pages:
@@ -784,6 +807,9 @@ class AlbumPlanWidget(QWidget):
 
         elif page.kind == PlanItemKind.PHOTO_GROUP:
             page_type = self._translator.tr("plan.photos_page")
+
+        elif page.kind == PlanItemKind.DAY_DIVIDER:
+            page_type = self._translator.tr("plan.day_divider")
 
         elif page.kind == PlanItemKind.MONTH_DIVIDER:
             page_type = self._translator.tr("plan.month_divider")

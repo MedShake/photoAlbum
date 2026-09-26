@@ -42,6 +42,7 @@ def test_msb_templates_are_discovered():
         "year-divider-classic",
         "month-divider-classic",
         "month-divider-simple",
+        "day-divider-simple",
         "photo-page-1",
         "photo-page-2",
         "photo-page-3",

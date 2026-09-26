@@ -192,6 +192,7 @@ class AlbumStructureSettings:
 
     month_dividers: DividerSettings
     year_dividers: DividerSettings
+    day_dividers: DividerSettings
 
     photo_pages: PhotoPageSettings
 

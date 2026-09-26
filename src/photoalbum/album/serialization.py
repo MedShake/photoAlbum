@@ -51,6 +51,16 @@ def album_settings_to_json(
             in settings.covers.items()
         },
 
+        "day_dividers": {
+            "enabled": settings.day_dividers.enabled,
+            "page": _instance_to_data(
+                settings.day_dividers.page
+            ),
+            "placement": (
+                settings.day_dividers.placement.value
+            ),
+        },
+
         "month_dividers": {
             "enabled": settings.month_dividers.enabled,
             "page": _instance_to_data(
@@ -132,6 +142,7 @@ def album_settings_from_json(
         for position in CoverPosition
     }
 
+    day_data = data["day_dividers"]
     month_data = data["month_dividers"]
     year_data = data["year_dividers"]
     photo_data = data["photo_pages"]
@@ -140,6 +151,16 @@ def album_settings_from_json(
 
     return AlbumStructureSettings(
         covers=covers,
+
+        day_dividers=DividerSettings(
+            enabled=bool(
+                day_data["enabled"]
+            ),
+            page=_instance_from_data(day_data["page"]),
+            placement=DividerPlacement(
+                day_data["placement"]
+            ),
+        ),
 
         month_dividers=DividerSettings(
             enabled=bool(

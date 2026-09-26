@@ -23,6 +23,11 @@ def create_registry() -> TemplateRegistry:
                 allowed_kinds=frozenset({TemplateKind.COVER}),
             ),
             TemplateDefinition(
+                template_id="day",
+                name="Day divider",
+                allowed_kinds=frozenset({TemplateKind.DAY_DIVIDER}),
+            ),
+            TemplateDefinition(
                 template_id="month",
                 name="Month divider",
                 allowed_kinds=frozenset({TemplateKind.MONTH_DIVIDER}),
@@ -61,6 +66,7 @@ def create_settings() -> AlbumStructureSettings:
             )
             for position in CoverPosition
         },
+        day_dividers=DividerSettings(enabled=False, template_id="day"),
         month_dividers=DividerSettings(
             enabled=True,
             template_id="month",

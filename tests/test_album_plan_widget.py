@@ -145,6 +145,7 @@ def create_structure_settings() -> AlbumStructureSettings:
             )
             for position in CoverPosition
         },
+        day_dividers=DividerSettings(enabled=False, template_id="day-divider-simple"),
         month_dividers=DividerSettings(
             enabled=True,
             template_id="month-divider-classic",
@@ -575,3 +576,125 @@ def test_empty_caption_diagnostics_are_not_recomputed(monkeypatch):
     widget.set_result(create_result())
     assert collect.call_count == 1
     widget.close()
+
+
+def test_day_groups_follow_pagination_inside_each_month():
+    from dataclasses import replace
+    from datetime import datetime
+    from pathlib import Path
+    from photoalbum.album import AlbumBuilder, DividerPlacement
+    from photoalbum.gui.widgets import AlbumSettingsWidget
+    from photoalbum.models import Photo
+
+    widget = create_widget()
+    editor = AlbumSettingsWidget(create_template_registry())
+    settings = editor.settings()
+    settings.day_dividers = replace(settings.day_dividers, enabled=True,
+                                    placement=DividerPlacement.NATURAL)
+    settings.month_dividers = replace(settings.month_dividers, placement=DividerPlacement.NATURAL)
+    settings.year_dividers = replace(settings.year_dividers, placement=DividerPlacement.NATURAL)
+    # Deliberately unsorted input; the tree consumes the planner's order.
+    dates = [(4, 10), (3, 12), (3, 2), (4, 2), (3, 2), (3, 2)]
+    photos = [Photo(path=Path(f"{i}.jpg"), filename=f"{i}.jpg",
+                    capture_datetime=datetime(2025, month, day))
+              for i, (month, day) in enumerate(dates)]
+    result = AlbumBuilder(create_template_registry()).build(photos, settings)
+    widget.set_result(result, settings)
+    body = next(widget._tree.topLevelItem(i) for i in range(widget._tree.topLevelItemCount())
+                if widget._tree.topLevelItem(i).text(0) == "Album body")
+    year = body.child(0)
+    months = [year.child(i) for i in range(year.childCount()) if year.child(i).childCount()]
+    assert [item.text(0) for item in months] == ["March", "April"]
+    for month_number, month, expected_days in zip((3, 4), months, ([2, 12], [2, 10])):
+        # The monthly separator stays directly under its month.
+        assert "Month divider" in month.child(0).text(0)
+        days = [month.child(i) for i in range(1, month.childCount())]
+        expected_labels = {
+            3: ["2  Sunday", "12  Wednesday"],
+            4: ["2  Wednesday", "10  Thursday"],
+        }
+        assert [day.text(0) for day in days] == expected_labels[month_number]
+        for day_number, day in zip(expected_days, days):
+            pages = [p for p in result.pagination.pages
+                     if (p.year, p.month, p.day) == (2025, month_number, day_number)]
+            assert page_numbers_in_visual_order(day) == [p.number for p in pages]
+            assert "Day divider" in day.child(0).text(0)
+            assert all("Photos" in day.child(i).text(0) for i in range(1, day.childCount()))
+            assert int(day.text(1)) == len(pages)
+            assert int(day.text(2)) == sum(len(p.photos) for p in pages)
+            assert day.isExpanded()
+            widget._tree.collapseItem(day)
+            assert not day.isExpanded()
+            assert month.isExpanded()
+            widget._tree.expandItem(day)
+            assert day.isExpanded()
+            assert page_numbers_in_visual_order(day) == [p.number for p in pages]
+    assert page_numbers_in_visual_order(body) == [p.number for p in result.pagination.pages]
+    # Even with dated pagination, the setting alone controls the extra level.
+    settings.day_dividers = replace(settings.day_dividers, enabled=False)
+    widget.set_result(result, settings)
+    body = next(widget._tree.topLevelItem(i) for i in range(widget._tree.topLevelItemCount())
+                if widget._tree.topLevelItem(i).text(0) == "Album body")
+    year = body.child(0)
+    months = [year.child(i) for i in range(year.childCount()) if year.child(i).childCount()]
+    assert all(month.child(i).childCount() == 0 for month in months for i in range(month.childCount()))
+    assert page_numbers_in_visual_order(body) == [p.number for p in result.pagination.pages]
+    editor.close()
+    widget.close()
+
+
+def test_day_groups_keep_unscoped_pages_and_reentered_dates_in_physical_order():
+    from dataclasses import replace
+
+    widget = create_widget()
+    settings = create_structure_settings()
+    settings.day_dividers = replace(settings.day_dividers, enabled=True)
+    pages = [
+        PlannedPage(1, PageSide.RIGHT, PlanItemKind.DAY_DIVIDER, "day-divider-simple",
+                    year=2025, month=3, day=2),
+        PlannedPage(2, PageSide.LEFT, PlanItemKind.PHOTO_GROUP, "photo-page-2",
+                    year=2025, month=3, day=2),
+        PlannedPage(3, PageSide.RIGHT, None, None, year=2025, month=3,
+                    blank_reason=BlankPageReason.TECHNICAL),
+        PlannedPage(4, PageSide.LEFT, PlanItemKind.DAY_DIVIDER, "day-divider-simple",
+                    year=2025, month=3, day=12),
+        PlannedPage(5, PageSide.RIGHT, PlanItemKind.PHOTO_GROUP, "photo-page-2",
+                    year=2025, month=3, day=2),
+    ]
+    widget.set_result(result_with_pages(pages), settings)
+    body = next(widget._tree.topLevelItem(i) for i in range(widget._tree.topLevelItemCount())
+                if widget._tree.topLevelItem(i).text(0) == "Album body")
+    march = body.child(0).child(0)
+    assert [march.child(i).text(0) for i in range(march.childCount())] == [
+        "2  Sunday", "Page 3 — Technical blank", "12  Wednesday", "2  Sunday",
+    ]
+    assert page_numbers_in_visual_order(body) == [1, 2, 3, 4, 5]
+    widget.close()
+
+
+def test_day_group_weekday_uses_application_language():
+    from dataclasses import replace
+    from PySide6.QtCore import QLocale
+
+    app = QApplication.instance() or QApplication([])
+    settings = create_structure_settings()
+    settings.day_dividers = replace(settings.day_dividers, enabled=True)
+    result = result_with_pages([
+        PlannedPage(1, PageSide.RIGHT, PlanItemKind.DAY_DIVIDER, "day-divider-simple",
+                    year=2025, month=10, day=17),
+    ])
+    previous_locale = QLocale()
+    try:
+        # The application language, not Qt's default locale, determines the label.
+        QLocale.setDefault(QLocale("de_DE"))
+        for language, expected in [("fr", "17  Vendredi"), ("en", "17  Friday")]:
+            widget = AlbumPlanWidget(create_template_registry(), translator=Translator(language))
+            try:
+                widget.set_result(result, settings)
+                labels = [label for i in range(widget._tree.topLevelItemCount())
+                          for label in structure_labels(widget._tree.topLevelItem(i))]
+                assert expected in labels
+            finally:
+                widget.close()
+    finally:
+        QLocale.setDefault(previous_locale)

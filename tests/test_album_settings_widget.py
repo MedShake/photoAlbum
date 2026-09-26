@@ -286,6 +286,7 @@ def test_settings_can_be_restored():
                 template_id="geographic-word-cloud",
             ),
         },
+        day_dividers=DividerSettings(enabled=False, template_id="day-divider-simple"),
         month_dividers=DividerSettings(
             enabled=False,
             template_id="month-divider-classic",

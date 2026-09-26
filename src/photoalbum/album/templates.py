@@ -11,6 +11,7 @@ class TemplateKind(str, Enum):
     COVER = "cover"
     PHOTO_PAGE = "photo_page"
     MONTH_DIVIDER = "month_divider"
+    DAY_DIVIDER = "day_divider"
     YEAR_DIVIDER = "year_divider"
     SPECIAL_PAGE = "special_page"
 

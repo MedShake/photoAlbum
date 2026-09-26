@@ -52,6 +52,11 @@ def registry(
                 photo_capacity=capacity,
             ),
             TemplateDefinition(
+                template_id="day",
+                name="Day divider",
+                allowed_kinds=frozenset({TemplateKind.DAY_DIVIDER}),
+            ),
+            TemplateDefinition(
                 template_id="month",
                 name="Month divider",
                 allowed_kinds=frozenset({TemplateKind.MONTH_DIVIDER}),
@@ -335,6 +340,7 @@ def album_settings(
             )
             for position in CoverPosition
         },
+        day_dividers=DividerSettings(enabled=False, template_id="day"),
         month_dividers=DividerSettings(
             enabled=True,
             template_id="month",

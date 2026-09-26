@@ -372,6 +372,7 @@ def _default_templates(value, definitions) -> dict[str, str]:
         "photo_page": (TemplateKind.PHOTO_PAGE, None),
         "year_divider": (TemplateKind.YEAR_DIVIDER, None),
         "month_divider": (TemplateKind.MONTH_DIVIDER, None),
+        "day_divider": (TemplateKind.DAY_DIVIDER, None),
     }
     for role, template_id in value.items():
         if role not in AlbumTemplateDefaults.__dataclass_fields__:

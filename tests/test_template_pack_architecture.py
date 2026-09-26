@@ -39,12 +39,13 @@ def selected_templates(settings):
         settings.photo_pages.template_id,
         settings.year_dividers.template_id,
         settings.month_dividers.template_id,
+        settings.day_dividers.template_id,
     ]
 
 
 EXPECTED_DEFAULTS = [
     "year-photo-scatter", "geographic-word-cloud", "dedication",
-    "geographic-word-cloud", "photo-page-2", "calendar-index", "month-divider-classic",
+    "geographic-word-cloud", "photo-page-2", "calendar-index", "month-divider-classic", "day-divider-simple",
 ]
 
 
@@ -66,7 +67,7 @@ def test_msb_defaults_ignore_discovery_and_alphabetical_order(
         'schema_version': 1, 'id': extra_id, 'name': extra_id,
         'templates': [{'id': extra_id, 'name': extra_id, 'module': 'unused_backend',
                        'kinds': ['cover', 'special_page', 'photo_page',
-                                 'month_divider', 'year_divider'], 'photo_capacity': 1}],
+                                 'month_divider', 'year_divider', 'day_divider'], 'photo_capacity': 1}],
     }))
     paths = discovery._manifest_paths(tmp_path)
     if reverse:

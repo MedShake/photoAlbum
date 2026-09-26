@@ -58,6 +58,7 @@ class AlbumSummaryBuilder:
             1
             for page in pages
             if page.kind in (
+                PlanItemKind.DAY_DIVIDER,
                 PlanItemKind.MONTH_DIVIDER,
                 PlanItemKind.YEAR_DIVIDER,
             )

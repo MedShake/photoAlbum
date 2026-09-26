@@ -3,7 +3,7 @@
 **MSB** is the original template pack bundled with Photo Album.
 
 It contains the historical templates used for covers, special pages,
-year and month dividers, and ordinary photo pages.
+year, month, and day dividers, and ordinary photo pages.
 
 The pack is identified by `msb`. Its catalog is declared in:
 
@@ -35,6 +35,7 @@ MSB currently contains the following templates.
 | `year-divider-classic` | Simple year divider | Year divider |
 | `month-divider-classic` | Month divider with city list | Month divider |
 | `month-divider-simple` | Simple month divider | Month divider |
+| `day-divider-simple` | Simple day divider | Day divider |
 | `photo-page-1` | One photo | Photo page |
 | `photo-page-2` | Two photos | Photo page |
 | `photo-page-3` | Three photos | Photo page |
@@ -146,6 +147,15 @@ information associated with that period, including its city list.
 
 Its appearance participates in the common MSB theme and it has its
 own page-level settings.
+
+## Simple day divider
+
+`day-divider-simple` displays the complete date carried by the planned day page,
+using the selected language (for example, “March 1, 2025” or “1er mars 2025”). It
+uses the MSB month's color and shared font, with local font and size controls.
+The default title size is 48 pt; long dates shrink to fit the available width.
+Its settings preview uses a sample date. Actual album previews and PDF exports
+use the same renderer with the day's `year`, `month`, and `day` values.
 
 ## Simple month divider
 

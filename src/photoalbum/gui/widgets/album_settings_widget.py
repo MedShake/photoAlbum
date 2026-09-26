@@ -74,6 +74,8 @@ class AlbumSettingsWidget(QWidget):
             PageInstance,
         ] = {}
 
+        self._day_divider_instance: PageInstance | None = None
+        self._day_default_automatic = True
         self._month_divider_instance: PageInstance | None = None
         self._year_divider_instance: PageInstance | None = None
         self._photo_page_instance: PageInstance | None = None
@@ -140,6 +142,8 @@ class AlbumSettingsWidget(QWidget):
             self._inside_front_cover_combo,
             self._inside_back_cover_combo,
             self._back_cover_combo,
+            self._day_divider_combo,
+            self._day_placement_combo,
             self._month_divider_combo,
             self._month_placement_combo,
             self._year_divider_combo,
@@ -152,6 +156,9 @@ class AlbumSettingsWidget(QWidget):
                 self._emit_settings_changed
             )
 
+        self._day_dividers_checkbox.toggled.connect(
+            self._day_dividers_changed
+        )
         self._month_dividers_checkbox.toggled.connect(
             self._emit_settings_changed
         )
@@ -464,6 +471,11 @@ class AlbumSettingsWidget(QWidget):
                 CoverPosition.BACK,
             ),
             (
+                self._day_divider_combo,
+                TemplateKind.DAY_DIVIDER,
+                None,
+            ),
+            (
                 self._month_divider_combo,
                 TemplateKind.MONTH_DIVIDER,
                 None,
@@ -722,6 +734,51 @@ class AlbumSettingsWidget(QWidget):
         group = QGroupBox(self._translator.tr("album.dividers"))
         layout = QVBoxLayout(group)
 
+        day_layout = QHBoxLayout()
+
+        self._day_dividers_checkbox = QCheckBox(
+            self._translator.tr("album.day_separators")
+        )
+        self._day_divider_combo = (
+            self._create_template_combo(
+                TemplateKind.DAY_DIVIDER
+            )
+        )
+        self._day_placement_combo = (
+            self._create_placement_combo()
+        )
+
+        day_layout.addWidget(
+            self._day_dividers_checkbox
+        )
+        day_layout.addWidget(
+            self._day_divider_combo,
+            1,
+        )
+
+        self._day_divider_settings_button = QPushButton(
+            self._translator.tr(
+                "album.settings"
+            )
+        )
+
+        self._day_divider_settings_button.clicked.connect(
+            lambda checked=False:
+            self._configure_divider_instance(
+                "day"
+            )
+        )
+
+        day_layout.addWidget(
+            self._day_divider_settings_button
+        )
+
+        day_layout.addWidget(
+            self._day_placement_combo,
+        )
+
+        layout.addLayout(day_layout)
+
         month_layout = QHBoxLayout()
 
         self._month_dividers_checkbox = QCheckBox(
@@ -815,6 +872,9 @@ class AlbumSettingsWidget(QWidget):
         self._year_divider_hint = QLabel()
         layout.addWidget(self._year_divider_hint)
 
+        self._day_dividers_checkbox.toggled.connect(
+            self._update_divider_controls
+        )
         self._month_dividers_checkbox.toggled.connect(
             self._update_divider_controls
         )
@@ -831,6 +891,9 @@ class AlbumSettingsWidget(QWidget):
         if kind == "month":
             combo = self._month_divider_combo
             instance = self._month_divider_instance
+        elif kind == "day":
+            combo = self._day_divider_combo
+            instance = self._day_divider_instance
         elif kind == "year":
             combo = self._year_divider_combo
             instance = self._year_divider_instance
@@ -866,11 +929,7 @@ class AlbumSettingsWidget(QWidget):
             template_pack_settings=(
                 self._template_pack_settings
             ),
-            usage=(
-                "year_divider"
-                if kind == "year"
-                else "month_divider"
-            ),
+            usage=f"{kind}_divider",
             parent=self,
         )
 
@@ -887,6 +946,8 @@ class AlbumSettingsWidget(QWidget):
 
         if kind == "month":
             self._month_divider_instance = instance
+        elif kind == "day":
+            self._day_divider_instance = instance
         else:
             self._year_divider_instance = instance
 
@@ -1283,6 +1344,8 @@ class AlbumSettingsWidget(QWidget):
             self._default_templates.back_cover,
         )
 
+        self._day_dividers_checkbox.setChecked(False)
+        self._day_default_automatic = True
         self._month_dividers_checkbox.setChecked(True)
         self._year_dividers_checkbox.setChecked(True)
 
@@ -1295,10 +1358,19 @@ class AlbumSettingsWidget(QWidget):
             self._default_templates.year_divider,
         )
         self._set_combo_template(
+            self._day_divider_combo,
+            self._default_templates.day_divider,
+        )
+
+        self._set_combo_template(
             self._month_divider_combo,
             self._default_templates.month_divider,
         )
 
+        self._set_placement(
+            self._day_placement_combo,
+            DividerPlacement.RIGHT_PAGE,
+        )
         self._set_placement(
             self._month_placement_combo,
             DividerPlacement.RIGHT_PAGE,
@@ -1307,6 +1379,30 @@ class AlbumSettingsWidget(QWidget):
             self._year_placement_combo,
             DividerPlacement.RIGHT_PAGE,
         )
+
+    def _day_dividers_changed(self, *args) -> None:
+        if not self._loading_settings:
+            self._day_default_automatic = False
+        self._emit_settings_changed()
+
+    def set_available_photos(self, photos) -> None:
+        """Apply the initial day choice until explicitly changed or loaded."""
+        if not self._day_default_automatic:
+            return
+        photos = tuple(photos)
+        months = {
+            (photo.capture_datetime.year, photo.capture_datetime.month)
+            for photo in photos if photo.capture_datetime is not None
+        }
+        enabled = len(months) == 1 and all(
+            photo.capture_datetime is not None for photo in photos
+        )
+        was_loading = self._loading_settings
+        self._loading_settings = True
+        try:
+            self._day_dividers_checkbox.setChecked(enabled)
+        finally:
+            self._loading_settings = was_loading
 
     def set_available_years(
         self,
@@ -1344,6 +1440,7 @@ class AlbumSettingsWidget(QWidget):
         # template-owned state.
         self._cover_instances.clear()
         self._photo_page_instance = None
+        self._day_divider_instance = None
 
         self._front_matter_list.clear()
         self._back_matter_list.clear()
@@ -1390,6 +1487,9 @@ class AlbumSettingsWidget(QWidget):
 
     def settings(self) -> AlbumStructureSettings:
         # Keep replacement instances stable across persistence and rebuilding.
+        self._day_divider_instance = self._divider_instance(
+            self._day_divider_instance, self._day_divider_combo,
+        )
         self._month_divider_instance = self._divider_instance(
             self._month_divider_instance, self._month_divider_combo,
         )
@@ -1432,6 +1532,15 @@ class AlbumSettingsWidget(QWidget):
                     ),
                 )
             },
+            day_dividers=DividerSettings(
+                enabled=(
+                    self._day_dividers_checkbox.isChecked()
+                ),
+                page=self._day_divider_instance,
+                placement=self._placement(
+                    self._day_placement_combo
+                ),
+            ),
             month_dividers=DividerSettings(
                 enabled=(
                     self._month_dividers_checkbox.isChecked()
@@ -1544,6 +1653,24 @@ class AlbumSettingsWidget(QWidget):
                 ].template_id,
             )
 
+            self._day_default_automatic = False
+            self._day_dividers_checkbox.setChecked(
+                settings.day_dividers.enabled
+            )
+
+            self._day_divider_instance = (
+                settings.day_dividers.page
+            )
+
+            self._set_combo_template(
+                self._day_divider_combo,
+                settings.day_dividers.template_id,
+            )
+            self._set_placement(
+                self._day_placement_combo,
+                settings.day_dividers.placement,
+            )
+
             self._month_dividers_checkbox.setChecked(
                 settings.month_dividers.enabled
             )
@@ -1609,6 +1736,20 @@ class AlbumSettingsWidget(QWidget):
             self._loading_settings = False
 
     def _update_divider_controls(self) -> None:
+        day_enabled = (
+            self._day_dividers_checkbox.isChecked()
+        )
+
+        self._day_divider_combo.setEnabled(
+            day_enabled
+        )
+        self._day_divider_settings_button.setEnabled(
+            day_enabled
+        )
+        self._day_placement_combo.setEnabled(
+            day_enabled
+        )
+
         month_enabled = (
             self._month_dividers_checkbox.isChecked()
         )

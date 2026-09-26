@@ -287,6 +287,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "preview.cover.inside_front": "Inside front cover",
         "preview.cover.inside_back": "Inside back cover",
         "preview.cover.back": "Back cover",
+        "preview.day_divider": "Day divider",
         "preview.month_divider": "Month divider",
         "preview.year_divider": "Year divider",
         "preview.special_page": "Special page",
@@ -550,6 +551,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.back_cover": "Back cover:",
 
         "album.dividers": "Dividers",
+        "album.day_separators": "Day separators",
         "album.month_separators": "Month separators",
         "album.year_separators": "Year separators",
 
@@ -646,6 +648,7 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "plan.page": "Page",
         "plan.photos_page": "Photos",
+        "plan.day_divider": "Day divider",
         "plan.month_divider": "Month divider",
         "plan.year_divider": "Year divider",
         "plan.special_page": "Special page",
@@ -960,6 +963,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "preview.cover.inside_front": "2e de couverture",
         "preview.cover.inside_back": "3e de couverture",
         "preview.cover.back": "4e de couverture",
+        "preview.day_divider": "Séparateur de jour",
         "preview.month_divider": "Séparateur de mois",
         "preview.year_divider": "Séparateur d’année",
         "preview.special_page": "Page spéciale",
@@ -1226,6 +1230,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.back_cover": "4e de couverture :",
 
         "album.dividers": "Séparateurs",
+        "album.day_separators": "Séparateurs de jours",
         "album.month_separators": "Séparateurs de mois",
         "album.year_separators": "Séparateurs d’année",
 
@@ -1326,6 +1331,7 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "plan.page": "Page",
         "plan.photos_page": "Photos",
+        "plan.day_divider": "Séparateur de jour",
         "plan.month_divider": "Séparateur de mois",
         "plan.year_divider": "Séparateur d’année",
         "plan.special_page": "Page spéciale",

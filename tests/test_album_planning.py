@@ -43,6 +43,7 @@ def settings(
             )
             for position in CoverPosition
         },
+        day_dividers=DividerSettings(enabled=False, template_id="day-divider-simple"),
         month_dividers=DividerSettings(
             enabled=months,
             template_id="month",

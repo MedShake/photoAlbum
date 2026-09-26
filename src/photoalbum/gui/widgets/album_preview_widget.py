@@ -529,6 +529,9 @@ class AlbumPagePreview(_PreviewPageBase):
                 "preview.blank_page"
             )
 
+        elif page.kind == PlanItemKind.DAY_DIVIDER:
+            text = self._translator.tr("preview.day_divider")
+
         elif page.kind == PlanItemKind.MONTH_DIVIDER:
             text = self._translator.tr(
                 "preview.month_divider"

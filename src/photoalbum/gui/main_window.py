@@ -654,6 +654,7 @@ class MainWindow(QMainWindow):
         }
 
         self._album_settings_widget.set_available_years(years)
+        self._album_settings_widget.set_available_photos(photos)
 
     def _prewarm_expensive_previews(self, result, settings, photos) -> None:
         """

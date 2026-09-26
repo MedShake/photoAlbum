@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from itertools import groupby
 
 from photoalbum.models import Photo
 
@@ -15,6 +16,7 @@ class PlanItemKind(str, Enum):
     SPECIAL_PAGE = "special_page"
     YEAR_DIVIDER = "year_divider"
     MONTH_DIVIDER = "month_divider"
+    DAY_DIVIDER = "day_divider"
     PHOTO_GROUP = "photo_group"
 
 
@@ -25,6 +27,7 @@ class PlanItem:
 
     year: int | None = None
     month: int | None = None
+    day: int | None = None
     photos: tuple[Photo, ...] = ()
 
     # Configurable page occurrence.
@@ -158,6 +161,31 @@ class AlbumPlanner:
         settings: AlbumStructureSettings,
     ) -> None:
         assert month is not None
+
+        if settings.day_dividers.enabled:
+            for date, group in groupby(photos, key=lambda photo: photo.capture_datetime.date()):
+                plan.items.append(
+                    PlanItem(
+                        kind=PlanItemKind.DAY_DIVIDER,
+                        template_id=settings.day_dividers.template_id,
+                        year=date.year,
+                        month=date.month,
+                        day=date.day,
+                        page_instance=settings.day_dividers.page,
+                    )
+                )
+                plan.items.append(
+                    PlanItem(
+                        kind=PlanItemKind.PHOTO_GROUP,
+                        template_id=settings.photo_pages.template_id,
+                        year=date.year,
+                        month=date.month,
+                        day=date.day,
+                        photos=tuple(group),
+                        page_instance=settings.photo_pages.page,
+                    )
+                )
+            return
 
         plan.items.append(
             PlanItem(

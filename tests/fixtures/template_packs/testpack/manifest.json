@@ -9,7 +9,7 @@
     "id": "testpack-page",
     "name": "Arbitrary page",
     "module": "photoalbum.templates.testpack.components",
-    "kinds": ["photo_page", "cover", "special_page", "month_divider", "year_divider"],
+    "kinds": ["photo_page", "cover", "special_page", "month_divider", "year_divider", "day_divider"],
     "photo_capacity": 1
   }]
 }

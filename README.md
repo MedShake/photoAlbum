@@ -122,7 +122,7 @@ It first allows you to select the **paper size** and **orientation**.
 Album composition then relies on Photo Album's template engine. Templates can be selected for the different families of pages that make up an album:
 
 - the four cover pages;
-- transition pages between months or years;
+- transition pages between days, months, or years;
 - pages containing photographs;
 - special-purpose pages that can be added to the album.
 

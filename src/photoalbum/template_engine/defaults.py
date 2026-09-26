@@ -13,6 +13,7 @@ class AlbumTemplateDefaults:
     photo_page: str
     year_divider: str
     month_divider: str
+    day_divider: str
 
 
 def default_template_choices(registry) -> AlbumTemplateDefaults:
