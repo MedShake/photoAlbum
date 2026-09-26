@@ -333,19 +333,6 @@ def compose_geographic_word_cloud(
         ),
     )
 
-    placed: list[
-        tuple[
-            float,
-            float,
-            float,
-            float,
-        ]
-    ] = []
-
-    words: list[
-        GeographicWord
-    ] = []
-
     longitude_span = (
         maximum_longitude
         - minimum_longitude
@@ -367,40 +354,49 @@ def compose_geographic_word_cloud(
         (-1, -1),
     )
 
-    for city, data in ordered:
-        initial_font = _font_size(
+    nominal_fonts = {
+        city: _font_size(
             data.count,
             minimum_count=minimum_count,
             maximum_count=maximum_count,
             minimum_font=minimum_font_pt,
             maximum_font=maximum_font_pt,
         )
+        for city, data in ordered
+    }
 
-        font_size = initial_font
-        placed_word = False
+    def try_compose(
+        scale: float,
+    ) -> tuple[GeographicWord, ...] | None:
+        placed: list[
+            tuple[
+                float,
+                float,
+                float,
+                float,
+            ]
+        ] = []
 
-        while (
-            font_size >= minimum_font_pt
-            and not placed_word
-        ):
-            word_width, word_height = (
-                _word_size_mm(
-                    city,
-                    font_size,
-                )
+        words: list[GeographicWord] = []
+
+        for city, data in ordered:
+            font_size = nominal_fonts[city] * scale
+
+            word_width, word_height = _word_size_mm(
+                city,
+                font_size,
             )
 
-            usable_width = max(
-                0.0,
-                available_width
-                - word_width,
-            )
+            # The whole scale attempt fails if even one word
+            # cannot physically fit inside the available area.
+            if (
+                word_width > available_width
+                or word_height > available_height
+            ):
+                return None
 
-            usable_height = max(
-                0.0,
-                available_height
-                - word_height,
-            )
+            usable_width = available_width - word_width
+            usable_height = available_height - word_height
 
             if longitude_span == 0:
                 longitude_ratio = 0.5
@@ -431,13 +427,13 @@ def compose_geographic_word_cloud(
                 * usable_height
             )
 
-            # Original PHP behaviour: first try geographical
-            # position, then eight directions with growing
-            # offsets.
-            offsets = range(
-                0,
-                52,
-                2,
+            placed_word = False
+
+            # Collision displacement belongs to the cloud
+            # geometry, so it follows the same global scale.
+            offsets = (
+                offset * scale
+                for offset in range(0, 52, 2)
             )
 
             for offset in offsets:
@@ -448,30 +444,18 @@ def compose_geographic_word_cloud(
                 )
 
                 for dx, dy in candidates:
-                    x = (
-                        base_x
-                        + dx * offset
-                    )
-                    y = (
-                        base_y
-                        + dy * offset
-                    )
+                    x = base_x + dx * offset
+                    y = base_y + dy * offset
 
                     x = min(
-                        max(
-                            x,
-                            margin_mm,
-                        ),
+                        max(x, margin_mm),
                         page_width_mm
                         - margin_mm
                         - word_width,
                     )
 
                     y = min(
-                        max(
-                            y,
-                            margin_mm,
-                        ),
+                        max(y, margin_mm),
                         page_height_mm
                         - margin_mm
                         - word_height,
@@ -493,22 +477,14 @@ def compose_geographic_word_cloud(
                     ):
                         continue
 
-                    placed.append(
-                        candidate
-                    )
+                    placed.append(candidate)
 
                     words.append(
                         GeographicWord(
                             text=city,
                             count=data.count,
-                            x=(
-                                x
-                                / page_width_mm
-                            ),
-                            y=(
-                                y
-                                / page_height_mm
-                            ),
+                            x=x / page_width_mm,
+                            y=y / page_height_mm,
                             width=(
                                 word_width
                                 / page_width_mm
@@ -529,7 +505,52 @@ def compose_geographic_word_cloud(
                     break
 
             if not placed_word:
-                font_size -= 2.0
+                return None
+
+        return tuple(words)
+
+    words: tuple[GeographicWord, ...] = ()
+
+    # Start from the largest scale at which every word can
+    # physically fit inside the available page area.
+    physical_scale = 1.0
+
+    for city, _data in ordered:
+        nominal_width, nominal_height = _word_size_mm(
+            city,
+            nominal_fonts[city],
+        )
+
+        if nominal_width > 0:
+            physical_scale = min(
+                physical_scale,
+                available_width / nominal_width,
+            )
+
+        if nominal_height > 0:
+            physical_scale = min(
+                physical_scale,
+                available_height / nominal_height,
+            )
+
+    candidate_words = try_compose(physical_scale)
+
+    if candidate_words is not None:
+        words = candidate_words
+    else:
+        # Physical fit is only the upper bound. Collisions may
+        # still require a smaller global scale. Keep every word
+        # proportional while searching downward from that bound.
+        scale = physical_scale - 0.01
+
+        while scale > 0:
+            candidate_words = try_compose(scale)
+
+            if candidate_words is not None:
+                words = candidate_words
+                break
+
+            scale -= 0.01
 
     return GeographicWordCloud(
         words=tuple(words),

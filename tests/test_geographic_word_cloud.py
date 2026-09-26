@@ -357,3 +357,90 @@ def test_widget_renderer_forwards_physical_page_geometry(
         "page_width_mm": 297.0,
         "page_height_mm": 210.0,
     }
+
+
+def test_constrained_geometry_preserves_global_font_proportions():
+    """Constrained geometry scales every city by one common factor."""
+    specs = (
+        ("Saint-Sébastien-sur-Loire", 8, 47.20, -1.50),
+        ("Nantes", 6, 47.22, -1.55),
+        ("Rezé", 4, 47.18, -1.54),
+        ("Vertou", 2, 47.17, -1.47),
+    )
+
+    photos = []
+    index = 0
+
+    for city, count, latitude, longitude in specs:
+        for _ in range(count):
+            index += 1
+            photos.append(
+                photo(
+                    f"photo-{index}.jpg",
+                    city=city,
+                    year=2025,
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+            )
+
+    cloud = compose_geographic_word_cloud(
+        photos,
+        page_width_mm=120.0,
+        page_height_mm=160.0,
+        seed=42,
+    )
+
+    assert {word.text for word in cloud.words} == {
+        city for city, *_ in specs
+    }
+
+    # With counts 2, 4, 6 and 8, nominal sizes are respectively
+    # 10, 20, 30 and 40 pt. Whatever physical scale is required
+    # by the page, one common factor must preserve those ratios.
+    sizes = {
+        word.text: word.font_size_pt
+        for word in cloud.words
+    }
+
+    scales = (
+        sizes["Saint-Sébastien-sur-Loire"] / 40.0,
+        sizes["Nantes"] / 30.0,
+        sizes["Rezé"] / 20.0,
+        sizes["Vertou"] / 10.0,
+    )
+
+    assert max(scales) - min(scales) < 1e-9
+
+    for word in cloud.words:
+        assert 0.0 <= word.x
+        assert 0.0 <= word.y
+        assert word.x + word.width <= 1.0 + 1e-9
+        assert word.y + word.height <= 1.0 + 1e-9
+
+    limiting_word = next(
+        word
+        for word in cloud.words
+        if word.text == "Saint-Sébastien-sur-Loire"
+    )
+
+    # This scenario is limited by physical width rather than a
+    # collision. The selected common scale must therefore be at
+    # the physical width boundary.
+    from photoalbum.templates.msb.geographic_word_cloud.composition import (
+        _word_size_mm,
+    )
+
+    scale = limiting_word.font_size_pt / 40.0
+
+    width_at_scale, _ = _word_size_mm(
+        limiting_word.text,
+        40.0 * scale,
+    )
+    width_above_scale, _ = _word_size_mm(
+        limiting_word.text,
+        40.0 * (scale + 0.001),
+    )
+
+    assert width_at_scale <= 80.0
+    assert width_above_scale > 80.0
