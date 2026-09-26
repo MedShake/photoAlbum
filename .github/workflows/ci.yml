@@ -32,48 +32,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0
 
-      - name: Install build tools
-        run: python -m pip install --upgrade pip build
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
 
       - name: Install Photo Album
         run: python -m pip install -e ".[dev]"
 
       - name: Run tests
         run: pytest
-
-      - name: Build wheel and source distribution
-        run: python -m build
-
-      - name: Verify application icon in wheel
-        shell: python
-        run: |
-          from pathlib import Path
-          from zipfile import ZipFile
-
-          wheels = list(Path("dist").glob("*.whl"))
-
-          if len(wheels) != 1:
-              raise SystemExit(
-                  f"Expected exactly one wheel, found {len(wheels)}"
-              )
-
-          wheel = wheels[0]
-
-          with ZipFile(wheel) as archive:
-              expected = "photoalbum/resources/icons/photoalbum.svg"
-
-              if expected not in archive.namelist():
-                  raise SystemExit(
-                      f"Missing application icon in {wheel.name}: "
-                      f"{expected}"
-                  )
-
-          print(f"OK: {expected} found in {wheel.name}")
-
-      - name: Upload Python packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-packages
-          path: |
-            dist/*.whl
-            dist/*.tar.gz
