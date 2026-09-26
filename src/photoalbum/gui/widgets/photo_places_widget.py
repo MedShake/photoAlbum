@@ -9,6 +9,7 @@ from PySide6.QtCore import (
     QPoint,
     QRect,
     QSize,
+    Signal,
     QTimer,
     Qt,
 )
@@ -35,6 +36,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QStyle,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QTreeWidget,
@@ -155,7 +158,7 @@ class FlowLayout(QLayout):
         for item in self._items:
             widget = item.widget()
 
-            if widget is None:
+            if widget is None or item.isEmpty():
                 continue
 
             hint = item.sizeHint()
@@ -200,6 +203,32 @@ class FlowLayout(QLayout):
             - rect.y()
             + margins.bottom()
         )
+
+
+class _PhotoCell(QWidget):
+    """Report height at the column width, not at the layout's preferred width."""
+
+    geometry_changed = Signal()
+
+    def event(self, event):
+        result = super().event(event)
+        if event.type() == QEvent.Type.LayoutRequest:
+            self.geometry_changed.emit()
+        return result
+
+    def __init__(self, tree, column):
+        super().__init__()
+        self._tree = tree
+        self._column = column
+
+    def sizeHint(self) -> QSize:
+        layout = self.layout()
+        if layout is None:
+            return super().sizeHint()
+        width = self._tree.columnWidth(self._column)
+        height = (layout.totalHeightForWidth(width) if layout.hasHeightForWidth()
+                  else layout.totalSizeHint().height())
+        return QSize(width, max(height, layout.totalMinimumSize().height()))
 
 
 class PhotoPlacesWidget(QWidget):
@@ -275,7 +304,6 @@ class PhotoPlacesWidget(QWidget):
 
     THUMBNAIL_WIDTH = 72
     THUMBNAIL_HEIGHT = 54
-    NATURAL_ROW_HEIGHT = 64
 
     def __init__(
         self,
@@ -338,15 +366,28 @@ class PhotoPlacesWidget(QWidget):
 
         self._editor_rows: dict[
             str,
-            tuple[QTreeWidgetItem, QWidget, FlowLayout],
+            tuple[
+                QTreeWidgetItem,
+                QWidget,
+                FlowLayout | None,
+            ],
         ] = {}
         self._truth_labels: dict[
             str,
             tuple[QLabel, QLabel],
         ] = {}
-        self._pencil_buttons: dict[
+        # Location mode selectors, keyed by photo path.
+        self._location_mode_boxes: dict[
             str,
-            QPushButton,
+            QComboBox,
+        ] = {}
+
+        # Both location representations stay alive. Switching the
+        # combo only changes their visibility; it never rebuilds the
+        # complete editor cell.
+        self._location_mode_widgets: dict[
+            str,
+            tuple[QWidget, QWidget, QLineEdit],
         ] = {}
 
         self._filter_text = ""
@@ -407,7 +448,8 @@ class PhotoPlacesWidget(QWidget):
         self._thumbnail_cache.clear()
         self._editor_rows.clear()
         self._truth_labels.clear()
-        self._pencil_buttons.clear()
+        self._location_mode_boxes.clear()
+        self._location_mode_widgets.clear()
         self._month_photos.clear()
         self._materialized_months.clear()
         self._thumbnail_generation += 1
@@ -615,11 +657,10 @@ class PhotoPlacesWidget(QWidget):
         header_font.setBold(False)
         header.setFont(header_font)
         header.sectionResized.connect(
-            lambda *_: QTimer.singleShot(
-                0,
-                self._update_all_editor_heights,
-            )
+            lambda *_: self._update_all_editor_heights()
         )
+
+        header.geometriesChanged.connect(self._update_all_editor_heights)
 
         header.setStyleSheet(
             "QHeaderView::section {"
@@ -917,7 +958,7 @@ class PhotoPlacesWidget(QWidget):
             self._thumbnail_labels.clear()
             self._editor_rows.clear()
             self._truth_labels.clear()
-            self._pencil_buttons.clear()
+            self._location_mode_boxes.clear()
 
             self._month_photos.clear()
             self._materialized_months.clear()
@@ -1240,47 +1281,7 @@ class PhotoPlacesWidget(QWidget):
         finally:
             self._tree.setUpdatesEnabled(True)
 
-        # Newly inserted editor widgets do not yet have their
-        # definitive geometry here. In particular, FlowLayout may
-        # wrap differently once QTreeWidget has assigned the real
-        # width of column 3.
-        #
-        # First let Qt complete insertion/layout, then compute row
-        # heights. A second event-loop turn catches geometry changes
-        # caused by the first height update.
-        QTimer.singleShot(
-            0,
-            self._stabilize_materialized_rows,
-        )
-
-
-    def _stabilize_materialized_rows(
-        self,
-    ) -> None:
-        # Pass 1: force the freshly inserted widgets/layouts to use
-        # the actual tree-column geometry.
-        self._tree.doItemsLayout()
-        self._tree.viewport().updateGeometry()
-
         self._update_all_editor_heights()
-
-        QTimer.singleShot(
-            0,
-            self._finish_materialized_rows_layout,
-        )
-
-    def _finish_materialized_rows_layout(
-        self,
-    ) -> None:
-        # Pass 2: row heights may themselves have changed the
-        # viewport geometry, so recompute wrapping once more.
-        self._tree.doItemsLayout()
-        self._tree.viewport().updateGeometry()
-
-        self._update_all_editor_heights()
-
-        self._tree.doItemsLayout()
-        self._tree.viewport().update()
 
     def _group_item(
         self,
@@ -1695,7 +1696,7 @@ class PhotoPlacesWidget(QWidget):
             photo
         )
 
-        container = QWidget()
+        container = _PhotoCell(self._tree, 0)
         layout = QHBoxLayout(container)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.addWidget(
@@ -1704,18 +1705,13 @@ class PhotoPlacesWidget(QWidget):
             Qt.AlignmentFlag.AlignCenter,
         )
 
+        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        container.setProperty("photo_path", str(photo.path))
+        container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
             0,
             container,
-        )
-
-        item.setSizeHint(
-            0,
-            QSize(
-                self.THUMBNAIL_WIDTH + 8,
-                self.NATURAL_ROW_HEIGHT,
-            ),
         )
 
     def _queue_thumbnail(
@@ -1824,10 +1820,13 @@ class PhotoPlacesWidget(QWidget):
             watched is self._tree.viewport()
             and event.type() == QEvent.Type.Resize
         ):
-            QTimer.singleShot(
-                0,
-                self._update_all_editor_heights,
-            )
+            self._update_all_editor_heights()
+
+        if isinstance(watched, _PhotoCell) and event.type() == QEvent.Type.Resize:
+            if event.size().width() != event.oldSize().width():
+                row = self._editor_rows.get(watched.property("photo_path"))
+                if row is not None:
+                    self._update_item_height(row[0])
 
         if watched in self._thumbnail_labels:
             photo = self._thumbnail_labels[
@@ -1902,7 +1901,7 @@ class PhotoPlacesWidget(QWidget):
             | Qt.AlignmentFlag.AlignLeft
         )
 
-        container = QWidget()
+        container = _PhotoCell(self._tree, 1)
         layout = QHBoxLayout(container)
         layout.setContentsMargins(
             8,
@@ -1912,6 +1911,9 @@ class PhotoPlacesWidget(QWidget):
         )
         layout.addWidget(label)
 
+        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        container.setProperty("photo_path", str(photo.path))
+        container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
             1,
@@ -1927,7 +1929,7 @@ class PhotoPlacesWidget(QWidget):
         item: QTreeWidgetItem,
         photo: Photo,
     ) -> None:
-        container = QWidget()
+        container = _PhotoCell(self._tree, 2)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(8, 3, 8, 3)
         layout.setSpacing(1)
@@ -1966,6 +1968,9 @@ class PhotoPlacesWidget(QWidget):
             caption,
         )
 
+        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        container.setProperty("photo_path", str(photo.path))
+        container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
             2,
@@ -2088,13 +2093,13 @@ class PhotoPlacesWidget(QWidget):
         photo: Photo,
     ) -> None:
         """
-        Fluid editor.
+        Location/caption editor.
 
-        Geographic components wrap naturally according to the
-        available width. The caption always starts below them.
-        No local scrollbar is used.
+        The left label column is shared by location and caption so
+        their separators and editable contents align vertically.
+        Automatic geographic components keep their wrapping flow.
         """
-        container = QWidget()
+        container = _PhotoCell(self._tree, 3)
         container.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Preferred,
@@ -2104,20 +2109,113 @@ class PhotoPlacesWidget(QWidget):
         outer.setContentsMargins(6, 3, 6, 3)
         outer.setSpacing(2)
 
-        location_widget = QWidget()
-        location_widget.setSizePolicy(
+        path_key = str(photo.path)
+        result = self._caption_result(photo)
+
+        visible_candidates = tuple(
+            candidate
+            for candidate in result.candidates
+            if self._component_is_visible(
+                candidate.key
+            )
+            and candidate.value.strip()
+        )
+
+        has_geographic_data = bool(
+            visible_candidates
+        )
+
+        custom_mode = (
+            not has_geographic_data
+            or self._has_custom_location(photo)
+        )
+
+        # ----------------------------------------------------
+        # Location row
+        # ----------------------------------------------------
+
+        location_row = QWidget()
+        location_row.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Preferred,
         )
 
-        location_layout = FlowLayout(
-            location_widget,
+        location_row_layout = QHBoxLayout(
+            location_row
+        )
+        location_row_layout.setContentsMargins(
+            0, 0, 0, 0
+        )
+        location_row_layout.setSpacing(5)
+
+        if has_geographic_data:
+            mode_box = QComboBox()
+            mode_box.addItem(
+                self._translator.tr(
+                    "photos.places.location_auto"
+                ),
+                False,
+            )
+            mode_box.addItem(
+                self._translator.tr(
+                    "photos.places.location_custom"
+                ),
+                True,
+            )
+
+            mode_box.setCurrentIndex(
+                1 if custom_mode else 0
+            )
+            mode_box.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToContents
+            )
+
+            self._location_mode_boxes[
+                path_key
+            ] = mode_box
+
+            location_label_widget = mode_box
+        else:
+            location_label_widget = QLabel(
+                self._translator.tr(
+                    "photos.places.location_custom"
+                )
+            )
+
+        # Fixed label-column width is established below after
+        # constructing the caption label.
+        location_row_layout.addWidget(
+            location_label_widget,
+            0,
+            Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        location_separator = QLabel(":")
+        location_separator.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        location_row_layout.addWidget(
+            location_separator,
+            0,
+            Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        # ----------------------------------------------------
+        # Automatic location content
+        # ----------------------------------------------------
+
+        automatic_widget = QWidget()
+        automatic_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
+
+        location_flow = FlowLayout(
+            automatic_widget,
             margin=0,
             h_spacing=10,
             v_spacing=2,
         )
-
-        result = self._caption_result(photo)
 
         selected = {
             (
@@ -2128,18 +2226,13 @@ class PhotoPlacesWidget(QWidget):
             in self._effective_components(photo)
         }
 
-        visible_count = 0
-
-        for candidate in result.candidates:
-            if not self._component_is_visible(
-                candidate.key
-            ):
-                continue
-
+        for candidate in visible_candidates:
             checkbox = QCheckBox(
                 candidate.value
             )
-            checkbox.setAutoFillBackground(False)
+            checkbox.setAutoFillBackground(
+                False
+            )
             checkbox.setChecked(
                 (
                     candidate.key,
@@ -2158,7 +2251,6 @@ class PhotoPlacesWidget(QWidget):
                 "location_value",
                 candidate.value,
             )
-
             checkbox.setProperty(
                 "group_edit_pending",
                 False,
@@ -2176,7 +2268,7 @@ class PhotoPlacesWidget(QWidget):
             checkbox.toggled.connect(
                 lambda checked,
                 p=photo,
-                row_widget=location_widget,
+                row_widget=automatic_widget,
                 cb=checkbox:
                     self._location_checkbox_toggled(
                         p,
@@ -2186,51 +2278,123 @@ class PhotoPlacesWidget(QWidget):
                     )
             )
 
-            location_layout.addWidget(
+            location_flow.addWidget(
                 checkbox
             )
-            visible_count += 1
 
-        if visible_count == 0:
-            location_layout.addWidget(
-                QLabel("—")
+        # ----------------------------------------------------
+        # Custom location content
+        # ----------------------------------------------------
+
+        custom_widget = QWidget()
+        custom_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
+
+        custom_layout = QHBoxLayout(
+            custom_widget
+        )
+        custom_layout.setContentsMargins(
+            0, 0, 0, 0
+        )
+        custom_layout.setSpacing(0)
+
+        if self._has_custom_location(photo):
+            location_text = (
+                photo.location_text or ""
+            )
+        else:
+            location_text = (
+                self._components_text(
+                    self._effective_components(photo)
+                )
+                or ""
             )
 
-        pencil = QPushButton("✎")
-        pencil.setFlat(True)
-        pencil.setFixedSize(18, 18)
-        pencil.setCursor(
-            Qt.CursorShape.PointingHandCursor
+        location_editor = QLineEdit(
+            location_text
         )
-        pencil.setToolTip(
-            self._translator.tr(
-                "photos.places.free_location"
-            )
+        location_editor.setClearButtonEnabled(
+            True
         )
-
-        self._style_pencil(
-            pencil,
-            photo,
+        location_editor.setFixedHeight(22)
+        location_editor.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
         )
-        self._pencil_buttons[
-            str(photo.path)
-        ] = pencil
-
-        pencil.clicked.connect(
-            lambda _checked=False, p=photo:
-                self._edit_free_location(p)
+        location_editor.setProperty(
+            "initial_location_text",
+            location_text,
         )
 
-        location_layout.addWidget(
-            pencil
+        location_editor.editingFinished.connect(
+            lambda p=photo, e=location_editor:
+                self._inline_location_finished(
+                    p,
+                    e,
+                )
+        )
+
+        custom_layout.addWidget(
+            location_editor,
+            1,
+        )
+
+        # Both widgets occupy the same content position. The inactive
+        # one is merely hidden, so switching modes does not recreate
+        # checkboxes, caption editors or signal connections.
+        location_content = QWidget()
+        location_content.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
+
+        content_stack = QVBoxLayout(
+            location_content
+        )
+        content_stack.setContentsMargins(
+            0, 0, 0, 0
+        )
+        content_stack.setSpacing(0)
+
+        content_stack.addWidget(
+            automatic_widget
+        )
+        content_stack.addWidget(
+            custom_widget
+        )
+
+        automatic_widget.setVisible(
+            has_geographic_data
+            and not custom_mode
+        )
+        custom_widget.setVisible(
+            custom_mode
+        )
+
+        location_row_layout.addWidget(
+            location_content,
+            1,
+            Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        self._location_mode_widgets[
+            path_key
+        ] = (
+            automatic_widget,
+            custom_widget,
+            location_editor,
         )
 
         outer.addWidget(
-            location_widget
+            location_row
         )
 
-        # Caption is deliberately a separate row: equivalent to
-        # a hard line break after the complete component flow.
+        # ----------------------------------------------------
+        # Caption row
+        # ----------------------------------------------------
+
         caption_container = QWidget()
         caption_layout = QHBoxLayout(
             caption_container
@@ -2245,9 +2409,56 @@ class PhotoPlacesWidget(QWidget):
                 "photos.places.caption"
             )
         )
+
+        # Use one stable label-column width for every photo.
+        # It must not depend on whether this particular photo has
+        # geographic data, otherwise mixed GPS/non-GPS rows drift
+        # horizontally.
+        automatic_probe = QComboBox()
+        automatic_probe.addItem(
+            self._translator.tr(
+                "photos.places.location_auto"
+            )
+        )
+        automatic_probe.addItem(
+            self._translator.tr(
+                "photos.places.location_custom"
+            )
+        )
+
+        custom_probe = QLabel(
+            self._translator.tr(
+                "photos.places.location_custom"
+            )
+        )
+
+        label_width = max(
+            automatic_probe.sizeHint().width(),
+            custom_probe.sizeHint().width(),
+            caption_label.sizeHint().width(),
+        )
+
+        location_label_widget.setFixedWidth(
+            label_width
+        )
+        caption_label.setFixedWidth(
+            label_width
+        )
+
         caption_layout.addWidget(
             caption_label,
             0,
+            Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        caption_separator = QLabel(":")
+        caption_separator.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        caption_layout.addWidget(
+            caption_separator,
+            0,
+            Qt.AlignmentFlag.AlignVCenter,
         )
 
         editor = QLineEdit(
@@ -2256,7 +2467,6 @@ class PhotoPlacesWidget(QWidget):
         editor.setClearButtonEnabled(True)
         editor.setFixedHeight(22)
 
-        path_key = str(photo.path)
         self._caption_editors[
             path_key
         ] = editor
@@ -2285,6 +2495,20 @@ class PhotoPlacesWidget(QWidget):
             caption_container
         )
 
+        if has_geographic_data:
+            mode_box.currentIndexChanged.connect(
+                lambda _index,
+                p=photo,
+                box=mode_box:
+                    self._location_mode_changed(
+                        p,
+                        box,
+                    )
+            )
+
+        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        container.setProperty("photo_path", str(photo.path))
+        container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
             3,
@@ -2294,142 +2518,168 @@ class PhotoPlacesWidget(QWidget):
         self._editor_rows[path_key] = (
             item,
             container,
-            location_layout,
+            location_flow,
         )
 
-        QTimer.singleShot(
-            0,
-            self._update_all_editor_heights,
-        )
+        self._update_item_height(item)
 
-    def _update_all_editor_heights(
+    def _update_all_editor_heights(self) -> None:
+        # Only already materialized rows participate; never expand closed months.
+        if getattr(self, "_updating_row_heights", False):
+            return
+        self._updating_row_heights = True
+        try:
+            for item, _container, _flow in tuple(self._editor_rows.values()):
+                self._update_item_height(item)
+        finally:
+            self._updating_row_heights = False
+
+    def _update_item_height(self, item: QTreeWidgetItem) -> None:
+        required = 0
+        for column in range(self._tree.columnCount()):
+            cell = self._tree.itemWidget(item, column)
+            if cell is not None:
+                required = max(required, cell.sizeHint().height())
+        # setItemWidget receives the item's content rect, excluding style padding.
+        option = QStyleOptionViewItem()
+        option.initFrom(self._tree)
+        option.rect = QRect(0, 0, self._tree.viewport().width(), required)
+        content = self._tree.style().subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, option, self._tree,
+        )
+        required += option.rect.height() - content.height()
+        hint = QSize(0, required)
+        changed = False
+        for column in range(self._tree.columnCount()):
+            if item.sizeHint(column) != hint:
+                item.setSizeHint(column, hint)
+                changed = True
+        if changed:
+            # Updating model hints alone can leave index widgets at old geometry.
+            # Let the view coalesce one normal layout request for the changed rows.
+            self._tree.scheduleDelayedItemsLayout()
+
+    def _location_mode_changed(
         self,
+        photo: Photo,
+        mode_box: QComboBox,
     ) -> None:
-        if not self._editor_rows:
+        path_key = str(photo.path)
+        widgets = self._location_mode_widgets.get(
+            path_key
+        )
+
+        if widgets is None:
             return
 
-        editor_available = max(
-            80,
-            self._tree.columnWidth(3) - 12,
+        (
+            automatic_widget,
+            custom_widget,
+            location_editor,
+        ) = widgets
+
+        custom_mode = bool(
+            mode_box.currentData()
         )
 
-        # Column 2 has 8 px left + 8 px right margins.
-        truth_available = max(
-            40,
-            self._tree.columnWidth(2) - 16,
+        if custom_mode:
+            # Entering custom mode is UI-only until the user actually
+            # edits the field.
+            if not self._has_custom_location(photo):
+                text = (
+                    self._components_text(
+                        self._effective_components(photo)
+                    )
+                    or ""
+                )
+                location_editor.setText(
+                    text
+                )
+                location_editor.setProperty(
+                    "initial_location_text",
+                    text,
+                )
+
+            automatic_widget.hide()
+            custom_widget.show()
+
+            self._update_item_height(self._photo_items[path_key])
+            return
+
+        # Return to the preserved structured composition.
+        components = tuple(
+            photo.selected_location_components
         )
 
-        for path_key, (
-            item,
-            container,
-            flow,
-        ) in tuple(
-            self._editor_rows.items()
-        ):
-            flow_height = flow.heightForWidth(
-                editor_available
+        if not photo.location_selection_edited:
+            components = self._effective_components(
+                photo
             )
 
-            editor_height = (
-                flow_height + 30
+        photo.selected_location_components = (
+            components
+        )
+        photo.location_text = self._components_text(
+            components
+        )
+        photo.location_selection_edited = True
+
+        custom_widget.hide()
+        automatic_widget.show()
+
+        if self._save_location is not None:
+            self._save_location(
+                photo,
+                components,
+                photo.location_text,
             )
 
-            # Measure the two wrapped QLabel instances at the
-            # width they really have in column 2.
-            truth_height = 0
+        self._after_editorial_change(photo)
 
-            labels = self._truth_labels.get(
-                path_key
-            )
-
-            if labels is not None:
-                location, caption = labels
-
-                location_height = (
-                    location.heightForWidth(
-                        truth_available
-                    )
-                )
-                caption_height = (
-                    caption.heightForWidth(
-                        truth_available
-                    )
-                )
-
-                if location_height < 0:
-                    location_height = (
-                        location.sizeHint().height()
-                    )
-
-                if caption_height < 0:
-                    caption_height = (
-                        caption.sizeHint().height()
-                    )
-
-                # QVBoxLayout:
-                # top/bottom margins = 3 + 3
-                # spacing between labels = 1
-                truth_height = (
-                    location_height
-                    + caption_height
-                    + 7
-                )
-
-            desired = max(
-                self.NATURAL_ROW_HEIGHT,
-                editor_height,
-                truth_height,
-            )
-
-            container.setMinimumHeight(
-                desired
-            )
-            container.setMaximumHeight(
-                desired
-            )
-
-            item.setSizeHint(
-                0,
-                QSize(
-                    self.THUMBNAIL_WIDTH + 8,
-                    desired,
-                ),
-            )
-
-        self._tree.viewport().update()
-
-    def _update_item_height(
+    def _inline_location_finished(
         self,
-        item: QTreeWidgetItem,
-        widget: QWidget,
-    ) -> None:
-        # Compatibility entry point for older callers.
-        self._update_all_editor_heights()
-
-    def _style_pencil(
-        self,
-        pencil: QPushButton,
         photo: Photo,
+        editor: QLineEdit,
     ) -> None:
-        if self._has_custom_location(photo):
-            pencil.setStyleSheet(
-                "QPushButton {"
-                " font-size: 14px;"
-                " font-weight: bold;"
-                " color: palette(highlight);"
-                " border: none;"
-                " padding: 0px;"
-                "}"
+        text = editor.text().strip()
+        initial = str(
+            editor.property(
+                "initial_location_text"
+            )
+            or ""
+        ).strip()
+
+        if text == initial:
+            return
+
+        if photo.location_selection_edited:
+            components = tuple(
+                photo.selected_location_components
             )
         else:
-            pencil.setStyleSheet(
-                "QPushButton {"
-                " font-size: 14px;"
-                " color: palette(text);"
-                " border: none;"
-                " padding: 0px;"
-                "}"
+            components = self._effective_components(
+                photo
             )
+
+        photo.selected_location_components = (
+            components
+        )
+        photo.location_text = text or None
+        photo.location_selection_edited = True
+
+        if self._save_location is not None:
+            self._save_location(
+                photo,
+                components,
+                photo.location_text,
+            )
+
+        editor.setProperty(
+            "initial_location_text",
+            text,
+        )
+
+        self._after_editorial_change(photo)
 
     def _location_checkbox_pressed(
         self,
@@ -3920,125 +4170,6 @@ class PhotoPlacesWidget(QWidget):
             photo
         )
 
-    def _edit_free_location(
-        self,
-        photo: Photo,
-    ) -> None:
-        # Establish the automatic components before the first
-        # free-text override so clearing the override can always
-        # return to the composition.
-        if not photo.location_selection_edited:
-            components = self._effective_components(
-                photo
-            )
-        else:
-            components = tuple(
-                photo.selected_location_components
-            )
-
-        component_text = self._components_text(
-            components
-        )
-
-        if self._has_custom_location(photo):
-            initial_text = (
-                photo.location_text or ""
-            )
-        else:
-            initial_text = (
-                component_text
-                or (
-                    ""
-                    if self._effective_location(photo)
-                    == "—"
-                    else self._effective_location(photo)
-                )
-            )
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(
-            self._translator.tr(
-                "photos.places.free_location"
-            )
-        )
-        dialog.setMinimumWidth(560)
-
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(
-            18,
-            18,
-            18,
-            18,
-        )
-        layout.setSpacing(10)
-
-        label = QLabel(
-            self._translator.tr(
-                "photos.places.free_location_prompt"
-            )
-        )
-        layout.addWidget(label)
-
-        editor = QLineEdit(
-            initial_text
-        )
-        editor.setClearButtonEnabled(True)
-        layout.addWidget(editor)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(
-            dialog.accept
-        )
-        buttons.rejected.connect(
-            dialog.reject
-        )
-        layout.addWidget(buttons)
-
-        editor.returnPressed.connect(
-            dialog.accept
-        )
-        editor.setFocus()
-
-        if (
-            dialog.exec()
-            != QDialog.DialogCode.Accepted
-        ):
-            return
-
-        custom_text = (
-            editor.text().strip()
-        )
-
-        # Empty text means "remove the override", not "force an
-        # empty location". The structured composition becomes the
-        # truth again.
-        location_text = (
-            custom_text
-            or component_text
-        )
-
-        photo.selected_location_components = (
-            components
-        )
-        photo.location_text = (
-            location_text or None
-        )
-        photo.location_selection_edited = True
-
-        if self._save_location is not None:
-            self._save_location(
-                photo,
-                components,
-                photo.location_text,
-            )
-
-        self._after_editorial_change(
-            photo
-        )
-
     # --------------------------------------------------------
     # Caption editing
     # --------------------------------------------------------
@@ -4166,15 +4297,10 @@ class PhotoPlacesWidget(QWidget):
                 self._display_caption(photo)
             )
 
-        pencil = self._pencil_buttons.get(
-            path_key
-        )
+        item = self._photo_items.get(path_key)
+        if item is not None:
+            self._update_item_height(item)
 
-        if pencil is not None:
-            self._style_pencil(
-                pencil,
-                photo,
-            )
 
     def _update_counter(
         self,

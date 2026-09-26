@@ -110,7 +110,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.current": "Current value",
         "photos.places.group.replacement": "Replacement",
         "photos.places.group.apply": "Apply to {count} photos",
-        "photos.places.caption": "Caption:",
+        "photos.places.caption": "Caption",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
             "{visible} / {total} photos"
@@ -137,6 +137,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.composition": "Composition",
         "photos.places.tooltip.location": "Place: {value}",
         "photos.places.free_location": "Free-form place",
+        "photos.places.location_auto": "Automatic place",
+        "photos.places.location_custom": "Custom place",
         "photos.places.free_location_prompt": "Place:",
 
         "photos.column.filename": "Filename",
@@ -783,7 +785,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.current": "Valeur actuelle",
         "photos.places.group.replacement": "Remplacement",
         "photos.places.group.apply": "Appliquer à {count} photos",
-        "photos.places.caption": "Légende :",
+        "photos.places.caption": "Légende",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
             "{visible} / {total} photos"
@@ -810,6 +812,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.composition": "Composition",
         "photos.places.tooltip.location": "Lieu : {value}",
         "photos.places.free_location": "Lieu libre",
+        "photos.places.location_auto": "Lieu automatique",
+        "photos.places.location_custom": "Lieu personnalisé",
         "photos.places.free_location_prompt": "Lieu :",
 
         "photos.column.filename": "Nom du fichier",
