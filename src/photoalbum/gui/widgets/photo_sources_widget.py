@@ -133,11 +133,16 @@ class PhotoSourcesWidget(QWidget):
         header = self.table.horizontalHeader()
 
         # Let the user resize columns manually.
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(
+            QHeaderView.ResizeMode.Interactive
+        )
+        # Filename is the elastic column. It keeps a real minimum
+        # width, but absorbs any horizontal space left by the other
+        # columns.
+        self._filename_column_min_width = 300
 
         # Sensible initial widths. Long filenames must not force
         # the complete table to become excessively wide.
-        self.table.setColumnWidth(0, 260)
         self.table.setColumnWidth(1, 116)
         self.table.setColumnWidth(2, 170)
         self.table.setColumnWidth(3, 130)
@@ -145,6 +150,9 @@ class PhotoSourcesWidget(QWidget):
         self.table.setColumnWidth(5, 150)
         self.table.setColumnWidth(6, 160)
         self.table.setColumnWidth(7, 120)
+
+        self._update_filename_column_width()
+
 
         header.setStretchLastSection(False)
 
@@ -168,6 +176,65 @@ class PhotoSourcesWidget(QWidget):
 
         sources_layout.addWidget(QLabel(self._translator.tr('main.photos')))
         sources_layout.addWidget(splitter, 1)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_filename_column_width()
+
+    def _update_filename_column_width(self) -> None:
+        """Share spare width between filename and city columns."""
+        if not hasattr(
+            self,
+            "_filename_column_min_width",
+        ):
+            return
+
+        filename_min = (
+            self._filename_column_min_width
+        )
+        city_min = 150
+
+        # Columns 0 (filename) and 5 (city) are elastic.
+        # All other columns keep their current widths.
+        fixed_width = sum(
+            self.table.columnWidth(column)
+            for column in range(
+                self.table.model().columnCount()
+            )
+            if column not in (0, 5)
+        )
+
+        elastic_available = (
+            self.table.viewport().width()
+            - fixed_width
+        )
+
+        extra = max(
+            0,
+            elastic_available
+            - filename_min
+            - city_min,
+        )
+
+        filename_width = (
+            filename_min
+            + round(extra * 2 / 3)
+        )
+        city_width = (
+            city_min
+            + extra
+            - round(extra * 2 / 3)
+        )
+
+        self.table.setColumnWidth(
+            0,
+            filename_width,
+        )
+        self.table.setColumnWidth(
+            5,
+            city_width,
+        )
+
 
     def select_photo(self, photo: Photo) -> None:
         source_model = self.model

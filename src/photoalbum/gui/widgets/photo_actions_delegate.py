@@ -208,7 +208,7 @@ class PhotoActionsDelegate(QStyledItemDelegate):
             QToolTip.showText(
                 event.globalPos(),
                 self.tr(
-                    "Voir la photo"
+                    "Ouvrir la photo"
                 ),
                 view,
             )
