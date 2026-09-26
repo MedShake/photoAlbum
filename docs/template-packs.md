@@ -252,65 +252,23 @@ Incompatible defaults still leave the first available GUI choice selected.
 ## Day dividers
 
 `day_divider` is an ordinary divider role with its own template and `PageInstance`.
-Its planned items and rendered pages carry `year`, `month`, and `day`. Renderers
-read these values from `composition.page`, just as monthly dividers read their
-month. Packs own date formatting, typography, settings editors, and translations.
-MSB supplies `day-divider-simple` as the application's initial day template.
-Other packs need only declare this kind if they offer a daily divider; their
-optional defaults may map `day_divider` to a template from their own pack.
-
-`AlbumStructureSettings.day_dividers` uses the same `DividerSettings` as month
-and year separators, including natural, right-page, and right-page-with-blank-facing
-placement. With daily separators disabled, photo groups remain monthly. When
-enabled, each represented calendar date gets a divider followed by its photo
-group, within the existing year/month hierarchy. Undated photos remain excluded.
-`PeriodEndCapacity` remains monthly; no daily capacity reports are added.
-
-The GUI initially enables day separators only for a nonempty project whose photos
-are all dated within one calendar month of one year. The initial choice follows
-photo changes until the user changes it or saved settings are loaded. Explicit
-and saved choices remain authoritative. Empty projects, undated photos, and
-multiple calendar months do not trigger automatic activation.
-
-The current album settings JSON requires `day_dividers` with `enabled`, `page`,
-and `placement`. The existing schema version stays unchanged. There is no
-migration or fallback for project settings missing this field.
+Its planned items and rendered pages carry `year`, `month`, and `day`, available
+to the renderer through `composition.page`. Packs that provide a day divider
+declare it like the other divider roles and may select one in `default_templates`.
 
 ## Temporal context and localized dates
 
-Renderers receive `temporal_context`, a frozen set containing `PlanItemKind.YEAR_DIVIDER`
-and/or `PlanItemKind.MONTH_DIVIDER` when these levels are materialized for the
-rendered page's year/month. The host derives this from album pagination; dividers
-in unrelated periods do not count. This context describes structure only. Packs
-decide whether and how to shorten a date title.
+Renderers can receive `temporal_context`, which identifies year and month divider
+levels actually materialized for the rendered period. This describes album
+structure only; each pack remains responsible for deciding how that context
+affects its presentation.
 
-The album settings dialog builds the current album and passes the first occurrence
-of the edited divider role and its pagination to `set_album_context(page, album_pages)`.
-This host method uses the same `materialized_periods` resolver as final rendering;
-checkbox state and UI availability hints are not an alternative source of truth.
-The preview uses that occurrence's calendar date. If no occurrence exists (for
-example, an empty or wholly undated album), context is empty and the template's
-sample date remains illustrative.
-
-Settings editors may override `set_temporal_context(context)`, calling the base
-method before updating controls and previews. `set_album_context` invokes this
-hook, so the Automatic label and preview update together. Reopening the dialog
-rebuilds context from current photos/settings. Standalone callers can still
-supply explicit temporal context when no album is available. Editors should not
-save derived context in their page settings.
-
-The public authoring API exports `format_date_parts(date, language=..., weekday=...,
-day=..., month=..., year=...)`. Use it to request calendar components while leaving
-localized names, ordering, punctuation, and French `1er` handling to the host.
-It uses the application language rather than the system locale and capitalizes
-the first word for a standalone title. It supports `en` and `fr`, including
-regional tags normalized to these language-level conventions; other languages
-raise `ValueError`. All component subsets are supported, including no components
-(an empty string). English uses month-first ordering and commas when both day
-and month are requested; otherwise selected components are space-separated in
-weekday/day/month/year order. French always uses that latter order and uses
-`1er` whenever the first day is included. Existing system-localized timestamp
-formatting is unchanged.
+The public authoring API provides
+`format_date_parts(date, language=..., weekday=..., day=..., month=..., year=...)`
+for localized date titles. It handles localized names, component ordering,
+punctuation and language-specific details such as French `1er`, independently
+of the system locale. The currently supported languages are English and French,
+including their regional variants.
 
 ## Translations and resources
 

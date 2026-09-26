@@ -150,41 +150,24 @@ own page-level settings.
 
 ## Simple day divider
 
-`day-divider-simple` offers automatic, weekday/day, weekday/day/month, and full-date
-titles. Automatic mode omits the month when a month divider is present, otherwise
-omits only the year when a year divider is present. Without either, it uses the
-full date (for example, “Saturday, March 1, 2025” or “Samedi 1er mars 2025”). It
-uses the MSB month's color and shared font, with local font and size controls.
-The default title size is 48 pt; long dates shrink to fit the available width.
-Its settings preview uses the first actual occurrence's date and materialized
-periods from the album build, or an illustrative sample with empty context when
-no occurrence exists. Album previews and PDF exports use the same renderer and
-period resolver with the day's `year`, `month`, and `day` values.
+`day-divider-simple` displays a localized day title using the MSB month's color
+and shared font, with local typography controls. It offers weekday/day,
+weekday/day/month, and full-date formats. In Automatic mode, MSB adapts the
+title to the month and year divider levels materialized for that period.
 
 ## Simple month divider
 
-`month-divider-simple` is the minimal MSB month separator. Its title format can
-be automatic, month only, or month and year. Automatic mode uses the month only
-when a year divider is present; otherwise it includes the year.
+`month-divider-simple` is the minimal MSB month separator. It can display the
+month alone or the month and year. In Automatic mode, MSB omits the year when
+a year divider is materialized for that period.
 
-Both simple separators store `title_format` inside their own settings section;
-missing values mean `auto`. Manual formats do not depend on album context. The
-Automatic combo label names the effective format. The pack owns these editorial
-rules in `simple_divider_titles.py`; the host supplies temporal context and the
-public `format_date_parts` helper supplies localized date components, including
-the French first-day ordinal. Typography settings and theme colors are independent
-of the title format.
+For both simple separators, these Automatic rules are editorial choices owned
+by the MSB pack. Manual formats remain independent of the album context, while
+localized date formatting is provided by the host.
 
-Its page-level typography includes:
-
-- title font family;
-- title font size.
-
-The font family defaults to the shared MSB theme unless overridden
-for the page.
-
-Use this template when the month heading itself is sufficient and
-the city list of the classic divider is not wanted.
+The simple month divider inherits the shared MSB font unless it is overridden
+for the page. Use it when the month heading itself is sufficient and the city
+list of the classic divider is not wanted.
 
 ## Photo pages
 
