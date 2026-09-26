@@ -150,16 +150,30 @@ own page-level settings.
 
 ## Simple day divider
 
-`day-divider-simple` displays the complete date carried by the planned day page,
-using the selected language (for example, “March 1, 2025” or “1er mars 2025”). It
+`day-divider-simple` offers automatic, weekday/day, weekday/day/month, and full-date
+titles. Automatic mode omits the month when a month divider is present, otherwise
+omits only the year when a year divider is present. Without either, it uses the
+full date (for example, “Saturday, March 1, 2025” or “Samedi 1er mars 2025”). It
 uses the MSB month's color and shared font, with local font and size controls.
 The default title size is 48 pt; long dates shrink to fit the available width.
-Its settings preview uses a sample date. Actual album previews and PDF exports
-use the same renderer with the day's `year`, `month`, and `day` values.
+Its settings preview uses the first actual occurrence's date and materialized
+periods from the album build, or an illustrative sample with empty context when
+no occurrence exists. Album previews and PDF exports use the same renderer and
+period resolver with the day's `year`, `month`, and `day` values.
 
 ## Simple month divider
 
-`month-divider-simple` is the minimal MSB month separator.
+`month-divider-simple` is the minimal MSB month separator. Its title format can
+be automatic, month only, or month and year. Automatic mode uses the month only
+when a year divider is present; otherwise it includes the year.
+
+Both simple separators store `title_format` inside their own settings section;
+missing values mean `auto`. Manual formats do not depend on album context. The
+Automatic combo label names the effective format. The pack owns these editorial
+rules in `simple_divider_titles.py`; the host supplies temporal context and the
+public `format_date_parts` helper supplies localized date components, including
+the French first-day ordinal. Typography settings and theme colors are independent
+of the title format.
 
 Its page-level typography includes:
 

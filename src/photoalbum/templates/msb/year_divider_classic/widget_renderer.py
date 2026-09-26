@@ -9,7 +9,7 @@ from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
 
 
 class YearDividerClassicWidgetRenderer:
-    DEFAULT_TITLE_COLOR = "#d0d0d0"
+    DEFAULT_TITLE_COLOR = "#008dc3"
 
     def paint(self, *, painter: QPainter, instance, photos, target_rect,
               width: int, height: int, translator, render_service,

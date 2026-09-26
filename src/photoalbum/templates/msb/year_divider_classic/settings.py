@@ -24,7 +24,7 @@ from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
 
 
 class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
-    DEFAULT_TITLE_COLOR = "#d0d0d0"
+    DEFAULT_TITLE_COLOR = "#008dc3"
     PREVIEW_WIDTH = 420
     def __init__(self, instance: PageInstance, photos, *, translator, render_service=None,
                  page_format: PageFormat = A4, template_pack_settings=None, parent=None) -> None:

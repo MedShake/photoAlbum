@@ -50,6 +50,8 @@ class PageTemplateSettingsWidget(QWidget):
     ) -> None:
         super().__init__(parent)
 
+        self._temporal_context = frozenset()
+        self._preview_page = None
         self._instance = instance
         self._photos = tuple(
             photos
@@ -188,12 +190,28 @@ class PageTemplateSettingsWidget(QWidget):
             painter.end()
         return pixmap
 
+    def set_album_context(self, page, album_pages) -> None:
+        """Preview one actual occurrence, resolving periods exactly as rendering does."""
+        from photoalbum.rendering.temporal_context import materialized_periods
+
+        self._preview_page = page
+        self.set_temporal_context(materialized_periods(page, album_pages))
+
+    def set_temporal_context(self, context) -> None:
+        """Receive materialized temporal levels; templates choose their presentation."""
+        self._temporal_context = frozenset(context)
+
     def render_template_preview(
         self, *, width: int, height: int, photos=(), page_attributes=None,
         album_pages=(), set_waiting_key=None,
         kind: PlanItemKind = PlanItemKind.SPECIAL_PAGE,
     ) -> QPixmap:
         attributes = dict(page_attributes or {})
+        if self._preview_page is not None:
+            for name in ("year", "month", "day"):
+                value = getattr(self._preview_page, name, None)
+                if value is not None:
+                    attributes[name] = value
         page = SimpleNamespace(
             number=int(attributes.pop("number", 1)),
             kind=kind,
@@ -225,7 +243,7 @@ class PageTemplateSettingsWidget(QWidget):
                 template_pack_settings=self._template_pack_settings,
                 render_service=self._render_service,
                 set_waiting_key=set_waiting_key, paint_fallback=None,
-                show_empty_slots=True,
+                show_empty_slots=True, temporal_context=self._temporal_context,
             )
         finally:
             painter.end()

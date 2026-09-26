@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from photoalbum.album.planning import PlanItemKind
+
 from PySide6.QtCore import Qt, Signal, QSignalBlocker
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -33,6 +35,7 @@ from photoalbum.album import (
     page_format_from_id,
     oriented_page_format,
     AlbumStructureSettings,
+    AlbumBuilder,
     CoverPosition,
     CoverSettings,
     DividerPlacement,
@@ -920,6 +923,11 @@ class AlbumSettingsWidget(QWidget):
             else []
         )
 
+        # Use the same build and period resolution as the final rendering.
+        pages = AlbumBuilder(self._registry).build(photos, self.settings()).pagination.pages
+        preview_page = next((page for page in pages
+                             if page.kind == PlanItemKind(f"{kind}_divider")), None)
+
         dialog = PageInstanceDialog(
             instance,
             photos,
@@ -930,6 +938,8 @@ class AlbumSettingsWidget(QWidget):
                 self._template_pack_settings
             ),
             usage=f"{kind}_divider",
+            preview_page=preview_page,
+            album_pages=pages,
             parent=self,
         )
 

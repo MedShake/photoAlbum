@@ -276,6 +276,42 @@ The current album settings JSON requires `day_dividers` with `enabled`, `page`,
 and `placement`. The existing schema version stays unchanged. There is no
 migration or fallback for project settings missing this field.
 
+## Temporal context and localized dates
+
+Renderers receive `temporal_context`, a frozen set containing `PlanItemKind.YEAR_DIVIDER`
+and/or `PlanItemKind.MONTH_DIVIDER` when these levels are materialized for the
+rendered page's year/month. The host derives this from album pagination; dividers
+in unrelated periods do not count. This context describes structure only. Packs
+decide whether and how to shorten a date title.
+
+The album settings dialog builds the current album and passes the first occurrence
+of the edited divider role and its pagination to `set_album_context(page, album_pages)`.
+This host method uses the same `materialized_periods` resolver as final rendering;
+checkbox state and UI availability hints are not an alternative source of truth.
+The preview uses that occurrence's calendar date. If no occurrence exists (for
+example, an empty or wholly undated album), context is empty and the template's
+sample date remains illustrative.
+
+Settings editors may override `set_temporal_context(context)`, calling the base
+method before updating controls and previews. `set_album_context` invokes this
+hook, so the Automatic label and preview update together. Reopening the dialog
+rebuilds context from current photos/settings. Standalone callers can still
+supply explicit temporal context when no album is available. Editors should not
+save derived context in their page settings.
+
+The public authoring API exports `format_date_parts(date, language=..., weekday=...,
+day=..., month=..., year=...)`. Use it to request calendar components while leaving
+localized names, ordering, punctuation, and French `1er` handling to the host.
+It uses the application language rather than the system locale and capitalizes
+the first word for a standalone title. It supports `en` and `fr`, including
+regional tags normalized to these language-level conventions; other languages
+raise `ValueError`. All component subsets are supported, including no components
+(an empty string). English uses month-first ordering and commas when both day
+and month are requested; otherwise selected components are space-separated in
+weekday/day/month/year order. French always uses that latter order and uses
+`1er` whenever the first day is included. Existing system-localized timestamp
+formatting is unchanged.
+
 ## Translations and resources
 
 Put catalogs in `i18n/<language>.json`. Fallback is the selected pack language,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from photoalbum.templates.msb.simple_divider_titles import FORMATS, automatic_format
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -70,6 +72,13 @@ class MonthDividerSimpleSettingsWidget(
         )
 
         form = QFormLayout()
+        self._title_format = QComboBox()
+        self._title_format.addItem("", "auto")
+        for choice in FORMATS["month"]:
+            self._title_format.addItem(self._translator.tr(f"divider_title.{choice}"), choice)
+        self._update_automatic_label()
+        form.addRow(self._translator.tr("divider_title.format"), self._title_format)
+
 
         self._font = QComboBox()
         for family in available_photo_album_fonts():
@@ -105,7 +114,19 @@ class MonthDividerSimpleSettingsWidget(
         self._preview = self.create_preview_label(self.PREVIEW_WIDTH)
         self.add_settings_columns(root, left, self._preview)
 
+    def set_temporal_context(self, context) -> None:
+        super().set_temporal_context(context)
+        self._update_automatic_label()
+        self._render_preview()
+
+    def _update_automatic_label(self) -> None:
+        effective = automatic_format("month", self._temporal_context)
+        self._title_format.setItemText(0, self._translator.tr(
+            "divider_title.automatic", format=self._translator.tr(f"divider_title.{effective}"),
+        ))
+
     def _connect_change_signals(self) -> None:
+        self._title_format.currentIndexChanged.connect(self._changed)
         self._font.currentIndexChanged.connect(
             self._changed
         )
@@ -114,6 +135,8 @@ class MonthDividerSimpleSettingsWidget(
         )
 
     def _load_state(self) -> None:
+        selected = self._instance.settings.get("month_divider_simple", {}).get("title_format", "auto")
+        self._title_format.setCurrentIndex(max(0, self._title_format.findData(selected)))
         theme = msb_theme_from_pack_settings(
             self._template_pack_settings
         )
@@ -146,6 +169,8 @@ class MonthDividerSimpleSettingsWidget(
                 {},
             )
         )
+
+        local["title_format"] = self._title_format.currentData()
 
         local["title_font_family"] = (
             self._font.currentData()

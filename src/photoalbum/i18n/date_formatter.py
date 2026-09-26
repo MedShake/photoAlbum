@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from PySide6.QtCore import QDateTime, QLocale
+from PySide6.QtCore import QDate, QDateTime, QLocale
 
 
 def _time_format_with_seconds(locale: QLocale) -> str:
@@ -60,3 +60,45 @@ def datetime_edit_format() -> str:
     time_pattern = _time_format_with_seconds(locale)
 
     return f"{date_pattern} {time_pattern}"
+
+
+def format_date_parts(value: date, *, language: str, weekday: bool = False,
+                      day: bool = True, month: bool = True, year: bool = True) -> str:
+    """Format selected calendar components in the application's language.
+
+    French uses an ordinal for the first day; English uses month-first dates.
+    Names come from Qt's locale data, independently of the system locale.
+    Supports en/fr (including regional tags), with stable language-level ordering.
+    With both day and month, English uses "Month day[, year]", optionally preceded
+    by "Weekday, ". Otherwise requested components are joined with spaces in
+    weekday/day/month/year order. Omitted components add no separators; selecting
+    none returns an empty string. The first word is capitalized for a title.
+    Unsupported languages raise ValueError rather than using a system fallback.
+    """
+    language = language.lower().replace("-", "_").split("_", 1)[0]
+    if language not in ("en", "fr"):
+        raise ValueError(f"Unsupported date language: {language}")
+    locale = QLocale(language)
+    qdate = QDate(value.year, value.month, value.day)
+    number = str(value.day)
+    if locale.language() == QLocale.Language.French and value.day == 1:
+        number = "1er"
+    month_name = locale.monthName(value.month)
+    if locale.language() == QLocale.Language.English and month and day:
+        text = f"{month_name} {number}"
+        if year:
+            text += f", {value.year}"
+        if weekday:
+            text = f"{locale.dayName(qdate.dayOfWeek())}, {text}"
+    else:
+        parts = []
+        if weekday:
+            parts.append(locale.dayName(qdate.dayOfWeek()))
+        if day:
+            parts.append(number)
+        if month:
+            parts.append(month_name)
+        if year:
+            parts.append(str(value.year))
+        text = " ".join(parts)
+    return text[:1].upper() + text[1:]

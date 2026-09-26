@@ -200,7 +200,7 @@ def test_day_role_is_validated_in_settings_and_pack_defaults(widget):
         discovery._default_templates({"day_divider": "month-divider-simple"}, widget._registry.list_all())
 
 
-@pytest.mark.parametrize("language,expected", [("en", "March 1, 2025"), ("fr", "1er mars 2025")])
+@pytest.mark.parametrize("language,expected", [("en", "Saturday, March 1, 2025"), ("fr", "Samedi 1er mars 2025")])
 def test_msb_day_editor_preview_and_pdf_date(widget, tmp_path, language, expected):
     from PySide6.QtGui import QImage
     from pypdf import PdfReader

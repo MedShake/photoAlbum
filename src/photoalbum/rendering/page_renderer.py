@@ -5,6 +5,7 @@ from PySide6.QtGui import QFont, QPainter
 
 from photoalbum.album.composition import PageComposition
 from photoalbum.rendering.fonts import resolve_font_family
+from photoalbum.rendering.temporal_context import materialized_periods
 from photoalbum.template_engine import template_extension_registry, translator_for_template
 from photoalbum.template_engine.instances import create_template_instance
 
@@ -21,7 +22,7 @@ class PageRenderer:
         photos=(), project_photos=None, composition=None,
         pixel_rect=None, thumbnail_cache=None, album_pages=(),
         template_pack_settings=None, render_service=None,
-        set_waiting_key=None, show_empty_slots=True,
+        set_waiting_key=None, show_empty_slots=True, temporal_context=None,
     ) -> bool:
         if instance is None:
             return False
@@ -41,6 +42,8 @@ class PageRenderer:
             translator=translator_for_template(instance.template_id, self._translator),
             render_service=render_service, set_waiting_key=set_waiting_key,
             show_empty_slots=show_empty_slots,
+            temporal_context=(materialized_periods(getattr(composition, "page", None), album_pages)
+                              if temporal_context is None else temporal_context),
         )
         return True
 
@@ -50,6 +53,7 @@ class PageRenderer:
         thumbnail_cache, project_photos=(), album_pages=(),
         template_pack_settings=None, render_service=None,
         set_waiting_key=None, paint_fallback=None, show_empty_slots=True,
+        temporal_context=None,
     ) -> None:
         page = composition.page
         instance = page.page_instance
@@ -64,7 +68,7 @@ class PageRenderer:
             thumbnail_cache=thumbnail_cache, album_pages=album_pages,
             template_pack_settings=template_pack_settings,
             render_service=render_service, set_waiting_key=set_waiting_key,
-            show_empty_slots=show_empty_slots,
+            show_empty_slots=show_empty_slots, temporal_context=temporal_context,
         )
         if not rendered and paint_fallback is not None:
             paint_fallback(painter)

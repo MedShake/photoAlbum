@@ -26,6 +26,9 @@ def create_template_settings_editor(
     page_format: PageFormat = A4,
     template_pack_settings=None,
     usage: str | None = None,
+    temporal_context=(),
+    preview_page=None,
+    album_pages=None,
     parent: QWidget | None = None,
 ) -> PageTemplateSettingsWidget | None:
     editor_type = (
@@ -64,8 +67,18 @@ def create_template_settings_editor(
     if "usage" in parameters:
         kwargs["usage"] = usage
 
-    return editor_type(
+    editor = editor_type(
         instance,
         photos,
         **kwargs,
     )
+
+    if album_pages is not None:
+        set_album_context = getattr(editor, "set_album_context", None)
+        if set_album_context is not None:
+            set_album_context(preview_page, album_pages)
+    else:
+        set_context = getattr(editor, "set_temporal_context", None)
+        if set_context is not None:
+            set_context(temporal_context)
+    return editor

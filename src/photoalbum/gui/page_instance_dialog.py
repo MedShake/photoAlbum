@@ -43,6 +43,9 @@ class PageInstanceDialog(QDialog):
         page_format: PageFormat = A4,
         template_pack_settings=None,
         usage: str | None = None,
+        temporal_context=(),
+        preview_page=None,
+        album_pages=None,
         parent=None,
     ) -> None:
         super().__init__(
@@ -60,6 +63,9 @@ class PageInstanceDialog(QDialog):
             template_pack_settings or {}
         )
         self._usage = usage
+        self._temporal_context = frozenset(temporal_context)
+        self._preview_page = preview_page
+        self._album_pages = album_pages
 
         self._editor = None
 
@@ -175,6 +181,9 @@ class PageInstanceDialog(QDialog):
                     self._template_pack_settings
                 ),
                 usage=self._usage,
+                temporal_context=self._temporal_context,
+                preview_page=self._preview_page,
+                album_pages=self._album_pages,
                 parent=self,
             )
         )
