@@ -1,5 +1,7 @@
 # GUI architecture
 
+**English** | [Français](gui-architecture.fr.md)
+
 `MainWindow` coordinates the open project, workflow tabs, album construction,
 and view synchronization. Changes to places and captions are saved immediately;
 the album is rebuilt when the user leaves that tab, or before exporting a PDF.

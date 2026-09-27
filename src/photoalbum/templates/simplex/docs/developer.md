@@ -1,14 +1,16 @@
 # Simplex template pack
 
+**English** | [Français](developer.fr.md)
+
 The **Simplex** template pack contains deliberately minimal page
 templates.
 
 Its first template is `simplex-full-photo-cover`, a full-page
-photographic front cover.
+photographic template usable as a cover or special page.
 
 ## Full-page photo cover
 
-The template is available for the **front cover** only.
+The template is available as a **special page** and at all four cover positions: front, inside front, inside back, and back.
 
 The template declares no geometric bounds. The host supplies physical page
 width and height; named formats and orientations do not restrict compatibility.
@@ -56,10 +58,7 @@ Simplex is discovered through the standard template-pack mechanism.
 Its executable behaviour is registered as a template extension rather
 than being implemented as a Simplex-specific branch in the main GUI.
 
-Cover choices are filtered by both:
+Cover choices are filtered by the declared cover position and by any physical page bounds declared by the template. This template declares no geometric bounds.
 
-- physical cover position;
-- current page format and orientation.
-
-See `docs/template-packs.md` for the general pack architecture and
-`docs/gui-architecture.md` for GUI responsibilities.
+See [`docs/template-packs.md`](../../../../../docs/template-packs.md) for the general pack architecture and
+[`docs/gui-architecture.md`](../../../../../docs/gui-architecture.md) for GUI responsibilities.

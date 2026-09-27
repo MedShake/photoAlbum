@@ -1,5 +1,7 @@
 # MSB template pack
 
+**English** | [Français](developer.fr.md)
+
 **MSB** is the original template pack bundled with Photo Album.
 
 It contains the historical templates used for covers, special pages,
@@ -16,7 +18,7 @@ and photo capacities.
 ## Physical page compatibility
 
 Most MSB templates declare no geometric bounds. The classic month divider requires
-at least 130 × 145 mm; the calendar index requires at least 110 × 260 mm. The host supplies physical
+at least 130 × 145 mm; the calendar index requires at least 180 × 180 mm. The host supplies physical
 page dimensions, including the chosen orientation. Named formats do not restrict
 template compatibility. Cover-position and page-kind restrictions still apply.
 
@@ -40,7 +42,7 @@ MSB currently contains the following templates.
 | `photo-page-2` | Two photos | Photo page |
 | `photo-page-3` | Three photos | Photo page |
 | `photo-page-4` | Four photos | Photo page |
-| `dedication` | Dedication | Special page, inside back cover |
+| `dedication` | Dedication | Special page, inside front/inside back/back cover |
 | `blank` | Blank page | Special page |
 
 The user-visible names are translated by Photo Album. For example,
@@ -64,7 +66,7 @@ Their allowed positions are:
 - back cover.
 
 `dedication` has a more restricted role as a cover template: it is
-available only for the inside back cover.
+available for the inside front, inside back, and back covers, but not the front cover.
 
 The same templates can also be used as special pages where declared
 by the manifest.
@@ -216,10 +218,9 @@ The built-in layouts support up to three caption lines per photo.
 `dedication` provides a dedicated text page.
 
 It is declared both as a special page and as a cover template, but
-its cover use is deliberately restricted to the inside back cover.
+its cover use is deliberately restricted to the inside front, inside back, and back covers.
 
-This makes it suitable for an end-of-album dedication without making
-it appear among unrelated front-cover choices.
+This keeps it out of the front-cover choices while allowing a dedication on the other cover positions.
 
 ## Blank page
 
@@ -326,8 +327,8 @@ requires:
 
 For the general template-pack architecture, see:
 
-- `docs/template-packs.md`;
-- `docs/gui-architecture.md`.
+- [`docs/template-packs.md`](../../../../../docs/template-packs.md);
+- [`docs/gui-architecture.md`](../../../../../docs/gui-architecture.md).
 
 ### Minimum page dimensions
 
@@ -337,11 +338,4 @@ French/English label, plus two 10 mm margins. The city area begins at 40 mm
 and occupies 65% of page height: 145 mm retains a bottom margin of at least
 10 mm (below 114.3 mm the rectangle exceeds the page).
 
-The calendar index requires width ≥ 110 mm and height ≥ 260 mm. It uses two
-columns and six rows, a 28 mm title band, 10 mm margins, 8 mm column spacing,
-and fixed 4 mm day cells. Each month can need 33 mm for its heading, weekday
-header and six weeks; 260 mm provides over 2 mm between these blocks. The
-110 mm width keeps weekday labels and typical month/page headings readable.
-These bounds cover default typography and ordinary content; unusually long
-city lists or custom large fonts may still need a larger page. No bounds were
-added to the photo scatter template.
+The calendar index requires width ≥ 180 mm and height ≥ 180 mm. These are the bounds declared by the manifest and enforced by the host. They provide the minimum physical area expected by the built-in calendar layout. Custom typography or unusually dense content may still require a larger page. No bounds were added to the photo scatter template.

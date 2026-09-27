@@ -1,5 +1,7 @@
 # Adding a template pack
 
+**English** | [Français](template-packs.fr.md)
+
 MSB remains the bundled pack and the default selection. Additional packs can be
 added under `src/photoalbum/templates/` without changing the engine, GUI, or
 packaging configuration. An album can mix templates from multiple packs.
