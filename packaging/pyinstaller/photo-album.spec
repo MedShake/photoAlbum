@@ -2,10 +2,15 @@
 
 import sys
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import (
+    collect_data_files,
+    collect_submodules,
+    copy_metadata,
+)
 
 
 datas = collect_data_files("photoalbum")
+datas += copy_metadata("photo-album")
 
 icon = None
 if sys.platform == "win32":
