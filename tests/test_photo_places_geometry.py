@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QApplication, QCheckBox
+from PySide6.QtWidgets import QApplication, QCheckBox, QWidget
 
 from photoalbum.gui.widgets.photo_places_widget import PhotoPlacesWidget
 from photoalbum.models import LocationComponent, Photo
@@ -16,7 +16,17 @@ from photoalbum.models import LocationComponent, Photo
 def view():
     app = QApplication.instance() or QApplication([])
     save = Mock()
-    widget = PhotoPlacesWidget(save_location=save)
+
+    # Keep geometry tests independent from the window manager.
+    # A top-level QWidget may have resize requests constrained by
+    # the desktop; as a child, its requested geometry is deterministic.
+    host = QWidget()
+    host.resize(2200, 900)
+
+    widget = PhotoPlacesWidget(
+        parent=host,
+        save_location=save,
+    )
     components = tuple(LocationComponent(key=k, value=v) for k, v in [
         ('road', 'Boulevard des longues promenades'),
         ('city', 'Saint-Martin-de-la-Montagne'),
@@ -31,6 +41,7 @@ def view():
                     capture_datetime=datetime(2025, month, 1))
               for name, month in [('gps', 3), ('no-gps', 3), ('later', 4)]]
     widget.resize(1400, 700)
+    host.show()
     widget.show()
     widget.set_photos(photos)
     widget._tree.topLevelItem(0).setExpanded(True)
@@ -41,7 +52,7 @@ def view():
             app.processEvents()
     settle()
     yield widget, photos, save, settle
-    widget.close()
+    host.close()
 
 
 def assert_fits(widget, photo):
