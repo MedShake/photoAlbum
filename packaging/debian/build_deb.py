@@ -96,7 +96,7 @@ Version: {version}
 Section: graphics
 Priority: optional
 Architecture: {architecture}
-Maintainer: Photo Album Contributors
+Maintainer: Bertrand Boutillier
 Description: Create chronological photo albums
  A multilingual desktop application for creating chronological
  photo albums and exporting them as PDF documents.

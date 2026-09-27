@@ -3,7 +3,7 @@
 #endif
 
 #define AppName "Photo Album"
-#define AppPublisher "Photo Album Contributors"
+#define AppPublisher "Bertrand Boutillier"
 #define AppExeName "photo-album.exe"
 
 [Setup]

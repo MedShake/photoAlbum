@@ -8,10 +8,20 @@ Update the project version in `pyproject.toml`, for example:
 
     version = "0.1.0b2"
 
-The version in `pyproject.toml` is the reference version used by the
-packaging tools.
+`pyproject.toml` is the single source of truth for the application
+version. Do not update a version string anywhere else.
 
-## 2. Run the test suite
+## 2. Refresh the editable installation
+
+When developing from an editable installation, refresh the installed
+package metadata after changing the version:
+
+    python -m pip install -e .
+
+This ensures that the application, `importlib.metadata`, the About
+dialog, and the HTTP User-Agent all see the new version.
+
+## 3. Run the test suite
 
 Before preparing the release:
 
@@ -19,7 +29,7 @@ Before preparing the release:
 
 All tests must pass.
 
-## 3. Commit and push
+## 4. Commit and push
 
 Commit the version change and any other changes intended for the release:
 
@@ -29,7 +39,7 @@ Commit the version change and any other changes intended for the release:
 
 Check that the GitHub CI workflow completes successfully.
 
-## 4. Create the GitHub Release
+## 5. Create the GitHub Release
 
 On GitHub:
 
@@ -51,7 +61,7 @@ For example:
 
 The release workflow checks this correspondence automatically.
 
-## 5. Automated builds
+## 6. Automated builds
 
 Publishing the GitHub Release triggers the release workflow.
 
@@ -70,7 +80,7 @@ For version `0.1.0b2`, the release assets will look like:
     photo-album_0.1.0~b2_amd64.deb
     PhotoAlbum-0.1.0b2-Windows-x64-Setup.exe
 
-## 6. Verify the published release
+## 7. Verify the published release
 
 After the workflow completes:
 

@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from photoalbum import __version__, cli
+from photoalbum import cli
+from photoalbum.app_info import user_agent
 from photoalbum.app import project_service
 from photoalbum.templates.msb.photo_page.composition import photo_location_text
 from photoalbum.database import PhotoRepository, ProjectDatabase
@@ -84,7 +85,7 @@ def test_geocoding(monkeypatch, project, command, outcome, capsys):
         return Location(latitude=lat, longitude=lon, city='New city',
                         raw_data={'address': {'city': 'New city'}})
     def factory(database, **kwargs):
-        assert kwargs['user_agent'] == f'PhotoAlbum/{__version__}'
+        assert kwargs['user_agent'] == user_agent()
         if command == 'set-gps':
             assert PhotoRepository(database).find_by_path(project[1]).raw_location_data is None
         return SimpleNamespace(resolve=resolve)

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
 )
 
-from photoalbum import __version__
+from photoalbum.app_info import VERSION
 from photoalbum.app import ProjectService
 from photoalbum.gui.help_dialog import HelpDialog
 from photoalbum.gui.template_pack_help_dialog import (
@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
         title.setStyleSheet('font-size: 26px; font-weight: bold;')
         layout.addWidget(title)
 
-        version_label = QLabel(self._translator.tr('about.version', version=__version__))
+        version_label = QLabel(self._translator.tr('about.version', version=VERSION))
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version_label)
 

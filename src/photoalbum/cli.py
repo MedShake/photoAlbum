@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PySide6.QtGui import QGuiApplication
 
-from photoalbum import __version__
+from photoalbum.app_info import user_agent
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.geocoding import (
     GeocodingError,
@@ -196,7 +196,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     refresh_location_parser.add_argument(
         "--user-agent",
-        default=f"PhotoAlbum/{__version__}",
+        default=user_agent(),
         help="User-Agent used for the geocoding service (default: application ID).",
     )
 
@@ -214,7 +214,7 @@ def build_parser() -> argparse.ArgumentParser:
     gps_parser.add_argument("longitude", type=float)
     gps_parser.add_argument("--project", type=Path, required=True)
     gps_parser.add_argument("--language", choices=("fr", "en"), default="fr")
-    gps_parser.add_argument("--user-agent", default=f"PhotoAlbum/{__version__}")
+    gps_parser.add_argument("--user-agent", default=user_agent())
     gps_parser.add_argument("--nominatim-endpoint", default=NominatimGeocoder.DEFAULT_ENDPOINT)
 
     pdf_parser = subparsers.add_parser(

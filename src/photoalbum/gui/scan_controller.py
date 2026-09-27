@@ -5,7 +5,7 @@ from datetime import datetime
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import QMessageBox
 
-from photoalbum import __version__
+from photoalbum.app_info import user_agent
 from photoalbum.app import ProjectService
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
 from photoalbum.gui.workers import ScanWorker
@@ -132,7 +132,7 @@ class ScanController(QObject):
             recursive=self._project_service.get_recursive_scan(),
             language=self._language,
             geocode=True,
-            user_agent=f"PhotoAlbum/{__version__}",
+            user_agent=user_agent(),
         )
 
         worker.moveToThread(thread)

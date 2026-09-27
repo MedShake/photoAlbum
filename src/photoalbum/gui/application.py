@@ -9,6 +9,11 @@ from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
+from photoalbum.app_info import (
+    APPLICATION_NAME,
+    ORGANIZATION_NAME,
+)
+
 from .main_window import MainWindow
 
 
@@ -87,8 +92,12 @@ def main() -> int:
 
     application = QApplication([sys.argv[0]])
 
-    application.setApplicationName("Photo Album")
-    application.setOrganizationName("Photo Album")
+    application.setApplicationName(
+        APPLICATION_NAME
+    )
+    application.setOrganizationName(
+        ORGANIZATION_NAME
+    )
     application.setWindowIcon(_application_icon())
 
     language = (

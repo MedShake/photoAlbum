@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QPushButton, QVBoxLayout,
 )
 
-from photoalbum import __version__
+from photoalbum.app_info import user_agent
 from photoalbum.app import ProjectService
 from photoalbum.gui.workers import GpsGeocodingWorker
 from photoalbum.i18n import Translator
@@ -287,7 +287,7 @@ class PhotoEditor(QObject):
             latitude=latitude,
             longitude=longitude,
             language=self._language,
-            user_agent=f"PhotoAlbum/{__version__}",
+            user_agent=user_agent(),
         )
 
         worker.moveToThread(thread)

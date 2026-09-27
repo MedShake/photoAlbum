@@ -19,6 +19,7 @@ from PySide6.QtGui import (
     QPdfWriter,
 )
 
+from photoalbum.app_info import APPLICATION_NAME
 from photoalbum.album.builder import AlbumBuildResult
 from photoalbum.album.composition import PageComposer
 from photoalbum.album.models import CoverPosition
@@ -151,7 +152,7 @@ class PdfExportService:
                 page_height_mm,
             ),
             QPageSize.Unit.Millimeter,
-            "Photo Album",
+            APPLICATION_NAME,
             QPageSize.SizeMatchPolicy.ExactMatch,
         )
 
@@ -182,7 +183,7 @@ class PdfExportService:
         # document. Author, subject and keywords are finalized
         # below with pypdf.
         writer.setCreator(
-            "Photo Album"
+            APPLICATION_NAME
         )
 
         image_cache = RenderImageCache()
@@ -432,7 +433,7 @@ class PdfExportService:
             if value is not None
         }
 
-        pdf_metadata["/Creator"] = "Photo Album"
+        pdf_metadata["/Creator"] = APPLICATION_NAME
 
         values = {
             "/Title": metadata.title,
