@@ -8,10 +8,13 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QFontMetricsF,
     QPainter,
     QPainterPath,
     QPen,
 )
+
+from photoalbum.rendering.fonts import resolve_font_family
 
 from .composition import GeographicMap
 from .geography import (
@@ -521,101 +524,109 @@ def _paint_month_legend(
     *,
     month_colors: dict[int, QColor],
     month_labels: dict[int, str],
-    text_color: QColor,
+    months: tuple[int, ...],
+    font_family: str | None = None,
 ) -> None:
-    """Paint a deliberately discreet month legend."""
+    """One proportional layout in logical pixels, independent of device DPI."""
     if rect.width() <= 0 or rect.height() <= 0:
         return
 
+    if not months:
+        return
+
+    # The physical width of one month cell is fixed by
+    # _month_legend_rect().  Derive the painter scale from that cell,
+    # rather than from the complete legend width: removing months must
+    # remove cells, not shrink the remaining dots and labels.
+    logical_cell_width = 1000.0 / 12.0
+    cell_width = rect.width() / len(months)
+    scale = cell_width / logical_cell_width
+
     painter.save()
+    painter.translate(rect.topLeft())
+    painter.scale(scale, scale)
 
-    font = QFont(painter.font())
-    font.setPointSizeF(
-        max(
-            5.5,
-            min(rect.width(), rect.height()) * 0.16,
-        )
+    logical_width = logical_cell_width * len(months)
+    height = rect.height() / scale
+
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(255, 255, 255, 230))
+    painter.drawRoundedRect(
+        QRectF(0, 0, logical_width, height),
+        10,
+        10,
     )
+
+    # Explicit theme font: do not inherit bold or point sizing from a page
+    # title. Text, dots and spacing share the same scaling in preview/PDF.
+    font = QFont(resolve_font_family(font_family))
+    font.setPixelSize(14)
     painter.setFont(font)
+    metrics = QFontMetricsF(font)
 
-    columns = 12
-    cell_width = rect.width() / columns
-
-    dot_radius = max(
-        1.4,
-        rect.height() * 0.075,
+    radius = 5.0
+    gap = 7.0
+    labels = [
+        (month, month_labels.get(month, str(month)))
+        for month in months
+    ]
+    longest = max(
+        metrics.horizontalAdvance(label)
+        for _month, label in labels
+    )
+    text_scale = min(
+        1.0,
+        (logical_cell_width - 28.0)
+        / max(longest, 1.0),
     )
 
-    for month in range(1, 13):
-        cell = QRectF(
-            rect.left()
-            + (month - 1) * cell_width,
-            rect.top(),
-            cell_width,
-            rect.height(),
+    for index, (month, label) in enumerate(labels):
+        label_width = metrics.horizontalAdvance(label) * text_scale
+        group_width = 2 * radius + gap + label_width
+        left = (
+            index * logical_cell_width
+            + (logical_cell_width - group_width) / 2
         )
-
-        color = QColor(
-            month_colors.get(
-                month,
-                text_color,
-            )
-        )
-
-        dot_x = (
-            cell.left()
-            + cell_width * 0.10
-        )
-        center_y = cell.center().y()
-
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(color)
+        painter.setBrush(month_colors[month])
+        painter.drawEllipse(QPointF(left + radius, height / 2), radius, radius)
 
-        painter.drawEllipse(
-            QPointF(dot_x, center_y),
-            dot_radius,
-            dot_radius,
-        )
-
-        label = month_labels.get(
-            month,
-            str(month),
-        )
-
-        if len(label) > 3:
-            label = label[:3]
-
-        # Month color belongs to the dot only.
-        # Keep labels neutral and clearly readable.
-        label_color = QColor("#222222")
-
-        painter.setPen(label_color)
-        painter.setBrush(
-            Qt.BrushStyle.NoBrush
-        )
-
-        text_rect = QRectF(
-            dot_x + dot_radius * 2.0,
-            cell.top(),
-            max(
-                0.0,
-                cell.right()
-                - dot_x
-                - dot_radius * 2.2,
-            ),
-            cell.height(),
-        )
-
+        painter.save()
+        painter.translate(left + 2 * radius + gap, height / 2)
+        painter.scale(text_scale, text_scale)
+        painter.setPen(QColor("#222222"))
         painter.drawText(
-            text_rect,
-            int(
-                Qt.AlignmentFlag.AlignVCenter
-                | Qt.AlignmentFlag.AlignLeft
-            ),
-            label,
+            QPointF(0, (metrics.ascent() - metrics.descent()) / 2), label,
         )
+        painter.restore()
 
     painter.restore()
+
+
+
+def _month_legend_rect(
+    rect: QRectF,
+    month_count: int,
+) -> QRectF:
+    """Return a centred legend with one fixed-width cell per month."""
+    month_count = max(
+        0,
+        min(12, int(month_count)),
+    )
+
+    maximum_width = rect.width() * 0.86
+    cell_width = maximum_width / 12.0
+    legend_width = cell_width * month_count
+    legend_height = maximum_width * 0.044
+
+    return QRectF(
+        rect.center().x() - legend_width / 2.0,
+        rect.bottom()
+        - legend_height
+        - rect.height() * 0.025,
+        legend_width,
+        legend_height,
+    )
 
 
 def paint_geographic_map(
@@ -634,6 +645,7 @@ def paint_geographic_map(
     show_month_legend: bool = False,
     month_labels: dict[int, str] | None = None,
     projection: str = PROJECTION_WEB_MERCATOR,
+    legend_font_family: str | None = None,
 ) -> None:
     land = land_color or DEFAULT_LAND_COLOR
     water = water_color or DEFAULT_WATER_COLOR
@@ -672,22 +684,6 @@ def paint_geographic_map(
     )
 
     legend_rect = QRectF()
-
-    if show_legend:
-        legend_width = rect.width() * 0.70
-        legend_height = max(
-            22.0,
-            rect.height() * 0.055,
-        )
-
-        legend_rect = QRectF(
-            rect.center().x() - legend_width / 2.0,
-            rect.bottom()
-            - legend_height
-            - rect.height() * 0.025,
-            legend_width,
-            legend_height,
-        )
 
     border_pen = QPen(border)
     border_pen.setWidthF(max(0.6, min(rect.width(), rect.height()) * 0.0015))
@@ -754,15 +750,29 @@ def paint_geographic_map(
         )
 
     if show_legend:
-        legend_text = QColor(border)
-        legend_text.setAlphaF(0.82)
-
-        _paint_month_legend(
-            painter,
-            legend_rect,
-            month_colors=month_colors,
-            month_labels=month_labels,
-            text_color=legend_text,
+        legend_months = tuple(
+            sorted(
+                {
+                    item.month
+                    for item in composition.markers
+                    if item.month in month_colors
+                }
+            )
         )
+
+        if legend_months:
+            legend_rect = _month_legend_rect(
+                rect,
+                len(legend_months),
+            )
+
+            _paint_month_legend(
+                painter,
+                legend_rect,
+                month_colors=month_colors,
+                month_labels=month_labels,
+                months=legend_months,
+                font_family=legend_font_family,
+            )
 
     painter.restore()

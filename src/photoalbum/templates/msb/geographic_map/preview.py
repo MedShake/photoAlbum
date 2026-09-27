@@ -148,6 +148,8 @@ class GeographicMapPreviewBackend(
             ),
             "month_colors",
             month_colors,
+            "legend_font_family",
+            theme.default_font_family,
         )
 
     def create_job(

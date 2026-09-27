@@ -1,5 +1,5 @@
 """Shared rendering options and empty-state painting for preview and export."""
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QLocale, Qt
 from PySide6.QtGui import QColor
 
 from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
@@ -15,11 +15,16 @@ def render_options(settings, translator, template_pack_settings=None):
     }
     for key in ("land_color", "water_color", "border_color"):
         options[key] = QColor(settings.get(key, getattr(defaults, "DEFAULT_" + key.upper())))
+    locale = QLocale(translator.language)
     options.update(
         marker_color=QColor(settings.get("point_color", defaults.DEFAULT_POINT_COLOR)),
         month_colors={month: QColor(*theme.color_for_month(month)) for month in range(1, 13)},
         show_month_legend=bool(settings.get("show_month_legend", True)),
-        month_labels={month: translator.month_name(month) for month in range(1, 13)},
+        month_labels={
+            month: locale.monthName(month, QLocale.FormatType.ShortFormat)
+            for month in range(1, 13)
+        },
+        legend_font_family=theme.default_font_family,
         empty_message=translator.tr("page_settings.map_no_geographic_data"),
     )
     return options
