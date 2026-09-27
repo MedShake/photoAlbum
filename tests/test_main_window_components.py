@@ -168,14 +168,14 @@ def test_hover_preview_clears_on_model_reset_and_tab_hide(app, tmp_path):
     view.model.set_photos([Photo(path=path, filename=path.name)])
     view.show()
     view._source_preview_row = 0
-    view._show_pending_source_photo_preview()
-    wait_until(app, lambda: view._hover_preview.preview is not None)
+    view._schedule_source_photo_preview()
+    wait_until(app, lambda: view._hover_preview._preview is not None)
     view.model.clear()
-    assert view._hover_preview.preview is None
+    assert view._hover_preview._preview is None
     assert view._source_preview_row is None
     view.model.set_photos([Photo(path=path, filename=path.name)])
     view._source_preview_row = 0
-    view._show_pending_source_photo_preview()
+    view._schedule_source_photo_preview()
     assert view._hover_preview._timer.isActive()
     view.hide()
     assert not view._hover_preview._timer.isActive()
@@ -335,9 +335,15 @@ def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_p
         (297.0, 210.0) if orientation == 'landscape' else (210.0, 297.0)
     )
     assert received[0]['output_path'].suffix == '.pdf'
+
+    log = widget._pdf_log_view.toPlainText()
+    assert 'PDF generation' in log
+    assert 'Starting rendering engine…' in log
+
     if failure:
-        assert 'test export failure' in widget._pdf_log_view.toPlainText()
+        assert 'ERROR: test export failure' in log
     else:
+        assert 'PDF created successfully.' in log
         assert widget._pdf_progress_bar.value() == 4
         assert 'album.pdf' in window.statusBar().currentMessage()
 

@@ -21,7 +21,6 @@ class PrintConstraints:
 
 @dataclass(frozen=True)
 class PrintDiagnostic:
-    page_count: int
     compatible: bool
     pages_to_add: int = 0
     page_multiple: int | None = None
@@ -40,7 +39,6 @@ class PrintDiagnostics:
             or constraints.page_multiple is None
         ):
             return PrintDiagnostic(
-                page_count=page_count,
                 compatible=True,
             )
 
@@ -49,13 +47,11 @@ class PrintDiagnostics:
 
         if remainder == 0:
             return PrintDiagnostic(
-                page_count=page_count,
                 compatible=True,
                 page_multiple=multiple,
             )
 
         return PrintDiagnostic(
-            page_count=page_count,
             compatible=False,
             pages_to_add=multiple - remainder,
             page_multiple=multiple,

@@ -184,7 +184,6 @@ class DayDividerSimpleSettingsWidget(
             settings=settings,
         )
 
-        self.instance_changed.emit()
         self._render_preview()
 
     def _render_preview(self) -> None:
@@ -200,6 +199,3 @@ class DayDividerSimpleSettingsWidget(
                 },
             )
         )
-
-    def msb_theme_changed(self) -> None:
-        self._render_preview()

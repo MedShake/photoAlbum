@@ -253,9 +253,8 @@ def test_builder_reports_optional_print_constraint():
         ),
     )
 
-    assert result.print_diagnostic.page_count == len(
-        result.pagination.pages
-    )
+    assert result.print_diagnostic.page_multiple == 4
+    assert result.print_diagnostic.pages_to_add == (-len(result.pagination.pages)) % 4
 
 
 def test_print_constraint_does_not_change_album_pages():

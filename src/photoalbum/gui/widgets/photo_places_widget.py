@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QStyle,
@@ -410,7 +409,6 @@ class PhotoPlacesWidget(QWidget):
         self._thumbnail_loading = False
         self._thumbnail_generation = 0
 
-        self._preview_photo: Photo | None = None
         self._preview_position = QPoint()
 
         self._create_ui()
@@ -892,47 +890,6 @@ class PhotoPlacesWidget(QWidget):
         )
 
         return expanded, selected_path, scroll
-
-    def _restore_view_state(
-        self,
-        expanded: set[tuple],
-        selected_path: str | None,
-        scroll: int,
-        *,
-        first_build: bool,
-    ) -> None:
-        iterator = QTreeWidgetItemIteratorCompat(
-            self._tree
-        )
-
-        for item in iterator:
-            group_key = item.data(
-                0,
-                self.GROUP_ROLE,
-            )
-
-            if group_key is None:
-                continue
-
-            item.setExpanded(
-                first_build
-                or tuple(group_key) in expanded
-            )
-
-        if selected_path:
-            item = self._photo_items.get(
-                selected_path
-            )
-            if item is not None:
-                self._tree.setCurrentItem(item)
-
-        QTimer.singleShot(
-            0,
-            lambda value=scroll:
-                self._tree.verticalScrollBar().setValue(
-                    value
-                ),
-        )
 
     # --------------------------------------------------------
     # Tree construction
@@ -1835,7 +1792,6 @@ class PhotoPlacesWidget(QWidget):
 
             if event.type() == QEvent.Type.Enter:
                 self._cancel_photo_preview()
-                self._preview_photo = photo
                 self._preview_position = (
                     watched.mapToGlobal(
                         QPoint(
@@ -1860,23 +1816,10 @@ class PhotoPlacesWidget(QWidget):
             event,
         )
 
-    def _show_pending_photo_preview(
-        self,
-    ) -> None:
-        photo = self._preview_photo
-
-        if photo is None:
-            return
-        self._hover_preview.schedule(
-            photo.path,
-            self._preview_position,
-        )
-
     def _cancel_photo_preview(
         self,
     ) -> None:
         self._hover_preview.cancel()
-        self._preview_photo = None
 
     def _install_date_widget(
         self,
@@ -3144,22 +3087,23 @@ class PhotoPlacesWidget(QWidget):
             return "—"
 
         labels = {
-            "neighbourhood": "Quartier",
-            "quarter": "Quartier",
-            "suburb": "Quartier",
-            "borough": "Arrondissement",
-            "city_district": "District",
-            "hamlet": "Hameau",
-            "isolated_dwelling": "Lieu-dit",
-            "city": "Ville",
-            "town": "Ville",
-            "village": "Village",
-            "municipality": "Commune",
-            "county": "Département",
-            "state_district": "District",
-            "state": "Région",
-            "region": "Région",
-            "country": "Pays",
+            "neighbourhood": "photos.location_component.neighbourhood",
+            "quarter": "photos.location_component.quarter",
+            "suburb": "photos.location_component.suburb",
+            "borough": "photos.location_component.borough",
+            "city_district": "photos.location_component.city_district",
+            "hamlet": "photos.location_component.hamlet",
+            "isolated_dwelling":
+                "photos.location_component.isolated_dwelling",
+            "city": "photos.location_component.city",
+            "town": "photos.location_component.town",
+            "village": "photos.location_component.village",
+            "municipality": "photos.location_component.municipality",
+            "county": "photos.location_component.county",
+            "state_district": "photos.location_component.state_district",
+            "state": "photos.location_component.state",
+            "region": "photos.location_component.region",
+            "country": "photos.location_component.country",
         }
 
         context: list[
@@ -3177,9 +3121,11 @@ class PhotoPlacesWidget(QWidget):
             ):
                 continue
 
-            label = labels.get(
-                key,
-                key.replace("_", " ").capitalize(),
+            label_key = labels.get(key)
+            label = (
+                self._translator.tr(label_key)
+                if label_key is not None
+                else key.replace("_", " ").capitalize()
             )
 
             context.append(

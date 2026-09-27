@@ -32,7 +32,7 @@ def test_library_scanner_analyzes_photos(tmp_path: Path):
     scanner = LibraryScanner()
     result = scanner.scan(tmp_path)
 
-    assert result.total_photos == 1
+    assert (len(result.photos) + len(result.date_anomalies)) == 1
     assert len(result.photos) == 1
     assert len(result.date_anomalies) == 0
     assert len(result.errors) == 0
@@ -51,7 +51,7 @@ def test_library_scanner_separates_date_anomalies(
     scanner = LibraryScanner()
     result = scanner.scan(tmp_path)
 
-    assert result.total_photos == 2
+    assert (len(result.photos) + len(result.date_anomalies)) == 2
     assert len(result.photos) == 1
     assert len(result.date_anomalies) == 1
 
@@ -131,8 +131,8 @@ def test_library_scanner_supports_recursive_scan(
         recursive=True,
     )
 
-    assert non_recursive.total_photos == 1
-    assert recursive.total_photos == 2
+    assert (len(non_recursive.photos) + len(non_recursive.date_anomalies)) == 1
+    assert (len(recursive.photos) + len(recursive.date_anomalies)) == 2
 
 
 def test_invalid_image_is_reported_as_error(
@@ -147,7 +147,7 @@ def test_invalid_image_is_reported_as_error(
     scanner = LibraryScanner()
     result = scanner.scan(tmp_path)
 
-    assert result.total_photos == 0
+    assert (len(result.photos) + len(result.date_anomalies)) == 0
     assert len(result.errors) == 1
     assert result.errors[0].path == invalid_image
     assert result.errors[0].message
@@ -189,7 +189,7 @@ def test_library_scanner_saves_analyzed_photo(
 
     cached = repository.find_by_path(image_path)
 
-    assert result.total_photos == 1
+    assert (len(result.photos) + len(result.date_anomalies)) == 1
     assert cached is not None
     assert cached.capture_datetime == datetime(2025, 6, 15)
 

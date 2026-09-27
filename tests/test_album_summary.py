@@ -53,7 +53,6 @@ def test_summary_counts_pages():
             ]
         ),
         print_diagnostic=PrintDiagnostic(
-            page_count=4,
             compatible=True,
             pages_to_add=0,
         ),
@@ -75,7 +74,6 @@ def test_summary_exposes_print_warning():
         plan=AlbumPlan(),
         pagination=PaginationResult(),
         print_diagnostic=PrintDiagnostic(
-            page_count=42,
             compatible=False,
             pages_to_add=2,
         ),
@@ -110,7 +108,6 @@ def test_summary_contains_period_fill_suggestions():
             ]
         ),
         print_diagnostic=PrintDiagnostic(
-            page_count=0,
             compatible=True,
             pages_to_add=0,
         ),
@@ -144,7 +141,6 @@ def test_summary_ignores_periods_without_free_slots():
             ]
         ),
         print_diagnostic=PrintDiagnostic(
-            page_count=0,
             compatible=True,
             pages_to_add=0,
         ),

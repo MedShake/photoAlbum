@@ -93,13 +93,3 @@ def oriented_page_format(
     raise ValueError(
         f"Unsupported page orientation: {orientation_value}"
     )
-
-
-@dataclass(frozen=True)
-class PrintProfile:
-    name: str
-    page_format: PageFormat = A4
-    target_ppi: int = 300
-    bleed_mm: float = 0.0
-    safe_margin_mm: float = 10.0
-    page_count_multiple: int | None = None

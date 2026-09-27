@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from PySide6.QtCore import QRect, QSize, Signal, Qt
+from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
 
@@ -35,7 +35,6 @@ class PageTemplateSettingsWidget(QWidget):
     physical preview geometry and the shared controls/preview layout.
     """
 
-    instance_changed = Signal()
 
     def __init__(
         self,
@@ -267,18 +266,4 @@ class PageTemplateSettingsWidget(QWidget):
         """
         return dict(
             self._template_pack_settings
-        )
-
-    def set_template_pack_settings(
-        self,
-        settings,
-    ) -> None:
-        """
-        Replace the editor's working template-pack context.
-
-        Keep ownership local to the editor: callers and editors
-        must not accidentally share a mutable settings dict.
-        """
-        self._template_pack_settings = dict(
-            settings or {}
         )

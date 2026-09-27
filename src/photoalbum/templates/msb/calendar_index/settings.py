@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -19,9 +18,6 @@ from photoalbum.album import (
 )
 from photoalbum.templates.msb.calendar_index.composition import (
     available_calendar_years,
-)
-from photoalbum.templates.msb.theme import (
-    msb_theme_from_pack_settings,
 )
 
 from photoalbum.templates.msb.settings_base import (
@@ -102,11 +98,6 @@ class CalendarIndexSettingsWidget(
         self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
         self.add_settings_columns(root, left, self._preview_label)
 
-    def msb_theme_changed(
-        self,
-    ) -> None:
-        self._render_preview()
-
     def _load_state(
         self,
     ) -> None:
@@ -180,7 +171,6 @@ class CalendarIndexSettingsWidget(
             # Persist even the automatically selected year.
             self._save_year(
                 selected_year,
-                emit=False,
             )
 
         self._year_combo.blockSignals(
@@ -197,14 +187,11 @@ class CalendarIndexSettingsWidget(
         calendar_settings["show_title"] = bool(checked)
         settings["calendar_index"] = calendar_settings
         self._instance = replace(self._instance, settings=settings)
-        self.instance_changed.emit()
         self._render_preview()
 
     def _save_year(
         self,
         year,
-        *,
-        emit: bool = True,
     ) -> None:
         settings = dict(
             self._instance.settings
@@ -229,9 +216,6 @@ class CalendarIndexSettingsWidget(
             self._instance,
             settings=settings,
         )
-
-        if emit:
-            self.instance_changed.emit()
 
     def _year_changed(
         self,

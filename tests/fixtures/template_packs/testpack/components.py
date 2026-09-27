@@ -42,7 +42,6 @@ class Editor(PageTemplateSettingsWidget):
 
     def changed(self, value):
         self._instance = self._instance.with_settings({**self._instance.settings, "banana_density": value})
-        self.instance_changed.emit()
 
 
 class Renderer:

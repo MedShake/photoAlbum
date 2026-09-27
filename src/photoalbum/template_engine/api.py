@@ -10,15 +10,15 @@ from photoalbum.album import (
 from photoalbum.album.composition import (
     HorizontalAlignment, ImageFit, NormalizedRect, PageComposer, PageComposition,
     PageNumberComposition, PhotoSlotComposition, TemplateLayout, TemplateLayoutRegistry,
-    compose_page_number, fit_contained_rect,
+    compose_page_number,
 )
 from photoalbum.gui.template_settings import PageTemplateSettingsWidget
 from photoalbum.models import Photo
 from photoalbum.i18n.date_formatter import format_date_parts
 from photoalbum.template_engine import (
     PageTemplateExtension, create_template_instance, register_template_extension,
-    validate_template_instance,
 )
+from photoalbum.template_engine.instances import validate_template_instance
 from photoalbum.template_engine.preview_backend import PreviewJob, TemplatePreviewBackend
 
 __all__ = [
@@ -28,6 +28,6 @@ __all__ = [
     "PageTemplateExtension", "PageTemplateSettingsWidget", "Photo", "PhotoSlotComposition",
     "PlannedPage", "PlanItemKind", "PreviewJob", "TemplateKind", "TemplateLayout",
     "TemplateLayoutRegistry", "TemplatePreviewBackend", "compose_page_number",
-    "create_template_instance", "fit_contained_rect", "register_template_extension",
+    "create_template_instance", "register_template_extension",
     "validate_template_instance", "format_date_parts",
 ]

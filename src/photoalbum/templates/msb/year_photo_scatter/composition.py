@@ -35,7 +35,6 @@ class CoverScatterItem:
 
 @dataclass(frozen=True)
 class CoverScatterComposition:
-    seed: int
     title: str
     items: tuple[CoverScatterItem, ...]
 
@@ -255,7 +254,6 @@ def compose_cover_scatter(
     )
 
     return CoverScatterComposition(
-        seed=seed,
         title=title,
         items=items,
     )

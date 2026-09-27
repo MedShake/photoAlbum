@@ -28,7 +28,6 @@ class ScanStatistics:
     geocoded: int = 0
     date_anomalies: int = 0
     errors: int = 0
-    missing: int = 0
 
 @dataclass
 class LibraryScanResult:
@@ -42,11 +41,6 @@ class LibraryScanResult:
         default_factory=ScanStatistics
     )
     cancelled: bool = False
-    @property
-    def total_photos(self) -> int:
-        return len(self.photos) + len(self.date_anomalies)
-
-
 class LibraryScanner:
     def __init__(
         self,
@@ -194,7 +188,6 @@ class LibraryScanner:
             result.missing_photos.append(
                 photo
             )
-            result.statistics.missing += 1
 
     def _get_or_process_photo(
         self,

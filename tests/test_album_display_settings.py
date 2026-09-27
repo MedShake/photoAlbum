@@ -1,6 +1,5 @@
 from photoalbum.templates.msb.photo_page.caption_style import caption_show_datetime, caption_show_location
 from photoalbum.album import PageInstance
-import json
 
 from photoalbum.album import (
     AlbumStructureSettings,

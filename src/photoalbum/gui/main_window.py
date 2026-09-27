@@ -103,11 +103,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 APPLICATION_NAME,
-                (
-                    "La génération du PDF est en cours. "
-                    "Attendez sa fin avant de fermer "
-                    "l'application."
-                ),
+                self._translator.tr('main.pdf_running_warning'),
             )
             event.ignore()
             return
@@ -385,7 +381,7 @@ class MainWindow(QMainWindow):
             self,
             self._translator.tr('main.new_project'),
             "",
-            "Photo Album Project (*.photoalbum)",
+            self._translator.tr("main.project_file_filter"),
         )
 
         if not path:
@@ -445,7 +441,7 @@ class MainWindow(QMainWindow):
             self,
             self._translator.tr("main.open_project_title"),
             "",
-            "Photo Album Project (*.photoalbum)",
+            self._translator.tr("main.project_file_filter"),
         )
 
         if not path:

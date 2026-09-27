@@ -21,7 +21,6 @@ class ImageFit(str, Enum):
 
 class HorizontalAlignment(str, Enum):
     LEFT = "left"
-    CENTER = "center"
     RIGHT = "right"
 
 
@@ -83,48 +82,6 @@ class PageComposition:
     page: PlannedPage
     photo_slots: tuple[PhotoSlotComposition, ...] = ()
     page_number: PageNumberComposition | None = None
-
-    @property
-    def used_photo_slots(self) -> int:
-        return min(
-            len(self.page.photos),
-            len(self.photo_slots),
-        )
-
-    @property
-    def unused_photo_slots(self) -> int:
-        return max(
-            0,
-            len(self.photo_slots) - len(self.page.photos),
-        )
-
-
-def fit_contained_rect(
-    box: NormalizedRect,
-    *,
-    pixel_width: int,
-    pixel_height: int,
-) -> NormalizedRect:
-    if pixel_width <= 0 or pixel_height <= 0:
-        return box
-
-    image_ratio = pixel_width / pixel_height
-    box_ratio = box.width / box.height
-
-    if image_ratio >= box_ratio:
-        width = box.width
-        height = width / image_ratio
-    else:
-        height = box.height
-        width = height * image_ratio
-
-    return NormalizedRect(
-        x=box.x + (box.width - width) / 2,
-        y=box.y + (box.height - height) / 2,
-        width=width,
-        height=height,
-    )
-
 
 class TemplateLayout(Protocol):
     def compose(

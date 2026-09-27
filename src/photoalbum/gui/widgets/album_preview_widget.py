@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
 
 from PySide6.QtCore import (
     QEvent,
     QRect,
-    QSize,
     QTimer,
     Qt,
 )
 from PySide6.QtGui import (
-    QColor,
     QFont,
     QPainter,
     QPen,
-    QPixmap,
 )
 from PySide6.QtWidgets import (
     QGridLayout,

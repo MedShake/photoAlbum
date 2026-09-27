@@ -19,7 +19,7 @@ from photoalbum.app import ProjectService
 from photoalbum.export import PdfExportService
 from photoalbum.gui.template_settings import create_template_settings_editor
 from photoalbum.gui.widgets.album_settings_widget import AlbumSettingsWidget
-from photoalbum.gui.widgets.album_preview_widget import AlbumCoverPreview, AlbumPagePreview
+from photoalbum.gui.widgets.album_preview_widget import AlbumCoverPreview
 from photoalbum.gui.preview_render_service import PreviewRenderService
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo

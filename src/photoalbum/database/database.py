@@ -31,20 +31,6 @@ class ProjectDatabase:
 
         self.connection.commit()
 
-    def get_schema_version(self) -> int:
-        row = self.connection.execute(
-            """
-            SELECT version
-            FROM schema_version
-            LIMIT 1
-            """
-        ).fetchone()
-
-        if row is None:
-            return 0
-
-        return int(row["version"])
-
     def set_project_metadata(
         self,
         key: str,

@@ -525,10 +525,6 @@ def test_captionless_row_gives_complete_cell_to_image():
     key = layout._row_key(cell)
 
     assert rows[key] == 0
-    assert not layout._row_has_caption(
-        row_key=key,
-        row_caption_lines=rows,
-    )
 
     slot = layout._compose_slot(
         cell=cell,

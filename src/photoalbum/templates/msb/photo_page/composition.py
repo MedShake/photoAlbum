@@ -262,21 +262,6 @@ class PhotoTemplateLayout:
     ) -> float:
         return round(cell.y, 6)
 
-    def _row_has_caption(
-        self,
-        *,
-        row_key: float,
-        row_caption_lines: dict[float, int],
-    ) -> bool:
-        """Return whether a row reserves caption space.
-
-        A row with no visible caption gives the complete cell
-        height back to its images.  As soon as one caption is
-        visible, the complete caption capacity declared by the
-        template is reserved for every cell in that row.
-        """
-        return row_caption_lines.get(row_key, 0) > 0
-
     def _compose_slot(
         self,
         *,

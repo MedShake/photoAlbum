@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
 )
@@ -155,11 +154,6 @@ class GeographicWordCloudSettingsWidget(
         self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
         self.add_settings_columns(root, left, self._preview_label)
 
-    def msb_theme_changed(
-        self,
-    ) -> None:
-        self._render_preview()
-
     def _load_state(
         self,
     ) -> None:
@@ -294,7 +288,6 @@ class GeographicWordCloudSettingsWidget(
         )
 
         self._has_local_palette = True
-        self.instance_changed.emit()
 
     def _choose_palette_color(
         self,
@@ -360,7 +353,6 @@ class GeographicWordCloudSettingsWidget(
         self._has_local_palette = False
 
         self._update_palette_buttons()
-        self.instance_changed.emit()
         self._render_preview()
 
     def _scope_changed(
@@ -393,7 +385,6 @@ class GeographicWordCloudSettingsWidget(
             settings=settings,
         )
 
-        self.instance_changed.emit()
 
         self._render_preview()
 

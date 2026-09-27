@@ -8,7 +8,6 @@ from photoalbum.album import (
     PageOrientation,
     page_format_from_id,
     oriented_page_format,
-    PrintProfile,
 )
 
 
@@ -22,31 +21,6 @@ def test_us_letter_format():
     assert US_LETTER.name == "US Letter"
     assert US_LETTER.width_mm == 215.9
     assert US_LETTER.height_mm == 279.4
-
-
-def test_default_print_profile_uses_a4():
-    profile = PrintProfile(
-        name="Default",
-    )
-
-    assert profile.page_format == A4
-
-
-def test_default_print_profile_targets_300_ppi():
-    profile = PrintProfile(
-        name="Default",
-    )
-
-    assert profile.target_ppi == 300
-
-
-def test_print_profile_can_require_page_count_multiple():
-    profile = PrintProfile(
-        name="Print service",
-        page_count_multiple=4,
-    )
-
-    assert profile.page_count_multiple == 4
 
 
 def test_cover_positions_define_four_covers():

@@ -15,12 +15,7 @@ from photoalbum.album.templates import (
     TemplateRegistry,
     PageConstraints,
 )
-from photoalbum.template_engine.translations import (
-    PackTranslator,
-    load_pack_catalogs,
-    replace_registered_pack_catalogs,
-    translator_for_pack,
-)
+from photoalbum.template_engine.translations import load_pack_catalogs, replace_registered_pack_catalogs, translator_for_pack
 from photoalbum.template_engine.extensions import (
     collect_template_extensions,
     template_extension_registry,
@@ -61,9 +56,6 @@ class TemplatePack:
     translation_catalogs: dict[str, dict[str, str]] | None = None
     settings_editor: str | None = None
     default_templates: dict[str, str] = field(default_factory=dict)
-
-    def translator(self, base) -> PackTranslator:
-        return PackTranslator(base, self.translation_catalogs or {})
 
     def documentation_path(
         self,
@@ -171,21 +163,11 @@ def _template_from_data(
         "localized_names",
         {},
     )
-    localized_descriptions = value.get(
-        "localized_descriptions",
-        {},
-    )
 
     if not isinstance(localized_names, dict):
         raise ValueError(
             f"Template {template_id!r}: "
             "localized_names must be an object."
-        )
-
-    if not isinstance(localized_descriptions, dict):
-        raise ValueError(
-            f"Template {template_id!r}: "
-            "localized_descriptions must be an object."
         )
 
     definition = TemplateDefinition(
@@ -202,11 +184,6 @@ def _template_from_data(
         localized_names={
             str(key): str(item)
             for key, item in localized_names.items()
-        },
-        localized_descriptions={
-            str(key): str(item)
-            for key, item
-            in localized_descriptions.items()
         },
     )
 

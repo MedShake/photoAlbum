@@ -6,26 +6,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.photos": "Photos",
         "tab.places_captions": "Places and captions",
         "main.analyze_photos": "Analyze photos",
-        "main.scan_discovered": "Discovered: {count}",
-        "main.scan_analyzed": "Analyzed: {count}",
-        "main.scan_reused": "Reused: {count}",
-        "main.scan_geocoded": "Geocoded: {count}",
-        "main.scan_anomalies": "Date anomalies: {count}",
-        "main.scan_errors": "Errors: {count}",
         "main.analyze_again": "Analyze photos again",
         "main.progress_photos": "{current} photos analyzed out of {total}",
-        "main.analysis_running_button": "Analysis in progress…",
         "main.analysis_progress": (
             "{current} / {total} photos — "
             "{remaining} remaining"
         ),
-        "scan.event.discovered": "Photo discovered",
-        "scan.event.analyzed": "Metadata analyzed",
-        "scan.event.reused": "Existing analysis reused",
-        "scan.event.geocoding": "Searching for location",
-        "scan.event.geocoded": "Location found",
-        "scan.event.date_anomaly": "Capture date missing",
-        "scan.event.error": "Analysis error",
 
         "processing.event.analysis_started": (
             "Photo processing started."
@@ -64,8 +50,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Photo processing completed."
         ),
 
-        "photos.tab.sources": "Sources",
-        "photos.tab.places": "Places",
         "photos.places.description": (
             "Choose how to describe the place where each photo was "
             "taken and, if you wish, add a caption for each one."
@@ -83,9 +67,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Edit (Ctrl+click for batch editing)"
         ),
         "photos.places.group.title": "Batch location editing",
-        "photos.places.group.source": (
-            "Source component: {value} ({component_key})"
-        ),
         "photos.places.group.replace": "Replace:",
         "photos.places.group.context": "In context:",
         "photos.places.group.current_location": "Current location",
@@ -97,18 +78,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.activate": "Activate",
         "photos.places.group.deactivate": "Deactivate",
         "photos.places.group.replace_by": "Replace with:",
-        "photos.places.group.no_target": (
-            "No broader geographic component is available "
-            "for this photo."
-        ),
         "photos.places.group.compatible": (
             "{count} compatible photos. Uncheck any photos you "
             "do not want to modify."
         ),
         "photos.places.group.photo": "Photo",
         "photos.places.group.date": "Date",
-        "photos.places.group.current": "Current value",
-        "photos.places.group.replacement": "Replacement",
         "photos.places.group.apply": "Apply to {count} photos",
         "photos.places.caption": "Caption",
         "photos.places.counter": "{count} photos",
@@ -131,15 +106,9 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.fix_in_photos": (
             "Correct in Photos…"
         ),
-        "photos.places.column.number": "No.",
         "photos.places.column.photo": "Photo",
-        "photos.places.column.location": "Place",
-        "photos.places.column.composition": "Composition",
-        "photos.places.tooltip.location": "Place: {value}",
-        "photos.places.free_location": "Free-form place",
         "photos.places.location_auto": "Automatic place",
         "photos.places.location_custom": "Custom place",
-        "photos.places.free_location_prompt": "Place:",
 
         "photos.column.filename": "Filename",
         "photos.column.actions": "Actions",
@@ -149,9 +118,25 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.column.city": "City",
         "photos.column.location_source": "Location source",
         "photos.column.status": "Status",
-        "photos.column.action": "Action",
         "photos.action.set_datetime": "Set date and time…",
         "photos.action.open_image": "Open photo",
+        "photos.action.set_location": "Edit photo location",
+        "photos.location_component.neighbourhood": "Neighbourhood",
+        "photos.location_component.quarter": "Quarter",
+        "photos.location_component.suburb": "Suburb",
+        "photos.location_component.borough": "Borough",
+        "photos.location_component.city_district": "District",
+        "photos.location_component.hamlet": "Hamlet",
+        "photos.location_component.isolated_dwelling": "Locality",
+        "photos.location_component.city": "City",
+        "photos.location_component.town": "Town",
+        "photos.location_component.village": "Village",
+        "photos.location_component.municipality": "Municipality",
+        "photos.location_component.county": "County",
+        "photos.location_component.state_district": "District",
+        "photos.location_component.state": "State / region",
+        "photos.location_component.region": "Region",
+        "photos.location_component.country": "Country",
         "photos.gps.title": "Edit photo location",
         "photos.gps.photo": "Photo:",
         "photos.gps.latitude": "Latitude:",
@@ -184,8 +169,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.gps.geocoding_busy": (
             "A reverse geocoding operation is already running."
         ),
-        "photos.action.date_missing": "Edit capture date and time",
-        "photos.action.date_present": "Edit capture date and time",
         "photos.open_image.not_found": "Image file not found: {path}",
         "photos.open_image.error": "Unable to open image: {path}",
         "photos.datetime.title": "Set capture date and time",
@@ -209,14 +192,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.date_source.manual": "Manual",
         "photos.date_source.unknown": "Unknown",
 
-        "photos.location_tooltip.caption": "Selected location: {value}",
-        "photos.location_tooltip.available": "Available information:",
         "photos.location_source.geocoding": "Geocoding",
         "photos.location_source.manual": "Manual",
         "photos.location_source.unknown": "Unknown",
-        "photos.location_tooltip.place": "Place: {value}",
         "photos.location_tooltip.city": "City: {value}",
-        "photos.location_tooltip.address": "Address: {value}",
         "photos.location_tooltip.gps": (
             "GPS: {latitude}, {longitude}"
         ),
@@ -224,7 +203,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.album": "Album settings",
         "tab.plan": "Plan",
         "tab.preview": "Preview",
-        "tab.pdf": "PDF export",
         "tab.render": "PDF",
         "render.title": "PDF",
         "render.description": (
@@ -258,9 +236,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.landscape": "Landscape",
         "render.page_count_pending": "Calculated during generation",
         "render.generate": "Generate PDF",
-        "render.generate_development": (
-            "PDF generation is in development."
-        ),
         "render.no_album": (
             "No album is available to export."
         ),
@@ -276,6 +251,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.generate_success": (
             "PDF generated successfully: {path}"
         ),
+        "render.log_start": "PDF generation",
+        "render.log_engine_start": "Starting rendering engine…",
+        "render.log_success": "PDF created successfully.",
+        "render.log_error": "ERROR: {error}",
         "page_settings.title": "Page settings",
         "page_settings.description": (
             "Customize the appearance and options of this page."
@@ -421,11 +400,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_running": "Analysis in progress...",
         "main.analysis_failed": "Analysis failed.",
         "main.analysis_completed": "Photo analysis completed.",
+        "main.analysis_in_progress": "Photo analysis in progress…",
         "main.stop_analysis": "Stop",
         "main.analysis_stopping": "Stopping analysis...",
         "main.analysis_stopping_button": "Stopping...",
         "main.analysis_cancelled": "Photo analysis stopped.",
-        "main.analyzing": "Analyzing photos...",
 
         "render.content_group": "Content to export",
         "render.content_complete": (
@@ -459,10 +438,13 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.ready": "Ready",
         "main.project": "Project: {name}",
 
-        "main.create_project_title": "Create Photo Album Project",
         "main.open_project_title": "Open Photo Album Project",
-        "main.choose_source_title": "Choose Source Photo Folder",
+        "main.project_file_filter": "Photo Album Project (*.photoalbum)",
 
+        "main.pdf_running_warning": (
+            "PDF generation is in progress. "
+            "Wait for it to finish before closing the application."
+        ),
         "main.scan_running_warning": (
             "A photo analysis is still running."
         ),
@@ -529,10 +511,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.custom_width": "Width",
         "album.custom_height": "Height",
         "album.apply_format": "Apply",
-        "album.paper_format": "Format",
-        "album.paper_format_a5_development": (
-            "A5 — 148 × 210 mm — in development"
-        ),
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
         "album.orientation_landscape": "Landscape",
@@ -541,9 +519,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
         "album.templates_unavailable_orientation": (
             "templates unavailable for this orientation"
-        ),
-        "album.orientation_landscape_development": (
-            "Landscape — in development"
         ),
         "album.covers": "Covers",
         "album.settings": "Settings…",
@@ -580,10 +555,6 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "album.year_detected": "{count} year detected.",
         "album.years_detected": "{count} years detected.",
-        "album.year_unavailable": (
-            "Year separators are unavailable: "
-            "all photos belong to {year}."
-        ),
         "album.year_no_photos": (
             "Year separators are unavailable until "
             "dated photos are present."
@@ -602,13 +573,6 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "plan.no_plan": "No album plan available.",
         "plan.no_optimization": "No optimization available.",
-        "plan.no_unused_capacity": (
-            "No unused photo capacity detected "
-            "at the end of a month."
-        ),
-        "plan.no_warning_or_optimization": (
-            "No warning or possible optimization detected."
-        ),
         "plan.caption_overflow": (
             "Page {page}, {photo}: the caption requires {required} lines, "
             "but this template displays at most {available}."
@@ -622,13 +586,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.technical_blanks": "Technical blanks",
         "plan.editorial_blanks": "Editorial blanks",
 
-        "plan.print_disabled": (
-            "Print diagnostic: no page-count constraint enabled."
-        ),
-        "plan.print_compatible": (
-            "Print diagnostic: {pages} pages — compatible "
-            "with a multiple of {multiple}."
-        ),
         "plan.print_incompatible_one": (
             "Print diagnostic: {pages} pages — not a multiple "
             "of {multiple}. 1 additional page would be required."
@@ -648,7 +605,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "without increasing the number of pages before the next period."
         ),
 
-        "plan.page": "Page",
         "plan.photos_page": "Photos",
         "plan.day_divider": "Day divider",
         "plan.month_divider": "Month divider",
@@ -679,26 +635,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.photos": "Photos",
         "tab.places_captions": "Lieux et légendes",
         "main.analyze_photos": "Analyser les photos",
-        "main.scan_discovered": "Détectées : {count}",
-        "main.scan_analyzed": "Analysées : {count}",
-        "main.scan_reused": "Réutilisées : {count}",
-        "main.scan_geocoded": "Géolocalisées : {count}",
-        "main.scan_anomalies": "Anomalies de date : {count}",
-        "main.scan_errors": "Erreurs : {count}",
         "main.analyze_again": "Analyser à nouveau les photos",
         "main.progress_photos": "{current} photos analysées sur {total}",
-        "main.analysis_running_button": "Analyse en cours…",
         "main.analysis_progress": (
             "{current} / {total} photos — "
             "{remaining} restantes"
         ),
-        "scan.event.discovered": "Photo détectée",
-        "scan.event.analyzed": "Métadonnées analysées",
-        "scan.event.reused": "Analyse existante réutilisée",
-        "scan.event.geocoding": "Recherche du lieu",
-        "scan.event.geocoded": "Lieu trouvé",
-        "scan.event.date_anomaly": "Date de prise de vue manquante",
-        "scan.event.error": "Erreur d’analyse",
 
         "processing.event.analysis_started": (
             "Traitement de la photo démarré."
@@ -738,8 +680,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Traitement de la photo terminé."
         ),
 
-        "photos.tab.sources": "Sources",
-        "photos.tab.places": "Lieux",
         "photos.places.description": (
             "Choisissez comment décrire le lieu où chaque photo a "
             "été prise et ajoutez, si vous le souhaitez, une légende "
@@ -758,9 +698,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Édition (Ctrl+clic pour modification groupée)"
         ),
         "photos.places.group.title": "Modification groupée des lieux",
-        "photos.places.group.source": (
-            "Composant d’origine : {value} ({component_key})"
-        ),
         "photos.places.group.replace": "Remplacer :",
         "photos.places.group.context": "Dans le contexte :",
         "photos.places.group.current_location": "Lieu actuel",
@@ -772,18 +709,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.activate": "Activer",
         "photos.places.group.deactivate": "Désactiver",
         "photos.places.group.replace_by": "Remplacer par :",
-        "photos.places.group.no_target": (
-            "Aucun composant géographique plus large n’est "
-            "disponible pour cette photo."
-        ),
         "photos.places.group.compatible": (
             "{count} photos compatibles. Décochez celles que vous "
             "ne souhaitez pas modifier."
         ),
         "photos.places.group.photo": "Photo",
         "photos.places.group.date": "Date",
-        "photos.places.group.current": "Valeur actuelle",
-        "photos.places.group.replacement": "Remplacement",
         "photos.places.group.apply": "Appliquer à {count} photos",
         "photos.places.caption": "Légende",
         "photos.places.counter": "{count} photos",
@@ -806,15 +737,9 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.fix_in_photos": (
             "Corriger dans Photos…"
         ),
-        "photos.places.column.number": "N°",
         "photos.places.column.photo": "Photo",
-        "photos.places.column.location": "Lieu",
-        "photos.places.column.composition": "Composition",
-        "photos.places.tooltip.location": "Lieu : {value}",
-        "photos.places.free_location": "Lieu libre",
         "photos.places.location_auto": "Lieu automatique",
         "photos.places.location_custom": "Lieu personnalisé",
-        "photos.places.free_location_prompt": "Lieu :",
 
         "photos.column.filename": "Nom du fichier",
         "photos.column.actions": "Actions",
@@ -824,9 +749,25 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.column.city": "Ville",
         "photos.column.location_source": "Source de localisation",
         "photos.column.status": "Statut",
-        "photos.column.action": "Action",
         "photos.action.set_datetime": "Renseigner la date…",
         "photos.action.open_image": "Ouvrir la photo",
+        "photos.action.set_location": "Modifier la localisation",
+        "photos.location_component.neighbourhood": "Quartier",
+        "photos.location_component.quarter": "Quartier",
+        "photos.location_component.suburb": "Quartier",
+        "photos.location_component.borough": "Arrondissement",
+        "photos.location_component.city_district": "District",
+        "photos.location_component.hamlet": "Hameau",
+        "photos.location_component.isolated_dwelling": "Lieu-dit",
+        "photos.location_component.city": "Ville",
+        "photos.location_component.town": "Ville",
+        "photos.location_component.village": "Village",
+        "photos.location_component.municipality": "Commune",
+        "photos.location_component.county": "Département",
+        "photos.location_component.state_district": "District",
+        "photos.location_component.state": "Région",
+        "photos.location_component.region": "Région",
+        "photos.location_component.country": "Pays",
         "photos.gps.title": "Modifier la localisation",
         "photos.gps.photo": "Photo :",
         "photos.gps.latitude": "Latitude :",
@@ -859,8 +800,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.gps.geocoding_busy": (
             "Un géocodage inverse est déjà en cours."
         ),
-        "photos.action.date_missing": "Modifier la date de prise de vue",
-        "photos.action.date_present": "Modifier la date de prise de vue",
         "photos.open_image.not_found": "Fichier image introuvable : {path}",
         "photos.open_image.error": "Impossible d’ouvrir l’image : {path}",
         "photos.datetime.title": "Définir la date et l’heure de prise de vue",
@@ -887,14 +826,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.date_source.manual": "Manuelle",
         "photos.date_source.unknown": "Inconnue",
 
-        "photos.location_tooltip.caption": "Localisation retenue : {value}",
-        "photos.location_tooltip.available": "Informations disponibles :",
         "photos.location_source.geocoding": "Géocodage",
         "photos.location_source.manual": "Manuelle",
         "photos.location_source.unknown": "Inconnue",
-        "photos.location_tooltip.place": "Lieu : {value}",
         "photos.location_tooltip.city": "Ville : {value}",
-        "photos.location_tooltip.address": "Adresse : {value}",
         "photos.location_tooltip.gps": (
             "GPS : {latitude}, {longitude}"
         ),
@@ -902,7 +837,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "tab.album": "Paramètres album",
         "tab.plan": "Plan",
         "tab.preview": "Aperçu",
-        "tab.pdf": "Export PDF",
         "tab.render": "PDF",
         "render.title": "PDF",
         "render.description": (
@@ -936,9 +870,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.landscape": "Paysage",
         "render.page_count_pending": "Calculé lors de la génération",
         "render.generate": "Générer le PDF",
-        "render.generate_development": (
-            "La génération PDF est en développement."
-        ),
         "render.no_album": (
             "Aucun album n’est disponible pour l’export."
         ),
@@ -954,6 +885,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "render.generate_success": (
             "PDF généré avec succès : {path}"
         ),
+        "render.log_start": "Génération du PDF",
+        "render.log_engine_start": "Démarrage du moteur de rendu…",
+        "render.log_success": "PDF créé avec succès.",
+        "render.log_error": "ERREUR : {error}",
         "page_settings.title": "Réglages de la page",
         "page_settings.description": (
             "Personnalisez l’apparence et les options de cette page."
@@ -1103,11 +1038,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_running": "Analyse en cours...",
         "main.analysis_failed": "Échec de l’analyse.",
         "main.analysis_completed": "Analyse des photos terminée.",
+        "main.analysis_in_progress": "Analyse des photos en cours…",
         "main.stop_analysis": "Arrêter",
         "main.analysis_stopping": "Arrêt de l’analyse en cours...",
         "main.analysis_stopping_button": "Arrêt en cours...",
         "main.analysis_cancelled": "Analyse des photos arrêtée.",
-        "main.analyzing": "Analyse des photos en cours...",
 
         "render.content_group": "Contenu à exporter",
         "render.content_complete": (
@@ -1141,10 +1076,13 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.ready": "Prêt",
         "main.project": "Projet : {name}",
 
-        "main.create_project_title": "Créer un projet Photo Album",
         "main.open_project_title": "Ouvrir un projet Photo Album",
-        "main.choose_source_title": "Choisir le dossier des photos",
+        "main.project_file_filter": "Projet Photo Album (*.photoalbum)",
 
+        "main.pdf_running_warning": (
+            "La génération du PDF est en cours. "
+            "Attendez sa fin avant de fermer l’application."
+        ),
         "main.scan_running_warning": (
             "Une analyse des photos est encore en cours."
         ),
@@ -1213,10 +1151,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.custom_width": "Largeur",
         "album.custom_height": "Hauteur",
         "album.apply_format": "Appliquer",
-        "album.paper_format": "Format",
-        "album.paper_format_a5_development": (
-            "A5 — 148 × 210 mm — en développement"
-        ),
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
         "album.orientation_landscape": "Paysage",
@@ -1261,10 +1195,6 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "album.year_detected": "{count} année détectée.",
         "album.years_detected": "{count} années détectées.",
-        "album.year_unavailable": (
-            "Séparateurs d’année indisponibles : "
-            "toutes les photos appartiennent à {year}."
-        ),
         "album.year_no_photos": (
             "Séparateurs d’année indisponibles tant qu’aucune "
             "photo datée n’est présente."
@@ -1284,13 +1214,6 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "plan.no_plan": "Aucun plan d’album disponible.",
         "plan.no_optimization": "Aucune optimisation disponible.",
-        "plan.no_unused_capacity": (
-            "Aucune capacité photo inutilisée détectée "
-            "en fin de mois."
-        ),
-        "plan.no_warning_or_optimization": (
-            "Aucun avertissement ni optimisation possible détecté."
-        ),
         "plan.caption_overflow": (
             "Page {page}, {photo} : la légende nécessite {required} lignes, "
             "mais ce modèle n’en affiche au maximum que {available}."
@@ -1304,14 +1227,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.technical_blanks": "Pages blanches techniques",
         "plan.editorial_blanks": "Pages blanches éditoriales",
 
-        "plan.print_disabled": (
-            "Diagnostic d’impression : aucune contrainte "
-            "de nombre de pages activée."
-        ),
-        "plan.print_compatible": (
-            "Diagnostic d’impression : {pages} pages — compatible "
-            "avec un multiple de {multiple}."
-        ),
         "plan.print_incompatible_one": (
             "Diagnostic d’impression : {pages} pages — ce nombre "
             "n’est pas un multiple de {multiple}. "
@@ -1333,7 +1248,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "avant la période suivante."
         ),
 
-        "plan.page": "Page",
         "plan.photos_page": "Photos",
         "plan.day_divider": "Séparateur de jour",
         "plan.month_divider": "Séparateur de mois",
@@ -1372,17 +1286,6 @@ class Translator:
     @property
     def language(self) -> str:
         return self._language
-
-    def set_language(
-        self,
-        language: str,
-    ) -> None:
-        if language not in CATALOGS:
-            raise ValueError(
-                f"Unsupported language: {language}"
-            )
-
-        self._language = language
 
     def tr(
         self,

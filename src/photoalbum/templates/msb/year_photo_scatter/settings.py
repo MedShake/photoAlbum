@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 from secrets import randbelow
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor,
 )
@@ -549,11 +548,6 @@ class YearPhotoScatterSettingsWidget(
         self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
         self.add_settings_columns(root, left, self._preview_label)
 
-    def msb_theme_changed(
-        self,
-    ) -> None:
-        self._request_preview()
-
     def _save_state(
         self,
     ) -> None:
@@ -592,7 +586,6 @@ class YearPhotoScatterSettingsWidget(
             settings=settings,
         )
 
-        self.instance_changed.emit()
 
     def _update_controls(
         self,
@@ -828,7 +821,6 @@ class YearPhotoScatterSettingsWidget(
             self._instance,
             settings=settings,
         )
-        self.instance_changed.emit()
         self._request_preview()
 
     def _change_title_font_size(self, value: float) -> None:
@@ -839,7 +831,6 @@ class YearPhotoScatterSettingsWidget(
             "title_font_size": value,
         }
         self._instance = replace(self._instance, settings=settings)
-        self.instance_changed.emit()
         self._request_preview()
 
     def _request_preview(

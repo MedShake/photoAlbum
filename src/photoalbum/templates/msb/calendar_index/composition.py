@@ -4,7 +4,6 @@ import calendar
 from dataclasses import dataclass
 from datetime import date
 
-from photoalbum.models import Photo
 
 from photoalbum.album.planning import PlanItemKind
 

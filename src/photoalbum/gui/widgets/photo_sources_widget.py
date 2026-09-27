@@ -111,7 +111,10 @@ class PhotoSourcesWidget(QWidget):
         self.table.setMouseTracking(True)
         self.table.viewport().installEventFilter(self)
 
-        self._photo_actions_delegate = PhotoActionsDelegate(self.table)
+        self._photo_actions_delegate = PhotoActionsDelegate(
+            self.table,
+            translator=self._translator,
+        )
 
         self._photo_actions_delegate.edit_datetime_requested.connect(
             self.edit_datetime_requested.emit
@@ -307,10 +310,6 @@ class PhotoSourcesWidget(QWidget):
             photo.path,
             self._source_preview_position,
         )
-
-    def _show_pending_source_photo_preview(self) -> None:
-        """Compatibility helper used by tests and non-mouse callers."""
-        self._schedule_source_photo_preview()
 
     def _cancel_source_photo_preview(self) -> None:
         self._hover_preview.cancel()

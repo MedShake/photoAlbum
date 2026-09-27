@@ -35,7 +35,6 @@ def test_multiple_of_four_is_compatible():
         PrintConstraints(page_multiple=4),
     )
 
-    assert diagnostic.page_count == 40
     assert diagnostic.compatible
     assert diagnostic.pages_to_add == 0
 
@@ -48,7 +47,6 @@ def test_42_pages_suggests_two_additional_pages():
         PrintConstraints(page_multiple=4),
     )
 
-    assert diagnostic.page_count == 42
     assert not diagnostic.compatible
     assert diagnostic.pages_to_add == 2
 

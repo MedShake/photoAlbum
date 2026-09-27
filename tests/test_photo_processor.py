@@ -173,36 +173,7 @@ def test_location_failure_does_not_mark_photo_as_geocoded():
     assert result.city is None
 
 
-def test_refresh_location_forces_resolver():
-    photo = Photo(
-        path=Path("/photos/example.jpg"),
-        filename="example.jpg",
-        latitude=47.2184,
-        longitude=-1.5536,
-        city="Old City",
-        location_source=LocationSource.GEOCODING,
-    )
-
-    resolver = FakeLocationResolver(
-        Location(
-            latitude=47.2184,
-            longitude=-1.5536,
-            city="Fresh City",
-        )
-    )
-
-    processor = PhotoProcessor(
-        location_resolver=resolver,
-    )
-
-    refreshed = processor.refresh_location(photo)
-
-    assert refreshed is True
-    assert photo.city == "Fresh City"
-    assert resolver.force_refresh_values == [True]
-
-
-def test_failed_refresh_keeps_existing_location():
+def test_failed_enrichment_keeps_existing_location():
     photo = Photo(
         path=Path("/photos/example.jpg"),
         filename="example.jpg",
@@ -216,7 +187,7 @@ def test_failed_refresh_keeps_existing_location():
         location_resolver=FakeLocationResolver(None),
     )
 
-    refreshed = processor.refresh_location(photo)
+    refreshed = processor.enrich_location(photo)
 
     assert refreshed is False
     assert photo.city == "Existing City"

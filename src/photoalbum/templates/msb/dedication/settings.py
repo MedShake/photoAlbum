@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
@@ -144,7 +143,9 @@ class DedicationSettingsWidget(
 
         layout.addWidget(
             QLabel(
-                "Texte de la dédicace (Markdown)"
+                self._translator.tr(
+                    "dedication.text"
+                )
             )
         )
 
@@ -153,8 +154,9 @@ class DedicationSettingsWidget(
             self._text
         )
         self._text_edit.setPlaceholderText(
-            "**Pour vous**\n\n"
-            "Avec toute notre affection."
+            self._translator.tr(
+                "dedication.placeholder"
+            )
         )
         self._text_edit.textChanged.connect(
             self._text_changed
@@ -185,7 +187,9 @@ class DedicationSettingsWidget(
             self._font_changed
         )
         form.addRow(
-            "Police",
+            self._translator.tr(
+                "dedication.font_family"
+            ),
             self._font_combo,
         )
 
@@ -201,7 +205,9 @@ class DedicationSettingsWidget(
             self._font_size_changed
         )
         form.addRow(
-            "Taille du texte",
+            self._translator.tr(
+                "dedication.font_size"
+            ),
             self._font_size_spin,
         )
 
@@ -210,7 +216,9 @@ class DedicationSettingsWidget(
             self._choose_frame_color
         )
         form.addRow(
-            "Couleur du cadre",
+            self._translator.tr(
+                "dedication.frame_color"
+            ),
             self._frame_color_button,
         )
 
@@ -226,7 +234,9 @@ class DedicationSettingsWidget(
             self._frame_width_changed
         )
         form.addRow(
-            "Épaisseur du cadre",
+            self._translator.tr(
+                "dedication.frame_width"
+            ),
             self._frame_width_spin,
         )
 
@@ -249,9 +259,6 @@ class DedicationSettingsWidget(
                 page_attributes={},
             )
         )
-
-    def msb_theme_changed(self) -> None:
-        self._render_preview()
 
     def _update_frame_color_button(
         self,
@@ -280,7 +287,6 @@ class DedicationSettingsWidget(
             settings=settings,
         )
 
-        self.instance_changed.emit()
         self._render_preview()
 
     def _text_changed(
@@ -333,7 +339,9 @@ class DedicationSettingsWidget(
                 self._frame_color
             ),
             self,
-            "Couleur du cadre",
+            self._translator.tr(
+                "dedication.choose_frame_color"
+            ),
         )
 
         if not color.isValid():

@@ -44,6 +44,11 @@ the pack name avoids collisions.
 }
 ```
 
+`schema_version` identifies the manifest format; `version` identifies the pack
+release. Pack metadata also includes `authors` (names or objects with a `name`
+field) and an optional `description`. These values are preserved by discovery,
+independently of whether the UI displays them.
+
 A pack can provide only some page types, with MSB providing the others. Available
 types are `photo_page`, `cover`, `special_page`, `day_divider`,
 `month_divider`, and `year_divider`. For covers, specify `cover_positions`: `front`, `inside_front`,

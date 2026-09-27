@@ -9,6 +9,7 @@ from photoalbum.album import (
     PhotoPageSettings,
     SpecialPage,
 )
+from photoalbum.i18n import Translator
 from photoalbum.template_engine import create_template_registry
 
 from photoalbum.gui.widgets import AlbumSettingsWidget
@@ -184,14 +185,14 @@ def test_year_divider_is_available_for_one_year():
 def test_detected_year_count_uses_correct_singular_and_plural():
     widget = create_widget()
 
-    widget._translator.set_language("fr")
+    widget._translator = Translator("fr")
     widget.set_available_years({2025})
     assert widget._year_divider_hint.text() == "1 année détectée."
 
     widget.set_available_years({2025, 2026})
     assert widget._year_divider_hint.text() == "2 années détectées."
 
-    widget._translator.set_language("en")
+    widget._translator = Translator("en")
     widget.set_available_years({2025})
     assert widget._year_divider_hint.text() == "1 year detected."
 

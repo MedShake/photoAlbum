@@ -30,13 +30,13 @@ def test_hover_result_is_reused_and_keeps_common_resolution():
     token = next(iter(cache._active))
     assert token[3] == 550
     finish(cache, token)
-    assert preview.preview is not None
+    assert preview._preview is not None
 
     preview.cancel()
     preview.schedule("photo.jpg", QPoint(30, 40))
     preview._request_image()
     assert cache._pool.start.call_count == 1
-    assert preview.preview is not None
+    assert preview._preview is not None
     preview.cancel()
 
 
@@ -54,7 +54,7 @@ def test_cancel_during_hover_delay_never_starts_decode_or_shows_tooltip():
 
     assert not preview._timer.isActive()
     cache._pool.start.assert_not_called()
-    assert preview.preview is None
+    assert preview._preview is None
 
 
 def test_completed_decode_cannot_show_an_obsolete_hover():
@@ -65,12 +65,12 @@ def test_completed_decode_cannot_show_an_obsolete_hover():
 
     preview.schedule("new.jpg", QPoint())
     finish(cache, old_token)
-    assert preview.preview is None
+    assert preview._preview is None
 
     preview._request_image()
     new_token = next(iter(cache._active))
     finish(cache, new_token)
-    assert preview.preview is not None
+    assert preview._preview is not None
     preview.cancel()
 
 
@@ -81,5 +81,5 @@ def test_clear_rejects_results_from_the_previous_project():
     token = next(iter(cache._active))
     preview.clear()
     finish(cache, token)
-    assert preview.preview is None
+    assert preview._preview is None
     assert not cache._cache

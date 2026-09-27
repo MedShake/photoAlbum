@@ -388,7 +388,7 @@ class PdfExportWidget(QWidget):
         self._pdf_progress_bar.setVisible(True)
 
         self._pdf_log_view.appendPlainText('────────────────────────────────────────')
-        self._pdf_log_view.appendPlainText('Génération du PDF')
+        self._pdf_log_view.appendPlainText(self._translator.tr('render.log_start'))
         self._pdf_log_view.appendPlainText(str(output_path))
         self._pdf_log_view.appendPlainText(f'{dpi} DPI — {total_pages} pages')
         self._pdf_log_view.appendPlainText('────────────────────────────────────────')
@@ -436,7 +436,7 @@ class PdfExportWidget(QWidget):
         self._pdf_thread = thread
         self._pdf_worker = worker
 
-        self._pdf_log_view.appendPlainText('Démarrage du moteur de rendu…')
+        self._pdf_log_view.appendPlainText(self._translator.tr('render.log_engine_start'))
 
         thread.start()
 
@@ -452,7 +452,7 @@ class PdfExportWidget(QWidget):
 
     def _pdf_export_finished(self, output_path) -> None:
         self._pdf_log_view.appendPlainText('────────────────────────────────────────')
-        self._pdf_log_view.appendPlainText('PDF créé avec succès.')
+        self._pdf_log_view.appendPlainText(self._translator.tr('render.log_success'))
 
         self.status_message.emit(
             self._translator.tr('render.generate_success', path=output_path),
@@ -467,7 +467,7 @@ class PdfExportWidget(QWidget):
 
     def _pdf_export_failed(self, error: str) -> None:
         self._pdf_log_view.appendPlainText('────────────────────────────────────────')
-        self._pdf_log_view.appendPlainText(f'ERREUR : {error}')
+        self._pdf_log_view.appendPlainText(self._translator.tr('render.log_error', error=error))
 
         self.error.emit(self._translator.tr('render.generate_error', error=error))
 

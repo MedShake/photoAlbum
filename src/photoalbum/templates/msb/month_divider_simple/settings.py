@@ -4,7 +4,6 @@ from dataclasses import replace
 
 from photoalbum.templates.msb.simple_divider_titles import FORMATS, automatic_format
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -186,7 +185,6 @@ class MonthDividerSimpleSettingsWidget(
             settings=settings,
         )
 
-        self.instance_changed.emit()
         self._render_preview()
 
     def _render_preview(self) -> None:
@@ -202,6 +200,3 @@ class MonthDividerSimpleSettingsWidget(
                 },
             )
         )
-
-    def msb_theme_changed(self) -> None:
-        self._render_preview()

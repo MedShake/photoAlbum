@@ -40,10 +40,6 @@ class HoverPhotoPreview(QObject):
         self._position = QPoint()
         self._preview: QLabel | None = None
 
-    @property
-    def preview(self) -> QLabel | None:
-        return self._preview
-
     def schedule(self, path: str | Path, position: QPoint) -> None:
         self.cancel()
         self._path = str(path)

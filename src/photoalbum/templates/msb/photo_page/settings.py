@@ -48,9 +48,6 @@ from photoalbum.templates.msb.settings_base import (
 
 
 from .caption_style import (
-    DEFAULT_CAPTION_COLOR,
-    DEFAULT_CAPTION_FONT_SIZE,
-    DEFAULT_CAPTION_ORDER,
     caption_color_name,
     caption_font_family,
     caption_font_size,
@@ -68,10 +65,10 @@ class PhotoPageSettingsWidget(
 
     PREVIEW_WIDTH = 360
     _ORDER_LABELS = {
-        "caption": "Légende utilisateur",
-        "datetime": "Date et heure",
-        "break": "─────── saut de ligne ───────",
-        "location": "Lieu",
+        "caption": "page_settings.caption_order_user",
+        "datetime": "page_settings.caption_order_datetime",
+        "break": "page_settings.caption_order_break",
+        "location": "page_settings.caption_order_location",
     }
 
     def __init__(
@@ -119,17 +116,19 @@ class PhotoPageSettingsWidget(
             self.create_page_settings_title()
         )
 
-        caption_group = QGroupBox("Légendes")
+        caption_group = QGroupBox(
+            self._translator.tr("page_settings.caption_group")
+        )
         caption_layout = QVBoxLayout(caption_group)
 
         self._show_caption = QCheckBox(
-            "Afficher la légende utilisateur"
+            self._translator.tr("page_settings.caption_show_user")
         )
         self._show_datetime = QCheckBox(
-            "Afficher la date et l'heure"
+            self._translator.tr("page_settings.caption_show_datetime")
         )
         self._show_location = QCheckBox(
-            "Afficher le lieu"
+            self._translator.tr("page_settings.caption_show_location")
         )
 
         caption_layout.addWidget(self._show_caption)
@@ -153,13 +152,26 @@ class PhotoPageSettingsWidget(
             self._choose_color
         )
 
-        style_form.addRow("Police", self._font)
-        style_form.addRow("Taille", self._size)
-        style_form.addRow("Couleur", self._color_button)
+        style_form.addRow(
+            self._translator.tr("page_settings.caption_font_family"),
+            self._font,
+        )
+        style_form.addRow(
+            self._translator.tr("page_settings.caption_font_size"),
+            self._size,
+        )
+        style_form.addRow(
+            self._translator.tr("page_settings.caption_color"),
+            self._color_button,
+        )
 
         caption_layout.addLayout(style_form)
 
-        caption_layout.addWidget(QLabel("Disposition"))
+        caption_layout.addWidget(
+            QLabel(
+                self._translator.tr("page_settings.caption_layout")
+            )
+        )
 
         self._order_list = QListWidget()
         self._order_list.setMaximumHeight(120)
@@ -234,7 +246,9 @@ class PhotoPageSettingsWidget(
         self._order_list.clear()
         for value in caption_order(settings):
             item = QListWidgetItem(
-                self._ORDER_LABELS[value]
+                self._translator.tr(
+                    self._ORDER_LABELS[value]
+                )
             )
             item.setData(
                 Qt.ItemDataRole.UserRole,
@@ -277,7 +291,9 @@ class PhotoPageSettingsWidget(
         color = QColorDialog.getColor(
             QColor(self._caption_color),
             self,
-            "Couleur des légendes",
+            self._translator.tr(
+                "page_settings.caption_choose_color"
+            ),
         )
 
         if not color.isValid():
@@ -321,10 +337,6 @@ class PhotoPageSettingsWidget(
             settings=settings,
         )
 
-        self.instance_changed.emit()
-        self._render_preview()
-
-    def msb_theme_changed(self) -> None:
         self._render_preview()
 
     def _render_preview(self) -> None:

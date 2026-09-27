@@ -28,28 +28,4 @@ def register() -> None:
     )
 
 
-def __getattr__(name: str):
-    if name == "GeographicWordCloudSettingsWidget":
-        from .settings import (
-            GeographicWordCloudSettingsWidget,
-        )
-
-        return GeographicWordCloudSettingsWidget
-
-    if name == "compose_geographic_word_cloud":
-        from .composition import (
-            compose_geographic_word_cloud,
-        )
-
-        return compose_geographic_word_cloud
-
-    raise AttributeError(
-        f"module {__name__!r} has no attribute {name!r}"
-    )
-
-
-__all__ = [
-    "GeographicWordCloudSettingsWidget",
-    "compose_geographic_word_cloud",
-    "register",
-]
+__all__ = ["register"]

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -29,7 +28,6 @@ from photoalbum.rendering.fonts import (
 )
 
 from .title import (
-    DEFAULT_TITLE_COLOR,
     TITLE_POSITIONS,
     automatic_title,
     custom_title_text,
@@ -503,7 +501,6 @@ class SimplexFullPhotoCoverSettingsWidget(
             )
         )
 
-        self.instance_changed.emit()
         self._render_preview()
 
     def _title_visibility_changed(
@@ -756,7 +753,6 @@ class SimplexFullPhotoCoverSettingsWidget(
         )
 
         self._update_source_controls()
-        self.instance_changed.emit()
         self._render_preview()
 
     def _browse_external_photo(self) -> None:
@@ -795,7 +791,6 @@ class SimplexFullPhotoCoverSettingsWidget(
             self._source_combo.blockSignals(False)
 
         self._update_source_controls()
-        self.instance_changed.emit()
         self._render_preview()
 
     def _selection_changed(
@@ -819,7 +814,6 @@ class SimplexFullPhotoCoverSettingsWidget(
             )
         )
 
-        self.instance_changed.emit()
         self._render_preview()
 
     def _render_preview(self) -> None:

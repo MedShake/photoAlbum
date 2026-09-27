@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
@@ -17,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from photoalbum.album import A4, PageFormat, PageInstance
 from photoalbum.album.planning import PlanItemKind
-from photoalbum.rendering.fonts import available_photo_album_fonts, resolve_font_family
+from photoalbum.rendering.fonts import available_photo_album_fonts
 from photoalbum.templates.msb.divider_style import divider_font_family, divider_font_size
 from photoalbum.templates.msb.settings_base import MsbTemplateSettingsWidget
 from photoalbum.templates.msb.theme import msb_theme_from_pack_settings
@@ -127,7 +126,6 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
             self._instance,
             settings=settings,
         )
-        self.instance_changed.emit()
         self._render_preview()
 
     def _choose_title_color(self):
@@ -164,5 +162,3 @@ class YearDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
                 page_attributes={"year": 2025},
             )
         )
-
-    def msb_theme_changed(self): self._render_preview()

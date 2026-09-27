@@ -286,20 +286,20 @@ class PdfExportService:
 
                 cover_labels = {
                     CoverPosition.FRONT:
-                        "Première de couverture",
+                        "preview.cover.front",
                     CoverPosition.INSIDE_FRONT:
-                        "Intérieur de couverture avant",
+                        "preview.cover.inside_front",
                     CoverPosition.INSIDE_BACK:
-                        "Intérieur de couverture arrière",
+                        "preview.cover.inside_back",
                     CoverPosition.BACK:
-                        "Quatrième de couverture",
+                        "preview.cover.back",
                 }
 
+                label_key = cover_labels.get(position)
                 report_progress(
-                    cover_labels.get(
-                        position,
-                        "Couverture",
-                    )
+                    self._translator.tr(label_key)
+                    if label_key is not None
+                    else self._translator.tr("album.covers")
                 )
 
             # Physical document order, identical to Preview.

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QToolTip,
 )
 
+from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 
 
@@ -40,6 +41,15 @@ class PhotoActionsDelegate(QStyledItemDelegate):
     ICON_SIZE = 20
     BUTTON_SIZE = 30
     SPACING = 4
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        translator: Translator | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._translator = translator or Translator("fr")
 
     def sizeHint(
         self,
@@ -187,8 +197,8 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         if date_rect.contains(position):
             QToolTip.showText(
                 event.globalPos(),
-                self.tr(
-                    "Modifier la date de prise de vue"
+                self._translator.tr(
+                    "photos.action.set_datetime"
                 ),
                 view,
             )
@@ -197,8 +207,8 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         if gps_rect.contains(position):
             QToolTip.showText(
                 event.globalPos(),
-                self.tr(
-                    "Modifier la localisation"
+                self._translator.tr(
+                    "photos.action.set_location"
                 ),
                 view,
             )
@@ -207,8 +217,8 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         if open_rect.contains(position):
             QToolTip.showText(
                 event.globalPos(),
-                self.tr(
-                    "Ouvrir la photo"
+                self._translator.tr(
+                    "photos.action.open_image"
                 ),
                 view,
             )

@@ -85,7 +85,6 @@ class PhotoProcessor:
         *,
         language: str | None = None,
         on_event: EventCallback | None = None,
-        force_refresh: bool = False,
     ) -> bool:
         if not photo.has_gps:
             return False
@@ -93,10 +92,7 @@ class PhotoProcessor:
         if self._location_resolver is None:
             return False
 
-        if (
-            photo.location_source == LocationSource.MANUAL
-            and not force_refresh
-        ):
+        if photo.location_source == LocationSource.MANUAL:
             return False
 
         self._emit(
@@ -111,7 +107,6 @@ class PhotoProcessor:
                 photo.latitude,
                 photo.longitude,
                 language=language,
-                force_refresh=force_refresh,
             )
         except GeocodingError as exc:
             self._emit(
@@ -160,20 +155,6 @@ class PhotoProcessor:
         )
 
         return True
-
-    def refresh_location(
-        self,
-        photo: Photo,
-        *,
-        language: str | None = None,
-        on_event: EventCallback | None = None,
-    ) -> bool:
-        return self.enrich_location(
-            photo,
-            language=language,
-            on_event=on_event,
-            force_refresh=True,
-        )
 
     @staticmethod
     def _apply_location(

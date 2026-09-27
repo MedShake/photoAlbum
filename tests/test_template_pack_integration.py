@@ -225,7 +225,7 @@ def test_removed_manifest_then_rediscovered_pack(external_pack):
     found = discovery.discover_templates()
     discovery.register_discovered_template_extensions(found.packs)
     assert discovery.pack_settings_editor('independent') is not None
-    assert template_extension_registry.preview_backend('independent-cover') is not None
+    assert template_extension_registry.get('independent-cover').preview_backend is not None
     assert translator_for_template('independent-photo', Translator('fr')).tr('probe') == 'Translated probe'
     layouts = TemplateLayoutRegistry()
     discovery.register_discovered_layouts(layouts, found.packs)

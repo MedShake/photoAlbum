@@ -2,10 +2,8 @@ from photoalbum.template_engine import (
     register_discovered_template_extensions,
     template_extension_registry,
 )
-from photoalbum.templates.msb.year_photo_scatter import (
-    YearPhotoScatterPreviewBackend,
-    YearPhotoScatterSettingsWidget,
-)
+from photoalbum.templates.msb.year_photo_scatter.preview import YearPhotoScatterPreviewBackend
+from photoalbum.templates.msb.year_photo_scatter.settings import YearPhotoScatterSettingsWidget
 
 
 def test_scatter_owns_its_extension():

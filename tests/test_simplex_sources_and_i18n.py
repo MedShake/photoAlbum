@@ -1,3 +1,4 @@
+from photoalbum.template_engine.translations import PackTranslator
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -140,7 +141,7 @@ def test_simplex_translations_are_present_in_english_and_french():
     }
 
     for language, translations in expected.items():
-        translator = simplex.translator(Translator(language))
+        translator = PackTranslator(Translator(language), simplex.translation_catalogs or {})
 
         for key, value in translations.items():
             assert translator.tr(key) == value

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import QRectF, Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from photoalbum.album import A4, PageFormat, PageInstance
@@ -40,5 +39,3 @@ class MonthDividerClassicSettingsWidget(MsbTemplateSettingsWidget):
                 page_attributes={"year": 2025, "month": 6, "cities": self.SAMPLE_CITIES},
             )
         )
-
-    def msb_theme_changed(self): self._render_preview()

@@ -12,8 +12,6 @@ PLAIN_KEYS = (
     "photos.places.column.location_caption",
     "photos.places.column.edit",
     "photos.places.caption",
-    "photos.places.free_location",
-    "photos.places.free_location_prompt",
     "photos.places.fix_in_photos",
 )
 

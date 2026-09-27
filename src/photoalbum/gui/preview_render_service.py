@@ -310,12 +310,6 @@ class PreviewRenderService(QObject):
             pixmap
         )
 
-    def is_pending(
-        self,
-        key: PreviewRenderKey,
-    ) -> bool:
-        return key in self._pending
-
     def request(
         self,
         instance: PageInstance,
@@ -499,21 +493,6 @@ class PreviewRenderService(QObject):
             key,
             message,
         )
-
-    def invalidate_instance(
-        self,
-        instance_id: str,
-    ) -> None:
-        for key in list(
-            self._cache
-        ):
-            if (
-                key.instance_id
-                == instance_id
-            ):
-                del self._cache[
-                    key
-                ]
 
     def clear(
         self,

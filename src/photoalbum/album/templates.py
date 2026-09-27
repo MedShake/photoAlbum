@@ -71,28 +71,6 @@ class TemplateDefinition:
     localized_names: dict[str, str] = field(
         default_factory=dict
     )
-    localized_descriptions: dict[str, str] = field(
-        default_factory=dict
-    )
-
-    def display_name(
-        self,
-        language: str,
-    ) -> str:
-        return (
-            self.localized_names.get(language)
-            or self.localized_names.get("en")
-            or self.name
-        )
-
-    def display_description(
-        self,
-        language: str,
-    ) -> str | None:
-        return (
-            self.localized_descriptions.get(language)
-            or self.localized_descriptions.get("en")
-        )
 
     def __post_init__(self) -> None:
         if not self.template_id:

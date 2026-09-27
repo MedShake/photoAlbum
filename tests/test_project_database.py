@@ -21,7 +21,7 @@ def test_project_database_has_schema_version(tmp_path: Path):
     database.initialize()
 
     assert (
-        database.get_schema_version()
+        database.connection.execute("SELECT version FROM schema_version").fetchone()["version"]
         == ProjectDatabase.CURRENT_SCHEMA_VERSION
     )
 
@@ -64,9 +64,7 @@ def test_unknown_project_metadata_returns_none(
 
     database.close()
 
-import sqlite3
 
-import pytest
 
 
 def test_initialize_is_idempotent(tmp_path: Path):
@@ -78,7 +76,7 @@ def test_initialize_is_idempotent(tmp_path: Path):
     database.initialize()
 
     assert (
-        database.get_schema_version()
+        database.connection.execute("SELECT version FROM schema_version").fetchone()["version"]
         == ProjectDatabase.CURRENT_SCHEMA_VERSION
     )
 

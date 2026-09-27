@@ -25,7 +25,6 @@ BASE_COLORS = tuple(
 @dataclass(frozen=True)
 class GeographicWord:
     text: str
-    count: int
 
     # Normalized page coordinates.
     x: float
@@ -41,9 +40,6 @@ class GeographicWord:
 @dataclass(frozen=True)
 class GeographicWordCloud:
     words: tuple[GeographicWord, ...]
-    year: int | None
-    photo_count: int
-    city_count: int
 
 
 @dataclass
@@ -268,9 +264,6 @@ def compose_geographic_word_cloud(
     if not cities:
         return GeographicWordCloud(
             words=(),
-            year=year,
-            photo_count=len(eligible),
-            city_count=0,
         )
 
     counts = [
@@ -482,7 +475,6 @@ def compose_geographic_word_cloud(
                     words.append(
                         GeographicWord(
                             text=city,
-                            count=data.count,
                             x=x / page_width_mm,
                             y=y / page_height_mm,
                             width=(
@@ -554,7 +546,4 @@ def compose_geographic_word_cloud(
 
     return GeographicWordCloud(
         words=tuple(words),
-        year=year,
-        photo_count=len(eligible),
-        city_count=len(cities),
     )

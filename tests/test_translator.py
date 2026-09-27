@@ -1,5 +1,3 @@
-import pytest
-
 from photoalbum.i18n import Translator
 
 
@@ -34,12 +32,6 @@ def test_unknown_key_returns_key():
 
     assert translator.tr("unknown.key") == "unknown.key"
 
-
-def test_invalid_language_is_rejected():
-    translator = Translator()
-
-    with pytest.raises(ValueError):
-        translator.set_language("xx")
 
 def test_print_diagnostic_uses_real_singular_and_plural():
     en = Translator("en")

@@ -129,7 +129,6 @@ def create_result() -> AlbumBuildResult:
             ],
         ),
         print_diagnostic=PrintDiagnostic(
-            page_count=4,
             compatible=True,
             pages_to_add=0,
         ),
@@ -165,7 +164,6 @@ def result_with_pages(pages: list[PlannedPage]) -> AlbumBuildResult:
         plan=AlbumPlan(),
         pagination=PaginationResult(pages=pages),
         print_diagnostic=PrintDiagnostic(
-            page_count=len(pages),
             compatible=True,
             pages_to_add=0,
         ),
@@ -431,7 +429,6 @@ def test_plan_widget_hides_warnings_when_print_is_compatible():
         plan=result.plan,
         pagination=result.pagination,
         print_diagnostic=PrintDiagnostic(
-            page_count=4,
             compatible=True,
             pages_to_add=0,
             page_multiple=4,
@@ -454,7 +451,6 @@ def test_plan_widget_displays_incompatible_print_as_warning():
         plan=result.plan,
         pagination=result.pagination,
         print_diagnostic=PrintDiagnostic(
-            page_count=6,
             compatible=False,
             pages_to_add=2,
             page_multiple=4,

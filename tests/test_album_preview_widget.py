@@ -100,7 +100,6 @@ def make_result() -> AlbumBuildResult:
             ]
         ),
         print_diagnostic=PrintDiagnostic(
-            page_count=1,
             compatible=True,
             pages_to_add=0,
         ),

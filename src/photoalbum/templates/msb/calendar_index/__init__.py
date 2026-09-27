@@ -28,28 +28,4 @@ def register() -> None:
     )
 
 
-def __getattr__(name: str):
-    if name == "CalendarIndexSettingsWidget":
-        from .settings import (
-            CalendarIndexSettingsWidget,
-        )
-
-        return CalendarIndexSettingsWidget
-
-    if name == "compose_calendar_index":
-        from .composition import (
-            compose_calendar_index,
-        )
-
-        return compose_calendar_index
-
-    raise AttributeError(
-        f"module {__name__!r} has no attribute {name!r}"
-    )
-
-
-__all__ = [
-    "CalendarIndexSettingsWidget",
-    "compose_calendar_index",
-    "register",
-]
+__all__ = ["register"]

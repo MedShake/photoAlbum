@@ -78,33 +78,6 @@ class PageTemplateExtensionRegistry:
 
         return extension.settings_editor_type
 
-    def widget_renderer(
-        self,
-        template_id: str,
-    ):
-        extension = self.get(
-            template_id
-        )
-
-        if extension is None:
-            return None
-
-        return extension.widget_renderer
-
-    def preview_backend(
-        self,
-        template_id: str,
-    ) -> TemplatePreviewBackend | None:
-        extension = self.get(
-            template_id
-        )
-
-        if extension is None:
-            return None
-
-        return extension.preview_backend
-
-
 template_extension_registry = (
     PageTemplateExtensionRegistry()
 )

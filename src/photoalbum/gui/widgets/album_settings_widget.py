@@ -6,7 +6,6 @@ from PySide6.QtCore import Qt, Signal, QSignalBlocker
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
@@ -15,7 +14,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QSpinBox,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -45,7 +43,6 @@ from photoalbum.album import (
     PageOrientation,
     PhotoPageSettings,
     PrintSettings,
-    SpecialPage,
     TemplateKind,
     TemplateRegistry,
 )
@@ -1982,20 +1979,6 @@ class AlbumSettingsWidget(QWidget):
         )
 
         self._emit_settings_changed()
-
-    def _configure_special_page(
-        self,
-        list_widget: QListWidget,
-    ) -> None:
-        item = list_widget.currentItem()
-
-        if item is None:
-            return
-
-        self._configure_special_page_item(
-            list_widget,
-            item,
-        )
 
     def _remove_special_page(
         self,

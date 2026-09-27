@@ -2,9 +2,6 @@ from photoalbum.template_engine import (
     register_discovered_template_extensions,
     template_extension_registry,
 )
-from photoalbum.template_engine.renderers import (
-    SimpleLabelWidgetRenderer,
-)
 from photoalbum.templates.msb.year_divider_classic.widget_renderer import (
     YearDividerClassicWidgetRenderer,
 )

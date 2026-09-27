@@ -1,3 +1,4 @@
+from photoalbum.template_engine.translations import PackTranslator
 from datetime import datetime
 from pathlib import Path
 
@@ -129,11 +130,6 @@ def test_title_editor_preserves_and_reloads_settings(monkeypatch):
         fonts[0],
     )
 
-    changes = []
-    editor.instance_changed.connect(
-        lambda: changes.append(True)
-    )
-
     font_index = editor._title_font_combo.findData(
         selected_family
     )
@@ -148,7 +144,6 @@ def test_title_editor_preserves_and_reloads_settings(monkeypatch):
 
     assert settings["title_font_family"] == selected_family
     assert settings["title_font_size"] == 38.5
-    assert len(changes) == 2
 
     # Generating another scatter proposal must preserve
     # the title style settings.
@@ -350,10 +345,7 @@ def test_title_position_combo_exposes_seven_ordered_positions(
     editor = YearPhotoScatterSettingsWidget(
         PageInstance(template_id="year-photo-scatter"),
         [],
-        translator=next(
-            pack for pack in discover_template_packs()
-            if pack.pack_id == "msb"
-        ).translator(Translator("fr")),
+        translator=PackTranslator(Translator('fr'), next((pack for pack in discover_template_packs() if pack.pack_id == 'msb')).translation_catalogs or {}),
     )
 
     assert [

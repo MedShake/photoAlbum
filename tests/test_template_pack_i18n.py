@@ -1,5 +1,5 @@
+from photoalbum.template_engine.translations import PackTranslator
 import json
-from pathlib import Path
 from dataclasses import replace
 
 import pytest
@@ -25,18 +25,18 @@ def test_builtin_pack_catalogs_are_localized_and_isolated():
     msb = builtin_pack("msb")
     simplex = builtin_pack("simplex")
 
-    assert msb.translator(Translator("en")).tr("msb_theme.title") == "MSB theme"
-    assert msb.translator(Translator("fr")).tr("msb_theme.title") == "Thème MSB"
-    assert simplex.translator(Translator("en")).tr(
+    assert PackTranslator(Translator('en'), msb.translation_catalogs or {}).tr("msb_theme.title") == "MSB theme"
+    assert PackTranslator(Translator('fr'), msb.translation_catalogs or {}).tr("msb_theme.title") == "Thème MSB"
+    assert PackTranslator(Translator('en'), simplex.translation_catalogs or {}).tr(
         "simplex.full-photo-cover.source"
     ) == "Image source"
-    assert simplex.translator(Translator("fr")).tr(
+    assert PackTranslator(Translator('fr'), simplex.translation_catalogs or {}).tr(
         "simplex.full-photo-cover.source"
     ) == "Source de l’image"
-    assert msb.translator(Translator("en")).tr(
+    assert PackTranslator(Translator('en'), msb.translation_catalogs or {}).tr(
         "simplex.full-photo-cover.source"
     ) == "simplex.full-photo-cover.source"
-    assert simplex.translator(Translator("en")).tr(
+    assert PackTranslator(Translator('en'), simplex.translation_catalogs or {}).tr(
         "msb_theme.title"
     ) == "msb_theme.title"
 
@@ -65,8 +65,8 @@ def test_pack_translation_fallback_contract_and_generic_discovery(tmp_path):
     }), encoding="utf-8")
 
     discovered = load_template_pack(pack / "manifest.json")
-    french = discovered.translator(Translator("fr"))
-    unavailable = discovered.translator(Translator("de"))
+    french = PackTranslator(Translator('fr'), discovered.translation_catalogs or {})
+    unavailable = PackTranslator(Translator('de'), discovered.translation_catalogs or {})
 
     assert french.tr("pack.localized") == "Français"
     assert french.tr("pack.english-only") == "English fallback"

@@ -2,24 +2,7 @@ from photoalbum.templates.msb.month_divider_classic.layout import month_cities
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.album import (
-    AlbumPlanner,
-    AlbumPlan,
-    PageSide,
-    PaginationEngine,
-    PlanItem,
-    PlanItemKind,
-    TemplateDefinition,
-    TemplateKind,
-    TemplateRegistry,
-    AlbumStructureSettings,
-    BlankPageReason,
-    CoverPosition,
-    CoverSettings,
-    DividerPlacement,
-    DividerSettings,
-    PhotoPageSettings,
-)
+from photoalbum.album import AlbumPlan, PageSide, PaginationEngine, PlanItem, PlanItemKind, TemplateDefinition, TemplateKind, TemplateRegistry, AlbumStructureSettings, BlankPageReason, CoverPosition, CoverSettings, DividerPlacement, DividerSettings, PhotoPageSettings
 from photoalbum.template_engine import create_template_registry
 
 from photoalbum.models import DateSource, Photo

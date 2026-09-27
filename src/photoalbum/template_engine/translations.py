@@ -32,9 +32,6 @@ class PackTranslator:
     def language(self) -> str:
         return self._base.language
 
-    def set_language(self, language: str) -> None:
-        self._base.set_language(language)
-
     def tr(self, key: str, **values) -> str:
         language = str(self.language or "en").lower()
         language = language.split("-", 1)[0].split("_", 1)[0]
