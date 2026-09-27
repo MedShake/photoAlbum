@@ -75,12 +75,15 @@ GitHub Actions automatically builds and verifies:
 - the Windows installer.
 
 The Debian package and Windows installer are then attached directly to
-the GitHub Release.
+the GitHub Release. The workflow also publishes stable-name aliases used by
+the permanent download links in the README.
 
 For version `1.2.0rc1`, the release assets will look like:
 
     photo-album_1.2.0~rc1_amd64.deb
     PhotoAlbum-1.2.0rc1-Windows-x64-Setup.exe
+    photo-album_latest_amd64.deb
+    PhotoAlbum-latest-Windows-x64-Setup.exe
 
 ## 7. Verify the published release
 
@@ -88,7 +91,7 @@ After the workflow completes:
 
 1. Check that all release jobs are green.
 2. Open the GitHub Release.
-3. Check that the `.deb` and Windows `Setup.exe` are present in **Assets**.
+3. Check that the versioned `.deb` and Windows `Setup.exe`, together with their `latest` aliases, are present in **Assets**.
 4. For important releases, install and launch the published packages on
    Linux and Windows as a final smoke test.
 

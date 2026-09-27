@@ -70,12 +70,14 @@ GitHub Actions construit et vérifie automatiquement :
 - le bundle Windows PyInstaller ;
 - l’installeur Windows.
 
-Le paquet Debian et l’installeur Windows sont ensuite attachés directement à la GitHub Release.
+Le paquet Debian et l’installeur Windows sont ensuite attachés directement à la GitHub Release. Le workflow publie également des alias à nom stable utilisés par les liens de téléchargement permanents du README.
 
 Pour la version `1.2.0rc1`, les fichiers publiés ressemblent à :
 
     photo-album_1.2.0~rc1_amd64.deb
     PhotoAlbum-1.2.0rc1-Windows-x64-Setup.exe
+    photo-album_latest_amd64.deb
+    PhotoAlbum-latest-Windows-x64-Setup.exe
 
 ## 7. Vérifier la version publiée
 
@@ -83,7 +85,7 @@ Une fois le workflow terminé :
 
 1. vérifiez que toutes les tâches de publication sont au vert ;
 2. ouvrez la GitHub Release ;
-3. vérifiez que le `.deb` et le `Setup.exe` Windows sont présents dans **Assets** ;
+3. vérifiez que le `.deb` et le `Setup.exe` Windows versionnés, ainsi que leurs alias `latest`, sont présents dans **Assets** ;
 4. pour les versions importantes, installez et lancez les paquets publiés sous Linux et Windows comme test final rapide.
 
 ## Builds manuels de release

@@ -1,3 +1,5 @@
+[English](README.md) | **Français** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Téléchargement rapide de la dernière version stable :** [Paquet Debian](https://github.com/MedShake/photoAlbum/releases/latest/download/photo-album_latest_amd64.deb) · [Installateur Windows](https://github.com/MedShake/photoAlbum/releases/latest/download/PhotoAlbum-latest-Windows-x64-Setup.exe)
+
 # Photo Album
 
 <p align="center">
@@ -6,9 +8,13 @@
        width="160">
 </p>
 
-**L’application pour ceux qui ne font jamais d’albums… et ceux qui aiment savoir où leurs photos ont été prises !**
+<p align="center">
+  <a href="https://github.com/MedShake/photoAlbum/releases/latest">
+    <img src="https://img.shields.io/github/v/release/MedShake/photoAlbum?label=derni%C3%A8re%20version" alt="Dernière version">
+  </a>
+</p>
 
-[English](README.md) | **Français**
+**L’application pour ceux qui ne font jamais d’albums… et ceux qui aiment savoir où leurs photos ont été prises !**
 
 Photo Album est une application créée par **Bertrand Boutillier** pour réaliser simplement des albums photo à partir de ses propres images, avec une attention particulière portée aux dates, aux lieux et aux légendes.
 
@@ -17,8 +23,6 @@ Elle est née autour de deux idées principales : exploiter réellement les info
 Pensée pour être très modulaire, elle propose aujourd’hui les modèles d’album que son auteur utilise lui-même — descendants directs de ceux qu’il fabriquait autrefois avec quelques bouts de PHP et pas mal de bricolage maison.
 
 Après quelques décennies à faire du Web, il était peut-être temps d’en faire une vraie application. C’est désormais chose faite, avec l’aide de l’IA.
-
----
 
 ## Testez rapidement les capacités du logiciel !
 
