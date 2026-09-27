@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
 )
 
-from photoalbum.app_info import VERSION
+from photoalbum.app_info import APPLICATION_NAME, VERSION
 from photoalbum.app import ProjectService
 from photoalbum.gui.help_dialog import HelpDialog
 from photoalbum.gui.template_pack_help_dialog import (
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self._editorial_album_dirty = False
         self._previous_tab_index = 0
 
-        self.setWindowTitle("Photo Album")
+        self.setWindowTitle(APPLICATION_NAME)
         self.resize(1100, 700)
 
         self._photo_editor = PhotoEditor(
@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
         if self._pdf_widget.is_running:
             QMessageBox.warning(
                 self,
-                "Photo Album",
+                APPLICATION_NAME,
                 (
                     "La génération du PDF est en cours. "
                     "Attendez sa fin avant de fermer "
@@ -115,7 +115,7 @@ class MainWindow(QMainWindow):
         if self._scan_controller.is_running:
             QMessageBox.warning(
                 self,
-                "Photo Album",
+                APPLICATION_NAME,
                 self._translator.tr('main.scan_running_warning'),
             )
             event.ignore()
@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(32, 24, 32, 20)
         layout.setSpacing(14)
 
-        title = QLabel("Photo Album")
+        title = QLabel(APPLICATION_NAME)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet('font-size: 26px; font-weight: bold;')
         layout.addWidget(title)
@@ -841,7 +841,7 @@ class MainWindow(QMainWindow):
             self._show_error(str(exc))
 
     def _show_error(self, message: str) -> None:
-        QMessageBox.critical(self, 'Photo Album', message)
+        QMessageBox.critical(self, APPLICATION_NAME, message)
 
     def _load_project_photos(self) -> None:
         if not self._project_service.is_open:

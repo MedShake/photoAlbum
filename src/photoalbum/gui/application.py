@@ -65,7 +65,7 @@ def _parse_arguments() -> argparse.Namespace:
     """Parse Photo Album GUI command-line arguments."""
     parser = argparse.ArgumentParser(
         prog="photo-album",
-        description="Photo Album graphical application.",
+        description=f"{APPLICATION_NAME} graphical application.",
     )
     parser.add_argument(
         "-l",
@@ -81,7 +81,7 @@ def _parse_arguments() -> argparse.Namespace:
         "project",
         nargs="?",
         type=Path,
-        help="Photo Album project to open",
+        help=f"{APPLICATION_NAME} project to open",
     )
 
     return parser.parse_args()

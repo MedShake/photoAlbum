@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PySide6.QtGui import QGuiApplication
 
-from photoalbum.app_info import user_agent
+from photoalbum.app_info import APPLICATION_NAME, user_agent
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.geocoding import (
     GeocodingError,
@@ -43,7 +43,7 @@ from photoalbum.template_engine import (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="photo-album-cli",
-        description="Manage Photo Album project data without modifying source images."
+        description=f"Manage {APPLICATION_NAME} project data without modifying source images."
     )
 
     subparsers = parser.add_subparsers(
@@ -219,7 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pdf_parser = subparsers.add_parser(
         "pdf",
-        help="Generate a PDF from an existing Photo Album project.",
+        help=f"Generate a PDF from an existing {APPLICATION_NAME} project.",
     )
 
     pdf_parser.add_argument(
