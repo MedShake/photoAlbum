@@ -150,7 +150,9 @@ jobs:
           if (-not (Test-Path "packaging/pyinstaller/dist/photo-album/photo-album-cli.exe")) {
               throw "photo-album-cli.exe not found"
           }
+
           & "packaging/pyinstaller/dist/photo-album/photo-album-cli.exe" --help
+
           if ($LASTEXITCODE -ne 0) {
               throw "photo-album-cli --help failed"
           }
@@ -254,6 +256,17 @@ jobs:
           name: PhotoAlbum-windows-installer
           path: release-assets
 
+      - name: Create stable download aliases
+        run: |
+          deb="$(find release-assets -maxdepth 1 -type f -name 'photo-album_*.deb' -print -quit)"
+          exe="$(find release-assets -maxdepth 1 -type f -name 'PhotoAlbum-*-Windows-x64-Setup.exe' -print -quit)"
+
+          test -n "$deb"
+          test -n "$exe"
+
+          cp "$deb" release-assets/photo-album_latest_amd64.deb
+          cp "$exe" release-assets/PhotoAlbum-latest-Windows-x64-Setup.exe
+
       - name: Show release assets
         run: |
           find release-assets -maxdepth 2 -type f -print
@@ -267,4 +280,3 @@ jobs:
             release-assets/*.exe \
             --repo "${{ github.repository }}" \
             --clobber
-
