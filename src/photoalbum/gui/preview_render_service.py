@@ -99,6 +99,8 @@ class PreviewRenderService(QObject):
     @staticmethod
     def _settings_signature(
         instance: PageInstance,
+        *,
+        template_pack_settings=None,
     ) -> str:
         extension = (
             template_extension_registry.get(
@@ -112,13 +114,28 @@ class PreviewRenderService(QObject):
             else None
         )
 
-        value = (
-            backend.render_settings_signature(
-                instance
-            )
-            if backend is not None
-            else instance.settings
-        )
+        if backend is None:
+            value = instance.settings
+        else:
+            try:
+                value = backend.render_settings_signature(
+                    instance,
+                    template_pack_settings=template_pack_settings,
+                )
+            except TypeError as exc:
+                if (
+                    "unexpected keyword argument"
+                    not in str(exc)
+                    or "template_pack_settings"
+                    not in str(exc)
+                ):
+                    raise
+
+                # Compatibility with preview backends implementing
+                # the original API.
+                value = backend.render_settings_signature(
+                    instance
+                )
 
         # repr is sufficient here because this is an in-memory
         # cache key, not a persistent serialization format.
@@ -174,6 +191,8 @@ class PreviewRenderService(QObject):
     @staticmethod
     def _photos_signature(
         photos,
+        *,
+        backend=None,
     ) -> str:
         """
         Stable signature for a set of photos.
@@ -221,12 +240,27 @@ class PreviewRenderService(QObject):
                 b"\0"
             )
 
-            # Metadata edits can change ordering or image geometry without
+            # Metadata edits can change the expensive raster without
             # changing the source file's modification time.
-            digest.update(repr((
-                photo.filename, photo.capture_datetime,
-                photo.width, photo.height, photo.orientation,
-            )).encode("utf-8", errors="replace"))
+            if backend is not None:
+                photo_state = backend.photo_signature(
+                    photo
+                )
+            else:
+                photo_state = (
+                    photo.filename,
+                    photo.capture_datetime,
+                    photo.width,
+                    photo.height,
+                    photo.orientation,
+                )
+
+            digest.update(
+                repr(photo_state).encode(
+                    "utf-8",
+                    errors="replace",
+                )
+            )
             digest.update(b"\0")
 
         return digest.hexdigest()
@@ -257,10 +291,23 @@ class PreviewRenderService(QObject):
         height: int | None = None,
         page_width_mm: float,
         page_height_mm: float,
+        template_pack_settings=None,
     ) -> PreviewRenderKey:
         photos = self.effective_photos(
             instance,
             photos,
+        )
+
+        extension = (
+            template_extension_registry.get(
+                instance.template_id
+            )
+        )
+
+        backend = (
+            extension.preview_backend
+            if extension is not None
+            else None
         )
 
         # Keep one canonical resolution per physical geometry, independent
@@ -280,12 +327,14 @@ class PreviewRenderService(QObject):
             ),
             settings_signature=(
                 self._settings_signature(
-                    instance
+                    instance,
+                    template_pack_settings=template_pack_settings,
                 )
             ),
             photos_signature=(
                 self._photos_signature(
-                    photos
+                    photos,
+                    backend=backend,
                 )
             ),
             width=max(1, round(page_width_mm * scale)),
@@ -319,6 +368,7 @@ class PreviewRenderService(QObject):
         height: int,
         page_width_mm: float,
         page_height_mm: float,
+        template_pack_settings=None,
     ) -> PreviewRenderKey:
         extension = (
             template_extension_registry.get(
@@ -344,6 +394,7 @@ class PreviewRenderService(QObject):
             height=height,
             page_width_mm=page_width_mm,
             page_height_mm=page_height_mm,
+            template_pack_settings=template_pack_settings,
         )
 
         if key in self._cache:
@@ -363,18 +414,39 @@ class PreviewRenderService(QObject):
         # Qt signals must never carry PreviewRenderKey directly.
         request_id = uuid4().hex
 
-        job = backend.create_job(
-            request_id=request_id,
-            instance=instance,
-            photos=photos,
-            width=key.width,
-            height=key.height,
-            page_width_mm=key.page_width_mm,
-            page_height_mm=key.page_height_mm,
-            translator=translator_for_template(
+        create_job_kwargs = {
+            "request_id": request_id,
+            "instance": instance,
+            "photos": photos,
+            "width": key.width,
+            "height": key.height,
+            "page_width_mm": key.page_width_mm,
+            "page_height_mm": key.page_height_mm,
+            "translator": translator_for_template(
                 instance.template_id, self._translator
             ),
-        )
+        }
+
+        from inspect import signature
+
+        create_job_parameters = signature(
+            backend.create_job
+        ).parameters
+
+        if (
+            "template_pack_settings"
+            in create_job_parameters
+        ):
+            job = backend.create_job(
+                **create_job_kwargs,
+                template_pack_settings=template_pack_settings,
+            )
+        else:
+            # Backwards compatibility with existing expensive
+            # preview backends implementing the original interface.
+            job = backend.create_job(
+                **create_job_kwargs,
+            )
 
         worker = job.worker
 

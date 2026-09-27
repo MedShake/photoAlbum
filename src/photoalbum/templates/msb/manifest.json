@@ -45,6 +45,21 @@
       ]
     },
     {
+      "id": "geographic-map",
+      "name": "Geographic map",
+      "module": "photoalbum.templates.msb.geographic_map",
+      "kinds": [
+        "cover",
+        "special_page"
+      ],
+      "cover_positions": [
+        "front",
+        "inside_front",
+        "inside_back",
+        "back"
+      ]
+    },
+    {
       "id": "calendar-index",
       "name": "Annual calendar",
       "module": "photoalbum.templates.msb.calendar_index",

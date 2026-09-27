@@ -57,9 +57,31 @@ class TemplatePreviewBackend(ABC):
             )
         )
 
+    def photo_signature(
+        self,
+        photo,
+    ) -> object:
+        """
+        Return the photo state that affects this backend's
+        expensive raster.
+
+        The default preserves the historical preview-cache
+        behaviour. Backends depending on additional photo
+        metadata may extend this signature.
+        """
+        return (
+            photo.filename,
+            photo.capture_datetime,
+            photo.width,
+            photo.height,
+            photo.orientation,
+        )
+
     def render_settings_signature(
         self,
         instance: PageInstance,
+        *,
+        template_pack_settings=None,
     ) -> object:
         """
         Return the settings state that affects the expensive
@@ -84,5 +106,6 @@ class TemplatePreviewBackend(ABC):
         page_width_mm: float,
         page_height_mm: float,
         translator: Translator,
+        template_pack_settings=None,
     ) -> PreviewJob:
         raise NotImplementedError

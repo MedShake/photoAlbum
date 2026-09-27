@@ -38,6 +38,7 @@ def test_msb_templates_are_discovered():
     } == {
         "year-photo-scatter",
         "geographic-word-cloud",
+        "geographic-map",
         "calendar-index",
         "year-divider-classic",
         "month-divider-classic",
