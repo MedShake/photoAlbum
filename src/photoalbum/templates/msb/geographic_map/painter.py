@@ -508,6 +508,43 @@ def _clip_world(ring, minimum, maximum):
     return tuple(ring)
 
 
+def _viewport_bounds(bounds, map_rect, target_rect, projection, projected_bounds):
+    """Conservative geographic coverage of the full painted page.
+
+    The fitted photo extent is only part of the viewport. Invert its pixel
+    transform to include neighbouring land in the margins and spare space.
+    All supported projections have monotone northing and easting proportional
+    to longitude, with the smallest factor at the highest absolute latitude.
+    """
+    minimum_x, minimum_y, maximum_x, maximum_y = projected_bounds
+    if map_rect.width() <= 0 or map_rect.height() <= 0:
+        return bounds
+
+    x_scale = (maximum_x - minimum_x) / map_rect.width()
+    y_scale = (maximum_y - minimum_y) / map_rect.height()
+    left = minimum_x + (target_rect.left() - map_rect.left()) * x_scale
+    right = minimum_x + (target_rect.right() - map_rect.left()) * x_scale
+    bottom = maximum_y - (target_rect.bottom() - map_rect.top()) * y_scale
+    top = maximum_y - (target_rect.top() - map_rect.top()) * y_scale
+
+    def latitude_for(northing):
+        low, high = -90.0, 90.0
+        for _ in range(48):
+            middle = (low + high) / 2
+            if _project_raw(0.0, middle, projection)[1] < northing:
+                low = middle
+            else:
+                high = middle
+        return (low + high) / 2
+
+    south = max(-90.0, latitude_for(bottom) - 1e-9)
+    north = min(90.0, latitude_for(top) + 1e-9)
+    factor = _project_raw(1.0, max(abs(south), abs(north)), projection)[0]
+    half_span = min(180.0, max(abs(left), abs(right)) / factor + 1e-9)
+    center = (bounds.minimum_longitude + bounds.maximum_longitude) / 2
+    return GeographicBounds(center - half_span, south, center + half_span, north)
+
+
 def _visible_rings(bounds):
     center = (bounds.minimum_longitude + bounds.maximum_longitude) / 2
     for _country, ring, extent in country_components():
@@ -692,7 +729,14 @@ def paint_geographic_map(
     painter.setPen(border_pen)
     painter.setBrush(land)
 
-    for ring in _visible_rings(composition.bounds):
+    # Include strokes touching the page as well as polygon interiors.
+    stroke_margin = border_pen.widthF() / 2
+    visible_bounds = _viewport_bounds(
+        composition.bounds, map_rect,
+        rect.adjusted(-stroke_margin, -stroke_margin, stroke_margin, stroke_margin),
+        projection, projected_bounds,
+    )
+    for ring in _visible_rings(visible_bounds):
         path = QPainterPath()
         for index, (longitude, latitude) in enumerate(ring):
             point = _project_continuous(

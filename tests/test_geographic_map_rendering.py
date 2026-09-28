@@ -272,3 +272,25 @@ def test_editor_projection_changes_persist_and_invalidate_cache(app, monkeypatch
             assert tr.tr('page_settings.map_no_geographic_data') != 'page_settings.map_no_geographic_data'
     finally:
         editor.close()
+
+
+@pytest.mark.parametrize('projection', map_painter.SUPPORTED_PROJECTIONS)
+def test_neighbouring_land_is_painted_outside_photo_extent(app, projection):
+    # A wide page shows more longitude than the fitted France photo extent.
+    # Countries in that extra visible area must not become ocean.
+    composition = compose_geographic_map(photos_for(SCENARIOS['france']))
+    target = QRectF(0, 0, 1800, 850)
+    image = QImage(1800, 850, QImage.Format.Format_ARGB32)
+    painter = QPainter(image)
+    try:
+        map_painter.paint_geographic_map(painter, target, composition, projection=projection)
+    finally:
+        painter.end()
+    fitted = map_painter._map_rect(composition.bounds, target, projection)
+    for longitude, latitude in [(-7.5, 41.8), (14.5, 50), (16, 51.5)]:
+        # Interior points in Portugal, Czechia and Poland, away from borders.
+        assert not (composition.bounds.minimum_longitude <= longitude
+                    <= composition.bounds.maximum_longitude)
+        point = map_painter._project(longitude, latitude, composition.bounds, fitted, projection)
+        assert target.contains(point)
+        assert image.pixelColor(round(point.x()), round(point.y())) == map_painter.DEFAULT_LAND_COLOR
