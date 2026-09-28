@@ -6,8 +6,8 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QDateTimeEdit, QDoubleSpinBox,
-    QFormLayout, QLabel, QPushButton, QVBoxLayout,
+    QDialog, QDialogButtonBox, QDateTimeEdit,
+    QFormLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
 )
 
 from photoalbum.app_info import user_agent
@@ -168,21 +168,14 @@ class PhotoEditor(QObject):
         filename_label = QLabel(photo.filename)
         filename_label.setWordWrap(True)
 
-        latitude_edit = QDoubleSpinBox(dialog)
-        latitude_edit.setDecimals(7)
-        latitude_edit.setRange(-90.0, 90.0)
-        latitude_edit.setSingleStep(0.0001)
-
-        longitude_edit = QDoubleSpinBox(dialog)
-        longitude_edit.setDecimals(7)
-        longitude_edit.setRange(-180.0, 180.0)
-        longitude_edit.setSingleStep(0.0001)
+        latitude_edit = QLineEdit(dialog)
+        longitude_edit = QLineEdit(dialog)
 
         if photo.latitude is not None:
-            latitude_edit.setValue(photo.latitude)
+            latitude_edit.setText(f"{photo.latitude:.7f}")
 
         if photo.longitude is not None:
-            longitude_edit.setValue(photo.longitude)
+            longitude_edit.setText(f"{photo.longitude:.7f}")
 
         form.addRow(self._translator.tr('photos.gps.photo'), filename_label)
         form.addRow(self._translator.tr('photos.gps.latitude'), latitude_edit)
@@ -190,15 +183,17 @@ class PhotoEditor(QObject):
 
         layout.addLayout(form)
 
-        restore_button = QPushButton(self._translator.tr('photos.gps.restore'), dialog)
-
         has_original_gps = (
             photo.original_latitude is not None and photo.original_longitude is not None
         )
 
-        restore_button.setEnabled(has_original_gps)
+        restore_button = None
 
         if has_original_gps:
+            restore_button = QPushButton(
+                self._translator.tr('photos.gps.restore'),
+                dialog,
+            )
             layout.addWidget(restore_button)
 
         buttons = QDialogButtonBox(
@@ -215,17 +210,59 @@ class PhotoEditor(QObject):
         if cancel_button is not None:
             cancel_button.setText(self._translator.tr('photos.gps.cancel'))
 
-        buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
 
         restore_requested = False
+
+        def accept_valid_gps() -> None:
+            latitude_text = latitude_edit.text().strip()
+            longitude_text = longitude_edit.text().strip()
+
+            if not latitude_text and not longitude_text:
+                dialog.accept()
+                return
+
+            if not latitude_text or not longitude_text:
+                QMessageBox.warning(
+                    dialog,
+                    self._translator.tr("photos.gps.title"),
+                    self._translator.tr("photos.gps.invalid_coordinates"),
+                )
+                return
+
+            try:
+                latitude = float(latitude_text.replace(",", "."))
+                longitude = float(longitude_text.replace(",", "."))
+            except ValueError:
+                QMessageBox.warning(
+                    dialog,
+                    self._translator.tr("photos.gps.title"),
+                    self._translator.tr("photos.gps.invalid_coordinates"),
+                )
+                return
+
+            if (
+                not -90.0 <= latitude <= 90.0
+                or not -180.0 <= longitude <= 180.0
+            ):
+                QMessageBox.warning(
+                    dialog,
+                    self._translator.tr("photos.gps.title"),
+                    self._translator.tr("photos.gps.invalid_coordinates"),
+                )
+                return
+
+            dialog.accept()
+
+        buttons.accepted.connect(accept_valid_gps)
 
         def request_restore() -> None:
             nonlocal restore_requested
             restore_requested = True
             dialog.accept()
 
-        restore_button.clicked.connect(request_restore)
+        if restore_button is not None:
+            restore_button.clicked.connect(request_restore)
 
         layout.addWidget(buttons)
 
@@ -244,10 +281,21 @@ class PhotoEditor(QObject):
 
                 action_key = "photos.gps.log_restored"
             else:
-                latitude = latitude_edit.value()
-                longitude = longitude_edit.value()
+                latitude_text = latitude_edit.text().strip()
+                longitude_text = longitude_edit.text().strip()
 
-                self._project_service.set_manual_gps(photo.path, latitude, longitude)
+                if not latitude_text and not longitude_text:
+                    latitude = None
+                    longitude = None
+                else:
+                    latitude = float(latitude_text.replace(",", "."))
+                    longitude = float(longitude_text.replace(",", "."))
+
+                self._project_service.set_manual_gps(
+                    photo.path,
+                    latitude,
+                    longitude,
+                )
 
                 action_key = "photos.gps.log_changed"
 
@@ -261,14 +309,15 @@ class PhotoEditor(QObject):
                 filename=photo.filename,
                 old_latitude='—' if old_latitude is None else f'{old_latitude:.7f}',
                 old_longitude='—' if old_longitude is None else f'{old_longitude:.7f}',
-                latitude=f"{latitude:.7f}",
-                longitude=f"{longitude:.7f}",
+                latitude='—' if latitude is None else f'{latitude:.7f}',
+                longitude='—' if longitude is None else f'{longitude:.7f}',
             )
         )
 
         self.photos_changed.emit()
 
-        self._start_gps_geocoding(photo.path, latitude, longitude)
+        if latitude is not None and longitude is not None:
+            self._start_gps_geocoding(photo.path, latitude, longitude)
 
     def _start_gps_geocoding(self, photo_path: Path, latitude: float, longitude: float) -> None:
         if self._gps_thread is not None:

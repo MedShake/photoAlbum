@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QDateTimeEdit, QDoubleSpinBox, QPushButton, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QDateTimeEdit, QLineEdit, QPushButton, QMessageBox
 
 from photoalbum.app import ProjectService
 from photoalbum.gui.main_window import MainWindow
@@ -234,9 +234,9 @@ def test_gps_editor_preserves_coordinates_and_requests_geocoding(app, monkeypatc
         if restore:
             next(b for b in dialog.findChildren(QPushButton) if 'Restore' in b.text()).click()
         else:
-            latitude, longitude = dialog.findChildren(QDoubleSpinBox)
-            latitude.setValue(-12.3456789)
-            longitude.setValue(78.1234567)
+            latitude, longitude = dialog.findChildren(QLineEdit)
+            latitude.setText("-12,3456789")
+            longitude.setText("78.1234567")
         return QDialog.DialogCode.Accepted
 
     monkeypatch.setattr(QDialog, 'exec', execute)
@@ -247,6 +247,106 @@ def test_gps_editor_preserves_coordinates_and_requests_geocoding(app, monkeypatc
     else:
         service.set_manual_gps.assert_called_once_with(photo.path, -12.3456789, 78.1234567)
         editor._start_gps_geocoding.assert_called_once_with(photo.path, -12.3456789, 78.1234567)
+
+
+def test_gps_editor_shows_empty_fields_without_gps(
+    app, monkeypatch, tmp_path,
+):
+    service = Mock()
+    editor = PhotoEditor(service, Translator('en'), language='en')
+    editor._start_gps_geocoding = Mock()
+    photo = Photo(
+        path=tmp_path / 'photo.jpg',
+        filename='photo.jpg',
+    )
+
+    def execute(dialog):
+        latitude, longitude = dialog.findChildren(QLineEdit)
+        assert latitude.text() == ''
+        assert longitude.text() == ''
+        assert not any(
+            'Restore' in button.text()
+            for button in dialog.findChildren(QPushButton)
+        )
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, 'exec', execute)
+
+    editor.edit_gps(photo)
+
+    service.set_manual_gps.assert_not_called()
+    editor._start_gps_geocoding.assert_not_called()
+
+
+def test_gps_editor_invalid_coordinates_do_not_accept_dialog(
+    app, monkeypatch, tmp_path,
+):
+    service = Mock()
+    editor = PhotoEditor(service, Translator('en'), language='en')
+    photo = Photo(
+        path=tmp_path / 'photo.jpg',
+        filename='photo.jpg',
+    )
+
+    warning = Mock()
+    monkeypatch.setattr(QMessageBox, 'warning', warning)
+
+    def execute(dialog):
+        latitude, longitude = dialog.findChildren(QLineEdit)
+        latitude.setText("48.123")
+        longitude.clear()
+
+        save_button = next(
+            button
+            for button in dialog.findChildren(QPushButton)
+            if button.text() == "Save"
+        )
+        save_button.click()
+        app.processEvents()
+
+        assert dialog.result() != QDialog.DialogCode.Accepted
+        assert warning.call_count == 1
+
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, 'exec', execute)
+
+    editor.edit_gps(photo)
+
+    service.set_manual_gps.assert_not_called()
+
+
+def test_gps_editor_can_clear_effective_coordinates(
+    app, monkeypatch, tmp_path,
+):
+    service = Mock()
+    editor = PhotoEditor(service, Translator('en'), language='en')
+    editor._start_gps_geocoding = Mock()
+    photo = Photo(
+        path=tmp_path / 'photo.jpg',
+        filename='photo.jpg',
+        latitude=10,
+        longitude=20,
+        original_latitude=30,
+        original_longitude=40,
+    )
+
+    def execute(dialog):
+        latitude, longitude = dialog.findChildren(QLineEdit)
+        latitude.clear()
+        longitude.clear()
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(QDialog, 'exec', execute)
+
+    editor.edit_gps(photo)
+
+    service.set_manual_gps.assert_called_once_with(
+        photo.path,
+        None,
+        None,
+    )
+    editor._start_gps_geocoding.assert_not_called()
 
 
 def test_scan_updates_project_and_derived_views(window, app, tmp_path):

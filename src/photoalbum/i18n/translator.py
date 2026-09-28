@@ -144,6 +144,9 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.gps.save": "Save",
         "photos.gps.cancel": "Cancel",
         "photos.gps.restore": "Restore original coordinates",
+        "photos.gps.invalid_coordinates": (
+            "Enter both latitude and longitude, using valid coordinates."
+        ),
         "photos.gps.log_changed": (
             "Photo {filename}: GPS changed from "
             "{old_latitude}, {old_longitude} to "
@@ -775,6 +778,9 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.gps.save": "Enregistrer",
         "photos.gps.cancel": "Annuler",
         "photos.gps.restore": "Restaurer les coordonnées d’origine",
+        "photos.gps.invalid_coordinates": (
+            "Saisissez la latitude et la longitude avec des coordonnées valides."
+        ),
         "photos.gps.log_changed": (
             "Photo {filename} : modification du GPS de "
             "{old_latitude}, {old_longitude} à "

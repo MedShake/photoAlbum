@@ -22,6 +22,82 @@ def create_repository(tmp_path: Path) -> tuple[ProjectDatabase, PhotoRepository]
     return database, repository
 
 
+def test_set_manual_gps_can_clear_effective_coordinates(tmp_path: Path):
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+
+    repository.save(
+        Photo(
+            path=path,
+            filename=path.name,
+            latitude=48.0,
+            longitude=2.0,
+            original_latitude=46.0,
+            original_longitude=3.0,
+            place_name="Old place",
+            city="Old city",
+            address="Old address",
+            raw_location_data={"address": {"city": "Old city"}},
+            location_source=LocationSource.GEOCODING,
+        )
+    )
+
+    repository.set_manual_gps(path, None, None)
+
+    loaded = repository.find_by_path(path)
+
+    assert loaded is not None
+    assert loaded.latitude is None
+    assert loaded.longitude is None
+    assert loaded.original_latitude == 46.0
+    assert loaded.original_longitude == 3.0
+    assert loaded.place_name is None
+    assert loaded.city is None
+    assert loaded.address is None
+    assert loaded.raw_location_data is None
+    assert loaded.location_source == LocationSource.MANUAL
+
+    repository.restore_original_gps(path)
+    restored = repository.find_by_path(path)
+
+    assert restored is not None
+    assert restored.latitude == 46.0
+    assert restored.longitude == 3.0
+
+    database.close()
+
+
+@pytest.mark.parametrize(
+    "latitude,longitude",
+    [(None, 2.0), (48.0, None)],
+)
+def test_set_manual_gps_rejects_partial_coordinates(
+    tmp_path: Path,
+    latitude,
+    longitude,
+):
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+
+    repository.save(
+        Photo(
+            path=path,
+            filename=path.name,
+            latitude=48.0,
+            longitude=2.0,
+        )
+    )
+
+    with pytest.raises(ValueError):
+        repository.set_manual_gps(path, latitude, longitude)
+
+    loaded = repository.find_by_path(path)
+    assert loaded is not None
+    assert (loaded.latitude, loaded.longitude) == (48.0, 2.0)
+
+    database.close()
+
+
 @pytest.mark.parametrize("restore", [False, True], ids=["manual", "restore"])
 @pytest.mark.parametrize("editorial", [False, True], ids=["automatic", "editorial"])
 def test_gps_change_clears_geocoding_and_preserves_editorial_data(

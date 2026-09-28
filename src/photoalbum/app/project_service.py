@@ -118,8 +118,8 @@ class ProjectService:
     def set_manual_gps(
         self,
         photo_path: Path,
-        latitude: float,
-        longitude: float,
+        latitude: float | None,
+        longitude: float | None,
     ) -> None:
         database = self._require_database()
 

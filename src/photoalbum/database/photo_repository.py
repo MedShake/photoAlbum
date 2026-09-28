@@ -305,15 +305,20 @@ class PhotoRepository:
     def set_manual_gps(
         self,
         path: Path,
-        latitude: float,
-        longitude: float,
+        latitude: float | None,
+        longitude: float | None,
     ) -> None:
-        if not -90.0 <= latitude <= 90.0:
+        if (latitude is None) != (longitude is None):
+            raise ValueError(
+                "Latitude and longitude must both be set or both be None."
+            )
+
+        if latitude is not None and not -90.0 <= latitude <= 90.0:
             raise ValueError(
                 "Latitude must be between -90 and 90."
             )
 
-        if not -180.0 <= longitude <= 180.0:
+        if longitude is not None and not -180.0 <= longitude <= 180.0:
             raise ValueError(
                 "Longitude must be between -180 and 180."
             )
