@@ -37,15 +37,52 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.synology.session_attached": (
             "Synology Photos reconnected without changing the project snapshot."
         ),
+        "source.sync.running": "Synchronizing photo source…",
+        "source.sync.button": "Synchronize with source",
+        "source.sync.running_button": "Synchronizing…",
+        "source.sync.failed": "Photo source synchronization failed.",
+        "source.sync.reconnect_required": "Reconnect the photo source before synchronizing.",
         "source.sync.completed": "Source snapshot updated: {count} photos.",
         "source.sync.log": (
             "Source {source}: {count} photos; {added} added, {updated} "
             "refreshed, {missing} no longer in the collection."
         ),
+        "source.metadata.completed": "Metadata updated for {count} photos.",
         "tab.places_captions": "Places and captions",
         "main.analyze_photos": "Analyze photos",
         "main.analyze_again": "Analyze photos again",
         "main.progress_photos": "{current} photos analyzed out of {total}",
+        "photos.source.title": "Photo source",
+        "photos.source.modify": "Choose the album photo source…",
+        "photos.source.modify_tooltip": (
+            "Choose where the photos used by this album come from."
+        ),
+        "photos.source.current": "Current source:",
+        "photos.source.local": "Local folder…",
+        "photos.policy.title": "Photo information to use",
+        "photos.policy.description": (
+            "When several values are available for a photo, choose which "
+            "information should be used by default."
+        ),
+        "photos.policy.date": "Date",
+        "photos.policy.gps": "GPS",
+        "photos.policy.location": "Location",
+        "photos.policy.exif": "EXIF",
+        "photos.policy.provider": "Photo source",
+        "photos.policy.filename": "Filename",
+        "photos.policy.nominatim": "Nominatim",
+        "photos.policy.none": "None",
+        "photos.policy.manual": "Manual",
+        "photos.policy.nominatim_enabled": "Complete locations from GPS with Nominatim",
+        "photos.policy.nominatim_tooltip": (
+            "Nominatim is OpenStreetMap’s reverse-geocoding service. GPS "
+            "coordinates are sent over the Internet to look up a city, place, "
+            "road or point of interest. No request is sent when this option "
+            "is disabled."
+        ),
+        "photos.progress.source": "Source",
+        "photos.progress.source_provider": "Source — {provider}",
+        "photos.progress.source_waiting": "Reading {provider}…",
         "photos.progress.metadata": "Metadata",
         "photos.progress.nominatim": "Nominatim",
         "photos.progress.value": "{current} / {total}",
@@ -128,6 +165,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.date": "Date",
         "photos.places.group.apply": "Apply to {count} photos",
         "photos.places.caption": "Caption",
+        "photos.places.provider_caption": "{provider} caption: {caption}",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
             "{visible} / {total} photos"
@@ -151,6 +189,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.photo": "Photo",
         "photos.places.location_auto": "Automatic place",
         "photos.places.location_custom": "Custom place",
+        "photos.places.location_source.custom": "Custom",
+        "photos.places.location_source.none": "None",
 
         "photos.column.filename": "Filename",
         "photos.column.actions": "Actions",
@@ -237,6 +277,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.date_source.manual": "Manual",
         "photos.date_source.unknown": "Unknown",
 
+        "photos.date_source.source": "Photo source",
+        "photos.gps_source.source": "Photo source",
+        "photos.gps_source.exif": "EXIF",
+        "photos.gps_source.manual": "Manual",
+        "photos.gps_source.unknown": "Unknown",
+        "photos.location_source.source": "Photo source",
         "photos.location_source.geocoding": "Geocoding",
         "photos.location_source.manual": "Manual",
         "photos.location_source.unknown": "Unknown",
@@ -712,15 +758,52 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.synology.session_attached": (
             "Synology Photos reconnecté sans modifier l’instantané du projet."
         ),
+        "source.sync.running": "Synchronisation de la source des photos…",
+        "source.sync.button": "Synchroniser avec la source",
+        "source.sync.running_button": "Synchronisation…",
+        "source.sync.failed": "Échec de la synchronisation de la source des photos.",
+        "source.sync.reconnect_required": "Reconnectez la source des photos avant de la synchroniser.",
         "source.sync.completed": "Instantané mis à jour : {count} photos.",
         "source.sync.log": (
             "Source {source} : {count} photos ; {added} ajoutées, {updated} "
             "actualisées, {missing} absentes de la collection."
         ),
+        "source.metadata.completed": "Métadonnées mises à jour pour {count} photos.",
         "tab.places_captions": "Lieux et légendes",
         "main.analyze_photos": "Analyser les photos",
         "main.analyze_again": "Analyser à nouveau les photos",
         "main.progress_photos": "{current} photos analysées sur {total}",
+        "photos.source.title": "Source des photos",
+        "photos.source.modify": "Choisir la source des photos de l’album…",
+        "photos.source.modify_tooltip": (
+            "Choisir d’où proviennent les photos utilisées par cet album."
+        ),
+        "photos.source.current": "Source actuelle :",
+        "photos.source.local": "Dossier local…",
+        "photos.policy.title": "Informations utilisées pour les photos",
+        "photos.policy.description": (
+            "Quand plusieurs informations sont disponibles pour une photo, "
+            "choisir celles à utiliser par défaut."
+        ),
+        "photos.policy.date": "Date",
+        "photos.policy.gps": "GPS",
+        "photos.policy.location": "Lieu",
+        "photos.policy.exif": "EXIF",
+        "photos.policy.provider": "Source des photos",
+        "photos.policy.filename": "Nom du fichier",
+        "photos.policy.nominatim": "Nominatim",
+        "photos.policy.none": "Aucune",
+        "photos.policy.manual": "Manuel",
+        "photos.policy.nominatim_enabled": "Compléter les lieux à partir du GPS avec Nominatim",
+        "photos.policy.nominatim_tooltip": (
+            "Nominatim est le service de géocodage inverse d’OpenStreetMap. "
+            "Les coordonnées GPS sont envoyées sur Internet pour rechercher "
+            "une ville, un lieu, une rue ou un point d’intérêt. Aucune requête "
+            "n’est envoyée lorsque cette option est désactivée."
+        ),
+        "photos.progress.source": "Source",
+        "photos.progress.source_provider": "Source — {provider}",
+        "photos.progress.source_waiting": "Lecture de {provider}…",
         "photos.progress.metadata": "Métadonnées",
         "photos.progress.nominatim": "Nominatim",
         "photos.progress.value": "{current} / {total}",
@@ -805,6 +888,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.date": "Date",
         "photos.places.group.apply": "Appliquer à {count} photos",
         "photos.places.caption": "Légende",
+        "photos.places.provider_caption": "Légende {provider} : {caption}",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
             "{visible} / {total} photos"
@@ -828,6 +912,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.photo": "Photo",
         "photos.places.location_auto": "Lieu automatique",
         "photos.places.location_custom": "Lieu personnalisé",
+        "photos.places.location_source.custom": "Personnalisé",
+        "photos.places.location_source.none": "Aucun",
 
         "photos.column.filename": "Nom du fichier",
         "photos.column.actions": "Actions",
@@ -917,6 +1003,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.date_source.manual": "Manuelle",
         "photos.date_source.unknown": "Inconnue",
 
+        "photos.date_source.source": "Source des photos",
+        "photos.gps_source.source": "Source des photos",
+        "photos.gps_source.exif": "EXIF",
+        "photos.gps_source.manual": "Manuel",
+        "photos.gps_source.unknown": "Inconnu",
+        "photos.location_source.source": "Source des photos",
         "photos.location_source.geocoding": "Géocodage",
         "photos.location_source.manual": "Manuelle",
         "photos.location_source.unknown": "Inconnue",

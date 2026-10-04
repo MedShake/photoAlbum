@@ -9,9 +9,11 @@ from pathlib import Path
 from photoalbum.models import (
     DateSource,
     GpsSource,
+    GpsCandidate,
     LocationComponent,
     LocationSource,
     Photo,
+    MetadataCandidates,
 )
 
 from .database import ProjectDatabase
@@ -22,6 +24,7 @@ class PhotoRepository:
         self._database = database
 
     def save(self, photo: Photo, *, commit: bool = True) -> None:
+        candidates = _normalized_candidates(photo)
         capture_datetime = (
             photo.capture_datetime.isoformat()
             if photo.capture_datetime is not None
@@ -61,6 +64,42 @@ class PhotoRepository:
                 separators=(",", ":"),
             )
             if photo.geocoded_location_data is not None
+            else None
+        )
+        metadata_candidates = candidates.to_json()
+        manual_capture_datetime = photo.manual_capture_datetime
+        if (
+            manual_capture_datetime is None
+            and photo.date_source == DateSource.MANUAL
+        ):
+            manual_capture_datetime = photo.capture_datetime
+        manual_latitude = photo.manual_latitude
+        manual_longitude = photo.manual_longitude
+        if (
+            manual_latitude is None
+            and manual_longitude is None
+            and photo.gps_source == GpsSource.MANUAL
+        ):
+            manual_latitude = photo.latitude
+            manual_longitude = photo.longitude
+        effective_manual_location = photo.manual_location_data
+        if (
+            effective_manual_location is None
+            and photo.location_source == LocationSource.MANUAL
+        ):
+            effective_manual_location = {
+                "place_name": photo.place_name,
+                "city": photo.city,
+                "address": photo.address,
+                "raw": photo.raw_location_data,
+            }
+        manual_location_data = (
+            json.dumps(
+                effective_manual_location,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            if effective_manual_location is not None
             else None
         )
 
@@ -108,13 +147,19 @@ class PhotoRepository:
                 imported_location_text,
                 imported_caption,
                 source_metadata,
+                metadata_candidates,
+                manual_capture_datetime,
+                manual_latitude,
+                manual_longitude,
+                manual_location_data,
                 is_missing
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?
             )
             ON CONFLICT(asset_key) DO UPDATE SET
                 path = COALESCE(excluded.path, photos.path),
@@ -157,6 +202,11 @@ class PhotoRepository:
                 imported_location_text = excluded.imported_location_text,
                 imported_caption = excluded.imported_caption,
                 source_metadata = excluded.source_metadata,
+                metadata_candidates = excluded.metadata_candidates,
+                manual_capture_datetime = excluded.manual_capture_datetime,
+                manual_latitude = excluded.manual_latitude,
+                manual_longitude = excluded.manual_longitude,
+                manual_location_data = excluded.manual_location_data,
                 is_missing = 0
             """,
             (
@@ -248,6 +298,15 @@ class PhotoRepository:
                     if getattr(photo, "source_metadata", None) is not None
                     else None
                 ),
+                metadata_candidates,
+                (
+                    manual_capture_datetime.isoformat()
+                    if manual_capture_datetime is not None
+                    else None
+                ),
+                manual_latitude,
+                manual_longitude,
+                manual_location_data,
                 0,
             ),
         )
@@ -401,7 +460,8 @@ class PhotoRepository:
             UPDATE photos
             SET
                 capture_datetime = original_capture_datetime,
-                date_source = original_date_source
+                date_source = original_date_source,
+                manual_capture_datetime = NULL
             WHERE path = ?
             """,
             (normalized_path,),
@@ -423,12 +483,14 @@ class PhotoRepository:
             """
             UPDATE photos
             SET capture_datetime = ?,
-                date_source = ?
+                date_source = ?,
+                manual_capture_datetime = ?
             WHERE path = ?
             """,
             (
                 capture_datetime.isoformat(),
                 DateSource.MANUAL.value,
+                capture_datetime.isoformat(),
                 str(path),
             ),
         )
@@ -472,11 +534,12 @@ class PhotoRepository:
                 latitude = ?,
                 longitude = ?,
                 gps_source = ?,
+                manual_latitude = ?,
+                manual_longitude = ?,
                 place_name = NULL,
                 city = NULL,
                 address = NULL,
                 raw_location_data = NULL,
-                geocoded_location_data = NULL,
                 location_source = ?
             WHERE path = ?
             """,
@@ -484,7 +547,9 @@ class PhotoRepository:
                 latitude,
                 longitude,
                 GpsSource.MANUAL.value,
-                LocationSource.MANUAL.value,
+                latitude,
+                longitude,
+                LocationSource.UNKNOWN.value,
                 normalized_path,
             ),
         )
@@ -522,11 +587,12 @@ class PhotoRepository:
                     THEN 'source'
                     ELSE 'unknown'
                 END,
+                manual_latitude = NULL,
+                manual_longitude = NULL,
                 place_name = NULL,
                 city = NULL,
                 address = NULL,
                 raw_location_data = NULL,
-                geocoded_location_data = NULL,
                 location_source = ?
             WHERE path = ?
             """,
@@ -558,7 +624,7 @@ class PhotoRepository:
 
         row = self._database.connection.execute(
             """
-            SELECT latitude, longitude
+            SELECT latitude, longitude, metadata_candidates
             FROM photos
             WHERE path = ?
             """,
@@ -583,6 +649,15 @@ class PhotoRepository:
             ensure_ascii=False,
             separators=(",", ":"),
         )
+        candidates = MetadataCandidates.from_json(row["metadata_candidates"])
+        locations = dict(candidates.location)
+        locations["geocoding"] = json.loads(geocoded_location_data)
+        candidates = MetadataCandidates(
+            date=dict(candidates.date),
+            gps=dict(candidates.gps),
+            location=locations,
+            caption=dict(candidates.caption),
+        )
 
         self._database.connection.execute(
             """
@@ -593,6 +668,7 @@ class PhotoRepository:
                 address = ?,
                 raw_location_data = ?,
                 geocoded_location_data = ?,
+                metadata_candidates = ?,
                 location_source = ?
             WHERE path = ?
             """,
@@ -610,6 +686,7 @@ class PhotoRepository:
                     else None
                 ),
                 geocoded_location_data,
+                candidates.to_json(),
                 LocationSource.GEOCODING.value,
                 normalized_path,
             ),
@@ -654,6 +731,7 @@ class PhotoRepository:
         *,
         components: tuple[LocationComponent, ...],
         location_text: str | None,
+        manual_location_data_override: dict[str, object] | None = None,
     ) -> None:
         normalized_path = str(
             path.expanduser().resolve()
@@ -674,6 +752,32 @@ class PhotoRepository:
             if components
             else None
         )
+        raw_address = {
+            component.key: component.value
+            for component in components
+        }
+        manual_location_data = (
+            manual_location_data_override
+            if manual_location_data_override is not None
+            else {
+                "place_name": None,
+                "city": next(
+                    (
+                        component.value
+                        for component in components
+                        if component.key
+                        in {"city", "town", "village", "municipality"}
+                    ),
+                    None,
+                ),
+                "address": location_text,
+                "components": [
+                    {"key": component.key, "value": component.value}
+                    for component in components
+                ],
+                "raw": {"address": raw_address},
+            }
+        )
 
         cursor = self._database.connection.execute(
             """
@@ -681,12 +785,18 @@ class PhotoRepository:
             SET
                 selected_location_components = ?,
                 location_text = ?,
-                location_selection_edited = 1
+                location_selection_edited = 1,
+                manual_location_data = ?
             WHERE path = ?
             """,
             (
                 serialized_components,
                 location_text,
+                json.dumps(
+                    manual_location_data,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
                 normalized_path,
             ),
         )
@@ -737,6 +847,9 @@ class PhotoRepository:
                 if row["source_metadata"] is not None
                 else None
             ),
+            metadata_candidates=MetadataCandidates.from_json(
+                row["metadata_candidates"]
+            ),
             file_size=row["file_size"],
             modified_time_ns=row["modified_time_ns"],
             content_hash=row["content_hash"],
@@ -748,6 +861,18 @@ class PhotoRepository:
             latitude=row["latitude"],
             longitude=row["longitude"],
             gps_source=GpsSource(row["gps_source"]),
+            manual_capture_datetime=(
+                datetime.fromisoformat(row["manual_capture_datetime"])
+                if row["manual_capture_datetime"] is not None
+                else None
+            ),
+            manual_latitude=row["manual_latitude"],
+            manual_longitude=row["manual_longitude"],
+            manual_location_data=(
+                json.loads(row["manual_location_data"])
+                if row["manual_location_data"] is not None
+                else None
+            ),
             original_orientation=row["original_orientation"],
             original_capture_datetime=original_capture_datetime,
             original_date_source=DateSource(
@@ -801,3 +926,43 @@ class PhotoRepository:
             ),
             caption=row["caption"],
         )
+
+
+def _normalized_candidates(photo: Photo) -> MetadataCandidates:
+    """Merge v3 compatibility fields into the extensible v4 contract."""
+    dates = dict(photo.metadata_candidates.date)
+    gps = dict(photo.metadata_candidates.gps)
+    locations = dict(photo.metadata_candidates.location)
+    captions = dict(photo.metadata_candidates.caption)
+
+    if photo.exif_capture_datetime is not None:
+        dates.setdefault("exif", photo.exif_capture_datetime)
+    if photo.source_capture_datetime is not None:
+        dates.setdefault("provider", photo.source_capture_datetime)
+    if (
+        photo.original_date_source == DateSource.FILENAME
+        and photo.original_capture_datetime is not None
+    ):
+        dates.setdefault("filename", photo.original_capture_datetime)
+    if photo.exif_latitude is not None and photo.exif_longitude is not None:
+        gps.setdefault(
+            "exif",
+            GpsCandidate(photo.exif_latitude, photo.exif_longitude),
+        )
+    if photo.source_latitude is not None and photo.source_longitude is not None:
+        gps.setdefault(
+            "provider",
+            GpsCandidate(photo.source_latitude, photo.source_longitude),
+        )
+    if photo.source_location_data is not None:
+        locations.setdefault("provider", photo.source_location_data)
+    if photo.geocoded_location_data is not None:
+        locations["geocoding"] = photo.geocoded_location_data
+    if photo.imported_caption:
+        captions.setdefault("provider", photo.imported_caption)
+    return MetadataCandidates(
+        date=dates,
+        gps=gps,
+        location=locations,
+        caption=captions,
+    )

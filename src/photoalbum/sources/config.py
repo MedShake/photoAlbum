@@ -5,6 +5,8 @@ import json
 from collections.abc import Mapping
 import re
 
+from .base import SourceCapabilities
+
 
 _SENSITIVE_KEY_PARTS = (
     "password",
@@ -54,18 +56,32 @@ class ProjectSource:
     collection_id: str
     collection_name: str
     config: dict[str, object] = field(default_factory=dict)
+    provider_label: str | None = None
+    capabilities: SourceCapabilities | None = None
 
     def to_json(self) -> str:
         _reject_sensitive_config(self.config)
         return json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "id": self.id,
                 "kind": self.kind,
                 "name": self.name,
                 "collection_id": self.collection_id,
                 "collection_name": self.collection_name,
                 "config": self.config,
+                "provider_label": self.provider_label,
+                "capabilities": (
+                    {
+                        "date": sorted(self.capabilities.date_candidates),
+                        "gps": sorted(self.capabilities.gps_candidates),
+                        "location": sorted(self.capabilities.location_candidates),
+                        "caption": sorted(self.capabilities.caption_candidates),
+                        "can_fetch_original": self.capabilities.can_fetch_original,
+                    }
+                    if self.capabilities is not None
+                    else None
+                ),
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -75,10 +91,26 @@ class ProjectSource:
     @classmethod
     def from_json(cls, value: str) -> "ProjectSource":
         data = json.loads(value)
-        if data.get("schema_version") != 1:
+        if data.get("schema_version") not in (1, 2):
             raise ValueError("Unsupported project source schema.")
         config = dict(data.get("config") or {})
         _reject_sensitive_config(config)
+        raw_capabilities = data.get("capabilities")
+        capabilities = None
+        if isinstance(raw_capabilities, Mapping):
+            capabilities = SourceCapabilities(
+                date_candidates=frozenset(raw_capabilities.get("date") or ()),
+                gps_candidates=frozenset(raw_capabilities.get("gps") or ()),
+                location_candidates=frozenset(
+                    raw_capabilities.get("location") or ()
+                ),
+                caption_candidates=frozenset(
+                    raw_capabilities.get("caption") or ()
+                ),
+                can_fetch_original=bool(
+                    raw_capabilities.get("can_fetch_original", False)
+                ),
+            )
         return cls(
             id=str(data["id"]),
             kind=str(data["kind"]),
@@ -86,4 +118,10 @@ class ProjectSource:
             collection_id=str(data["collection_id"]),
             collection_name=str(data["collection_name"]),
             config=config,
+            provider_label=(
+                str(data["provider_label"])
+                if data.get("provider_label")
+                else None
+            ),
+            capabilities=capabilities,
         )

@@ -289,11 +289,14 @@ class LibraryScanner:
         if previous.date_source == DateSource.MANUAL:
             photo.capture_datetime = previous.capture_datetime
             photo.date_source = DateSource.MANUAL
+        photo.manual_capture_datetime = previous.manual_capture_datetime
 
         if previous.gps_source == GpsSource.MANUAL:
             photo.latitude = previous.latitude
             photo.longitude = previous.longitude
             photo.gps_source = GpsSource.MANUAL
+        photo.manual_latitude = previous.manual_latitude
+        photo.manual_longitude = previous.manual_longitude
 
         if previous.location_source == LocationSource.MANUAL:
             photo.place_name = previous.place_name
@@ -301,6 +304,7 @@ class LibraryScanner:
             photo.address = previous.address
             photo.raw_location_data = previous.raw_location_data
             photo.location_source = LocationSource.MANUAL
+        photo.manual_location_data = previous.manual_location_data
 
         # Editorial choices are independent from source analysis.
         photo.selected_location_components = (

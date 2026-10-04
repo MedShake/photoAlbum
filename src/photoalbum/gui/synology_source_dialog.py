@@ -241,6 +241,12 @@ class SynologySourceDialog(QDialog):
             collection_id=album.id,
             collection_name=album.name,
             config=config,
+            provider_label="Synology Photos",
+            capabilities=getattr(
+                self.provider,
+                "capabilities",
+                SynologyPhotosSource.capabilities,
+            ),
         )
         self.accept()
 

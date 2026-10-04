@@ -15,7 +15,20 @@ from photoalbum.gui.photo_editor import PhotoEditor
 from photoalbum.gui.scan_controller import ScanController
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
 from photoalbum.i18n import Translator
-from photoalbum.models import Photo
+from photoalbum.models import (
+    DateSource,
+    GpsCandidate,
+    GpsSource,
+    LocationSource,
+    MetadataCandidates,
+    Photo,
+)
+from photoalbum.sources import (
+    ProjectSource,
+    SourceAsset,
+    SourceCapabilities,
+    SourceCollection,
+)
 
 
 @pytest.fixture(scope="module")
@@ -145,7 +158,7 @@ def test_photo_controls_forward_signals_and_selection_respects_sort(app, tmp_pat
     view.source_requested.connect(source)
     view.scan_requested.connect(scan)
     view.recursive_changed.connect(recursive)
-    view.browse_button.click()
+    view.source_requested.emit()
     view.analyze_button.click()
     view.recursive_checkbox.setChecked(True)
     source.assert_called_once_with()
@@ -382,6 +395,105 @@ def test_scan_without_project_reports_error(app):
     view.close()
 
 
+def test_remote_import_and_sync_are_async_and_analysis_does_not_sync_provider(
+    app,
+    tmp_path,
+):
+    class Provider:
+        kind = "future-provider"
+        label = "Future Photos"
+        capabilities = SourceCapabilities(
+            date_candidates=frozenset({"provider"}),
+            can_fetch_original=True,
+        )
+
+        def __init__(self):
+            self.list_calls = 0
+
+        def list_assets(self, collection_id):
+            self.list_calls += 1
+            return [SourceAsset(id="1", filename="photo.jpg")]
+
+        def fetch_thumbnail(self, asset, destination):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(b"thumbnail")
+            return destination
+
+        def fetch_original(self, asset, destination):
+            raise AssertionError("Original must not be fetched during import")
+
+        def close(self):
+            pass
+
+    service = ProjectService()
+    service.create(tmp_path / "async.photoalbum")
+    source = ProjectSource(
+        id="future-1",
+        kind="future-provider",
+        name="remote",
+        collection_id="album",
+        collection_name="Album",
+        provider_label="Future Photos",
+        capabilities=Provider.capabilities,
+    )
+    provider = Provider()
+    view = PhotoSourcesWidget(Translator("en"))
+    controller = ScanController(service, view, Translator("en"), language="en")
+
+    controller.import_remote_source(source, provider)
+    assert controller.is_running
+    assert view.source_progress_bar.maximum() == 0
+    wait_until(app, lambda: not controller.is_running)
+    assert provider.list_calls == 1
+    assert service.get_photo_source() == source
+
+    controller.start()
+    assert controller.is_running
+    wait_until(app, lambda: not controller.is_running)
+    assert provider.list_calls == 1
+
+    controller.sync_source()
+    assert controller.is_running
+    wait_until(app, lambda: not controller.is_running)
+    assert provider.list_calls == 2
+    service.close()
+    view.close()
+
+
+def test_open_remote_project_exposes_snapshot_before_background_refresh(
+    window,
+    tmp_path,
+):
+    from photoalbum.database import PhotoRepository, ProjectDatabase
+
+    project_path = tmp_path / "snapshot.photoalbum"
+    database = ProjectDatabase(project_path)
+    database.initialize()
+    source = ProjectSource(
+        id="remote-1",
+        kind="future-provider",
+        name="remote",
+        collection_id="album",
+        collection_name="Album",
+        provider_label="Future Photos",
+    )
+    database.set_project_metadata("photo_source", source.to_json())
+    PhotoRepository(database).save(
+        Photo(
+            path=tmp_path / "thumbnail.jpg",
+            filename="photo.jpg",
+            source_id="remote-1",
+            asset_id="1",
+        )
+    )
+    database.close()
+
+    window._open_project_path(project_path)
+
+    assert window._photos_widget.model.rowCount() == 1
+    assert window._photos_widget.source_edit.text() == "Future Photos — Album"
+
+
 @pytest.mark.parametrize('failure', [False, True])
 @pytest.mark.parametrize('orientation', ['portrait', 'landscape', 'custom'])
 def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_path, monkeypatch, failure, orientation):
@@ -562,3 +674,245 @@ def test_photo_sources_widget_hides_nominatim_when_disabled(app):
     assert view.metadata_progress_bar.isVisible()
     assert not view.nominatim_progress_label.isVisible()
     assert not view.nominatim_progress_bar.isVisible()
+
+
+def test_photo_sources_widget_metadata_policy_controls(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    received = []
+    view.metadata_policy_changed.connect(
+        lambda date, gps, location, nominatim: received.append(
+            (date, gps, location, nominatim)
+        )
+    )
+
+    view.set_source_kind("synology-photos")
+    view.set_metadata_policy(
+        date_preference="source",
+        gps_preference="exif",
+        location_preference="source",
+        nominatim_enabled=False,
+    )
+
+    assert view.date_source_combo.currentData() == "source"
+    assert view.gps_source_combo.currentData() == "exif"
+    assert view.location_source_combo.currentData() == "source"
+    assert not view.nominatim_checkbox.isChecked()
+    assert received == []
+
+    view.nominatim_checkbox.setChecked(True)
+
+    assert received[-1] == (
+        "source",
+        "exif",
+        "source",
+        True,
+    )
+
+    view.close()
+
+
+def test_policy_choices_use_actual_candidates_and_provider_label(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    view.set_metadata_sources(
+        provider_label="Synology Photos",
+        available={
+            "date": {"provider", "filename"},
+            "gps": {"provider"},
+            "location": {"provider", "geocoding"},
+            "caption": {"provider"},
+        },
+        source_kind="synology-photos",
+    )
+
+    assert [view.date_source_combo.itemText(i) for i in range(view.date_source_combo.count())] == [
+        "Synology Photos",
+        "Filename",
+    ]
+    assert view.date_source_combo.findData("exif") == -1
+    assert [view.gps_source_combo.itemText(i) for i in range(view.gps_source_combo.count())] == [
+        "Synology Photos"
+    ]
+    assert view.sync_button.isVisible() is False  # hidden until the widget is shown
+    view.show()
+    app.processEvents()
+    assert view.sync_button.isVisible()
+    view.close()
+
+
+def test_provider_label_mechanism_accepts_immich_without_special_ui_code(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    view.set_metadata_sources(
+        provider_label="Immich",
+        available={
+            "date": {"provider", "exif"},
+            "gps": {"provider", "exif"},
+            "location": {"provider"},
+            "caption": set(),
+        },
+        source_kind="immich",
+    )
+    assert view.date_source_combo.itemText(0) == "Immich"
+    assert view.location_source_combo.itemText(0) == "Immich"
+    view.close()
+
+
+def test_table_displays_effective_provider_provenance(app, tmp_path):
+    view = PhotoSourcesWidget(Translator("en"))
+    view.set_metadata_sources(
+        provider_label="Synology Photos",
+        available={"date": {"provider"}, "gps": {"provider"}, "location": {"provider"}, "caption": set()},
+        source_kind="synology-photos",
+    )
+    view.model.set_photos([
+        Photo(
+            path=tmp_path / "photo.jpg",
+            filename="photo.jpg",
+            capture_datetime=datetime(2024, 1, 1),
+            date_source=DateSource.SOURCE,
+            latitude=48.0,
+            longitude=2.0,
+            gps_source=GpsSource.SOURCE,
+            city="Paris",
+            location_source=LocationSource.SOURCE,
+        )
+    ])
+    assert view.model.index(0, 3).data() == "Synology Photos"
+    assert view.model.index(0, 4).data() == "Yes — Synology Photos"
+    assert view.model.index(0, 6).data() == "Synology Photos"
+    view.close()
+
+
+def test_main_window_persists_photo_metadata_policy(window, tmp_path):
+    from photoalbum.sources import PhotoMetadataPolicy
+
+    service = window._project_service
+    service.create(tmp_path / "policy-ui.photoalbum")
+    service.set_source_directory(tmp_path / "photos")
+    window._load_project_settings()
+
+    window._photos_widget.set_metadata_policy(
+        date_preference="filename",
+        gps_preference="exif",
+        location_preference="none",
+        nominatim_enabled=False,
+    )
+    window._photos_widget._emit_metadata_policy_changed()
+
+    assert service.get_photo_metadata_policy() == PhotoMetadataPolicy(
+        date_preference="filename",
+        gps_preference="exif",
+        location_preference="none",
+        nominatim_enabled=False,
+    )
+
+
+def test_policy_change_immediately_refreshes_all_effective_values_and_sources(
+    window,
+    app,
+    tmp_path,
+):
+    from photoalbum.database import PhotoRepository
+
+    service = window._project_service
+    service.create(tmp_path / "immediate-policy.photoalbum")
+    service.set_source_directory(tmp_path / "photos")
+    path = tmp_path / "photo.jpg"
+    PhotoRepository(service._require_database()).save(
+        Photo(
+            path=path,
+            filename=path.name,
+            capture_datetime=datetime(2020, 1, 1),
+            date_source=DateSource.EXIF,
+            latitude=47.0,
+            longitude=-1.0,
+            gps_source=GpsSource.EXIF,
+            exif_capture_datetime=datetime(2020, 1, 1),
+            source_capture_datetime=datetime(2024, 7, 1),
+            exif_latitude=47.0,
+            exif_longitude=-1.0,
+            source_latitude=48.0,
+            source_longitude=2.0,
+            source_location_data={"city": "Paris", "address": "Paris"},
+        )
+    )
+    window._load_project_settings()
+    window._load_project_photos()
+
+    window._photo_metadata_policy_changed("source", "source", "source", False)
+
+    displayed = window._photos_widget.model.photo_at(0)
+    assert displayed.capture_datetime == datetime(2024, 7, 1)
+    assert displayed.date_source == DateSource.SOURCE
+    assert (displayed.latitude, displayed.longitude) == (48.0, 2.0)
+    assert displayed.gps_source == GpsSource.SOURCE
+    assert displayed.city == "Paris"
+    assert displayed.location_source == LocationSource.SOURCE
+    wait_until(app, lambda: not window._scan_controller.is_running)
+
+
+def test_photo_sources_widget_uses_user_facing_source_and_policy_labels(app):
+    view = PhotoSourcesWidget(Translator("fr"))
+
+    assert (
+        view.modify_source_button.text()
+        == "Choisir la source des photos de l’album…"
+    )
+    assert view.current_source_label.text() == "Source actuelle :"
+
+    assert view.date_source_combo.maximumWidth() == 360
+    assert view.gps_source_combo.maximumWidth() == 360
+    assert view.location_source_combo.maximumWidth() == 360
+
+    assert (
+        view.nominatim_checkbox.text()
+        == "Compléter les lieux à partir du GPS avec Nominatim"
+    )
+    assert "OpenStreetMap" in view.nominatim_checkbox.toolTip()
+    assert "Internet" in view.nominatim_checkbox.toolTip()
+    assert view.nominatim_info_label.toolTip() == (
+        view.nominatim_checkbox.toolTip()
+    )
+
+    view.close()
+
+
+def test_source_metadata_provenance_translations_are_not_raw_keys():
+    english = Translator("en")
+    french = Translator("fr")
+
+    assert english.tr("photos.date_source.source") == "Photo source"
+    assert english.tr("photos.location_source.source") == "Photo source"
+
+    assert french.tr("photos.date_source.source") == "Source des photos"
+    assert french.tr("photos.location_source.source") == "Source des photos"
+
+
+def test_photo_sources_widget_displays_source_sync_progress(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    view.show()
+    app.processEvents()
+
+    view.prepare_source_progress()
+
+    assert view.source_progress_label.isVisible()
+    assert view.source_progress_bar.isVisible()
+    assert not view.metadata_progress_label.isVisible()
+    assert not view.nominatim_progress_label.isVisible()
+
+    # Unknown total while the provider is listing its collection.
+    assert view.source_progress_bar.minimum() == 0
+    assert view.source_progress_bar.maximum() == 0
+
+    view.update_source_progress(83, 171)
+
+    assert view.source_progress_bar.maximum() == 171
+    assert view.source_progress_bar.value() == 83
+    assert view.source_progress_bar.format() == "83 / 171"
+
+    view.finish_processing_progress()
+
+    assert not view.source_progress_bar.isVisible()
+    assert not view.metadata_progress_bar.isVisible()
+    assert not view.nominatim_progress_bar.isVisible()
+
+    view.close()

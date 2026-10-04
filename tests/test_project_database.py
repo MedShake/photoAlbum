@@ -275,7 +275,7 @@ def test_v2_project_migrates_metadata_candidates_without_changing_effective_data
 
     assert migrated.connection.execute(
         "SELECT version FROM schema_version"
-    ).fetchone()["version"] == 3
+    ).fetchone()["version"] == 4
 
     migrated.close()
 
@@ -356,7 +356,7 @@ def test_v2_remote_project_migrates_provider_candidates(tmp_path: Path):
     migrated.close()
 
 
-def test_schema_v3_initialization_is_idempotent(tmp_path: Path):
+def test_schema_v4_initialization_is_idempotent(tmp_path: Path):
     from photoalbum.database import ProjectDatabase
 
     project_path = tmp_path / "idempotent.photoalbum"
@@ -384,7 +384,54 @@ def test_schema_v3_initialization_is_idempotent(tmp_path: Path):
     assert len(first_columns) == len(set(first_columns))
     assert database.connection.execute(
         "SELECT version FROM schema_version"
-    ).fetchone()["version"] == 3
+    ).fetchone()["version"] == 4
 
     database.close()
 
+
+def test_v3_project_migrates_generic_candidates_and_manual_state(tmp_path: Path):
+    from datetime import datetime
+    from photoalbum.database import PhotoRepository, ProjectDatabase
+    from photoalbum.models import DateSource, GpsSource, Photo
+
+    project_path = tmp_path / "v3-to-v4.photoalbum"
+    database = ProjectDatabase(project_path)
+    database.initialize()
+    path = tmp_path / "photo.jpg"
+    manual_date = datetime(2025, 1, 2, 3, 4)
+    PhotoRepository(database).save(
+        Photo(
+            path=path,
+            filename=path.name,
+            capture_datetime=manual_date,
+            date_source=DateSource.MANUAL,
+            latitude=45.0,
+            longitude=4.0,
+            gps_source=GpsSource.MANUAL,
+            exif_capture_datetime=datetime(2020, 1, 1),
+            source_capture_datetime=datetime(2024, 1, 1),
+            source_latitude=48.0,
+            source_longitude=2.0,
+        )
+    )
+    for column in (
+        "metadata_candidates",
+        "manual_capture_datetime",
+        "manual_latitude",
+        "manual_longitude",
+        "manual_location_data",
+    ):
+        database.connection.execute(f"ALTER TABLE photos DROP COLUMN {column}")
+    database.connection.execute("UPDATE schema_version SET version = 3")
+    database.connection.commit()
+    database.close()
+
+    migrated = ProjectDatabase(project_path)
+    migrated.initialize()
+    loaded = PhotoRepository(migrated).find_by_path(path)
+
+    assert loaded.manual_capture_datetime == manual_date
+    assert (loaded.manual_latitude, loaded.manual_longitude) == (45.0, 4.0)
+    assert set(loaded.metadata_candidates.date) == {"exif", "provider"}
+    assert set(loaded.metadata_candidates.gps) == {"provider"}
+    migrated.close()

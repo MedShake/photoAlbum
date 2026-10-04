@@ -10,9 +10,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import HTTPSHandler, Request, build_opener
 
+from photoalbum.models import GpsCandidate, MetadataCandidates
+
 from .base import (
     AuthenticationError,
     SourceAsset,
+    SourceCapabilities,
     SourceCollection,
     SourceError,
     copy_stream,
@@ -90,6 +93,14 @@ class SynologyPhotosSource:
     """
 
     kind = "synology-photos"
+    label = "Synology Photos"
+    capabilities = SourceCapabilities(
+        date_candidates=frozenset({"provider", "filename"}),
+        gps_candidates=frozenset({"provider"}),
+        location_candidates=frozenset({"provider"}),
+        caption_candidates=frozenset({"provider"}),
+        can_fetch_original=True,
+    )
     PAGE_SIZE = 500
     ADDITIONAL = [
         "thumbnail", "resolution", "orientation", "exif", "description",
@@ -475,17 +486,24 @@ class SynologyPhotosSource:
                     "raw": address,
                 }
 
+        capture_datetime = _timestamp(timestamp)
+        latitude = _optional_float(gps.get("latitude"))
+        longitude = _optional_float(gps.get("longitude"))
+        caption = str(description) if description else (
+            str(row["title"]) if row.get("title") else None
+        )
+
         return SourceAsset(
             id=str(row["id"]),
             filename=str(row.get("filename") or row["id"]),
-            capture_datetime=_timestamp(timestamp),
+            capture_datetime=capture_datetime,
             capture_datetime_origin="source",
             file_size=_optional_int(row.get("filesize")),
             width=_optional_int(resolution.get("width")),
             height=_optional_int(resolution.get("height")),
             orientation=_optional_int(additional.get("orientation")),
-            latitude=_optional_float(gps.get("latitude")),
-            longitude=_optional_float(gps.get("longitude")),
+            latitude=latitude,
+            longitude=longitude,
             gps_origin="source",
             title=str(row["title"]) if row.get("title") else None,
             description=str(description) if description else None,
@@ -497,6 +515,28 @@ class SynologyPhotosSource:
                 or ""
             ) or None,
             metadata=dict(row),
+            candidates=MetadataCandidates(
+                date=(
+                    {"provider": capture_datetime}
+                    if capture_datetime is not None
+                    else {}
+                ),
+                gps=(
+                    {"provider": GpsCandidate(latitude, longitude)}
+                    if latitude is not None and longitude is not None
+                    else {}
+                ),
+                location=(
+                    {"provider": structured_location}
+                    if structured_location is not None
+                    else {}
+                ),
+                caption=(
+                    {"provider": caption}
+                    if caption
+                    else {}
+                ),
+            ),
         )
 
     @staticmethod
@@ -659,5 +699,3 @@ def _timestamp(value: object) -> datetime | None:
     if timestamp > 10_000_000_000:
         timestamp /= 1000
     return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
-
-

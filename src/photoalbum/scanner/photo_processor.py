@@ -164,9 +164,8 @@ class PhotoProcessor:
             "raw": location.raw_data,
         }
 
-        # Until project policy is wired into the scanner, retain the
-        # historical effective-location behaviour for automatic values.
-        # A manual location remains authoritative.
+        # Keep the effective value useful for callers that do not immediately
+        # run the project policy. A manual location remains authoritative.
         if photo.location_source == LocationSource.MANUAL:
             return
 

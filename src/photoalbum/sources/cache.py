@@ -64,6 +64,7 @@ class SourceAssetCache:
             location_text=photo.imported_location_text,
             revision=photo.content_hash,
             metadata=photo.source_metadata or {},
+            candidates=photo.metadata_candidates,
         )
         if quality == "thumbnail":
             path = provider.fetch_thumbnail(asset, destination)

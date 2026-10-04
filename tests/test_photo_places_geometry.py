@@ -87,11 +87,11 @@ def test_resize_both_directions_and_mode_switches(view):
     settle()
     custom = assert_fits(widget, photo)
     assert custom < narrow
-    save.assert_not_called()
+    assert save.call_count == 1
     combo.setCurrentIndex(0)
     settle()
     assert assert_fits(widget, photo) == narrow
-    assert save.call_count == 1
+    assert save.call_count == 2
     widget.resize(1400, 700)
     settle()
     assert assert_fits(widget, photo) == wide

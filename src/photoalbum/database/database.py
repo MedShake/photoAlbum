@@ -12,7 +12,7 @@ class ProjectDatabase:
     Schema upgrades are performed in place so projects remain reproducible.
     """
 
-    CURRENT_SCHEMA_VERSION = 3
+    CURRENT_SCHEMA_VERSION = 4
 
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -47,6 +47,9 @@ class ProjectDatabase:
 
                 if version < 3:
                     self._migrate_photo_metadata_candidates()
+
+                if version < 4:
+                    self._migrate_generic_metadata_candidates()
 
             self._set_schema_version(self.CURRENT_SCHEMA_VERSION)
         except Exception:
@@ -167,11 +170,131 @@ class ProjectDatabase:
                 imported_location_text TEXT,
                 imported_caption TEXT,
                 source_metadata TEXT,
+                metadata_candidates TEXT NOT NULL DEFAULT '{}',
+                manual_capture_datetime TEXT,
+                manual_latitude REAL,
+                manual_longitude REAL,
+                manual_location_data TEXT,
 
                 is_missing INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+
+    def _migrate_generic_metadata_candidates(self) -> None:
+        """Keep v3 data while adding extensible candidates and manual state."""
+        columns = {
+            row["name"]
+            for row in self.connection.execute("PRAGMA table_info(photos)")
+        }
+        additions = (
+            ("metadata_candidates", "TEXT NOT NULL DEFAULT '{}'"),
+            ("manual_capture_datetime", "TEXT"),
+            ("manual_latitude", "REAL"),
+            ("manual_longitude", "REAL"),
+            ("manual_location_data", "TEXT"),
+        )
+        for name, definition in additions:
+            if name not in columns:
+                self.connection.execute(
+                    f"ALTER TABLE photos ADD COLUMN {name} {definition}"
+                )
+
+        rows = self.connection.execute("SELECT * FROM photos").fetchall()
+        for row in rows:
+            dates: dict[str, str] = {}
+            gps: dict[str, dict[str, float]] = {}
+            locations: dict[str, object] = {}
+            captions: dict[str, str] = {}
+
+            if row["exif_capture_datetime"] is not None:
+                dates["exif"] = row["exif_capture_datetime"]
+            if row["source_capture_datetime"] is not None:
+                dates["provider"] = row["source_capture_datetime"]
+            if (
+                row["original_date_source"] == "filename"
+                and row["original_capture_datetime"] is not None
+            ):
+                dates["filename"] = row["original_capture_datetime"]
+            if (
+                row["exif_latitude"] is not None
+                and row["exif_longitude"] is not None
+            ):
+                gps["exif"] = {
+                    "latitude": row["exif_latitude"],
+                    "longitude": row["exif_longitude"],
+                }
+            if (
+                row["source_latitude"] is not None
+                and row["source_longitude"] is not None
+            ):
+                gps["provider"] = {
+                    "latitude": row["source_latitude"],
+                    "longitude": row["source_longitude"],
+                }
+            for key, column in (
+                ("provider", "source_location_data"),
+                ("geocoding", "geocoded_location_data"),
+            ):
+                if row[column] is not None:
+                    try:
+                        locations[key] = json.loads(row[column])
+                    except (TypeError, ValueError):
+                        pass
+            if row["imported_caption"]:
+                captions["provider"] = row["imported_caption"]
+
+            manual_location = None
+            if row["location_source"] == "manual":
+                raw = None
+                if row["raw_location_data"] is not None:
+                    try:
+                        raw = json.loads(row["raw_location_data"])
+                    except (TypeError, ValueError):
+                        pass
+                manual_location = json.dumps(
+                    {
+                        "place_name": row["place_name"],
+                        "city": row["city"],
+                        "address": row["address"],
+                        "raw": raw,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+
+            self.connection.execute(
+                """
+                UPDATE photos
+                SET metadata_candidates = ?,
+                    manual_capture_datetime = CASE
+                        WHEN date_source = 'manual' THEN capture_datetime
+                        ELSE manual_capture_datetime END,
+                    manual_latitude = CASE
+                        WHEN gps_source = 'manual' THEN latitude
+                        ELSE manual_latitude END,
+                    manual_longitude = CASE
+                        WHEN gps_source = 'manual' THEN longitude
+                        ELSE manual_longitude END,
+                    manual_location_data = COALESCE(?, manual_location_data)
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(
+                        {
+                            "date": dates,
+                            "gps": gps,
+                            "location": locations,
+                            "caption": captions,
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                    manual_location,
+                    row["id"],
+                ),
+            )
 
     def _schema_version(self) -> int:
         row = self.connection.execute(

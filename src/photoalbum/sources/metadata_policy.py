@@ -133,7 +133,12 @@ def _resolve_date(
     photo: Photo,
     policy: PhotoMetadataPolicy,
 ) -> None:
-    if photo.date_source == DateSource.MANUAL:
+    manual = photo.manual_capture_datetime
+    if manual is None and photo.date_source == DateSource.MANUAL:
+        manual = photo.capture_datetime
+    if manual is not None:
+        photo.capture_datetime = manual
+        photo.date_source = DateSource.MANUAL
         return
 
     candidates = {
@@ -150,6 +155,11 @@ def _resolve_date(
             DateSource.FILENAME,
         ),
     }
+    for key, value in photo.metadata_candidates.date.items():
+        candidates[_policy_key(key)] = (
+            value,
+            _date_provenance(key),
+        )
 
     fallback_order = {
         "exif": ("exif", "source", "filename"),
@@ -178,7 +188,21 @@ def _resolve_gps(
     photo: Photo,
     policy: PhotoMetadataPolicy,
 ) -> None:
-    if photo.gps_source == GpsSource.MANUAL:
+    manual_latitude = photo.manual_latitude
+    manual_longitude = photo.manual_longitude
+    if (
+        manual_latitude is None
+        and manual_longitude is None
+        and photo.gps_source == GpsSource.MANUAL
+    ):
+        manual_latitude = photo.latitude
+        manual_longitude = photo.longitude
+        if manual_latitude is None and manual_longitude is None:
+            return
+    if manual_latitude is not None and manual_longitude is not None:
+        photo.latitude = manual_latitude
+        photo.longitude = manual_longitude
+        photo.gps_source = GpsSource.MANUAL
         return
 
     candidates = {
@@ -193,6 +217,12 @@ def _resolve_gps(
             GpsSource.SOURCE,
         ),
     }
+    for key, value in photo.metadata_candidates.gps.items():
+        candidates[_policy_key(key)] = (
+            value.latitude,
+            value.longitude,
+            _gps_provenance(key),
+        )
 
     fallback_order = (
         ("exif", "source")
@@ -217,19 +247,80 @@ def _resolve_location(
     photo: Photo,
     policy: PhotoMetadataPolicy,
 ) -> None:
+    manual = photo.manual_location_data
+    source_candidate = _usable_location_candidate(
+        photo.source_location_data
+        or photo.metadata_candidates.location.get("provider")
+    )
+    geocoded_candidate = _usable_geocoded_candidate(photo)
+
+    # The Places widget stores a per-photo source choice inside the existing
+    # extensible editorial JSON. It takes precedence over the project policy,
+    # while the policy remains the default when no local choice exists.
+    override_origin = None
+    if isinstance(manual, dict):
+        state = manual.get("photo_places")
+        if isinstance(state, dict):
+            value = state.get("origin")
+            if value in {"provider", "geocoding", "manual", "none"}:
+                override_origin = str(value)
+
+    if override_origin == "provider":
+        if source_candidate is not None:
+            _apply_location_candidate(
+                photo, source_candidate, LocationSource.SOURCE
+            )
+        else:
+            _clear_effective_location(photo)
+        return
+    if override_origin == "geocoding":
+        if geocoded_candidate is not None:
+            _apply_location_candidate(
+                photo, geocoded_candidate, LocationSource.GEOCODING
+            )
+        else:
+            _clear_effective_location(photo)
+        return
+    if override_origin == "none":
+        _clear_effective_location(photo)
+        return
+    if override_origin == "manual":
+        manual_candidate = _usable_location_candidate(manual)
+        if manual_candidate is None and isinstance(manual, dict):
+            state = manual.get("photo_places")
+            if isinstance(state, dict):
+                manual_candidate = _usable_location_candidate(
+                    state.get("manual_data")
+                    if isinstance(state.get("manual_data"), dict)
+                    else None
+                )
+        if manual_candidate is not None:
+            _apply_location_candidate(
+                photo, manual_candidate, LocationSource.MANUAL
+            )
+        else:
+            _clear_effective_location(photo)
+            photo.location_source = LocationSource.MANUAL
+        return
+
     # Existing manual state remains authoritative. This also preserves the
     # explicit "manual GPS, location not resolved yet" state.
+    if manual is None and photo.location_source == LocationSource.MANUAL:
+        manual = {
+            "place_name": photo.place_name,
+            "city": photo.city,
+            "address": photo.address,
+            "raw": photo.raw_location_data,
+        }
+    if _usable_location_candidate(manual) is not None:
+        _apply_location_candidate(photo, manual, LocationSource.MANUAL)
+        return
     if photo.location_source == LocationSource.MANUAL:
         return
 
     if policy.location_preference == "none":
         _clear_effective_location(photo)
         return
-
-    source_candidate = _usable_location_candidate(
-        photo.source_location_data
-    )
-    geocoded_candidate = _usable_geocoded_candidate(photo)
 
     if policy.location_preference == "source":
         candidates = (
@@ -246,18 +337,7 @@ def _resolve_location(
         if candidate is None:
             continue
 
-        photo.place_name = _optional_text(candidate.get("place_name"))
-        photo.city = _optional_text(candidate.get("city"))
-        photo.address = _optional_text(candidate.get("address"))
-
-        raw = candidate.get("raw")
-        photo.raw_location_data = (
-            dict(raw)
-            if isinstance(raw, dict)
-            else None
-        )
-
-        photo.location_source = provenance
+        _apply_location_candidate(photo, candidate, provenance)
         return
 
     _clear_effective_location(photo)
@@ -291,6 +371,7 @@ def _usable_geocoded_candidate(
 ) -> dict[str, object] | None:
     candidate = _usable_location_candidate(
         photo.geocoded_location_data
+        or photo.metadata_candidates.location.get("geocoding")
     )
     if candidate is None:
         return None
@@ -338,9 +419,55 @@ def _clear_effective_location(photo: Photo) -> None:
     photo.location_source = LocationSource.UNKNOWN
 
 
+def _apply_location_candidate(
+    photo: Photo,
+    candidate: dict[str, object],
+    provenance: LocationSource,
+) -> None:
+    photo.place_name = _optional_text(candidate.get("place_name"))
+    photo.city = _optional_text(candidate.get("city"))
+    photo.address = _optional_text(candidate.get("address"))
+    raw = candidate.get("raw")
+    components = candidate.get("components")
+    if isinstance(raw, dict) and isinstance(raw.get("address"), dict):
+        photo.raw_location_data = dict(raw)
+    elif isinstance(components, list):
+        address_data = {
+            str(item["key"]): str(item["value"])
+            for item in components
+            if isinstance(item, dict) and item.get("key") and item.get("value")
+        }
+        photo.raw_location_data = {"address": address_data}
+    elif isinstance(raw, dict):
+        photo.raw_location_data = {"address": dict(raw)}
+    else:
+        photo.raw_location_data = None
+    photo.location_source = provenance
+
+
+def _policy_key(key: str) -> str:
+    return "source" if key == "provider" else key
+
+
+def _date_provenance(key: str) -> DateSource:
+    return {
+        "provider": DateSource.SOURCE,
+        "source": DateSource.SOURCE,
+        "exif": DateSource.EXIF,
+        "filename": DateSource.FILENAME,
+    }.get(key, DateSource.UNKNOWN)
+
+
+def _gps_provenance(key: str) -> GpsSource:
+    return {
+        "provider": GpsSource.SOURCE,
+        "source": GpsSource.SOURCE,
+        "exif": GpsSource.EXIF,
+    }.get(key, GpsSource.UNKNOWN)
+
+
 def _optional_text(value: object) -> str | None:
     if value is None:
         return None
     result = str(value).strip()
     return result or None
-

@@ -3,14 +3,21 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from photoalbum.metadata import PhotoAnalyzer
+from photoalbum.metadata import FilenameDateParser, PhotoAnalyzer
+from photoalbum.models import GpsCandidate, MetadataCandidates
 from photoalbum.scanner import FolderScanner
 
-from .base import SourceAsset, SourceCollection
+from .base import SourceAsset, SourceCapabilities, SourceCollection
 
 
 class LocalFolderSource:
     kind = "local"
+    label = "Local folder"
+    capabilities = SourceCapabilities(
+        date_candidates=frozenset({"exif", "filename"}),
+        gps_candidates=frozenset({"exif"}),
+        can_fetch_original=True,
+    )
 
     def __init__(self, directory: Path, *, recursive: bool = False) -> None:
         self.directory = directory.expanduser().resolve()
@@ -23,6 +30,7 @@ class LocalFolderSource:
         if collection_id != "folder":
             raise KeyError(collection_id)
         analyzer = PhotoAnalyzer()
+        filename_parser = FilenameDateParser()
         return [
             SourceAsset(
                 id=str(path), filename=photo.filename,
@@ -34,9 +42,35 @@ class LocalFolderSource:
                 gps_origin="exif" if photo.has_gps else "unknown",
                 revision=f"{photo.modified_time_ns}:{photo.file_size}",
                 metadata={"path": str(path)},
+                candidates=MetadataCandidates(
+                    date={
+                        **(
+                            {"exif": photo.capture_datetime}
+                            if photo.capture_datetime is not None
+                            and photo.date_source.value == "exif"
+                            else {}
+                        ),
+                        **(
+                            {"filename": filename_date}
+                            if filename_date is not None
+                            else {}
+                        ),
+                    },
+                    gps=(
+                        {
+                            "exif": GpsCandidate(
+                                photo.latitude,
+                                photo.longitude,
+                            )
+                        }
+                        if photo.has_gps
+                        else {}
+                    ),
+                ),
             )
             for path in FolderScanner().scan(self.directory, recursive=self.recursive)
             for photo in [analyzer.analyze(path)]
+            for filename_date in [filename_parser.parse(path.name)]
         ]
 
     def fetch_thumbnail(self, asset: SourceAsset, destination: Path) -> Path:

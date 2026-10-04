@@ -1,9 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
 from .location_component import LocationComponent
+from .metadata_candidates import MetadataCandidates
 
 
 class DateSource(str, Enum):
@@ -41,6 +42,9 @@ class Photo:
     imported_location_text: str | None = None
     imported_caption: str | None = None
     source_metadata: dict[str, object] | None = None
+    metadata_candidates: MetadataCandidates = field(
+        default_factory=MetadataCandidates
+    )
 
     file_size: int | None = None
     modified_time_ns: int | None = None
@@ -56,6 +60,13 @@ class Photo:
     latitude: float | None = None
     longitude: float | None = None
     gps_source: GpsSource = GpsSource.UNKNOWN
+
+    # User-authored values are independent from imported candidates and from
+    # the current effective resolution.
+    manual_capture_datetime: datetime | None = None
+    manual_latitude: float | None = None
+    manual_longitude: float | None = None
+    manual_location_data: dict[str, object] | None = None
 
     # Metadata originally detected from the source file.
     # These values are preserved when the user applies

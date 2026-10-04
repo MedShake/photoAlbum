@@ -5,6 +5,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, Protocol
 
+from photoalbum.models import GpsCandidate, MetadataCandidates
+
+
+@dataclass(frozen=True)
+class SourceCapabilities:
+    date_candidates: frozenset[str] = frozenset()
+    gps_candidates: frozenset[str] = frozenset()
+    location_candidates: frozenset[str] = frozenset()
+    caption_candidates: frozenset[str] = frozenset()
+    can_fetch_original: bool = False
+
 
 @dataclass(frozen=True)
 class SourceCollection:
@@ -35,12 +46,41 @@ class SourceAsset:
     structured_location: dict[str, object] | None = None
     revision: str | None = None
     metadata: dict[str, object] = field(default_factory=dict)
+    candidates: MetadataCandidates = field(default_factory=MetadataCandidates)
+
+    def advertised_candidates(self) -> MetadataCandidates:
+        """Return the generic contract, including legacy constructor values."""
+        dates = dict(self.candidates.date)
+        gps = dict(self.candidates.gps)
+        locations = dict(self.candidates.location)
+        captions = dict(self.candidates.caption)
+
+        if self.capture_datetime is not None:
+            key = _candidate_key(self.capture_datetime_origin)
+            dates.setdefault(key, self.capture_datetime)
+        if self.latitude is not None and self.longitude is not None:
+            key = _candidate_key(self.gps_origin)
+            gps.setdefault(key, GpsCandidate(self.latitude, self.longitude))
+        if self.structured_location is not None:
+            locations.setdefault("provider", dict(self.structured_location))
+        caption = self.description or self.title
+        if caption:
+            captions.setdefault("provider", caption)
+
+        return MetadataCandidates(
+            date=dates,
+            gps=gps,
+            location=locations,
+            caption=captions,
+        )
 
 
 class PhotoSource(Protocol):
     """Read-only boundary implemented by local and remote photo services."""
 
     kind: str
+    label: str
+    capabilities: SourceCapabilities
 
     def list_collections(self) -> list[SourceCollection]: ...
 
@@ -59,6 +99,10 @@ class SourceError(RuntimeError):
 
 class AuthenticationError(SourceError):
     pass
+
+
+def _candidate_key(origin: str) -> str:
+    return "provider" if origin == "source" else origin
 
 
 def copy_stream(source: BinaryIO, destination: Path) -> Path:

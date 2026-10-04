@@ -4,6 +4,7 @@ from .location_resolver import LocationResolver
 from .nominatim_geocoder import GeocodingError, NominatimGeocoder
 from .nominatim_parser import NominatimParser
 from .factory import create_nominatim_location_resolver
+from .location_component_order import order_location_components
 
 __all__ = [
     "GeocodingCache",
@@ -13,4 +14,5 @@ __all__ = [
     "NominatimParser",
     "distance_in_meters",
     "create_nominatim_location_resolver",
+    "order_location_components",
 ]

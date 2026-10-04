@@ -8,7 +8,7 @@ from photoalbum.i18n.date_formatter import (
     format_datetime,
 )
 from photoalbum.i18n import Translator
-from photoalbum.models import Photo
+from photoalbum.models import DateSource, GpsSource, LocationSource, Photo
 
 
 class PhotoTableModel(QAbstractTableModel):
@@ -35,6 +35,15 @@ class PhotoTableModel(QAbstractTableModel):
 
         self._translator = translator or Translator("en")
         self._photos = list(photos or [])
+        self._provider_label = self._translator.tr("photos.policy.provider")
+
+    def set_provider_label(self, label: str) -> None:
+        self._provider_label = label or self._translator.tr("photos.policy.provider")
+        if self._photos:
+            self.dataChanged.emit(
+                self.index(0, 0),
+                self.index(len(self._photos) - 1, len(self.HEADER_KEYS) - 1),
+            )
 
     def rowCount(
         self,
@@ -159,21 +168,28 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         if column == 3:
+            if photo.date_source == DateSource.SOURCE:
+                return self._provider_label
             return self._translator.tr(
                 f"photos.date_source.{photo.date_source.value}"
             )
 
         if column == 4:
-            return self._translator.tr(
+            value = self._translator.tr(
                 "photos.value.yes"
                 if photo.has_gps
                 else "photos.value.no"
             )
+            if photo.has_gps and photo.gps_source != GpsSource.UNKNOWN:
+                value = f"{value} — {self._gps_source_label(photo)}"
+            return value
 
         if column == 5:
             return photo.city or "—"
 
         if column == 6:
+            if photo.location_source == LocationSource.SOURCE:
+                return self._provider_label
             return self._translator.tr(
                 "photos.location_source."
                 f"{photo.location_source.value}"
@@ -220,14 +236,25 @@ class PhotoTableModel(QAbstractTableModel):
         lines.append(
             self._translator.tr(
                 "photos.location_tooltip.source",
-                value=self._translator.tr(
-                    "photos.location_source."
-                    f"{photo.location_source.value}"
+                value=(
+                    self._provider_label
+                    if photo.location_source == LocationSource.SOURCE
+                    else self._translator.tr(
+                        "photos.location_source."
+                        f"{photo.location_source.value}"
+                    )
                 ),
             )
         )
 
         return "\n".join(lines)
+
+    def _gps_source_label(self, photo: Photo) -> str:
+        if photo.gps_source == GpsSource.SOURCE:
+            return self._provider_label
+        return self._translator.tr(
+            f"photos.gps_source.{photo.gps_source.value}"
+        )
 
     @staticmethod
     def _sort_value(

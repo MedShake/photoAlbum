@@ -1,4 +1,5 @@
 from __future__ import annotations
+from photoalbum.gui.workers import SourceSyncWorker
 
 from datetime import datetime
 from pathlib import Path
@@ -7,7 +8,15 @@ import json
 import pytest
 
 from photoalbum.database import PhotoRepository, ProjectDatabase
-from photoalbum.models import DateSource, GpsSource, LocationSource, Photo
+from photoalbum.models import (
+    DateSource,
+    GpsCandidate,
+    GpsSource,
+    LocationComponent,
+    LocationSource,
+    MetadataCandidates,
+    Photo,
+)
 from photoalbum.sources import (
     ProjectSource,
     SourceAsset,
@@ -120,6 +129,119 @@ def test_import_is_snapshot_and_only_fetches_thumbnails(tmp_path):
     database.close()
 
 
+def test_provider_can_import_multiple_real_candidates_per_dimension(tmp_path):
+    database = ProjectDatabase(tmp_path / "multiple.photoalbum")
+    database.initialize()
+    repository = PhotoRepository(database)
+    provider_date = datetime(2024, 7, 1, 12, 30)
+    exif_date = datetime(2024, 7, 1, 12, 29)
+    provider = FakeRemoteSource([
+        SourceAsset(
+            id="42",
+            filename="IMG_20240701_123100.jpg",
+            candidates=MetadataCandidates(
+                date={"provider": provider_date, "exif": exif_date},
+                gps={
+                    "provider": GpsCandidate(48.0, 2.0),
+                    "exif": GpsCandidate(47.0, -1.0),
+                },
+            ),
+        )
+    ])
+
+    SourceImporter(repository, SourceAssetCache(database.path)).import_collection(
+        project_source(), provider
+    )
+    photo = repository.find_by_identity("remote-1:42")
+
+    assert photo is not None
+    assert photo.metadata_candidates.date["provider"] == provider_date
+    assert photo.metadata_candidates.date["exif"] == exif_date
+    assert "filename" in photo.metadata_candidates.date
+    assert photo.metadata_candidates.gps["provider"] == GpsCandidate(48.0, 2.0)
+    assert photo.metadata_candidates.gps["exif"] == GpsCandidate(47.0, -1.0)
+    database.close()
+
+
+def test_provider_only_candidate_does_not_invent_exif(tmp_path):
+    database = ProjectDatabase(tmp_path / "provider-only.photoalbum")
+    database.initialize()
+    repository = PhotoRepository(database)
+    provider = FakeRemoteSource([
+        SourceAsset(
+            id="42",
+            filename="plain.jpg",
+            candidates=MetadataCandidates(
+                date={"provider": datetime(2024, 7, 1)},
+                gps={"provider": GpsCandidate(48.0, 2.0)},
+            ),
+        )
+    ])
+    SourceImporter(repository, SourceAssetCache(database.path)).import_collection(
+        project_source(), provider
+    )
+    photo = repository.find_by_identity("remote-1:42")
+    assert photo is not None
+    assert "exif" not in photo.metadata_candidates.date
+    assert "exif" not in photo.metadata_candidates.gps
+    assert photo.exif_capture_datetime is None
+    assert photo.exif_latitude is None
+    database.close()
+
+
+def test_resync_preserves_independent_manual_values_and_editorial_caption(tmp_path):
+    database = ProjectDatabase(tmp_path / "manual.photoalbum")
+    database.initialize()
+    repository = PhotoRepository(database)
+    cache = SourceAssetCache(database.path)
+    first = FakeRemoteSource([
+        SourceAsset(
+            id="1",
+            filename="one.jpg",
+            capture_datetime=datetime(2020, 1, 1),
+            latitude=48.0,
+            longitude=2.0,
+            structured_location={"city": "Paris", "address": "Paris"},
+            description="Provider caption",
+        )
+    ])
+    SourceImporter(repository, cache).import_collection(project_source(), first)
+    path = repository.find_by_identity("remote-1:1").path
+    manual_date = datetime(2025, 2, 3, 4, 5)
+    repository.set_manual_capture_datetime(path, manual_date)
+    repository.set_manual_gps(path, 45.0, 4.0)
+    repository.set_editorial_location(
+        path,
+        components=(LocationComponent("city", "Lyon"),),
+        location_text="Lyon, France",
+    )
+    repository.set_caption(path, "Editorial caption")
+
+    second = FakeRemoteSource([
+        SourceAsset(
+            id="1",
+            filename="one.jpg",
+            capture_datetime=datetime(2030, 1, 1),
+            latitude=50.0,
+            longitude=6.0,
+            structured_location={"city": "Brussels", "address": "Brussels"},
+            description="Changed provider caption",
+        )
+    ])
+    SourceImporter(repository, cache).import_collection(project_source(), second)
+    loaded = repository.find_by_identity("remote-1:1")
+
+    assert loaded.capture_datetime == manual_date
+    assert loaded.date_source == DateSource.MANUAL
+    assert (loaded.latitude, loaded.longitude) == (45.0, 4.0)
+    assert loaded.gps_source == GpsSource.MANUAL
+    assert loaded.address == "Lyon, France"
+    assert loaded.location_source == LocationSource.MANUAL
+    assert loaded.caption == "Editorial caption"
+    assert loaded.imported_caption == "Changed provider caption"
+    database.close()
+
+
 def test_refresh_preserves_editorial_changes_and_marks_missing_explicitly(tmp_path):
     database = ProjectDatabase(tmp_path / "album.photoalbum")
     database.initialize()
@@ -136,6 +258,7 @@ def test_refresh_preserves_editorial_changes_and_marks_missing_explicitly(tmp_pa
     photo.location_selection_edited = True
     photo.latitude = 3
     photo.longitude = 4
+    photo.gps_source = GpsSource.MANUAL
     photo.location_source = LocationSource.MANUAL
     repository.save(photo)
 
@@ -335,3 +458,83 @@ def test_import_uses_structured_provider_location_as_effective_candidate(tmp_pat
 
     database.close()
 
+
+def test_source_import_reports_each_processed_asset(tmp_path):
+    database = ProjectDatabase(
+        tmp_path / "progress.photoalbum"
+    )
+    database.initialize()
+
+    provider = FakeRemoteSource([
+        SourceAsset(id="1", filename="one.jpg"),
+        SourceAsset(id="2", filename="two.jpg"),
+        SourceAsset(id="3", filename="three.jpg"),
+    ])
+
+    progress = []
+
+    SourceImporter(
+        PhotoRepository(database),
+        SourceAssetCache(database.path),
+    ).import_collection(
+        project_source(),
+        provider,
+        on_progress=lambda current, total: progress.append(
+            (current, total)
+        ),
+    )
+
+    assert progress == [
+        (1, 3),
+        (2, 3),
+        (3, 3),
+    ]
+
+    database.close()
+
+
+def test_source_sync_worker_uses_project_file_and_forwards_progress(tmp_path):
+    project_path = tmp_path / "worker-progress.photoalbum"
+
+    database = ProjectDatabase(project_path)
+    database.initialize()
+    database.close()
+
+    provider = FakeRemoteSource([
+        SourceAsset(id="1", filename="one.jpg"),
+        SourceAsset(id="2", filename="two.jpg"),
+    ])
+
+    worker = SourceSyncWorker(
+        project_path=project_path,
+        source=project_source(),
+        provider=provider,
+    )
+
+    progress = []
+    completed = []
+    failed = []
+
+    worker.progress.connect(
+        lambda current, total: progress.append(
+            (current, total)
+        )
+    )
+    worker.completed.connect(completed.append)
+    worker.failed.connect(failed.append)
+
+    worker.run()
+
+    assert failed == []
+    assert progress == [
+        (0, 0),
+        (1, 2),
+        (2, 2),
+    ]
+    assert len(completed) == 1
+    assert len(completed[0].photos) == 2
+
+    reopened = ProjectDatabase(project_path)
+    reopened.initialize()
+    assert len(PhotoRepository(reopened).list_all()) == 2
+    reopened.close()

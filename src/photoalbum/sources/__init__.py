@@ -2,6 +2,7 @@ from .base import (
     AuthenticationError,
     PhotoSource,
     SourceAsset,
+    SourceCapabilities,
     SourceCollection,
     SourceError,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "SourceImporter",
     "SourceImportResult",
     "SourceAsset",
+    "SourceCapabilities",
     "SourceCollection",
     "SourceError",
     "SourceProviderRegistry",
@@ -40,4 +42,3 @@ __all__ = [
     "SynologyCookie",
     "SynologyPhotosSource",
 ]
-

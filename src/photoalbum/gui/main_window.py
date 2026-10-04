@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QDialog,
@@ -263,12 +263,21 @@ class MainWindow(QMainWindow):
         self._scan_controller.running_changed.connect(self._set_scan_running)
         self._scan_controller.photos_ready.connect(self._scan_photos_ready)
         self._scan_controller.source_unavailable.connect(lambda: self._tabs.setCurrentIndex(0))
+        self._scan_controller.source_changed.connect(
+            self._source_import_completed
+        )
         self._photos_widget.source_requested.connect(self._choose_source_directory)
         self._photos_widget.synology_source_requested.connect(
             self._choose_synology_source
         )
         self._photos_widget.recursive_changed.connect(self._recursive_changed)
+        self._photos_widget.metadata_policy_changed.connect(
+            self._photo_metadata_policy_changed
+        )
         self._photos_widget.scan_requested.connect(self._scan_controller.toggle)
+        self._photos_widget.sync_requested.connect(
+            self._scan_controller.sync_source
+        )
         self._photos_widget.edit_datetime_requested.connect(self._photo_editor.edit_datetime)
         self._photos_widget.edit_gps_requested.connect(self._photo_editor.edit_gps)
         self._photos_widget.open_photo_requested.connect(self._photo_editor.open_in_os)
@@ -282,6 +291,7 @@ class MainWindow(QMainWindow):
         self._photos_places_widget = PhotoPlacesWidget(
             translator=self._translator,
             save_location=self._save_photo_editorial_location,
+            save_location_override=self._save_photo_location_override,
             save_caption=self._save_photo_caption,
             save_locations=self._save_photo_editorial_locations,
             edit_source_photo=self._go_to_source_photo,
@@ -472,10 +482,9 @@ class MainWindow(QMainWindow):
         self._load_project_photos()
         self._update_project_state()
 
-        # Opening an existing project also synchronizes it with
-        # its source directory. The scanner already reuses
-        # unchanged photos, so only new or changed files require
-        # actual analysis.
+        # The persisted snapshot is already visible. Necessary local analysis
+        # or remote metadata resolution now continues in the background;
+        # provider synchronization remains an explicit user action.
         if self._photos_widget.source_edit.text().strip():
             self._scan_controller.start()
 
@@ -549,7 +558,7 @@ class MainWindow(QMainWindow):
                     dialog.provider,
                 )
             else:
-                result = self._project_service.change_photo_source(
+                self._scan_controller.import_remote_source(
                     dialog.source,
                     dialog.provider,
                 )
@@ -568,12 +577,43 @@ class MainWindow(QMainWindow):
                 5000,
             )
             return
-        self._photos_widget.source_edit.setText(
-            f"Synology Photos — {dialog.source.collection_name}"
-        )
-        self._photos_widget.recursive_checkbox.setVisible(False)
-        self._scan_photos_ready(list(result.photos))
+
+    def _source_import_completed(self) -> None:
+        self._load_project_settings()
         self._update_project_state()
+
+    def _photo_metadata_policy_changed(
+        self,
+        date_preference: str,
+        gps_preference: str,
+        location_preference: str,
+        nominatim_enabled: bool,
+    ) -> None:
+        if not self._project_service.is_open:
+            return
+
+        from photoalbum.sources import PhotoMetadataPolicy
+
+        policy = PhotoMetadataPolicy(
+            date_preference=date_preference,
+            gps_preference=gps_preference,
+            location_preference=location_preference,
+            nominatim_enabled=nominatim_enabled,
+        )
+
+        self._project_service.set_photo_metadata_policy(policy)
+        # Pure in-memory resolution makes values and provenances visible at
+        # once; persistence and optional Nominatim work continue in a worker.
+        photos = self._project_service.preview_photo_metadata_policy(policy)
+        self._photos_widget.model.set_photos(photos)
+        self._photos_places_widget.set_photos(photos)
+        self._update_album_years(photos)
+        # Keep policy controls responsive; derived album work can follow on
+        # the next event-loop turn while persistence runs in its worker.
+        QTimer.singleShot(0, self._refresh_album_plan)
+        QTimer.singleShot(0, self._update_pdf_summary)
+        if not self._scan_controller.is_running:
+            self._scan_controller.refresh_metadata()
 
     def _recursive_changed(self, checked: bool) -> None:
         if not self._project_service.is_open:
@@ -591,11 +631,12 @@ class MainWindow(QMainWindow):
         source_directory = self._project_service.get_source_directory()
         source = self._project_service.get_photo_source()
 
+        provider_label = self._project_service.get_source_label()
         self._photos_widget.source_edit.setText(
             (
                 str(source_directory)
                 if source is None or source.kind == "local"
-                else f"Synology Photos — {source.collection_name}"
+                else f"{provider_label} — {source.collection_name}"
             ) if source is not None or source_directory is not None else ''
         )
 
@@ -605,6 +646,23 @@ class MainWindow(QMainWindow):
 
         self._photos_widget.recursive_checkbox.setChecked(
             self._project_service.get_recursive_scan()
+        )
+
+        self._photos_widget.set_metadata_sources(
+            provider_label=provider_label,
+            available=self._project_service.available_metadata_candidates(),
+            source_kind=source.kind if source is not None else None,
+        )
+        self._photos_places_widget.set_provider_context(provider_label)
+
+        metadata_policy = (
+            self._project_service.get_photo_metadata_policy()
+        )
+        self._photos_widget.set_metadata_policy(
+            date_preference=metadata_policy.date_preference,
+            gps_preference=metadata_policy.gps_preference,
+            location_preference=metadata_policy.location_preference,
+            nominatim_enabled=metadata_policy.nominatim_enabled,
         )
 
         album_settings = self._project_service.get_album_structure_settings()
@@ -621,12 +679,7 @@ class MainWindow(QMainWindow):
 
         self._close_project_action.setEnabled(not running and self._project_service.is_open)
 
-        self._photos_widget.browse_button.setEnabled(
-            (
-                not running and self._project_service.is_open
-            )
-        )
-        self._photos_widget.synology_button.setEnabled(
+        self._photos_widget.modify_source_button.setEnabled(
             not running and self._project_service.is_open
         )
 
@@ -644,6 +697,9 @@ class MainWindow(QMainWindow):
                     and bool(self._photos_widget.source_edit.text())
                 )
             )
+        )
+        self._photos_widget.sync_button.setEnabled(
+            not running and self._photos_widget.sync_button.isVisible()
         )
 
         # Photos remains the project entry point. Every other
@@ -663,8 +719,6 @@ class MainWindow(QMainWindow):
 
         for index in range(1, self._tabs.count()):
             self._tabs.setTabEnabled(index, photos_available)
-
-        self._photos_widget.progress_bar.setVisible(running)
 
         if running:
             self._photos_widget.analyze_button.setText(
@@ -902,6 +956,24 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._show_error(str(exc))
 
+    def _save_photo_location_override(
+        self,
+        photo: Photo,
+        components,
+        location_text: str | None,
+        manual_location_data: dict[str, object],
+    ) -> None:
+        try:
+            self._project_service.set_editorial_location(
+                photo.path,
+                components=components,
+                location_text=location_text,
+                manual_location_data_override=manual_location_data,
+            )
+            self._mark_editorial_album_dirty()
+        except Exception as exc:
+            self._show_error(str(exc))
+
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(self, APPLICATION_NAME, message)
 
@@ -914,6 +986,16 @@ class MainWindow(QMainWindow):
 
         self._photos_widget.model.set_photos(photos)
         self._photos_places_widget.set_photos(photos)
+        if self._project_service.is_open:
+            self._photos_widget.set_metadata_sources(
+                provider_label=self._project_service.get_source_label(),
+                available=self._project_service.available_metadata_candidates(),
+                source_kind=(
+                    self._project_service.get_photo_source().kind
+                    if self._project_service.get_photo_source() is not None
+                    else None
+                ),
+            )
         self._update_album_years(photos)
 
         total = len(photos)
@@ -940,6 +1022,12 @@ class MainWindow(QMainWindow):
     def _scan_photos_ready(self, photos: list[Photo]) -> None:
         self._photos_widget.model.set_photos(photos)
         self._photos_places_widget.set_photos(photos)
+        source = self._project_service.get_photo_source()
+        self._photos_widget.set_metadata_sources(
+            provider_label=self._project_service.get_source_label(),
+            available=self._project_service.available_metadata_candidates(),
+            source_kind=source.kind if source is not None else None,
+        )
         self._update_album_years(photos)
         self._refresh_album_plan()
         self._update_pdf_summary()
