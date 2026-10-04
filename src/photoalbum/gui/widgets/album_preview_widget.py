@@ -332,9 +332,7 @@ class AlbumCoverPreview(_PreviewPageBase):
 
         for item in self._result.plan.items:
             for photo in item.photos:
-                key = str(
-                    photo.path
-                )
+                key = photo.identity
 
                 if key in seen:
                     continue
@@ -865,9 +863,7 @@ class AlbumPreviewWidget(QWidget):
 
         for plan_item in result.plan.items:
             for photo in plan_item.photos:
-                key = str(
-                    photo.path
-                )
+                key = photo.identity
 
                 if key in seen_photo_paths:
                     continue

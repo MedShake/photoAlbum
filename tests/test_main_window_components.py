@@ -511,3 +511,54 @@ def test_window_refuses_close_during_export(window):
         assert not event.isAccepted()
     finally:
         window._pdf_widget._pdf_thread = None
+
+
+def test_photo_sources_widget_displays_scan_phase_progress(app):
+    view = PhotoSourcesWidget(Translator("en"))
+
+    view.prepare_scan_progress(nominatim_enabled=True)
+
+    assert view.metadata_progress_label.isVisible() is False
+    assert view.nominatim_progress_label.isVisible() is False
+
+    # Visibility of a child follows the top-level widget, so show it
+    # before asserting the actual presentation state.
+    view.show()
+    app.processEvents()
+
+    assert view.metadata_progress_label.isVisible()
+    assert view.metadata_progress_bar.isVisible()
+    assert view.nominatim_progress_label.isVisible()
+    assert view.nominatim_progress_bar.isVisible()
+
+    view.update_scan_phase_progress(
+        "metadata",
+        12,
+        20,
+    )
+    view.update_scan_phase_progress(
+        "nominatim",
+        3,
+        7,
+    )
+
+    assert view.metadata_progress_bar.maximum() == 20
+    assert view.metadata_progress_bar.value() == 12
+    assert view.metadata_progress_bar.format() == "12 / 20"
+
+    assert view.nominatim_progress_bar.maximum() == 7
+    assert view.nominatim_progress_bar.value() == 3
+    assert view.nominatim_progress_bar.format() == "3 / 7"
+
+
+def test_photo_sources_widget_hides_nominatim_when_disabled(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    view.show()
+    app.processEvents()
+
+    view.prepare_scan_progress(nominatim_enabled=False)
+
+    assert view.metadata_progress_label.isVisible()
+    assert view.metadata_progress_bar.isVisible()
+    assert not view.nominatim_progress_label.isVisible()
+    assert not view.nominatim_progress_bar.isVisible()

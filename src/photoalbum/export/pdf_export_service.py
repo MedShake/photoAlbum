@@ -196,7 +196,7 @@ class PdfExportService:
 
         for plan_item in result.plan.items:
             for photo in plan_item.photos:
-                key = str(photo.path)
+                key = photo.identity
 
                 if key in seen_photo_paths:
                     continue
@@ -205,7 +205,7 @@ class PdfExportService:
                 project_photos.append(photo)
 
         project_photos.sort(
-            key=lambda photo: str(photo.path)
+            key=lambda photo: photo.identity
         )
 
         painter = QPainter()

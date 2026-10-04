@@ -57,7 +57,7 @@ def eligible_photos(
         if not (isfinite(longitude) and isfinite(latitude)
                 and -180 <= longitude <= 180 and -90 <= latitude <= 90):
             continue
-        result.setdefault(str(photo.path), photo)
+        result.setdefault(photo.identity, photo)
 
     return [result[key] for key in sorted(result)]
 

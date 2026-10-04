@@ -102,10 +102,94 @@ def test_photo_with_gps_is_enriched():
 
     result = processor.process(photo.path)
 
+    assert result.place_name is None
+    assert result.city is None
+    assert result.address is None
+    assert result.location_source == LocationSource.UNKNOWN
+    assert resolver.calls == 0
+
+    assert processor.enrich_location(result) is True
     assert result.place_name == "Example Place"
     assert result.city == "Nantes"
     assert result.address == "Example Place, Nantes, France"
     assert result.location_source == LocationSource.GEOCODING
+
+
+def test_geocoding_stores_independent_candidate():
+    photo = Photo(
+        path=Path("/photos/example.jpg"),
+        filename="example.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+    )
+
+    raw_data = {
+        "address": {
+            "city": "Nantes",
+            "country": "France",
+        }
+    }
+
+    resolver = FakeLocationResolver(
+        Location(
+            latitude=47.2184,
+            longitude=-1.5536,
+            place_name="Example Place",
+            city="Nantes",
+            address="Example Place, Nantes, France",
+            raw_data=raw_data,
+        )
+    )
+
+    processor = PhotoProcessor(
+        photo_analyzer=FakeAnalyzer(photo),
+        location_resolver=resolver,
+    )
+
+    result = processor.process(photo.path)
+    assert processor.enrich_location(result) is True
+
+    assert result.geocoded_location_data == {
+        "provider": "nominatim",
+        "latitude": 47.2184,
+        "longitude": -1.5536,
+        "place_name": "Example Place",
+        "city": "Nantes",
+        "address": "Example Place, Nantes, France",
+        "raw": raw_data,
+    }
+
+
+def test_geocoding_candidate_does_not_replace_manual_location():
+    photo = Photo(
+        path=Path("/photos/example.jpg"),
+        filename="example.jpg",
+        latitude=47.2184,
+        longitude=-1.5536,
+        city="Manual City",
+        location_source=LocationSource.MANUAL,
+    )
+
+    resolver = FakeLocationResolver(
+        Location(
+            latitude=47.2184,
+            longitude=-1.5536,
+            city="Automatic City",
+        )
+    )
+
+    processor = PhotoProcessor(
+        photo_analyzer=FakeAnalyzer(photo),
+        location_resolver=resolver,
+    )
+
+    result = processor.process(photo.path)
+    assert processor.enrich_location(result) is True
+
+    assert result.city == "Manual City"
+    assert result.location_source == LocationSource.MANUAL
+    assert result.geocoded_location_data is not None
+    assert result.geocoded_location_data["city"] == "Automatic City"
 
 
 def test_missing_date_emits_anomaly_event():
@@ -251,15 +335,29 @@ def test_geocoding_error_does_not_fail_photo_processing():
 
     assert result is photo
     assert result.location_source == LocationSource.UNKNOWN
+    assert (
+        ProcessingEventType.GEOCODING_ERROR
+        not in [event.type for event in events]
+    )
+    assert (
+        events[-1].type
+        == ProcessingEventType.ANALYSIS_COMPLETED
+    )
 
+    changed = processor.enrich_location(
+        result,
+        on_event=events.append,
+    )
+
+    assert changed is False
+    assert result.location_source == LocationSource.UNKNOWN
     assert (
         ProcessingEventType.GEOCODING_ERROR
         in [event.type for event in events]
     )
-
     assert (
         events[-1].type
-        == ProcessingEventType.ANALYSIS_COMPLETED
+        == ProcessingEventType.GEOCODING_ERROR
     )
 
 def test_geocoding_preserves_raw_location_data():
@@ -298,6 +396,7 @@ def test_geocoding_preserves_raw_location_data():
     )
 
     result = processor.process(photo.path)
+    assert processor.enrich_location(result) is True
 
     assert result.raw_location_data == raw_data
 
@@ -325,8 +424,12 @@ def test_location_from_reverse_emits_reverse_event():
         location_resolver=resolver,
     )
 
-    processor.process(
+    result = processor.process(
         photo.path,
+        on_event=events.append,
+    )
+    processor.enrich_location(
+        result,
         on_event=events.append,
     )
 
@@ -381,8 +484,12 @@ def test_location_from_cache_emits_cache_event():
         location_resolver=resolver,
     )
 
-    processor.process(
+    result = processor.process(
         photo.path,
+        on_event=events.append,
+    )
+    processor.enrich_location(
+        result,
         on_event=events.append,
     )
 

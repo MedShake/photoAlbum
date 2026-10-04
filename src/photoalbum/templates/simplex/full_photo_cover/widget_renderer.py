@@ -25,6 +25,7 @@ from .title import (
 
 
 PHOTO_PATH_KEY = "photo_path"
+PHOTO_ASSET_KEY = "photo_asset_key"
 SOURCE_TYPE_KEY = "source_type"
 EXTERNAL_PATH_KEY = "external_path"
 
@@ -39,13 +40,15 @@ def selected_photo(instance, photos):
     An explicit persisted path wins. For a fresh instance with no
     selection yet, the first project photo provides a useful default.
     """
-    selected = instance.settings.get(PHOTO_PATH_KEY)
+    selected_asset = instance.settings.get(PHOTO_ASSET_KEY)
+    selected = selected_asset or instance.settings.get(PHOTO_PATH_KEY)
 
     if selected:
         selected = str(selected)
 
         for photo in photos:
-            if str(photo.path) == selected:
+            identity = getattr(photo, "identity", None)
+            if identity == selected or str(photo.path) == selected:
                 return photo
 
         # Do not silently change an explicit selection if the file
@@ -87,6 +90,8 @@ def selected_image_path(instance, photos):
     if photo is None:
         return None
 
+    if hasattr(photo, "require_path"):
+        return photo.require_path()
     return Path(photo.path)
 
 

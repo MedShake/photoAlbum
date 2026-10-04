@@ -284,16 +284,14 @@ class YearPhotoScatterWidgetRenderer:
                     continue
 
                 unique.setdefault(
-                    str(photo.path),
+                    photo.identity,
                     photo,
                 )
 
             effective_photos = tuple(
                 sorted(
                     unique.values(),
-                    key=lambda photo: str(
-                        photo.path
-                    ),
+                    key=lambda photo: photo.identity,
                 )
             )
 

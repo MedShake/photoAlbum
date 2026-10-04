@@ -56,12 +56,6 @@ class PhotoProcessor:
                 path,
                 "GPS coordinates found.",
             )
-
-            self.enrich_location(
-                photo,
-                language=language,
-                on_event=on_event,
-            )
         else:
             self._emit(
                 on_event,
@@ -90,9 +84,6 @@ class PhotoProcessor:
             return False
 
         if self._location_resolver is None:
-            return False
-
-        if photo.location_source == LocationSource.MANUAL:
             return False
 
         self._emit(
@@ -161,6 +152,24 @@ class PhotoProcessor:
         photo: Photo,
         location: Location,
     ) -> None:
+        # Keep the Nominatim result as an independent candidate tied to
+        # the GPS position for which it was resolved.
+        photo.geocoded_location_data = {
+            "provider": "nominatim",
+            "latitude": photo.latitude,
+            "longitude": photo.longitude,
+            "place_name": location.place_name,
+            "city": location.city,
+            "address": location.address,
+            "raw": location.raw_data,
+        }
+
+        # Until project policy is wired into the scanner, retain the
+        # historical effective-location behaviour for automatic values.
+        # A manual location remains authoritative.
+        if photo.location_source == LocationSource.MANUAL:
+            return
+
         photo.place_name = location.place_name
         photo.city = location.city
         photo.address = location.address

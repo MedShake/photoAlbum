@@ -19,6 +19,7 @@ class PhotoSourcesWidget(QWidget):
     """Source controls and sortable photo browser, including hover previews."""
 
     source_requested = Signal()
+    synology_source_requested = Signal()
     recursive_changed = Signal(bool)
     scan_requested = Signal()
     edit_datetime_requested = Signal(object)
@@ -55,14 +56,19 @@ class PhotoSourcesWidget(QWidget):
         self.source_edit.setReadOnly(True)
 
         self.browse_button = QPushButton(self._translator.tr('main.choose_source'))
+        self.synology_button = QPushButton(
+            self._translator.tr("source.synology.choose")
+        )
 
         self.browse_button.clicked.connect(self.source_requested.emit)
+        self.synology_button.clicked.connect(self.synology_source_requested.emit)
 
         source_layout.addWidget(QLabel(self._translator.tr('main.source_folder')))
 
         source_layout.addWidget(self.source_edit, 1)
 
         source_layout.addWidget(self.browse_button)
+        source_layout.addWidget(self.synology_button)
 
         sources_layout.addLayout(source_layout)
 
@@ -80,14 +86,56 @@ class PhotoSourcesWidget(QWidget):
 
         self.analyze_button.clicked.connect(self.scan_requested.emit)
 
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-
         action_layout.addWidget(self.analyze_button)
-
-        action_layout.addWidget(self.progress_bar, 1)
+        action_layout.addStretch(1)
 
         sources_layout.addLayout(action_layout)
+
+        # Scan phase progress.
+        self.metadata_progress_label = QLabel(
+            self._translator.tr("photos.progress.metadata")
+        )
+        self.metadata_progress_bar = QProgressBar()
+        self.metadata_progress_bar.setVisible(False)
+
+        # Backward-compatible name used by existing controller/tests.
+        self.progress_bar = self.metadata_progress_bar
+
+        self.metadata_progress_layout = QHBoxLayout()
+        self.metadata_progress_layout.addWidget(
+            self.metadata_progress_label
+        )
+        self.metadata_progress_layout.addWidget(
+            self.metadata_progress_bar,
+            1,
+        )
+
+        self.metadata_progress_label.setVisible(False)
+
+        sources_layout.addLayout(
+            self.metadata_progress_layout
+        )
+
+        self.nominatim_progress_label = QLabel(
+            self._translator.tr("photos.progress.nominatim")
+        )
+        self.nominatim_progress_bar = QProgressBar()
+
+        self.nominatim_progress_label.setVisible(False)
+        self.nominatim_progress_bar.setVisible(False)
+
+        self.nominatim_progress_layout = QHBoxLayout()
+        self.nominatim_progress_layout.addWidget(
+            self.nominatim_progress_label
+        )
+        self.nominatim_progress_layout.addWidget(
+            self.nominatim_progress_bar,
+            1,
+        )
+
+        sources_layout.addLayout(
+            self.nominatim_progress_layout
+        )
 
         # Analysis summary.
         self.summary_label = QLabel(self._translator.tr('main.no_analysis'))
@@ -179,6 +227,75 @@ class PhotoSourcesWidget(QWidget):
 
         sources_layout.addWidget(QLabel(self._translator.tr('main.photos')))
         sources_layout.addWidget(splitter, 1)
+
+    def prepare_scan_progress(
+        self,
+        *,
+        nominatim_enabled: bool,
+    ) -> None:
+        """Reset and expose progress rows for a new scan."""
+        self.metadata_progress_label.setVisible(True)
+        self.metadata_progress_bar.setVisible(True)
+        self.metadata_progress_bar.setRange(0, 0)
+        self.metadata_progress_bar.setValue(0)
+        self.metadata_progress_bar.setFormat(
+            self._translator.tr("photos.progress.waiting")
+        )
+
+        self.nominatim_progress_label.setVisible(
+            nominatim_enabled
+        )
+        self.nominatim_progress_bar.setVisible(
+            nominatim_enabled
+        )
+
+        if nominatim_enabled:
+            self.nominatim_progress_bar.setRange(0, 0)
+            self.nominatim_progress_bar.setValue(0)
+            self.nominatim_progress_bar.setFormat(
+                self._translator.tr("photos.progress.waiting")
+            )
+
+    def update_scan_phase_progress(
+        self,
+        phase: str,
+        current: int,
+        total: int,
+    ) -> None:
+        """Update one scan phase without coupling the widget to scanner types."""
+        if phase == "metadata":
+            progress_bar = self.metadata_progress_bar
+        elif phase == "nominatim":
+            progress_bar = self.nominatim_progress_bar
+        else:
+            return
+
+        current = max(current, 0)
+        total = max(total, 0)
+
+        if total <= 0:
+            progress_bar.setRange(0, 1)
+            progress_bar.setValue(0)
+            progress_bar.setFormat(
+                self._translator.tr(
+                    "photos.progress.value",
+                    current=0,
+                    total=0,
+                )
+            )
+            return
+
+        current = min(current, total)
+
+        progress_bar.setRange(0, total)
+        progress_bar.setValue(current)
+        progress_bar.setFormat(
+            self._translator.tr(
+                "photos.progress.value",
+                current=current,
+                total=total,
+            )
+        )
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

@@ -48,6 +48,7 @@ from photoalbum.template_engine import (
 from photoalbum.i18n import Translator
 from photoalbum.gui.scan_controller import ScanController
 from photoalbum.gui.photo_editor import PhotoEditor
+from photoalbum.gui.synology_source_dialog import SynologySourceDialog
 from photoalbum.gui.widgets.pdf_export_widget import PdfExportWidget
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
 from photoalbum.models import Photo
@@ -263,6 +264,9 @@ class MainWindow(QMainWindow):
         self._scan_controller.photos_ready.connect(self._scan_photos_ready)
         self._scan_controller.source_unavailable.connect(lambda: self._tabs.setCurrentIndex(0))
         self._photos_widget.source_requested.connect(self._choose_source_directory)
+        self._photos_widget.synology_source_requested.connect(
+            self._choose_synology_source
+        )
         self._photos_widget.recursive_changed.connect(self._recursive_changed)
         self._photos_widget.scan_requested.connect(self._scan_controller.toggle)
         self._photos_widget.edit_datetime_requested.connect(self._photo_editor.edit_datetime)
@@ -414,6 +418,7 @@ class MainWindow(QMainWindow):
         self._scan_controller.reset()
 
         self._photos_widget.source_edit.clear()
+        self._photos_widget.recursive_checkbox.setVisible(True)
 
         previous = self._photos_widget.recursive_checkbox.blockSignals(True)
 
@@ -486,6 +491,7 @@ class MainWindow(QMainWindow):
         self._album_preview_widget.clear()
 
         self._photos_widget.source_edit.clear()
+        self._photos_widget.recursive_checkbox.setVisible(True)
         self._photos_widget.recursive_checkbox.setChecked(False)
         self._photos_widget.summary_label.setText(self._translator.tr('main.no_analysis'))
         self._photos_widget.log_view.clear()
@@ -521,6 +527,54 @@ class MainWindow(QMainWindow):
         # analysis therefore starts immediately.
         self._scan_controller.start()
 
+    def _choose_synology_source(self) -> None:
+        if not self._project_service.is_open:
+            return
+        current_source = self._project_service.get_photo_source()
+        reconnecting = (
+            current_source is not None
+            and current_source.kind == "synology-photos"
+        )
+        dialog = SynologySourceDialog(
+            self._translator,
+            self,
+            existing_source=current_source if reconnecting else None,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            if reconnecting:
+                self._project_service.attach_source_session(
+                    current_source.id,
+                    dialog.provider,
+                )
+            else:
+                result = self._project_service.change_photo_source(
+                    dialog.source,
+                    dialog.provider,
+                )
+        except Exception as exc:
+            if dialog.provider is not None:
+                try:
+                    dialog.provider.close()
+                except Exception:
+                    pass
+                dialog.provider = None
+            self._show_error(str(exc))
+            return
+        if reconnecting:
+            self.statusBar().showMessage(
+                self._translator.tr("source.synology.session_attached"),
+                5000,
+            )
+            return
+        self._photos_widget.source_edit.setText(
+            f"Synology Photos — {dialog.source.collection_name}"
+        )
+        self._photos_widget.recursive_checkbox.setVisible(False)
+        self._scan_photos_ready(list(result.photos))
+        self._update_project_state()
+
     def _recursive_changed(self, checked: bool) -> None:
         if not self._project_service.is_open:
             return
@@ -535,9 +589,18 @@ class MainWindow(QMainWindow):
 
     def _load_project_settings(self) -> None:
         source_directory = self._project_service.get_source_directory()
+        source = self._project_service.get_photo_source()
 
         self._photos_widget.source_edit.setText(
-            str(source_directory) if source_directory is not None else ''
+            (
+                str(source_directory)
+                if source is None or source.kind == "local"
+                else f"Synology Photos — {source.collection_name}"
+            ) if source is not None or source_directory is not None else ''
+        )
+
+        self._photos_widget.recursive_checkbox.setVisible(
+            source is None or source.kind == "local"
         )
 
         self._photos_widget.recursive_checkbox.setChecked(
@@ -562,6 +625,9 @@ class MainWindow(QMainWindow):
             (
                 not running and self._project_service.is_open
             )
+        )
+        self._photos_widget.synology_button.setEnabled(
+            not running and self._project_service.is_open
         )
 
         self._photos_widget.recursive_checkbox.setEnabled(
@@ -669,7 +735,7 @@ class MainWindow(QMainWindow):
 
         for item in result.plan.items:
             for photo in item.photos:
-                key = str(photo.path)
+                key = photo.identity
 
                 if key in seen_paths:
                     continue

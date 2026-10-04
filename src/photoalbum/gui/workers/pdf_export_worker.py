@@ -38,6 +38,7 @@ class PdfExportWorker(QObject):
         dpi: int,
         metadata,
         content,
+        prepare_assets=None,
     ) -> None:
         super().__init__()
 
@@ -56,10 +57,13 @@ class PdfExportWorker(QObject):
             "metadata": metadata,
             "content": content,
         }
+        self._prepare_assets = prepare_assets
 
     @Slot()
     def run(self) -> None:
         try:
+            if self._prepare_assets is not None:
+                self._prepare_assets(self._arguments["photos"])
             self._service.export(
                 output_path=self._output_path,
                 progress_callback=self._progress,

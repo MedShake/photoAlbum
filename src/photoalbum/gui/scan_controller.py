@@ -77,6 +77,11 @@ class ScanController(QObject):
             self.error.emit(self._translator.tr('main.no_project_error'))
             return
 
+        source = self._project_service.get_photo_source()
+        if source is not None and source.kind != "local":
+            self._sync_remote_source(source.name)
+            return
+
         source_directory = self._project_service.get_source_directory()
         if source_directory is None:
             self.error.emit(self._translator.tr('main.choose_source_error'))
@@ -124,6 +129,14 @@ class ScanController(QObject):
 
         self.running_changed.emit(True)
 
+        metadata_policy = (
+            self._project_service.get_photo_metadata_policy()
+        )
+
+        self._view.prepare_scan_progress(
+            nominatim_enabled=metadata_policy.nominatim_enabled,
+        )
+
         thread = QThread(self)
 
         worker = ScanWorker(
@@ -131,7 +144,7 @@ class ScanController(QObject):
             source_directory=source_directory,
             recursive=self._project_service.get_recursive_scan(),
             language=self._language,
-            geocode=True,
+            metadata_policy=metadata_policy,
             user_agent=user_agent(),
         )
 
@@ -142,6 +155,9 @@ class ScanController(QObject):
         worker.event_received.connect(self._handle_processing_event)
         worker.discovered.connect(self._scan_discovered)
         worker.progress.connect(self._scan_progress)
+        worker.phase_progress.connect(
+            self._scan_phase_progress
+        )
         worker.completed.connect(self._scan_completed)
         worker.failed.connect(self._scan_failed)
 
@@ -156,10 +172,50 @@ class ScanController(QObject):
 
         thread.start()
 
+    def _sync_remote_source(self, source_name: str) -> None:
+        """Explicitly refresh the provider snapshot.
+
+        Network access is confined to the source service; this controller only
+        updates the same view contract as a local scan.
+        """
+        self.running_changed.emit(True)
+        self._view.summary_label.setText(self._translator.tr("main.analysis_running"))
+        try:
+            result = self._project_service.sync_photo_source()
+        except Exception as exc:
+            self.analysis_completed = False
+            self._view.summary_label.setText(self._translator.tr("main.analysis_failed"))
+            self.error.emit(str(exc))
+        else:
+            self.analysis_completed = True
+            photos = list(result.photos)
+            self.photos_ready.emit(photos)
+            self._view.summary_label.setText(
+                self._translator.tr("source.sync.completed", count=len(photos))
+            )
+            self._view.log_view.appendPlainText(
+                self._translator.tr(
+                    "source.sync.log", source=source_name, count=len(photos),
+                    added=result.added, updated=result.updated, missing=result.missing,
+                )
+            )
+        finally:
+            self.running_changed.emit(False)
+
     def _scan_discovered(self, total: int) -> None:
         """Initialize scan progress after file discovery."""
         self._scan_total_files = max(total, 0)
         self._update_scan_progress(0)
+
+    def _scan_phase_progress(self, progress) -> None:
+        """Display progress for one logical scan phase."""
+        phase = getattr(progress.phase, "value", progress.phase)
+
+        self._view.update_scan_phase_progress(
+            str(phase),
+            progress.current,
+            progress.total,
+        )
 
     def _scan_progress(self, current: int, total: int) -> None:
         """Update scan progress from the scanner."""

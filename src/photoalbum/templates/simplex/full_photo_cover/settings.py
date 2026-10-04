@@ -41,6 +41,7 @@ from .title import (
 from .widget_renderer import (
     EXTERNAL_PATH_KEY,
     PHOTO_PATH_KEY,
+    PHOTO_ASSET_KEY,
     SOURCE_EXTERNAL,
     SOURCE_PROJECT,
     SOURCE_TYPE_KEY,
@@ -595,6 +596,9 @@ class SimplexFullPhotoCoverSettingsWidget(
         )
 
     def _load_photos(self) -> None:
+        selected_asset = str(
+            self._instance.settings.get(PHOTO_ASSET_KEY, "")
+        )
         selected_path = str(
             self._instance.settings.get(
                 PHOTO_PATH_KEY,
@@ -609,6 +613,7 @@ class SimplexFullPhotoCoverSettingsWidget(
 
         for index, photo in enumerate(self._photos):
             path = str(photo.path)
+            identity = photo.identity
 
             label = Path(path).name
 
@@ -626,10 +631,10 @@ class SimplexFullPhotoCoverSettingsWidget(
 
             self._photo_combo.addItem(
                 label,
-                path,
+                identity,
             )
 
-            if path == selected_path:
+            if identity == selected_asset or path == selected_path:
                 selected_index = index
 
         if selected_index >= 0:
@@ -645,8 +650,9 @@ class SimplexFullPhotoCoverSettingsWidget(
                 self._instance.settings
             )
             settings[PHOTO_PATH_KEY] = (
-                self._photo_combo.currentData()
+                str(self._photos[self._photo_combo.currentIndex()].path)
             )
+            settings[PHOTO_ASSET_KEY] = self._photo_combo.currentData()
             self._instance = (
                 self._instance.with_settings(
                     settings
@@ -805,8 +811,9 @@ class SimplexFullPhotoCoverSettingsWidget(
         )
 
         settings[PHOTO_PATH_KEY] = (
-            self._photo_combo.itemData(index)
+            str(self._photos[index].path)
         )
+        settings[PHOTO_ASSET_KEY] = self._photo_combo.itemData(index)
 
         self._instance = (
             self._instance.with_settings(

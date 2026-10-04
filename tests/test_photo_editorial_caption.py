@@ -1,5 +1,8 @@
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
+
+from PySide6.QtWidgets import QApplication
 
 from photoalbum.templates.msb.photo_page.composition import build_photo_caption
 from photoalbum.album.settings import (
@@ -10,6 +13,7 @@ from photoalbum.database import (
     ProjectDatabase,
 )
 from photoalbum.models import Photo
+from photoalbum.gui.widgets.photo_places_widget import PhotoPlacesWidget
 
 
 def test_repository_persists_editorial_caption(
@@ -125,3 +129,32 @@ def test_caption_without_datetime_still_uses_first_line():
 
     assert content.line_count == 2
 
+
+def test_imported_caption_is_a_searchable_editor_suggestion():
+    app = QApplication.instance() or QApplication([])
+    widget = PhotoPlacesWidget()
+    photo = Photo(
+        path=Path("remote.jpg"),
+        filename="remote.jpg",
+        capture_datetime=datetime(2025, 7, 14),
+        imported_caption="Provider description",
+    )
+    widget._caption_result = lambda _photo: SimpleNamespace(
+        candidates=(), selected=(), caption=None,
+    )
+    widget.set_photos([photo])
+    year = widget._tree.topLevelItem(0)
+    year.setExpanded(True)
+    month = year.child(0)
+    month.setExpanded(True)
+    for _ in range(5):
+        app.processEvents()
+
+    editor = widget._caption_editors[str(photo.path)]
+    assert editor.text() == ""
+    assert editor.placeholderText() == "Provider description"
+    assert photo.caption is None
+
+    widget._filter_text = "provider"
+    assert widget._matches_filter(photo) is True
+    widget.close()

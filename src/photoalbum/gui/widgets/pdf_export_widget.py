@@ -412,6 +412,7 @@ class PdfExportWidget(QWidget):
             dpi=dpi,
             metadata=metadata,
             content=export_content,
+            prepare_assets=self._project_service.materialize_originals,
         )
 
         worker.moveToThread(thread)

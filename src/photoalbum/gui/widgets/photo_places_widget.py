@@ -849,6 +849,7 @@ class PhotoPlacesWidget(QWidget):
             photo.filename,
             self._effective_location(photo),
             photo.caption or "",
+            photo.imported_caption or "",
         )
 
         return any(
@@ -2010,7 +2011,7 @@ class PhotoPlacesWidget(QWidget):
             return "—"
 
         result = self._caption_result(photo)
-        return result.caption or "—"
+        return result.caption or photo.imported_location_text or "—"
 
     def _component_is_visible(
         self,
@@ -2252,6 +2253,7 @@ class PhotoPlacesWidget(QWidget):
                 self._components_text(
                     self._effective_components(photo)
                 )
+                or photo.imported_location_text
                 or ""
             )
 
@@ -2407,6 +2409,10 @@ class PhotoPlacesWidget(QWidget):
         editor = QLineEdit(
             photo.caption or ""
         )
+        if photo.imported_caption:
+            editor.setPlaceholderText(
+                photo.imported_caption.strip()
+            )
         editor.setClearButtonEnabled(True)
         editor.setFixedHeight(22)
 

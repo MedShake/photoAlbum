@@ -8,12 +8,21 @@ from .location_component import LocationComponent
 
 class DateSource(str, Enum):
     EXIF = "exif"
+    SOURCE = "source"
     FILENAME = "filename"
     MANUAL = "manual"
     UNKNOWN = "unknown"
 
 
+class GpsSource(str, Enum):
+    EXIF = "exif"
+    SOURCE = "source"
+    MANUAL = "manual"
+    UNKNOWN = "unknown"
+
+
 class LocationSource(str, Enum):
+    SOURCE = "source"
     GEOCODING = "geocoding"
     MANUAL = "manual"
     UNKNOWN = "unknown"
@@ -21,8 +30,17 @@ class LocationSource(str, Enum):
 
 @dataclass
 class Photo:
-    path: Path
+    # ``path`` is the currently materialized representation of the asset.  It
+    # is permanent for local sources and may be absent (or point at a cache
+    # entry) for remote sources.  It is deliberately no longer the identity.
+    path: Path | None
     filename: str
+
+    source_id: str = "local"
+    asset_id: str | None = None
+    imported_location_text: str | None = None
+    imported_caption: str | None = None
+    source_metadata: dict[str, object] | None = None
 
     file_size: int | None = None
     modified_time_ns: int | None = None
@@ -37,6 +55,7 @@ class Photo:
     date_source: DateSource = DateSource.UNKNOWN
     latitude: float | None = None
     longitude: float | None = None
+    gps_source: GpsSource = GpsSource.UNKNOWN
 
     # Metadata originally detected from the source file.
     # These values are preserved when the user applies
@@ -46,6 +65,19 @@ class Photo:
     original_date_source: DateSource = DateSource.UNKNOWN
     original_latitude: float | None = None
     original_longitude: float | None = None
+
+    # Independent metadata candidates. They are deliberately separate from
+    # the effective values above so changing the project policy never destroys
+    # information supplied by another source.
+    exif_capture_datetime: datetime | None = None
+    source_capture_datetime: datetime | None = None
+    exif_latitude: float | None = None
+    exif_longitude: float | None = None
+    source_latitude: float | None = None
+    source_longitude: float | None = None
+
+    source_location_data: dict[str, object] | None = None
+    geocoded_location_data: dict[str, object] | None = None
 
     place_name: str | None = None
     city: str | None = None
@@ -61,6 +93,23 @@ class Photo:
 
     # Free editorial caption, independent from the geographic location.
     caption: str | None = None
+
+    @property
+    def identity(self) -> str:
+        """Stable project identity, independent from local materialization."""
+        if self.asset_id is not None:
+            return f"{self.source_id}:{self.asset_id}"
+        if self.path is None:
+            raise ValueError("A photo needs either an asset id or a local path.")
+        return f"local:{self.path}"
+
+    def require_path(self) -> Path:
+        """Return a renderer-ready path or fail with an actionable error."""
+        if self.path is None:
+            raise FileNotFoundError(
+                f"Photo asset is not materialized: {self.identity}"
+            )
+        return self.path
 
     @property
     def has_capture_datetime(self) -> bool:

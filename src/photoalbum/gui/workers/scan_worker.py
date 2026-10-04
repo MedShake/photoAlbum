@@ -6,6 +6,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 
 from photoalbum.app import ProjectScanService
 from photoalbum.scanner import ProcessingEvent
+from photoalbum.sources import PhotoMetadataPolicy
 
 
 class ScanWorker(QObject):
@@ -14,6 +15,7 @@ class ScanWorker(QObject):
     event_received = Signal(object)
     discovered = Signal(int)
     progress = Signal(int, int)
+    phase_progress = Signal(object)
     completed = Signal(object)
     failed = Signal(str)
 
@@ -24,7 +26,7 @@ class ScanWorker(QObject):
         source_directory: Path,
         recursive: bool,
         language: str | None = None,
-        geocode: bool = False,
+        metadata_policy: PhotoMetadataPolicy | None = None,
         user_agent: str | None = None,
     ) -> None:
         super().__init__()
@@ -33,7 +35,7 @@ class ScanWorker(QObject):
         self._source_directory = source_directory
         self._recursive = recursive
         self._language = language
-        self._geocode = geocode
+        self._metadata_policy = metadata_policy
         self._user_agent = user_agent
         self._cancel_requested = False
 
@@ -47,11 +49,12 @@ class ScanWorker(QObject):
                 source_directory=self._source_directory,
                 recursive=self._recursive,
                 language=self._language,
-                geocode=self._geocode,
+                metadata_policy=self._metadata_policy,
                 user_agent=self._user_agent,
                 on_event=self._handle_event,
                 on_discovered=self._handle_discovered,
                 on_progress=self._handle_progress,
+                on_phase_progress=self._handle_phase_progress,
                 should_cancel=self._should_cancel,
             )
 
@@ -79,6 +82,9 @@ class ScanWorker(QObject):
         total: int,
     ) -> None:
         self.progress.emit(current, total)
+
+    def _handle_phase_progress(self, progress) -> None:
+        self.phase_progress.emit(progress)
 
     def request_cancel(self) -> None:
         """Request a cooperative scan cancellation."""

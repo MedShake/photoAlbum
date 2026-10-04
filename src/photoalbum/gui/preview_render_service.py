@@ -174,16 +174,14 @@ class PreviewRenderService(QObject):
 
         for photo in photos:
             unique.setdefault(
-                str(photo.path),
+                photo.identity,
                 photo,
             )
 
         return tuple(
             sorted(
                 unique.values(),
-                key=lambda photo: str(
-                    photo.path
-                ),
+                key=lambda photo: photo.identity,
             )
         )
 
@@ -205,16 +203,12 @@ class PreviewRenderService(QObject):
 
         normalized = sorted(
             photos,
-            key=lambda photo: str(
-                photo.path
-            ),
+            key=lambda photo: photo.identity,
         )
 
         for photo in normalized:
             digest.update(
-                str(
-                    photo.path
-                ).encode(
+                photo.identity.encode(
                     "utf-8",
                     errors="replace",
                 )

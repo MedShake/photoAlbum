@@ -4,10 +4,52 @@ from __future__ import annotations
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
         "tab.photos": "Photos",
+        "source.synology.choose": "Synology Photos…",
+        "source.synology.title": "Synology Photos source",
+        "source.synology.url": "NAS address:",
+        "source.synology.verify_tls": "Verify the TLS certificate",
+        "source.synology.username": "Username",
+        "source.synology.password": "Password",
+        "source.synology.otp": "2FA code (optional)",
+        "source.synology.credentials_memory": (
+            "Credentials are used only for this connection and are never saved."
+        ),
+        "source.synology.connect": "Connect with Synology",
+        "source.synology.reconnect": "Reconnect with Synology",
+        "source.synology.browser_memory": (
+            "Authentication is handled by Synology. Browser cookies and "
+            "session tokens remain in memory and are not saved in the project."
+        ),
+        "source.synology.browser_title": "Sign in to Synology Photos",
+        "source.synology.browser_instructions": (
+            "Sign in normally, open Synology Photos, then open Albums. "
+            "When the session is detected, use the button below."
+        ),
+        "source.synology.browser_waiting": (
+            "Waiting for an authenticated Synology Photos request…"
+        ),
+        "source.synology.browser_ready": "Synology Photos session detected.",
+        "source.synology.browser_use_session": "Use this session",
+        "source.synology.browser_cancelled": "Authentication cancelled.",
+        "source.synology.connection_error": "Connection failed: {error}",
+        "source.synology.connected": "Connected — {count} albums available.",
+        "source.synology.reconnected": "Connected to the project source.",
+        "source.synology.session_attached": (
+            "Synology Photos reconnected without changing the project snapshot."
+        ),
+        "source.sync.completed": "Source snapshot updated: {count} photos.",
+        "source.sync.log": (
+            "Source {source}: {count} photos; {added} added, {updated} "
+            "refreshed, {missing} no longer in the collection."
+        ),
         "tab.places_captions": "Places and captions",
         "main.analyze_photos": "Analyze photos",
         "main.analyze_again": "Analyze photos again",
         "main.progress_photos": "{current} photos analyzed out of {total}",
+        "photos.progress.metadata": "Metadata",
+        "photos.progress.nominatim": "Nominatim",
+        "photos.progress.value": "{current} / {total}",
+        "photos.progress.waiting": "Waiting…",
         "main.analysis_progress": (
             "{current} / {total} photos — "
             "{remaining} remaining"
@@ -636,10 +678,53 @@ CATALOGS: dict[str, dict[str, str]] = {
 
     "fr": {
         "tab.photos": "Photos",
+        "source.synology.choose": "Synology Photos…",
+        "source.synology.title": "Source Synology Photos",
+        "source.synology.url": "Adresse du NAS :",
+        "source.synology.verify_tls": "Vérifier le certificat TLS",
+        "source.synology.username": "Nom d’utilisateur",
+        "source.synology.password": "Mot de passe",
+        "source.synology.otp": "Code 2FA (facultatif)",
+        "source.synology.credentials_memory": (
+            "Les identifiants sont utilisés uniquement pour cette connexion "
+            "et ne sont jamais enregistrés."
+        ),
+        "source.synology.connect": "Se connecter avec Synology",
+        "source.synology.reconnect": "Se reconnecter avec Synology",
+        "source.synology.browser_memory": (
+            "L’authentification est gérée par Synology. Les cookies et jetons "
+            "de session restent en mémoire et ne sont pas enregistrés dans le projet."
+        ),
+        "source.synology.browser_title": "Connexion à Synology Photos",
+        "source.synology.browser_instructions": (
+            "Connectez-vous normalement, ouvrez Synology Photos, puis Albums. "
+            "Lorsque la session est détectée, utilisez le bouton ci-dessous."
+        ),
+        "source.synology.browser_waiting": (
+            "En attente d’une requête Synology Photos authentifiée…"
+        ),
+        "source.synology.browser_ready": "Session Synology Photos détectée.",
+        "source.synology.browser_use_session": "Utiliser cette session",
+        "source.synology.browser_cancelled": "Authentification annulée.",
+        "source.synology.connection_error": "Échec de la connexion : {error}",
+        "source.synology.connected": "Connecté — {count} albums disponibles.",
+        "source.synology.reconnected": "Connexion établie avec la source du projet.",
+        "source.synology.session_attached": (
+            "Synology Photos reconnecté sans modifier l’instantané du projet."
+        ),
+        "source.sync.completed": "Instantané mis à jour : {count} photos.",
+        "source.sync.log": (
+            "Source {source} : {count} photos ; {added} ajoutées, {updated} "
+            "actualisées, {missing} absentes de la collection."
+        ),
         "tab.places_captions": "Lieux et légendes",
         "main.analyze_photos": "Analyser les photos",
         "main.analyze_again": "Analyser à nouveau les photos",
         "main.progress_photos": "{current} photos analysées sur {total}",
+        "photos.progress.metadata": "Métadonnées",
+        "photos.progress.nominatim": "Nominatim",
+        "photos.progress.value": "{current} / {total}",
+        "photos.progress.waiting": "En attente…",
         "main.analysis_progress": (
             "{current} / {total} photos — "
             "{remaining} restantes"

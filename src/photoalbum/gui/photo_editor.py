@@ -408,6 +408,12 @@ class PhotoEditor(QObject):
         self._gps_photo_path = None
 
     def open_in_os(self, photo: Photo) -> None:
+        if photo.source_id != "local":
+            try:
+                self._project_service.materialize_originals([photo])
+            except Exception as exc:
+                self.error.emit(str(exc))
+                return
         path = Path(photo.path)
 
         if not path.exists():
