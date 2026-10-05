@@ -9,7 +9,10 @@ from photoalbum.album.composition import (
     PageComposer,
 )
 from photoalbum.album import (
+    AutomaticPhotoPageSettings,
+    BlankPageReason,
     PageSide,
+    PhotoPageSettings,
     PlanItemKind,
     PlannedPage,
 )
@@ -181,3 +184,27 @@ def test_non_photo_page_has_no_photo_slots():
     composition = PageComposer().compose(page)
 
     assert composition.photo_slots == ()
+
+def test_technical_blank_composes_with_automatic_photo_page_settings():
+    page = PlannedPage(
+        number=2,
+        side=PageSide.LEFT,
+        kind=None,
+        template_id="photo-page-2",
+        photo_capacity=2,
+        blank_reason=BlankPageReason.TECHNICAL,
+    )
+    photo_settings = PhotoPageSettings(
+        automatic_mode=AutomaticPhotoPageSettings(
+            "msb-orientation-1-2"
+        )
+    )
+
+    composition = PageComposer().compose(
+        page,
+        photo_settings,
+    )
+
+    assert composition.page == page
+    assert len(composition.photo_slots) == 2
+

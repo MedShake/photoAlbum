@@ -64,6 +64,42 @@ def _browser_session() -> SynologyBrowserSession:
     )
 
 
+@pytest.mark.parametrize(
+    ("width", "height", "orientation", "expected"),
+    [
+        (4032, 3024, 1, (4032, 3024)),
+        (4032, 3024, 3, (4032, 3024)),
+        (3024, 4032, 5, (4032, 3024)),
+        (3024, 4032, 6, (4032, 3024)),
+        (3024, 4032, 7, (4032, 3024)),
+        (3024, 4032, 8, (4032, 3024)),
+        (4384, 2192, 6, (2192, 4384)),
+    ],
+)
+def test_synology_normalizes_visual_resolution_to_raw_exif_dimensions(
+    width, height, orientation, expected
+):
+    source = SynologyPhotosSource(
+        "https://nas.example/",
+        _browser_session(),
+        opener=FakeOpener([]),
+    )
+    asset = source._asset_from_row({
+        "id": 42,
+        "filename": "IMG_0042.JPG",
+        "filesize": 123,
+        "time": 1720000000,
+        "additional": {
+            "thumbnail": {"cache_key": "42_7", "xl": "ready"},
+            "resolution": {"width": width, "height": height},
+            "orientation": orientation,
+        },
+    })
+
+    assert (asset.width, asset.height) == expected
+    assert asset.orientation == orientation
+
+
 def test_synology_lists_albums_and_maps_asset_metadata(tmp_path):
     opener = FakeOpener([
         {"success": True, "data": {"name": "alice"}},

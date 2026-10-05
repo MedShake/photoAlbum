@@ -380,7 +380,11 @@ class PageComposer:
     def _page_instance(page, photo_settings):
         if page.page_instance is not None:
             return page.page_instance
-        if photo_settings is not None and photo_settings.template_id == page.template_id:
+        if (
+            photo_settings is not None
+            and photo_settings.page is not None
+            and photo_settings.page.template_id == page.template_id
+        ):
             return photo_settings.page
         from photoalbum.template_engine.instances import create_template_instance
         return create_template_instance(page.template_id)

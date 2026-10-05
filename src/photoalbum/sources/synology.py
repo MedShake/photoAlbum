@@ -493,15 +493,24 @@ class SynologyPhotosSource:
             str(row["title"]) if row.get("title") else None
         )
 
+        width = _optional_int(resolution.get("width"))
+        height = _optional_int(resolution.get("height"))
+        orientation = _optional_int(additional.get("orientation"))
+        # Synology Photos reports resolution in visual orientation while also
+        # retaining the original EXIF orientation. SourceAsset follows the
+        # local-source convention: raw dimensions + EXIF orientation.
+        if orientation in (5, 6, 7, 8) and width is not None and height is not None:
+            width, height = height, width
+
         return SourceAsset(
             id=str(row["id"]),
             filename=str(row.get("filename") or row["id"]),
             capture_datetime=capture_datetime,
             capture_datetime_origin="source",
             file_size=_optional_int(row.get("filesize")),
-            width=_optional_int(resolution.get("width")),
-            height=_optional_int(resolution.get("height")),
-            orientation=_optional_int(additional.get("orientation")),
+            width=width,
+            height=height,
+            orientation=orientation,
             latitude=latitude,
             longitude=longitude,
             gps_origin="source",
