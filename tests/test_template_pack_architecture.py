@@ -49,7 +49,7 @@ def selected_templates(settings):
 
 EXPECTED_DEFAULTS = [
     "year-photo-scatter", "geographic-word-cloud", "dedication",
-    "geographic-word-cloud", "msb-orientation-1-2", "calendar-index", "month-divider-classic", "day-divider-simple",
+    "geographic-word-cloud", "msb-orientation-1-2-3", "calendar-index", "month-divider-classic", "day-divider-simple",
 ]
 
 
@@ -86,7 +86,7 @@ def test_msb_defaults_ignore_discovery_and_alphabetical_order(
         assert all(
             (
                 registry.get_automatic_photo_page_mode(t).pack_id
-                if t == "msb-orientation-1-2"
+                if t == "msb-orientation-1-2-3"
                 else registry.get(t).pack_id
             ) == DEFAULT_TEMPLATE_PACK
             for t in EXPECTED_DEFAULTS

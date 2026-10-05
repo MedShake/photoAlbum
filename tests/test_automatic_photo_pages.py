@@ -30,6 +30,7 @@ from photoalbum.template_engine import create_template_registry
 
 
 MODE_ID = "msb-orientation-1-2"
+MODE_ID_1_2_3 = "msb-orientation-1-2-3"
 
 
 def photo(name: str, width: int | None, height: int | None, *, orientation=None, day=1):
@@ -67,12 +68,19 @@ def photo_pages(result):
     return [page for page in result.pagination.pages if page.photos]
 
 
-def test_msb_mode_is_discovered_and_is_the_new_default():
+def test_msb_modes_are_discovered_and_orientation_1_2_3_is_the_new_default():
     registry = create_template_registry()
-    mode = registry.get_automatic_photo_page_mode(MODE_ID)
-    assert mode.pack_id == "msb"
-    assert mode.template_ids == ("photo-page-1", "photo-page-2")
-    assert registry.pack_defaults["msb"]["photo_page"] == MODE_ID
+
+    mode_1_2 = registry.get_automatic_photo_page_mode(MODE_ID)
+    assert mode_1_2.pack_id == "msb"
+    assert mode_1_2.template_ids == ("photo-page-1", "photo-page-2")
+
+    mode_1_2_3 = registry.get_automatic_photo_page_mode(MODE_ID_1_2_3)
+    assert mode_1_2_3.pack_id == "msb"
+    assert mode_1_2_3.template_ids == (
+        "photo-page-1", "photo-page-2", "photo-page-3"
+    )
+    assert registry.pack_defaults["msb"]["photo_page"] == MODE_ID_1_2_3
 
 
 def test_mode_rejects_missing_non_photo_and_cross_pack_templates():
@@ -156,6 +164,50 @@ def test_msb_orientation_sequence_and_exif_axis_swap():
     ))
     assert [page.template_id for page in pages] == ["photo-page-1", "photo-page-1"]
 
+
+
+def test_msb_orientation_1_2_3_prefers_three_then_two_then_one():
+    registry = create_template_registry()
+
+    def build(dimensions, *, landscape):
+        photos = [
+            photo(str(index), width, height, day=index + 1)
+            for index, (width, height) in enumerate(dimensions)
+        ]
+        settings = automatic_settings(landscape=landscape)
+        settings.photo_pages = PhotoPageSettings(
+            automatic_mode=AutomaticPhotoPageSettings(MODE_ID_1_2_3)
+        )
+        return photo_pages(AlbumBuilder(registry).build(photos, settings))
+
+    # Portrait page: large landscape on top, two portraits below.
+    pages = build([(3, 2), (2, 3), (2, 3)], landscape=False)
+    assert [page.template_id for page in pages] == ["photo-page-3"]
+    assert [len(page.photos) for page in pages] == [3]
+
+    # Landscape page: large portrait on the left, two landscapes on the right.
+    pages = build([(2, 3), (3, 2), (3, 2)], landscape=True)
+    assert [page.template_id for page in pages] == ["photo-page-3"]
+    assert [len(page.photos) for page in pages] == [3]
+
+    # If the 3-photo pattern is not possible, preserve the 1/2 rule.
+    pages = build([(3, 2), (3, 2)], landscape=False)
+    assert [page.template_id for page in pages] == ["photo-page-2"]
+
+    pages = build([(2, 3), (3, 2)], landscape=False)
+    assert [page.template_id for page in pages] == [
+        "photo-page-1", "photo-page-1"
+    ]
+
+    # Mixed sequence demonstrates the priority over subsequent pairings.
+    pages = build(
+        [(3, 2), (2, 3), (2, 3), (3, 2), (3, 2)],
+        landscape=False,
+    )
+    assert [page.template_id for page in pages] == [
+        "photo-page-3", "photo-page-2"
+    ]
+    assert [len(page.photos) for page in pages] == [3, 2]
 
 def test_automatic_mode_respects_override_insertion_and_chronological_boundaries():
     registry = create_template_registry()

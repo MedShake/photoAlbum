@@ -155,8 +155,8 @@ def test_default_photo_choice_is_automatic_orientation_mode():
     settings = widget.settings()
 
     assert settings.photo_pages.page is None
-    assert settings.photo_pages.automatic_mode.mode_id == "msb-orientation-1-2"
-    index = widget._photo_page_combo.findData("msb-orientation-1-2")
+    assert settings.photo_pages.automatic_mode.mode_id == "msb-orientation-1-2-3"
+    index = widget._photo_page_combo.findData("msb-orientation-1-2-3")
     assert "MSB" in widget._photo_page_combo.itemText(index)
 
 

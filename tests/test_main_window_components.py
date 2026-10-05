@@ -78,7 +78,7 @@ def test_project_without_album_settings_uses_msb_and_existing_settings_survive(w
     window._load_project_settings()
     settings = window._album_settings_widget.settings()
     assert settings.covers[CoverPosition.FRONT].template_id == 'year-photo-scatter'
-    assert settings.photo_pages.automatic_mode.mode_id == 'msb-orientation-1-2'
+    assert settings.photo_pages.automatic_mode.mode_id == 'msb-orientation-1-2-3'
     assert settings.year_dividers.template_id == 'calendar-index'
     settings.covers[CoverPosition.FRONT] = CoverSettings(
         position=CoverPosition.FRONT, template_id='simplex-full-photo-cover',
