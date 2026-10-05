@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+import sys
 
 import pytest
 from PySide6.QtCore import QPoint
@@ -157,3 +158,31 @@ def test_custom_location_and_caption_keep_horizontal_alignment(view):
         assert location.width() == caption.width()
         starts.append(x)
     assert starts[0] == starts[1]
+
+
+def test_rebuilding_materialized_rows_ignores_stale_qt_geometry_events(
+    view, monkeypatch,
+):
+    widget, photos, _, settle = view
+    errors = []
+    monkeypatch.setattr(
+        sys,
+        "excepthook",
+        lambda exception_type, value, traceback: errors.append(value),
+    )
+    stale_generation = widget._tree_generation
+
+    # Source activation/policy changes rebuild this view several times in one
+    # event-loop turn. Old _PhotoCell LayoutRequest events may arrive later.
+    for index in range(8):
+        widget.set_source_labels({"local": f"Provider {index}"})
+        widget.set_photos(photos)
+        year = widget._tree.topLevelItem(0)
+        year.setExpanded(True)
+        year.child(0).setExpanded(True)
+
+    widget._update_photo_item_height(photos[0].identity, stale_generation)
+    settle()
+
+    assert errors == []
+    assert_fits(widget, photos[0])

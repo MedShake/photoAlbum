@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from photoalbum.geocoding.location_caption_builder import (
     LocationCaptionBuilder,
@@ -420,6 +421,10 @@ class PhotoPlacesWidget(QWidget):
         ] = []
         self._thumbnail_loading = False
         self._thumbnail_generation = 0
+        # Geometry notifications are delivered asynchronously by Qt. A view
+        # generation prevents notifications from cells belonging to a previous
+        # tree build from touching QTreeWidgetItems already destroyed by clear().
+        self._tree_generation = 0
 
         self._preview_position = QPoint()
 
@@ -479,6 +484,7 @@ class PhotoPlacesWidget(QWidget):
         self._month_photos.clear()
         self._materialized_months.clear()
         self._thumbnail_generation += 1
+        self._tree_generation += 1
         self._thumbnail_queue.clear()
         self._thumbnail_loading = False
         self._tree.clear()
@@ -925,6 +931,10 @@ class PhotoPlacesWidget(QWidget):
     # --------------------------------------------------------
 
     def _rebuild_tree(self) -> None:
+        self._tree_generation += 1
+        self._thumbnail_generation += 1
+        self._thumbnail_queue.clear()
+        self._thumbnail_loading = False
         (
             expanded,
             selected_path,
@@ -936,18 +946,23 @@ class PhotoPlacesWidget(QWidget):
         self._tree.setUpdatesEnabled(False)
 
         try:
-            self._tree.clear()
-            self._clear_undated_panel()
-
+            # Header/resize/layout events can be emitted synchronously while
+            # QTreeWidget destroys its item widgets. Drop every lookup first,
+            # so those events cannot resolve an item from the old generation.
             self._photo_items.clear()
             self._caption_editors.clear()
             self._thumbnail_labels.clear()
             self._editor_rows.clear()
             self._truth_labels.clear()
             self._location_mode_boxes.clear()
+            self._location_mode_widgets.clear()
+            self._location_flows.clear()
 
             self._month_photos.clear()
             self._materialized_months.clear()
+
+            self._tree.clear()
+            self._clear_undated_panel()
 
             undated = [
                 photo
@@ -1691,7 +1706,7 @@ class PhotoPlacesWidget(QWidget):
             Qt.AlignmentFlag.AlignCenter,
         )
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        self._connect_item_geometry(container, photo.identity)
         container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
@@ -1883,7 +1898,7 @@ class PhotoPlacesWidget(QWidget):
         )
         layout.addWidget(label)
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        self._connect_item_geometry(container, photo.identity)
         container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
@@ -1940,7 +1955,7 @@ class PhotoPlacesWidget(QWidget):
             caption,
         )
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        self._connect_item_geometry(container, photo.identity)
         container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
@@ -2682,7 +2697,7 @@ class PhotoPlacesWidget(QWidget):
                 )
         )
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
+        self._connect_item_geometry(container, photo.identity)
         container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
@@ -2751,6 +2766,24 @@ class PhotoPlacesWidget(QWidget):
         automatic_widget.setProperty("location_origin", origin)
         automatic_widget.updateGeometry()
 
+    def _connect_item_geometry(self, container: _PhotoCell, photo_identity: str) -> None:
+        generation = self._tree_generation
+        container.geometry_changed.connect(
+            lambda identity=photo_identity, current_generation=generation:
+                self._update_photo_item_height(identity, current_generation)
+        )
+
+    def _update_photo_item_height(
+        self,
+        photo_identity: str,
+        generation: int,
+    ) -> None:
+        if generation != self._tree_generation:
+            return
+        item = self._photo_items.get(photo_identity)
+        if item is not None:
+            self._update_item_height(item)
+
     def _update_all_editor_heights(self) -> None:
         # Only already materialized rows participate; never expand closed months.
         if getattr(self, "_updating_row_heights", False):
@@ -2763,6 +2796,10 @@ class PhotoPlacesWidget(QWidget):
             self._updating_row_heights = False
 
     def _update_item_height(self, item: QTreeWidgetItem) -> None:
+        # QTreeWidgetItem is not a QObject, so queued Python callbacks are not
+        # automatically disconnected when its C++ owner destroys it.
+        if not isValid(item):
+            return
         required = 0
         for column in range(self._tree.columnCount()):
             cell = self._tree.itemWidget(item, column)
