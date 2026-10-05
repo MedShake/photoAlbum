@@ -171,8 +171,14 @@
       "name": "Blank page",
       "module": "photoalbum.templates.msb.blank",
       "kinds": [
+        "cover",
         "special_page",
         "body_special_page"
+      ],
+      "cover_positions": [
+        "inside_front",
+        "inside_back",
+        "back"
       ]
     }
   ],
