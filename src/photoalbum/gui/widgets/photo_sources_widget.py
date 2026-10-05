@@ -33,6 +33,7 @@ class PhotoSourcesWidget(QWidget):
     edit_source_requested = Signal(str)
     delete_source_requested = Signal(str)
     source_policy_changed = Signal(str, object)
+    source_recursive_changed = Signal(str, bool)
 
     def __init__(
         self,
@@ -281,6 +282,7 @@ class PhotoSourcesWidget(QWidget):
             card.edit_requested.connect(self.edit_source_requested.emit)
             card.delete_requested.connect(self.delete_source_requested.emit)
             card.policy_changed.connect(self.source_policy_changed.emit)
+            card.recursive_changed.connect(self.source_recursive_changed.emit)
             self._source_cards.addWidget(card)
         self.model.set_sources(labels, {source.id: source.collection_name for source in sources})
         self._sources = list(sources)

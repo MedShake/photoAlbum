@@ -317,9 +317,11 @@ class ScanController(QObject):
     def _metadata_refresh_completed(self, photos) -> None:
         self.analysis_completed = True
         self.photos_ready.emit(list(photos))
-        self._view.summary_label.setText(
-            self._translator.tr("source.metadata.completed", count=len(photos))
+        message = self._translator.tr(
+            "source.metadata.completed", count=len(photos)
         )
+        self._view.summary_label.setText(message)
+        self.status_message.emit(message)
 
     def _scan_discovered(self, total: int) -> None:
         """Initialize scan progress after file discovery."""

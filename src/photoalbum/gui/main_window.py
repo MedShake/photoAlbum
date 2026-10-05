@@ -281,6 +281,9 @@ class MainWindow(QMainWindow):
         self._photos_widget.edit_source_requested.connect(self._edit_source)
         self._photos_widget.delete_source_requested.connect(self._delete_source)
         self._photos_widget.source_policy_changed.connect(self._source_policy_changed)
+        self._photos_widget.source_recursive_changed.connect(
+            self._source_recursive_changed
+        )
         self._photos_widget.open_photo_requested.connect(self._photo_editor.open_in_os)
         self._photo_editor.log_message.connect(self._photos_widget.log_view.appendPlainText)
         self._tabs.addTab(self._photos_widget, self._translator.tr("tab.photos"))
@@ -583,6 +586,26 @@ class MainWindow(QMainWindow):
         self._load_project_photos()
         self._update_project_state()
 
+
+    def _source_recursive_changed(self, source_id, recursive) -> None:
+        from dataclasses import replace
+
+        source = self._project_service.get_photo_source(source_id)
+        if source is None or source.kind != "local":
+            return
+
+        recursive = bool(recursive)
+        if bool(source.config.get("recursive", False)) == recursive:
+            return
+
+        config = dict(source.config)
+        config["recursive"] = recursive
+        self._project_service.set_photo_source(replace(source, config=config))
+        self._refresh_source_cards()
+        self._scan_controller.reset()
+        self._update_project_state()
+        self._scan_controller.start()
+
     def _source_policy_changed(self, source_id, policy) -> None:
         self._project_service.set_photo_metadata_policy(policy, source_id)
         self._project_service.apply_photo_metadata_policy(source_id=source_id)
@@ -603,7 +626,7 @@ class MainWindow(QMainWindow):
 
     def _edit_source(self, source_id) -> None:
         from dataclasses import replace
-        from PySide6.QtWidgets import QCheckBox, QDialogButtonBox, QLineEdit, QVBoxLayout
+        from PySide6.QtWidgets import QDialogButtonBox, QLineEdit, QVBoxLayout
         source = self._project_service.get_photo_source(source_id)
         if source is None:
             return
@@ -616,18 +639,21 @@ class MainWindow(QMainWindow):
         dialog.setWindowTitle(self._translator.tr("sources.modify"))
         layout = QVBoxLayout(dialog)
         path = QLineEdit(str(source.config["directory"]))
-        recursive = QCheckBox(self._translator.tr("main.include_subdirectories"))
-        recursive.setChecked(bool(source.config.get("recursive", False)))
         layout.addWidget(path)
-        layout.addWidget(recursive)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             directory = Path(path.text()).expanduser().resolve()
-            self._project_service.set_photo_source(replace(source, name=directory.name,
-                collection_name=directory.name, config={"directory": str(directory), "recursive": recursive.isChecked()}))
+            config = dict(source.config)
+            config["directory"] = str(directory)
+            self._project_service.set_photo_source(replace(
+                source,
+                name=directory.name,
+                collection_name=directory.name,
+                config=config,
+            ))
             self._refresh_source_cards()
 
     def _edit_photo_usage(self, photo) -> None:

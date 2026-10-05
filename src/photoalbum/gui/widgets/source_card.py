@@ -9,6 +9,7 @@ class SourceCard(QWidget):
     edit_requested = Signal(str)
     delete_requested = Signal(str)
     policy_changed = Signal(str, object)
+    recursive_changed = Signal(str, bool)
 
     def __init__(self, source, available, translator, parent=None):
         super().__init__(parent)
@@ -20,9 +21,23 @@ class SourceCard(QWidget):
         enabled.setChecked(source.enabled)
         enabled.toggled.connect(lambda value: self.enabled_changed.emit(source.id, value))
         heading.addWidget(enabled)
-        label = QLabel(f"{source.provider_label or source.kind} — {source.collection_name}")
+        provider_name = (
+            tr("sources.local_folder")
+            if source.kind == "local"
+            else (source.provider_label or source.kind)
+        )
+        label = QLabel(f"{provider_name} — {source.collection_name}")
         label.setToolTip(str(source.config.get("directory") or source.config.get("base_url") or source.name))
-        heading.addWidget(label, 1)
+        heading.addWidget(label)
+        if source.kind == "local":
+            heading.addSpacing(24)
+            recursive = QCheckBox(tr("main.include_subdirectories"))
+            recursive.setChecked(bool(source.config.get("recursive", False)))
+            recursive.toggled.connect(
+                lambda value: self.recursive_changed.emit(source.id, value)
+            )
+            heading.addWidget(recursive)
+        heading.addStretch(1)
         for key, signal in (("sources.modify", self.edit_requested), ("sources.delete", self.delete_requested)):
             button = QPushButton(tr(key))
             button.clicked.connect(lambda _checked=False, s=signal: s.emit(source.id))
