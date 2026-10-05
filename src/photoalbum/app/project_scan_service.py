@@ -29,6 +29,7 @@ class ProjectScanService:
         *,
         project_path: Path,
         source_directory: Path,
+        source_id: str = "local",
         recursive: bool = False,
         language: str | None = None,
         metadata_policy: PhotoMetadataPolicy | None = None,
@@ -48,6 +49,7 @@ class ProjectScanService:
             metadata_processor = PhotoProcessor()
 
             scanner = LibraryScanner(
+                source_id=source_id,
                 photo_repository=repository,
                 photo_processor=metadata_processor,
             )
@@ -162,7 +164,7 @@ class ProjectScanService:
             if metadata_policy is not None:
                 # Reload the persisted effective state after both phases.
                 photos = [
-                    repository.find_by_path(photo.path)
+                    repository.find_by_identity(photo.identity)
                     for photo in photos
                     if photo.path is not None
                 ]

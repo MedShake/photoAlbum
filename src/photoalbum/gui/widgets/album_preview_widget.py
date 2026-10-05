@@ -327,31 +327,7 @@ class AlbumCoverPreview(_PreviewPageBase):
     def _project_photos(
         self,
     ):
-        photos = []
-        seen = set()
-
-        for item in self._result.plan.items:
-            for photo in item.photos:
-                key = photo.identity
-
-                if key in seen:
-                    continue
-
-                seen.add(
-                    key
-                )
-
-                photos.append(
-                    photo
-                )
-
-        return sorted(
-            photos,
-            key=lambda photo: str(
-                photo.path
-            ),
-        )
-
+        return list(self._result.template_photos)
 
     def _shared_preview_ready(
         self,
@@ -858,23 +834,7 @@ class AlbumPreviewWidget(QWidget):
 
         # One canonical list of project photos for templates
         # that operate on the whole album.
-        project_photos = []
-        seen_photo_paths = set()
-
-        for plan_item in result.plan.items:
-            for photo in plan_item.photos:
-                key = photo.identity
-
-                if key in seen_photo_paths:
-                    continue
-
-                seen_photo_paths.add(
-                    key
-                )
-
-                project_photos.append(
-                    photo
-                )
+        project_photos = list(result.template_photos)
 
         # Interior starts on the right opposite the inside
         # front cover.

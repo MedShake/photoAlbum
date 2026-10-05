@@ -77,11 +77,11 @@ def _materialize(widget: PhotoPlacesWidget, photo: Photo):
     month.setExpanded(True)
     for _ in range(5):
         app.processEvents()
-    return widget._location_mode_boxes[str(photo.path)]
+    return widget._location_mode_boxes[photo.identity]
 
 
 def _checkbox_values(widget: PhotoPlacesWidget, photo: Photo) -> list[str]:
-    automatic = widget._location_mode_widgets[str(photo.path)][0]
+    automatic = widget._location_mode_widgets[photo.identity][0]
     return [box.text() for box in automatic.findChildren(QCheckBox)]
 
 
@@ -128,7 +128,7 @@ def test_manual_photo_override_is_preserved():
     combo = _materialize(widget, photo)
 
     assert combo.currentData() == "manual"
-    assert widget._location_mode_widgets[str(photo.path)][2].text() == "Mon endroit"
+    assert widget._location_mode_widgets[photo.identity][2].text() == "Mon endroit"
     widget.close()
 
 
@@ -145,7 +145,7 @@ def test_persisted_components_are_checked_for_the_effective_source():
     }
     widget = PhotoPlacesWidget()
     _materialize(widget, photo)
-    automatic = widget._location_mode_widgets[str(photo.path)][0]
+    automatic = widget._location_mode_widgets[photo.identity][0]
 
     checked = [
         box.text()
@@ -216,7 +216,7 @@ def test_checkbox_composition_is_kept_per_source():
     photo = resolve_photo_metadata(_photo("per-source.jpg"), _policy("source"))
     widget = PhotoPlacesWidget(save_location_override=lambda *_args: None)
     combo = _materialize(widget, photo)
-    automatic = widget._location_mode_widgets[str(photo.path)][0]
+    automatic = widget._location_mode_widgets[photo.identity][0]
     paris = next(
         box
         for box in automatic.findChildren(QCheckBox)
@@ -227,7 +227,7 @@ def test_checkbox_composition_is_kept_per_source():
     combo.setCurrentIndex(combo.findData("geocoding"))
     combo.setCurrentIndex(combo.findData("provider"))
 
-    automatic = widget._location_mode_widgets[str(photo.path)][0]
+    automatic = widget._location_mode_widgets[photo.identity][0]
     checked = {
         box.text()
         for box in automatic.findChildren(QCheckBox)

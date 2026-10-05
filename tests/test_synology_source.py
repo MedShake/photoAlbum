@@ -348,6 +348,40 @@ def test_new_source_persists_endpoint_but_no_browser_session_secrets():
     provider.close()
 
 
+def test_synology_occurrences_are_unique_and_collection_edits_keep_identity():
+    from dataclasses import replace
+    from photoalbum.sources import PhotoMetadataPolicy
+    QApplication.instance() or QApplication([])
+    albums = [SourceCollection(id="7", name="Summer"), SourceCollection(id="8", name="Winter")]
+    sources = []
+    for _ in range(2):
+        provider = _DialogProvider(albums=albums)
+        dialog = SynologySourceDialog(Translator("en"),
+            provider_factory=lambda *args, **kwargs: provider,
+            browser_authenticator=lambda *args, **kwargs: _browser_session())
+        dialog.url_edit.setText("https://nas.example")
+        dialog._connect()
+        dialog._accept_source()
+        sources.append(dialog.source)
+        provider.close()
+    assert sources[0].id != sources[1].id
+    original = replace(sources[0], enabled=False,
+        metadata_policy=PhotoMetadataPolicy("filename", "exif", "none", False))
+    provider = _DialogProvider(albums=albums)
+    editor = SynologySourceDialog(Translator("en"), existing_source=original, edit_collection=True,
+        provider_factory=lambda *args, **kwargs: provider,
+        browser_authenticator=lambda *args, **kwargs: _browser_session())
+    editor._connect()
+    assert editor.album_combo.currentData().id == original.collection_id
+    editor.album_combo.setCurrentIndex(1)
+    editor._accept_source()
+    assert editor.source.id == original.id
+    assert editor.source.collection_id == "8"
+    assert editor.source.metadata_policy == original.metadata_policy
+    assert editor.source.enabled is False
+    provider.close()
+
+
 def test_legacy_project_source_with_username_config_still_loads():
     source = ProjectSource.from_json(json.dumps({
         "schema_version": 1,

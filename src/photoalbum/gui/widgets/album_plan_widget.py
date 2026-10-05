@@ -1,11 +1,12 @@
 from __future__ import annotations
+from dataclasses import replace
 
 from photoalbum.i18n import Translator
 from photoalbum.album.composition import PageComposer
 
 from photoalbum.gui.template_labels import template_display_name
 
-from PySide6.QtCore import QDate, QLocale, Qt
+from PySide6.QtCore import QDate, QLocale, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHeaderView,
@@ -16,6 +17,8 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
+    QHBoxLayout,
+    QPushButton,
 )
 
 from photoalbum.album import (
@@ -30,6 +33,7 @@ from photoalbum.album import (
 
 
 class AlbumPlanWidget(QWidget):
+    settings_changed = Signal(object)
     def __init__(
         self,
         registry: TemplateRegistry,
@@ -145,10 +149,13 @@ class AlbumPlanWidget(QWidget):
                 self._translator.tr("plan.pages"),
                 self._translator.tr("plan.photos"),
                 self._translator.tr("plan.details"),
+                self._translator.tr("photos.column.actions"),
             ]
         )
 
         header = self._tree.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
         # La hiérarchie du document se trouve dans cette colonne.
         header.setSectionResizeMode(
@@ -197,6 +204,8 @@ class AlbumPlanWidget(QWidget):
         result: AlbumBuildResult,
         settings: AlbumStructureSettings | None = None,
     ) -> None:
+        self._result = result
+        self._settings = settings
         summary = self._summary_builder.build(result)
         self._caption_overflows = self._collect_caption_overflows(result, settings)
 
@@ -244,6 +253,103 @@ class AlbumPlanWidget(QWidget):
             result,
             settings,
         )
+        self._install_page_actions()
+
+    def _install_page_actions(self) -> None:
+        from photoalbum.album.settings import ContentAnchor
+        if self._settings is None:
+            return
+        def install(item):
+            page = item.data(0, Qt.ItemDataRole.UserRole)
+            if page is not None:
+                container = QWidget()
+                row = QHBoxLayout(container)
+                row.setContentsMargins(0, 0, 0, 0)
+                def button(key, callback):
+                    action = QPushButton(self._translator.tr(key))
+                    action.clicked.connect(callback)
+                    row.addWidget(action)
+                if page.kind == PlanItemKind.PHOTO_GROUP and page.photos:
+                    button("plan.modify", lambda _=False, p=page: self._edit_photo_page(p))
+                    anchor = ContentAnchor("photo", photo_identity=page.photos[-1].identity)
+                    button("plan.insert_special", lambda _=False, a=anchor, p=page: self._insert_page(a, p))
+                elif page.kind in (PlanItemKind.YEAR_DIVIDER, PlanItemKind.MONTH_DIVIDER, PlanItemKind.DAY_DIVIDER):
+                    anchor = ContentAnchor(page.kind.value, year=page.year, month=page.month, day=page.day)
+                    button("plan.insert_special", lambda _=False, a=anchor, p=page: self._insert_page(a, p))
+                elif page.kind == PlanItemKind.BODY_SPECIAL_PAGE:
+                    self._insertion_buttons(row, page.page_instance.instance_id, page)
+                self._tree.setItemWidget(item, 4, container)
+                item.setSizeHint(4, container.sizeHint())
+            for index in range(item.childCount()):
+                install(item.child(index))
+        for index in range(self._tree.topLevelItemCount()):
+            install(self._tree.topLevelItem(index))
+        effective_ids = {page.page_instance.instance_id for page in self._result.pagination.pages if page.page_instance}
+        for insertion in self._settings.body_insertions:
+            if insertion.page.instance_id in effective_ids:
+                continue
+            state = "plan.disabled" if not insertion.enabled else "plan.dormant"
+            item = QTreeWidgetItem([self._template_name(insertion.page.template_id), "—", "—", self._translator.tr(state)])
+            for column in range(4):
+                item.setForeground(column, QColor("#777777"))
+            self._tree.addTopLevelItem(item)
+            container = QWidget()
+            row = QHBoxLayout(container)
+            row.setContentsMargins(0, 0, 0, 0)
+            self._insertion_buttons(row, insertion.page.instance_id, None)
+            self._tree.setItemWidget(item, 4, container)
+            item.setSizeHint(4, container.sizeHint())
+
+    def _insertion_buttons(self, row, instance_id, page):
+        insertion = next(item for item in self._settings.body_insertions if item.page.instance_id == instance_id)
+        for key, callback in (
+            ("plan.modify", lambda: self._edit_insertion(insertion, page)),
+            ("plan.disable" if insertion.enabled else "plan.enable", lambda: self._replace_insertion(insertion, replace(insertion, enabled=not insertion.enabled))),
+            ("sources.delete", lambda: self._replace_insertion(insertion, None)),
+        ):
+            action = QPushButton(self._translator.tr(key))
+            action.clicked.connect(lambda _=False, cb=callback: cb())
+            row.addWidget(action)
+
+    def _replace_insertion(self, insertion, replacement, pack_settings=None):
+        items = [replacement if item.page.instance_id == insertion.page.instance_id else item
+                 for item in self._settings.body_insertions]
+        self.settings_changed.emit(replace(self._settings,
+            body_insertions=[item for item in items if item is not None],
+            template_pack_settings=pack_settings if pack_settings is not None else self._settings.template_pack_settings))
+
+    def _edit_insertion(self, insertion, page):
+        from photoalbum.gui.plan_page_editor import choose_page
+        chosen = choose_page(self, self._registry, self._settings, self._result, self._translator,
+                             page=page, instance=insertion.page)
+        if chosen is not None:
+            _, instance, pack_settings = chosen
+            self._replace_insertion(insertion, replace(insertion, page=instance), pack_settings)
+
+    def _insert_page(self, anchor, page):
+        from photoalbum.album.settings import BodyPageInsertion
+        from photoalbum.gui.plan_page_editor import choose_page
+        chosen = choose_page(self, self._registry, self._settings, self._result, self._translator, page=page)
+        if chosen is not None:
+            _, instance, pack_settings = chosen
+            self.settings_changed.emit(replace(self._settings,
+                body_insertions=[*self._settings.body_insertions, BodyPageInsertion(anchor, instance)],
+                template_pack_settings=pack_settings))
+
+    def _edit_photo_page(self, page):
+        from photoalbum.album.settings import PhotoPageOverride
+        from photoalbum.gui.plan_page_editor import choose_page
+        existing = next((item for item in self._settings.photo_page_overrides
+                         if item.photo_identity == page.photos[0].identity), None)
+        chosen = choose_page(self, self._registry, self._settings, self._result, self._translator,
+                             page=page, instance=existing.page if existing else None, photo_override=True)
+        if chosen is not None:
+            identity, instance, pack_settings = chosen
+            overrides = [item for item in self._settings.photo_page_overrides if item.photo_identity != identity]
+            if instance is not None:
+                overrides.append(PhotoPageOverride(identity, instance))
+            self.settings_changed.emit(replace(self._settings, photo_page_overrides=overrides,
+                                               template_pack_settings=pack_settings))
 
     def _set_suggestions(
         self,
@@ -271,6 +377,8 @@ class AlbumPlanWidget(QWidget):
                 )
             )
 
+        for page in result.excluded_photo_overrides:
+            warning_lines.append(self._translator.tr("plan.override_incompatible", template=self._template_name(page.template_id)))
         for page in result.excluded_special_pages:
             warning_lines.append(self._translator.tr(
                 "plan.special_page_excluded",
@@ -817,7 +925,7 @@ class AlbumPlanWidget(QWidget):
         elif page.kind == PlanItemKind.YEAR_DIVIDER:
             page_type = self._translator.tr("plan.year_divider")
 
-        elif page.kind == PlanItemKind.SPECIAL_PAGE:
+        elif page.kind in (PlanItemKind.SPECIAL_PAGE, PlanItemKind.BODY_SPECIAL_PAGE):
             page_type = self._translator.tr("plan.special_page")
 
         else:
@@ -880,6 +988,7 @@ class AlbumPlanWidget(QWidget):
             self._translator.tr("plan.page_label", number=page.number, type=page_type),
             "1", str(photo_count), details,
         ])
+        item.setData(0, Qt.ItemDataRole.UserRole, page)
         if overflows:
             item.setForeground(3, QColor("#c62828"))
         elif page.unused_photo_slots:

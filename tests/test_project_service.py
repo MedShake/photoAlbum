@@ -75,6 +75,8 @@ def test_recursive_scan_is_persisted(tmp_path: Path):
 
     service = ProjectService()
     service.create(project_path)
+    service.set_photo_source(ProjectSource(id="local", kind="local", name="Local",
+        collection_id="photos", collection_name="Photos", config={"directory": str(tmp_path / "photos")}))
     service.set_recursive_scan(True)
     service.close()
 
@@ -266,12 +268,13 @@ def test_failed_source_change_keeps_previous_source_and_snapshot(tmp_path):
     service.close()
 
 
-def test_remote_source_cannot_bypass_atomic_change(tmp_path):
+def test_remote_source_configuration_can_be_saved_without_import(tmp_path):
     service = ProjectService()
     service.create(tmp_path / "album.photoalbum")
-    with pytest.raises(RuntimeError, match="change_photo_source"):
-        service.set_photo_source(_remote_source("remote", "album"))
-    assert service.get_photo_source() is None
+    source = _remote_source("remote", "album")
+    service.set_photo_source(source)
+    assert service.get_photo_source() == source
+    assert service.list_photos() == []
     service.close()
 
 
@@ -361,6 +364,8 @@ def test_photo_metadata_policy_is_persisted(tmp_path: Path):
 
     service = ProjectService()
     service.create(project_path)
+    service.set_photo_source(ProjectSource(id="local", kind="local", name="Local",
+        collection_id="photos", collection_name="Photos", config={"directory": str(tmp_path / "photos")}))
 
     policy = PhotoMetadataPolicy(
         date_preference="source",
@@ -386,6 +391,8 @@ def test_photo_metadata_policy_does_not_trigger_processing(tmp_path: Path):
 
     service = ProjectService()
     service.create(project_path)
+    service.set_photo_source(ProjectSource(id="local", kind="local", name="Local",
+        collection_id="photos", collection_name="Photos", config={"directory": str(tmp_path / "photos")}))
 
     policy = PhotoMetadataPolicy(
         date_preference="exif",
@@ -442,6 +449,8 @@ def test_apply_photo_metadata_policy_recomputes_effective_values(tmp_path: Path)
 
     service = ProjectService()
     service.create(project_path)
+    service.set_photo_source(ProjectSource(id="local", kind="local", name="Local",
+        collection_id="photos", collection_name="Photos", config={"directory": str(tmp_path / "photos")}))
 
     repository = PhotoRepository(service._require_database())
     path = (tmp_path / "photo.jpg").resolve()

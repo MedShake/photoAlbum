@@ -157,7 +157,8 @@
       "module": "photoalbum.templates.msb.dedication",
       "kinds": [
         "special_page",
-        "cover"
+        "cover",
+        "body_special_page"
       ],
       "cover_positions": [
         "inside_front",
@@ -170,7 +171,8 @@
       "name": "Blank page",
       "module": "photoalbum.templates.msb.blank",
       "kinds": [
-        "special_page"
+        "special_page",
+        "body_special_page"
       ]
     }
   ],

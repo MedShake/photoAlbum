@@ -10,6 +10,7 @@ from photoalbum.models import (
     GpsSource,
     LocationSource,
     Photo,
+    PhotoUsage,
     MetadataCandidates,
 )
 from photoalbum.metadata import FilenameDateParser
@@ -45,9 +46,7 @@ class SourceImporter:
         metadata_policy: PhotoMetadataPolicy | None = None,
     ) -> SourceImportResult:
         assets = provider.list_assets(source.collection_id)
-        effective_policy = metadata_policy or PhotoMetadataPolicy.for_source_kind(
-            source.kind
-        )
+        effective_policy = metadata_policy or source.effective_metadata_policy
         known = {
             photo.identity: photo
             for photo in self._repository.list_by_source(
@@ -79,7 +78,6 @@ class SourceImporter:
             identity for identity in known if identity not in seen
         ]
         with self._repository.atomic():
-            self._repository.set_other_sources_missing(source.id, commit=False)
             for photo in imported:
                 self._repository.save(photo, commit=False)
             for identity in missing_identities:
@@ -215,6 +213,7 @@ class SourceImporter:
             filename=asset.filename,
             source_id=source_id,
             asset_id=asset.id,
+            usage=previous.usage if previous else PhotoUsage.BODY,
             imported_location_text=asset.location_text,
             imported_caption=candidates.caption.get("provider"),
             source_metadata=asset.metadata,

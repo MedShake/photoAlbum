@@ -634,7 +634,7 @@ class SimplexFullPhotoCoverSettingsWidget(
                 identity,
             )
 
-            if identity == selected_asset or path == selected_path:
+            if identity == selected_asset or (not selected_asset and path == selected_path):
                 selected_index = index
 
         if selected_index >= 0:

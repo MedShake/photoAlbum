@@ -157,13 +157,13 @@ def test_photo_controls_forward_signals_and_selection_respects_sort(app, tmp_pat
     source, scan, recursive = Mock(), Mock(), Mock()
     view.source_requested.connect(source)
     view.scan_requested.connect(scan)
-    view.recursive_changed.connect(recursive)
+    view.source_enabled_changed.connect(recursive)
     view.source_requested.emit()
     view.analyze_button.click()
-    view.recursive_checkbox.setChecked(True)
+    view.source_enabled_changed.emit("source-a", True)
     source.assert_called_once_with()
     scan.assert_called_once_with()
-    recursive.assert_called_once_with(True)
+    recursive.assert_called_once_with("source-a", True)
     first = Photo(path=tmp_path / 'a.jpg', filename='a.jpg')
     second = Photo(path=tmp_path / 'z.jpg', filename='z.jpg')
     view.model.set_photos([first, second])
@@ -226,9 +226,9 @@ def test_date_editor_preserves_save_restore_and_cancel(app, monkeypatch, tmp_pat
     monkeypatch.setattr(QDialog, 'exec', execute)
     editor.edit_datetime(photo)
     if action == 'save':
-        service.set_manual_capture_datetime.assert_called_once_with(photo.path, replacement)
+        service.set_manual_capture_datetime.assert_called_once_with(photo.identity, replacement)
     elif action == 'restore':
-        service.restore_original_capture_datetime.assert_called_once_with(photo.path)
+        service.restore_original_capture_datetime.assert_called_once_with(photo.identity)
     else:
         service.set_manual_capture_datetime.assert_not_called()
         service.restore_original_capture_datetime.assert_not_called()
@@ -255,11 +255,11 @@ def test_gps_editor_preserves_coordinates_and_requests_geocoding(app, monkeypatc
     monkeypatch.setattr(QDialog, 'exec', execute)
     editor.edit_gps(photo)
     if restore:
-        service.restore_original_gps.assert_called_once_with(photo.path)
-        editor._start_gps_geocoding.assert_called_once_with(photo.path, 30, 40)
+        service.restore_original_gps.assert_called_once_with(photo.identity)
+        editor._start_gps_geocoding.assert_called_once_with(photo.identity, 30, 40)
     else:
-        service.set_manual_gps.assert_called_once_with(photo.path, -12.3456789, 78.1234567)
-        editor._start_gps_geocoding.assert_called_once_with(photo.path, -12.3456789, 78.1234567)
+        service.set_manual_gps.assert_called_once_with(photo.identity, -12.3456789, 78.1234567)
+        editor._start_gps_geocoding.assert_called_once_with(photo.identity, -12.3456789, 78.1234567)
 
 
 def test_gps_editor_shows_empty_fields_without_gps(
@@ -355,7 +355,7 @@ def test_gps_editor_can_clear_effective_coordinates(
     editor.edit_gps(photo)
 
     service.set_manual_gps.assert_called_once_with(
-        photo.path,
+        photo.identity,
         None,
         None,
     )
@@ -477,7 +477,8 @@ def test_open_remote_project_exposes_snapshot_before_background_refresh(
         collection_name="Album",
         provider_label="Future Photos",
     )
-    database.set_project_metadata("photo_source", source.to_json())
+    from photoalbum.database.source_repository import SourceRepository
+    SourceRepository(database).save(source)
     PhotoRepository(database).save(
         Photo(
             path=tmp_path / "thumbnail.jpg",
@@ -491,7 +492,7 @@ def test_open_remote_project_exposes_snapshot_before_background_refresh(
     window._open_project_path(project_path)
 
     assert window._photos_widget.model.rowCount() == 1
-    assert window._photos_widget.source_edit.text() == "Future Photos — Album"
+    assert window._photos_widget._sources == [source]
 
 
 @pytest.mark.parametrize('failure', [False, True])
@@ -522,7 +523,7 @@ def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_p
         page_format='custom' if orientation == 'custom' else 'a4',
         custom_width_mm=345.5, custom_height_mm=123.25,
     ))
-    window._album_build_result = SimpleNamespace(pagination=SimpleNamespace(pages=[object()]), total_page_count=5)
+    window._album_build_result = SimpleNamespace(pagination=SimpleNamespace(pages=[object()]), total_page_count=5, template_photos=())
     widget = window._pdf_widget
     window._tabs.setTabEnabled(5, True)
     widget._pdf_output_edit.setText(str(tmp_path / 'album'))
@@ -676,63 +677,52 @@ def test_photo_sources_widget_hides_nominatim_when_disabled(app):
     assert not view.nominatim_progress_bar.isVisible()
 
 
+def _source_card(view, *, label="Synology Photos", kind="synology-photos",
+                 available=None, policy=None):
+    source = ProjectSource(
+        id="source-a", kind=kind, name="NAS", collection_id="album",
+        collection_name="Album", provider_label=label, metadata_policy=policy,
+    )
+    view.set_sources([source], {source.id: available or {
+        "date": {"provider", "exif", "filename"}, "gps": {"provider", "exif"},
+        "location": {"provider", "geocoding"}, "caption": {"provider"},
+    }}, {source.id: label})
+    return view._source_cards.itemAt(0).widget()
+
+
 def test_photo_sources_widget_metadata_policy_controls(app):
+    from photoalbum.sources import PhotoMetadataPolicy
     view = PhotoSourcesWidget(Translator("en"))
     received = []
-    view.metadata_policy_changed.connect(
-        lambda date, gps, location, nominatim: received.append(
-            (date, gps, location, nominatim)
-        )
-    )
-
-    view.set_source_kind("synology-photos")
-    view.set_metadata_policy(
-        date_preference="source",
-        gps_preference="exif",
-        location_preference="source",
-        nominatim_enabled=False,
-    )
-
-    assert view.date_source_combo.currentData() == "source"
-    assert view.gps_source_combo.currentData() == "exif"
-    assert view.location_source_combo.currentData() == "source"
-    assert not view.nominatim_checkbox.isChecked()
+    view.source_policy_changed.connect(lambda sid, policy: received.append((sid, policy)))
+    card = _source_card(view, policy=PhotoMetadataPolicy(
+        date_preference="source", gps_preference="exif",
+        location_preference="source", nominatim_enabled=False,
+    ))
+    assert card._combos["date"].currentData() == "source"
+    assert card._combos["gps"].currentData() == "exif"
+    assert card._combos["location"].currentData() == "source"
+    assert not card._nominatim.isChecked()
     assert received == []
-
-    view.nominatim_checkbox.setChecked(True)
-
-    assert received[-1] == (
-        "source",
-        "exif",
-        "source",
-        True,
-    )
-
+    card._nominatim.setChecked(True)
+    assert received[-1] == ("source-a", PhotoMetadataPolicy(
+        date_preference="source", gps_preference="exif",
+        location_preference="source", nominatim_enabled=True,
+    ))
     view.close()
 
 
 def test_policy_choices_use_actual_candidates_and_provider_label(app):
     view = PhotoSourcesWidget(Translator("en"))
-    view.set_metadata_sources(
-        provider_label="Synology Photos",
-        available={
-            "date": {"provider", "filename"},
-            "gps": {"provider"},
-            "location": {"provider", "geocoding"},
-            "caption": {"provider"},
-        },
-        source_kind="synology-photos",
-    )
-
-    assert [view.date_source_combo.itemText(i) for i in range(view.date_source_combo.count())] == [
-        "Synology Photos",
-        "Filename",
-    ]
-    assert view.date_source_combo.findData("exif") == -1
-    assert [view.gps_source_combo.itemText(i) for i in range(view.gps_source_combo.count())] == [
-        "Synology Photos"
-    ]
-    assert view.sync_button.isVisible() is False  # hidden until the widget is shown
+    card = _source_card(view, available={
+        "date": {"provider", "filename"}, "gps": {"provider"},
+        "location": {"provider", "geocoding"}, "caption": {"provider"},
+    })
+    date, gps = card._combos["date"], card._combos["gps"]
+    assert [date.itemText(i) for i in range(date.count())] == ["Synology Photos", "Filename"]
+    assert date.findData("exif") == -1
+    assert [gps.itemText(i) for i in range(gps.count())] == ["Synology Photos"]
+    assert not view.sync_button.isVisible()
     view.show()
     app.processEvents()
     assert view.sync_button.isVisible()
@@ -741,39 +731,21 @@ def test_policy_choices_use_actual_candidates_and_provider_label(app):
 
 def test_provider_label_mechanism_accepts_immich_without_special_ui_code(app):
     view = PhotoSourcesWidget(Translator("en"))
-    view.set_metadata_sources(
-        provider_label="Immich",
-        available={
-            "date": {"provider", "exif"},
-            "gps": {"provider", "exif"},
-            "location": {"provider"},
-            "caption": set(),
-        },
-        source_kind="immich",
-    )
-    assert view.date_source_combo.itemText(0) == "Immich"
-    assert view.location_source_combo.itemText(0) == "Immich"
+    card = _source_card(view, label="Immich", kind="immich")
+    assert card._combos["date"].itemText(0) == "Immich"
+    assert card._combos["location"].itemText(0) == "Immich"
     view.close()
 
 
 def test_table_displays_effective_provider_provenance(app, tmp_path):
     view = PhotoSourcesWidget(Translator("en"))
-    view.set_metadata_sources(
-        provider_label="Synology Photos",
-        available={"date": {"provider"}, "gps": {"provider"}, "location": {"provider"}, "caption": set()},
-        source_kind="synology-photos",
-    )
+    _source_card(view)
     view.model.set_photos([
         Photo(
-            path=tmp_path / "photo.jpg",
-            filename="photo.jpg",
-            capture_datetime=datetime(2024, 1, 1),
-            date_source=DateSource.SOURCE,
-            latitude=48.0,
-            longitude=2.0,
-            gps_source=GpsSource.SOURCE,
-            city="Paris",
-            location_source=LocationSource.SOURCE,
+            path=tmp_path / "photo.jpg", filename="photo.jpg", source_id="source-a",
+            capture_datetime=datetime(2024, 1, 1), date_source=DateSource.SOURCE,
+            latitude=48.0, longitude=2.0, gps_source=GpsSource.SOURCE,
+            city="Paris", location_source=LocationSource.SOURCE,
         )
     ])
     assert view.model.index(0, 3).data() == "Synology Photos"
@@ -784,62 +756,45 @@ def test_table_displays_effective_provider_provenance(app, tmp_path):
 
 def test_main_window_persists_photo_metadata_policy(window, tmp_path):
     from photoalbum.sources import PhotoMetadataPolicy
-
     service = window._project_service
     service.create(tmp_path / "policy-ui.photoalbum")
     service.set_source_directory(tmp_path / "photos")
     window._load_project_settings()
-
-    window._photos_widget.set_metadata_policy(
-        date_preference="filename",
-        gps_preference="exif",
-        location_preference="none",
-        nominatim_enabled=False,
+    policy = PhotoMetadataPolicy(
+        date_preference="filename", gps_preference="exif",
+        location_preference="none", nominatim_enabled=False,
     )
-    window._photos_widget._emit_metadata_policy_changed()
-
-    assert service.get_photo_metadata_policy() == PhotoMetadataPolicy(
-        date_preference="filename",
-        gps_preference="exif",
-        location_preference="none",
-        nominatim_enabled=False,
-    )
+    window._source_policy_changed(service.get_photo_source().id, policy)
+    assert service.get_photo_metadata_policy() == policy
 
 
 def test_policy_change_immediately_refreshes_all_effective_values_and_sources(
-    window,
-    app,
-    tmp_path,
+    window, app, tmp_path,
 ):
     from photoalbum.database import PhotoRepository
-
+    from photoalbum.sources import PhotoMetadataPolicy
     service = window._project_service
     service.create(tmp_path / "immediate-policy.photoalbum")
     service.set_source_directory(tmp_path / "photos")
     path = tmp_path / "photo.jpg"
     PhotoRepository(service._require_database()).save(
         Photo(
-            path=path,
-            filename=path.name,
-            capture_datetime=datetime(2020, 1, 1),
-            date_source=DateSource.EXIF,
-            latitude=47.0,
-            longitude=-1.0,
-            gps_source=GpsSource.EXIF,
-            exif_capture_datetime=datetime(2020, 1, 1),
+            path=path, filename=path.name, source_id=service.get_photo_source().id,
+            asset_id=str(path), capture_datetime=datetime(2020, 1, 1),
+            date_source=DateSource.EXIF, latitude=47.0, longitude=-1.0,
+            gps_source=GpsSource.EXIF, exif_capture_datetime=datetime(2020, 1, 1),
             source_capture_datetime=datetime(2024, 7, 1),
-            exif_latitude=47.0,
-            exif_longitude=-1.0,
-            source_latitude=48.0,
-            source_longitude=2.0,
+            exif_latitude=47.0, exif_longitude=-1.0,
+            source_latitude=48.0, source_longitude=2.0,
             source_location_data={"city": "Paris", "address": "Paris"},
         )
     )
     window._load_project_settings()
     window._load_project_photos()
-
-    window._photo_metadata_policy_changed("source", "source", "source", False)
-
+    window._source_policy_changed(service.get_photo_source().id, PhotoMetadataPolicy(
+        date_preference="source", gps_preference="source",
+        location_preference="source", nominatim_enabled=False,
+    ))
     displayed = window._photos_widget.model.photo_at(0)
     assert displayed.capture_datetime == datetime(2024, 7, 1)
     assert displayed.date_source == DateSource.SOURCE
@@ -851,28 +806,14 @@ def test_policy_change_immediately_refreshes_all_effective_values_and_sources(
 
 
 def test_photo_sources_widget_uses_user_facing_source_and_policy_labels(app):
+    from PySide6.QtWidgets import QGroupBox
     view = PhotoSourcesWidget(Translator("fr"))
-
-    assert (
-        view.modify_source_button.text()
-        == "Choisir la source des photos de l’album…"
-    )
-    assert view.current_source_label.text() == "Source actuelle :"
-
-    assert view.date_source_combo.maximumWidth() == 360
-    assert view.gps_source_combo.maximumWidth() == 360
-    assert view.location_source_combo.maximumWidth() == 360
-
-    assert (
-        view.nominatim_checkbox.text()
-        == "Compléter les lieux à partir du GPS avec Nominatim"
-    )
-    assert "OpenStreetMap" in view.nominatim_checkbox.toolTip()
-    assert "Internet" in view.nominatim_checkbox.toolTip()
-    assert view.nominatim_info_label.toolTip() == (
-        view.nominatim_checkbox.toolTip()
-    )
-
+    card = _source_card(view)
+    titles = {group.title() for group in view.findChildren(QGroupBox)}
+    assert {"Ajouter une source", "Source(s) de l’album", "Actualisation des photos"} <= titles
+    assert view.modify_source_button.text() == "Ajouter…"
+    assert "OpenStreetMap" in card._nominatim.toolTip()
+    assert "Internet" in card._nominatim.toolTip()
     view.close()
 
 

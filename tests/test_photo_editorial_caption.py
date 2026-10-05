@@ -150,7 +150,7 @@ def test_imported_caption_is_a_searchable_editor_suggestion():
     for _ in range(5):
         app.processEvents()
 
-    editor = widget._caption_editors[str(photo.path)]
+    editor = widget._caption_editors[photo.identity]
     assert editor.text() == ""
     assert editor.placeholderText() == "Provider description"
     assert photo.caption is None
@@ -192,18 +192,18 @@ def test_places_exposes_provider_location_components_and_caption_identity():
     for _ in range(5):
         app.processEvents()
 
-    combo = widget._location_mode_boxes[str(photo.path)]
+    combo = widget._location_mode_boxes[photo.identity]
     choices = [combo.itemText(index) for index in range(combo.count())]
     assert choices[:2] == ["Synology Photos", "Nominatim"]
     assert combo.currentText() == "Synology Photos"
     values = [
         checkbox.text()
-        for checkbox in widget._location_mode_widgets[str(photo.path)][0]
+        for checkbox in widget._location_mode_widgets[photo.identity][0]
         .findChildren(QCheckBox)
     ]
     assert values == ["Paris", "France"]
     assert "Nantes" not in values
-    editor = widget._caption_editors[str(photo.path)]
+    editor = widget._caption_editors[photo.identity]
     assert "Synology Photos" in editor.toolTip()
     assert "Provider description" in editor.toolTip()
     widget.close()

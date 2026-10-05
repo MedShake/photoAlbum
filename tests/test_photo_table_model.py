@@ -16,7 +16,7 @@ def test_empty_model_has_no_rows():
     model = PhotoTableModel()
 
     assert model.rowCount() == 0
-    assert model.columnCount() == 8
+    assert model.columnCount() == 9
 
 
 def test_model_displays_photo_information():

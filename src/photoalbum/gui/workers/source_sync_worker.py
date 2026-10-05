@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
 
 from photoalbum.database import PhotoRepository, ProjectDatabase
+from photoalbum.database.source_repository import SourceRepository
 from photoalbum.sources import (
     PhotoSource,
     ProjectSource,
@@ -34,9 +35,7 @@ class SourceSyncWorker(QObject):
         self._project_path = project_path
         self._source = source
         self._provider = provider
-        self._metadata_policy = metadata_policy or PhotoMetadataPolicy.for_source_kind(
-            source.kind
-        )
+        self._metadata_policy = metadata_policy or source.effective_metadata_policy
         self._publish_source = publish_source
 
     @Slot()
@@ -60,9 +59,8 @@ class SourceSyncWorker(QObject):
                 on_progress=self._handle_progress,
                 metadata_policy=self._metadata_policy,
                 on_commit=(
-                    lambda: database.set_project_metadata(
-                        "photo_source",
-                        self._source.to_json(),
+                    lambda: SourceRepository(database).save(
+                        self._source,
                         commit=False,
                     )
                     if self._publish_source

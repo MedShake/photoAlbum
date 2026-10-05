@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import re
 
 from .base import SourceCapabilities
+from .metadata_policy import PhotoMetadataPolicy
 
 
 _SENSITIVE_KEY_PARTS = (
@@ -58,6 +59,16 @@ class ProjectSource:
     config: dict[str, object] = field(default_factory=dict)
     provider_label: str | None = None
     capabilities: SourceCapabilities | None = None
+    enabled: bool = True
+    metadata_policy: PhotoMetadataPolicy | None = None
+
+    def __post_init__(self) -> None:
+        if self.metadata_policy is None:
+            object.__setattr__(self, "metadata_policy", PhotoMetadataPolicy.for_source_kind(self.kind))
+
+    @property
+    def effective_metadata_policy(self) -> PhotoMetadataPolicy:
+        return self.metadata_policy or PhotoMetadataPolicy.for_source_kind(self.kind)
 
     def to_json(self) -> str:
         _reject_sensitive_config(self.config)
@@ -82,6 +93,8 @@ class ProjectSource:
                     if self.capabilities is not None
                     else None
                 ),
+                "enabled": self.enabled,
+                "metadata_policy": json.loads(self.effective_metadata_policy.to_json()),
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -124,4 +137,9 @@ class ProjectSource:
                 else None
             ),
             capabilities=capabilities,
+            enabled=bool(data.get("enabled", True)),
+            metadata_policy=(
+                PhotoMetadataPolicy.from_json(json.dumps(data["metadata_policy"]))
+                if data.get("metadata_policy") is not None else None
+            ),
         )

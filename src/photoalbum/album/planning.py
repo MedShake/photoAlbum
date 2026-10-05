@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import groupby
 
-from photoalbum.models import Photo
+from photoalbum.models import Photo, PhotoUsage
 
 from .settings import (
     AlbumStructureSettings,
@@ -14,6 +14,7 @@ from .settings import (
 
 class PlanItemKind(str, Enum):
     SPECIAL_PAGE = "special_page"
+    BODY_SPECIAL_PAGE = "body_special_page"
     YEAR_DIVIDER = "year_divider"
     MONTH_DIVIDER = "month_divider"
     DAY_DIVIDER = "day_divider"
@@ -49,11 +50,11 @@ class AlbumPlanner:
         dated_photos = [
             photo
             for photo in photos
-            if photo.capture_datetime is not None
+            if photo.capture_datetime is not None and photo.usage == PhotoUsage.BODY
         ]
 
         dated_photos.sort(
-            key=lambda photo: photo.capture_datetime
+            key=lambda photo: (photo.capture_datetime, photo.identity)
         )
 
         plan = AlbumPlan()
@@ -211,4 +212,3 @@ class AlbumPlanner:
                     page_instance=page,
                 )
             )
-

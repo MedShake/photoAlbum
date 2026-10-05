@@ -29,6 +29,12 @@ class LocationSource(str, Enum):
     UNKNOWN = "unknown"
 
 
+class PhotoUsage(str, Enum):
+    BODY = "body"
+    TEMPLATE_ONLY = "template_only"
+    OFF = "off"
+
+
 @dataclass
 class Photo:
     # ``path`` is the currently materialized representation of the asset.  It
@@ -39,6 +45,7 @@ class Photo:
 
     source_id: str = "local"
     asset_id: str | None = None
+    usage: PhotoUsage = PhotoUsage.BODY
     imported_location_text: str | None = None
     imported_caption: str | None = None
     source_metadata: dict[str, object] | None = None
@@ -112,7 +119,7 @@ class Photo:
             return f"{self.source_id}:{self.asset_id}"
         if self.path is None:
             raise ValueError("A photo needs either an asset id or a local path.")
-        return f"local:{self.path}"
+        return f"{self.source_id}:{self.path}"
 
     def require_path(self) -> Path:
         """Return a renderer-ready path or fail with an actionable error."""

@@ -34,7 +34,7 @@ def test_old_unversioned_album_settings_are_rejected():
     import pytest
 
     data = json.loads(album_settings_to_json(create_settings()))
-    assert data['schema_version'] == 2
+    assert data['schema_version'] == 3
     assert set(data['photo_pages']) == {'page'}
     data.pop('schema_version')
     with pytest.raises(ValueError, match='Unsupported album settings schema'):

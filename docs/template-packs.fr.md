@@ -42,7 +42,7 @@ Le nom du dossier doit correspondre à l’`id` du manifest. Les modules Python 
 
 `schema_version` identifie la version du format du manifest ; `version` identifie la version du pack. Les métadonnées comprennent également `authors` (noms ou objets contenant un champ `name`) et une `description` optionnelle. Ces valeurs sont conservées lors de la découverte, indépendamment de leur affichage actuel dans l’interface.
 
-Un pack peut ne fournir que certains types de pages, MSB fournissant les autres. Les types disponibles sont `photo_page`, `cover`, `special_page`, `day_divider`, `month_divider` et `year_divider`. Pour les couvertures, `cover_positions` peut contenir `front`, `inside_front`, `inside_back` et `back`.
+Un pack peut ne fournir que certains types de pages, MSB fournissant les autres. Les types disponibles sont `photo_page`, `cover`, `special_page`, `body_special_page`, `day_divider`, `month_divider` et `year_divider`. Pour les couvertures, `cover_positions` peut contenir `front`, `inside_front`, `inside_back` et `back`.
 
 ## Compatibilité physique des pages
 
@@ -53,6 +53,13 @@ Un template peut déclarer dans le manifest des limites physiques optionnelles v
 La commande CLI de catalogue expose ces informations collectées ; le format JSON permet également de les exploiter de manière structurée.
 
 ## API publique d’écriture des packs
+
+Le rôle opt-in `body_special_page` autorise une occurrence au milieu du corps
+depuis le Plan. Il n’est pas impliqué par `special_page`. MSB `dedication` et
+`blank`, ainsi que Simplex `simplex-full-photo-cover`, le déclarent. Le format
+du manifeste reste en version 1 ; seul l’ensemble de valeurs de rôle s’étend.
+Ces pages utilisent le renderer habituel et reçoivent le contexte temporel de
+leur ancrage. Voir [la pagination éditoriale](editorial-pagination.md).
 
 Les packs doivent importer les primitives de l’hôte depuis `photoalbum.template_engine.api` plutôt que depuis les modules internes :
 

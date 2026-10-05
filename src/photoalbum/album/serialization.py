@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 
 from .models import CoverPosition
 from .settings import (
     AlbumStructureSettings,
+    ContentAnchor,
+    PhotoPageOverride,
+    BodyPageInsertion,
     CoverSettings,
     DividerPlacement,
     DividerSettings,
@@ -42,7 +46,16 @@ def album_settings_to_json(
     settings: AlbumStructureSettings,
 ) -> str:
     data = {
-        "schema_version": 2,
+        "schema_version": 3,
+        "photo_page_overrides": [
+            {"photo_identity": override.photo_identity, "page": _instance_to_data(override.page)}
+            for override in settings.photo_page_overrides
+        ],
+        "body_insertions": [
+            {"anchor": asdict(insertion.anchor), "page": _instance_to_data(insertion.page),
+             "enabled": insertion.enabled}
+            for insertion in settings.body_insertions
+        ],
         "covers": {
             position.value: _instance_to_data(
                 cover.page
@@ -129,7 +142,7 @@ def album_settings_from_json(
     value: str,
 ) -> AlbumStructureSettings:
     data = json.loads(value)
-    if data.get("schema_version") != 2:
+    if data.get("schema_version") not in (2, 3):
         raise ValueError("Unsupported album settings schema; recreate this beta album's settings.")
 
     covers = {
@@ -150,6 +163,15 @@ def album_settings_from_json(
     print_data = data["print_settings"]
 
     return AlbumStructureSettings(
+        photo_page_overrides=[
+            PhotoPageOverride(str(item["photo_identity"]), _instance_from_data(item["page"]))
+            for item in data.get("photo_page_overrides", [])
+        ],
+        body_insertions=[
+            BodyPageInsertion(ContentAnchor(**item["anchor"]), _instance_from_data(item["page"]),
+                              bool(item.get("enabled", True)))
+            for item in data.get("body_insertions", [])
+        ],
         covers=covers,
 
         day_dividers=DividerSettings(

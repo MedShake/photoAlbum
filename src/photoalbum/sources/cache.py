@@ -81,10 +81,13 @@ class SourceAssetCache:
         providers: dict[str, PhotoSource],
         *,
         quality: str,
+        source_kinds: dict[str, str] | None = None,
     ) -> list[Photo]:
         prepared = []
         for photo in photos:
-            if photo.source_id == "local":
+            provider = providers.get(photo.source_id)
+            kind = (source_kinds or {}).get(photo.source_id, getattr(provider, "kind", None))
+            if kind == "local" or photo.asset_id is None:
                 photo.require_path()
                 prepared.append(photo)
                 continue

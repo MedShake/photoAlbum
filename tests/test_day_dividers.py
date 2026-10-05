@@ -178,7 +178,7 @@ def test_day_settings_round_trip_and_gui_preserve_instance(widget, placement):
         template_id="day-divider-simple", settings={"day_divider_simple": {"title_font_size": 35}},
     ))
     encoded = album_settings_to_json(original)
-    assert json.loads(encoded)["schema_version"] == 2
+    assert json.loads(encoded)["schema_version"] == 3
     restored = album_settings_from_json(encoded)
     assert restored == original
     widget.set_settings(restored)

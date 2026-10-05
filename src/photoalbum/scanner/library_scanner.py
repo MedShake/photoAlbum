@@ -48,9 +48,11 @@ class LibraryScanner:
         photo_analyzer: PhotoAnalyzer | None = None,
         photo_repository: PhotoRepository | None = None,
         photo_processor: PhotoProcessor | None = None,
+        source_id: str = "local",
     ) -> None:
         self._folder_scanner = folder_scanner or FolderScanner()
         self._photo_repository = photo_repository
+        self._source_id = source_id
 
         self._photo_processor = (
             photo_processor
@@ -154,7 +156,8 @@ class LibraryScanner:
         }
 
         known_photos = (
-            self._photo_repository.list_all(
+            self._photo_repository.list_by_source(
+                self._source_id,
                 include_missing=True
             )
         )
@@ -167,7 +170,7 @@ class LibraryScanner:
                 # that has returned unchanged and was therefore
                 # reused from the cache.
                 self._photo_repository.set_missing(
-                    photo.path,
+                    photo.identity,
                     False,
                 )
                 continue
@@ -176,12 +179,12 @@ class LibraryScanner:
             # list_all(include_missing=True) returns both states,
             # so inspect the database state before changing it.
             if self._photo_repository.is_missing(
-                photo.path
+                photo.identity
             ):
                 continue
 
             self._photo_repository.set_missing(
-                photo.path,
+                photo.identity,
                 True,
             )
 
@@ -198,7 +201,7 @@ class LibraryScanner:
         statistics: ScanStatistics,
     ) -> Photo:
         previous_photo = (
-            self._photo_repository.find_by_path(path)
+            self._photo_repository.find_by_identity(f"{self._source_id}:{path}")
             if self._photo_repository is not None
             else None
         )
@@ -215,6 +218,8 @@ class LibraryScanner:
             language=language,
             on_event=on_event,
         )
+        photo.source_id = self._source_id
+        photo.asset_id = str(path)
 
         statistics.analyzed += 1
 
@@ -236,7 +241,7 @@ class LibraryScanner:
         if self._photo_repository is None:
             return None
 
-        cached_photo = self._photo_repository.find_by_path(path)
+        cached_photo = self._photo_repository.find_by_identity(f"{self._source_id}:{path}")
 
         if cached_photo is None:
             return None
@@ -285,6 +290,7 @@ class LibraryScanner:
         previous: Photo,
     ) -> None:
         """Keep user-authored state while refreshing source metadata."""
+        photo.usage = previous.usage
 
         if previous.date_source == DateSource.MANUAL:
             photo.capture_datetime = previous.capture_datetime

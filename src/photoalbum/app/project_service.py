@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
 
-from photoalbum.models import LocationComponent
+from photoalbum.models import LocationComponent, PhotoUsage
+from photoalbum.database.source_repository import SourceRepository
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import Location, Photo
 from photoalbum.geocoding import NominatimGeocoder, create_nominatim_location_resolver
@@ -25,11 +28,7 @@ from photoalbum.album import (
 )
 
 class ProjectService:
-    SOURCE_DIRECTORY_KEY = "source_directory"
-    RECURSIVE_SCAN_KEY = "recursive_scan"
     ALBUM_STRUCTURE_SETTINGS_KEY = "album_structure_settings"
-    PHOTO_SOURCE_KEY = "photo_source"
-    PHOTO_METADATA_POLICY_KEY = "photo_metadata_policy"
 
     def __init__(self) -> None:
         self._database: ProjectDatabase | None = None
@@ -80,7 +79,8 @@ class ProjectService:
 
         repository = PhotoRepository(database)
 
-        return repository.list_all()
+        active = {source.id for source in self.list_sources() if source.enabled}
+        return [photo for photo in repository.list_all() if photo.source_id in active]
 
     def find_photo(self, photo_path: Path) -> Photo | None:
         repository = PhotoRepository(self._require_database())
@@ -110,7 +110,7 @@ class ProjectService:
 
     def restore_original_capture_datetime(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
     ) -> None:
         database = self._require_database()
 
@@ -122,7 +122,7 @@ class ProjectService:
 
     def set_manual_capture_datetime(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
         capture_datetime: datetime,
     ) -> None:
         database = self._require_database()
@@ -136,7 +136,7 @@ class ProjectService:
 
     def set_manual_gps(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
         latitude: float | None,
         longitude: float | None,
     ) -> None:
@@ -152,7 +152,7 @@ class ProjectService:
 
     def restore_original_gps(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
     ) -> None:
         database = self._require_database()
 
@@ -164,7 +164,7 @@ class ProjectService:
 
     def set_photo_caption(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
         caption: str | None,
     ) -> None:
         database = self._require_database()
@@ -177,7 +177,7 @@ class ProjectService:
 
     def set_editorial_location(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
         *,
         components: tuple[LocationComponent, ...],
         location_text: str | None,
@@ -195,7 +195,7 @@ class ProjectService:
 
     def set_geocoded_location(
         self,
-        photo_path: Path,
+        photo_path: Path | str,
         *,
         place_name: str | None,
         city: str | None,
@@ -225,190 +225,123 @@ class ProjectService:
             self._database.close()
             self._database = None
 
-    def set_source_directory(
-        self,
-        directory: Path,
-    ) -> None:
-        database = self._require_database()
+    def list_sources(self) -> list[ProjectSource]:
+        return SourceRepository(self._require_database()).list_all()
 
-        directory = directory.expanduser().resolve()
+    def get_photo_source(self, source_id: str | None = None) -> ProjectSource | None:
+        repository = SourceRepository(self._require_database())
+        if source_id is not None:
+            return repository.find(source_id)
+        sources = repository.list_all()
+        return sources[0] if sources else None
 
-        database.set_project_metadata(
-            self.SOURCE_DIRECTORY_KEY,
-            str(directory),
-        )
-        database.set_project_metadata(
-            self.PHOTO_SOURCE_KEY,
-            ProjectSource(
-                id="local",
-                kind="local",
-                name=directory.name,
-                collection_id="folder",
-                collection_name=directory.name,
-                config={"directory": str(directory)},
-                provider_label=self._local_source_label(),
-                capabilities=SourceCapabilities(
-                    date_candidates=frozenset({"exif", "filename"}),
-                    gps_candidates=frozenset({"exif"}),
-                    can_fetch_original=True,
-                ),
-            ).to_json(),
-        )
-
-    def get_source_directory(self) -> Path | None:
-        database = self._require_database()
-
-        value = database.get_project_metadata(
-            self.SOURCE_DIRECTORY_KEY
-        )
-
-        if value is None:
-            return None
-
-        return Path(value)
-
-    def set_photo_source(
-        self, source: ProjectSource, provider: PhotoSource | None = None
-    ) -> None:
-        if source.kind != "local":
-            raise RuntimeError(
-                "Remote sources must be installed with change_photo_source()."
-            )
-        database = self._require_database()
-        database.set_project_metadata(self.PHOTO_SOURCE_KEY, source.to_json())
+    def set_photo_source(self, source: ProjectSource, provider: PhotoSource | None = None) -> None:
+        SourceRepository(self._require_database()).save(source)
         if provider is not None:
-            old = self._source_sessions.pop(source.id, None)
-            if old is not None and old is not provider:
-                old.close()
-            self._source_sessions[source.id] = provider
+            self.attach_source_session(source.id, provider)
 
-    def get_photo_source(self) -> ProjectSource | None:
-        database = self._require_database()
-        value = database.get_project_metadata(self.PHOTO_SOURCE_KEY)
-        if value is not None:
-            return ProjectSource.from_json(value)
-        directory = self.get_source_directory()
-        if directory is None:
-            return None
-        return ProjectSource(
-            id="local", kind="local", name=directory.name,
+    def add_local_source(self, directory: Path, *, recursive: bool = False) -> ProjectSource:
+        directory = directory.expanduser().resolve()
+        source = ProjectSource(
+            id=uuid4().hex, kind="local", name=directory.name,
             collection_id="folder", collection_name=directory.name,
-            config={"directory": str(directory)},
-            provider_label=self._local_source_label(),
+            config={"directory": str(directory), "recursive": recursive},
+            provider_label="Local folder",
             capabilities=SourceCapabilities(
                 date_candidates=frozenset({"exif", "filename"}),
-                gps_candidates=frozenset({"exif"}),
-                can_fetch_original=True,
-            ),
+                gps_candidates=frozenset({"exif"}), can_fetch_original=True),
         )
+        self.set_photo_source(source)
+        return source
 
-    @staticmethod
-    def _local_source_label() -> str:
-        return "Local folder"
+    def set_source_enabled(self, source_id: str, enabled: bool) -> None:
+        SourceRepository(self._require_database()).set_enabled(source_id, enabled)
 
-    def get_photo_metadata_policy(self) -> PhotoMetadataPolicy:
-        """Return persisted metadata preferences or source-appropriate defaults."""
-        database = self._require_database()
-        value = database.get_project_metadata(
-            self.PHOTO_METADATA_POLICY_KEY
-        )
-        if value is not None:
-            return PhotoMetadataPolicy.from_json(value)
+    def delete_source(self, source_id: str) -> None:
+        SourceRepository(self._require_database()).delete(source_id)
+        provider = self._source_sessions.pop(source_id, None)
+        if provider is not None:
+            provider.close()
 
-        source = self.get_photo_source()
-        source_kind = source.kind if source is not None else "local"
-        return PhotoMetadataPolicy.for_source_kind(source_kind)
+    def set_source_directory(self, directory: Path, source_id: str | None = None) -> None:
+        source = self.get_photo_source(source_id)
+        if source is None or source.kind != "local":
+            self.add_local_source(directory)
+            return
+        directory = directory.expanduser().resolve()
+        self.set_photo_source(replace(
+            source, name=directory.name, collection_name=directory.name,
+            config={**source.config, "directory": str(directory)}))
 
-    def set_photo_metadata_policy(
-        self,
-        policy: PhotoMetadataPolicy,
-    ) -> None:
-        """Persist metadata preferences without processing photos."""
-        database = self._require_database()
-        database.set_project_metadata(
-            self.PHOTO_METADATA_POLICY_KEY,
-            policy.to_json(),
-        )
+    def get_source_directory(self, source_id: str | None = None) -> Path | None:
+        source = self.get_photo_source(source_id)
+        return (Path(str(source.config["directory"]))
+                if source is not None and source.kind == "local" else None)
 
-    def apply_photo_metadata_policy(
-        self,
-        policy: PhotoMetadataPolicy | None = None,
-    ) -> None:
-        """Recompute effective metadata from preserved candidates."""
-        database = self._require_database()
-        repository = PhotoRepository(database)
+    def get_photo_metadata_policy(self, source_id: str | None = None) -> PhotoMetadataPolicy:
+        source = self.get_photo_source(source_id)
+        return source.effective_metadata_policy if source else PhotoMetadataPolicy.for_source_kind("local")
 
-        if policy is None:
-            policy = self.get_photo_metadata_policy()
+    def set_photo_metadata_policy(self, policy: PhotoMetadataPolicy, source_id: str | None = None) -> None:
+        source = self.get_photo_source(source_id)
+        if source is None:
+            raise KeyError(source_id)
+        self.set_photo_source(replace(source, metadata_policy=policy))
 
-        photos = repository.list_all()
-
+    def apply_photo_metadata_policy(self, policy: PhotoMetadataPolicy | None = None,
+                                    source_id: str | None = None) -> None:
+        repository = PhotoRepository(self._require_database())
+        sources = ([self.get_photo_source(source_id)] if source_id is not None
+                   else self.list_sources())
         with repository.atomic():
-            for photo in photos:
-                repository.save(
-                    resolve_photo_metadata(photo, policy),
-                    commit=False,
-                )
+            for source in sources:
+                if source is None:
+                    continue
+                for photo in repository.list_by_source(source.id):
+                    repository.save(resolve_photo_metadata(
+                        photo, policy or source.effective_metadata_policy), commit=False)
 
-    def preview_photo_metadata_policy(
-        self,
-        policy: PhotoMetadataPolicy | None = None,
-    ) -> list[Photo]:
-        """Resolve in memory so the GUI can refresh before background writes."""
-        if policy is None:
-            policy = self.get_photo_metadata_policy()
+    def preview_photo_metadata_policy(self, policy: PhotoMetadataPolicy | None = None,
+                                      source_id: str | None = None) -> list[Photo]:
+        sources = {source.id: source for source in self.list_sources()}
         return [
-            resolve_photo_metadata(photo, policy)
+            resolve_photo_metadata(photo, policy or sources[photo.source_id].effective_metadata_policy)
+            if source_id is None or photo.source_id == source_id else photo
             for photo in self.list_photos()
         ]
 
-    def get_source_label(self) -> str:
-        source = self.get_photo_source()
+    def list_album_photos(self) -> list[Photo]:
+        return [photo for photo in self.list_photos() if photo.usage != PhotoUsage.OFF]
+
+    def list_body_photos(self) -> list[Photo]:
+        return [photo for photo in self.list_photos() if photo.usage == PhotoUsage.BODY]
+
+    def set_photo_usage(self, identity: str, usage: PhotoUsage) -> None:
+        PhotoRepository(self._require_database()).set_usage(identity, usage)
+
+    def source_labels(self) -> dict[str, str]:
+        return {source.id: self.get_source_label(source.id) for source in self.list_sources()}
+
+    def get_source_label(self, source_id: str | None = None) -> str:
+        source = self.get_photo_source(source_id)
         if source is None:
             return ""
         provider = self._source_sessions.get(source.id)
-        label = getattr(provider, "label", None) if provider is not None else None
-        if label:
-            return str(label)
-        if source.provider_label:
-            return source.provider_label
-        return source.kind.replace("-", " ").title()
+        return str(getattr(provider, "label", None) or source.provider_label or source.kind.title())
 
-    def available_metadata_candidates(self) -> dict[str, set[str]]:
-        available = {
-            "date": set(),
-            "gps": set(),
-            "location": set(),
-            "caption": set(),
-        }
-        photos = self.list_photos()
+    def available_metadata_candidates(self, source_id: str | None = None) -> dict[str, set[str]]:
+        available = {key: set() for key in ("date", "gps", "location", "caption")}
+        source = self.get_photo_source(source_id)
+        if source is None:
+            return available
+        photos = PhotoRepository(self._require_database()).list_by_source(source.id)
         for photo in photos:
-            available["date"].update(photo.metadata_candidates.date)
-            available["gps"].update(photo.metadata_candidates.gps)
-            available["location"].update(photo.metadata_candidates.location)
-            available["caption"].update(photo.metadata_candidates.caption)
-            if photo.manual_capture_datetime is not None:
-                available["date"].add("manual")
-            if photo.gps_source.value == "manual":
-                available["gps"].add("manual")
-            if photo.manual_location_data is not None:
-                available["location"].add("manual")
-            if photo.caption:
-                available["caption"].add("manual")
-        source = self.get_photo_source()
-        if source is not None:
-            if not photos and source.capabilities is not None:
-                available["date"].update(source.capabilities.date_candidates)
-                available["gps"].update(source.capabilities.gps_candidates)
-                available["location"].update(source.capabilities.location_candidates)
-                available["caption"].update(source.capabilities.caption_candidates)
-            provider = self._source_sessions.get(source.id)
-            capabilities = getattr(provider, "capabilities", None)
-            if not photos and capabilities is not None:
-                available["date"].update(capabilities.date_candidates)
-                available["gps"].update(capabilities.gps_candidates)
-                available["location"].update(capabilities.location_candidates)
-                available["caption"].update(capabilities.caption_candidates)
+            for key in available:
+                available[key].update(getattr(photo.metadata_candidates, key))
+        capabilities = source.capabilities or getattr(self._source_sessions.get(source.id), "capabilities", None)
+        if capabilities is not None:
+            for key in available:
+                available[key].update(getattr(capabilities, key + "_candidates"))
         return available
 
     def get_photo_source_session(
@@ -426,84 +359,45 @@ class ProjectService:
             old.close()
         self._source_sessions[source_id] = provider
 
-    def activate_source_session(
-        self,
-        source_id: str,
-        provider: PhotoSource,
-    ) -> None:
-        """Adopt a newly imported source and retire other in-memory sessions."""
-        for existing_id, existing in tuple(self._source_sessions.items()):
-            if existing is provider:
-                continue
-            try:
-                existing.close()
-            except Exception:
-                pass
-            del self._source_sessions[existing_id]
+    def activate_source_session(self, source_id: str, provider: PhotoSource) -> None:
         self.attach_source_session(source_id, provider)
 
-    def change_photo_source(
-        self,
-        source: ProjectSource,
-        provider: PhotoSource,
-    ) -> SourceImportResult:
-        """Publish a new source only with its successfully imported snapshot."""
+    def change_photo_source(self, source: ProjectSource, provider: PhotoSource) -> SourceImportResult:
         database = self._require_database()
-        importer = SourceImporter(
-            PhotoRepository(database), SourceAssetCache(database.path)
-        )
         try:
-            result = importer.import_collection(
-                source,
-                provider,
-                metadata_policy=PhotoMetadataPolicy.for_source_kind(source.kind),
-                on_commit=lambda: database.set_project_metadata(
-                    self.PHOTO_SOURCE_KEY,
-                    source.to_json(),
-                    commit=False,
-                ),
-            )
+            result = SourceImporter(PhotoRepository(database), SourceAssetCache(database.path)).import_collection(
+                source, provider, metadata_policy=source.effective_metadata_policy,
+                on_commit=lambda: SourceRepository(database).save(source, commit=False))
         except Exception:
-            try:
-                provider.close()
-            except Exception:
-                pass
+            provider.close()
             raise
-
-        for source_id, previous in tuple(self._source_sessions.items()):
-            if previous is provider:
-                continue
-            try:
-                previous.close()
-            except Exception:
-                pass
-            del self._source_sessions[source_id]
         self.attach_source_session(source.id, provider)
         return result
 
-    def sync_photo_source(self) -> SourceImportResult:
+    def sync_photo_source(self, source_id: str | None = None) -> SourceImportResult:
         database = self._require_database()
-        source = self.get_photo_source()
+        source = self.get_photo_source(source_id)
         if source is None:
             raise RuntimeError("No photo source is configured.")
         provider = self._source_sessions.get(source.id)
         if provider is None:
-            raise RuntimeError(
-                f"Source {source.name!r} must be connected before synchronization."
-            )
-        return SourceImporter(
-            PhotoRepository(database), SourceAssetCache(database.path)
-        ).import_collection(
-            source,
-            provider,
-            metadata_policy=self.get_photo_metadata_policy(),
-        )
+            raise RuntimeError(f"Source {source.name!r} must be connected before synchronization.")
+        return SourceImporter(PhotoRepository(database), SourceAssetCache(database.path)).import_collection(
+            source, provider, metadata_policy=source.effective_metadata_policy)
 
     def materialize_originals(self, photos: list[Photo]) -> None:
         database = self._require_database()
         cache = SourceAssetCache(database.path)
+        # PDF preparation runs in a worker: read source descriptors using a
+        # connection owned by that thread, never the GUI connection.
+        reader = ProjectDatabase(database.path)
+        try:
+            sources = {source.id: source for source in SourceRepository(reader).list_all()}
+        finally:
+            reader.close()
         for photo in photos:
-            if photo.source_id == "local":
+            source = sources.get(photo.source_id)
+            if source is not None and source.kind == "local":
                 photo.require_path()
                 continue
             provider = self._source_sessions.get(photo.source_id)
@@ -518,26 +412,15 @@ class ProjectService:
                 )
             photo.path = cache.materialize(photo, provider, quality="original")
 
-    def set_recursive_scan(
-        self,
-        recursive: bool,
-    ) -> None:
-        database = self._require_database()
+    def set_recursive_scan(self, recursive: bool, source_id: str | None = None) -> None:
+        source = self.get_photo_source(source_id)
+        if source is None:
+            raise KeyError(source_id)
+        self.set_photo_source(replace(source, config={**source.config, "recursive": recursive}))
 
-        database.set_project_metadata(
-            self.RECURSIVE_SCAN_KEY,
-            "1" if recursive else "0",
-        )
-
-    def get_recursive_scan(self) -> bool:
-        database = self._require_database()
-
-        value = database.get_project_metadata(
-            self.RECURSIVE_SCAN_KEY
-        )
-
-        return value == "1"
-
+    def get_recursive_scan(self, source_id: str | None = None) -> bool:
+        source = self.get_photo_source(source_id)
+        return bool(source and source.config.get("recursive", False))
 
     def set_album_structure_settings(
         self,

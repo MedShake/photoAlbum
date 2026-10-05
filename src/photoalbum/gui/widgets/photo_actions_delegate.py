@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.i18n import Translator
-from photoalbum.models import Photo
+from photoalbum.models import Photo, PhotoUsage
 
 
 class PhotoActionsDelegate(QStyledItemDelegate):
@@ -37,6 +37,7 @@ class PhotoActionsDelegate(QStyledItemDelegate):
     edit_datetime_requested = Signal(object)
     edit_gps_requested = Signal(object)
     open_photo_requested = Signal(object)
+    edit_usage_requested = Signal(object)
 
     ICON_SIZE = 20
     BUTTON_SIZE = 30
@@ -62,7 +63,7 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         )
 
         return QSize(
-            3 * self.BUTTON_SIZE + 2 * self.SPACING,
+            4 * self.BUTTON_SIZE + 3 * self.SPACING,
             max(
                 size.height(),
                 self.BUTTON_SIZE,
@@ -92,7 +93,7 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         if not isinstance(photo, Photo):
             return
 
-        date_rect, gps_rect, open_rect = (
+        date_rect, gps_rect, open_rect, usage_rect = (
             self._action_rects(option.rect)
         )
 
@@ -109,6 +110,29 @@ class PhotoActionsDelegate(QStyledItemDelegate):
             gps_rect,
             missing=not photo.has_gps,
         )
+
+        painter.save()
+        color, symbol = {
+            PhotoUsage.BODY: ("#707070", "+"),
+            PhotoUsage.TEMPLATE_ONLY: ("#d87812", "−"),
+            PhotoUsage.OFF: ("#c62828", "×"),
+        }[photo.usage]
+        painter.setPen(QPen(QColor(color), 1.5))
+        painter.drawRect(usage_rect.adjusted(5, 5, -7, -5))
+        painter.drawLine(usage_rect.left() + 7, usage_rect.top() + 19,
+                         usage_rect.left() + 13, usage_rect.top() + 12)
+        painter.drawLine(usage_rect.left() + 13, usage_rect.top() + 12,
+                         usage_rect.left() + 20, usage_rect.top() + 20)
+        badge = QRect(usage_rect.right() - 13, usage_rect.bottom() - 13, 13, 13)
+        painter.setBrush(QColor(color))
+        painter.drawEllipse(badge)
+        font = painter.font()
+        font.setPixelSize(13)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor("white"))
+        painter.drawText(badge, Qt.AlignmentFlag.AlignCenter, symbol)
+        painter.restore()
 
         self._paint_open(
             painter,
@@ -143,11 +167,14 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         if not isinstance(photo, Photo):
             return False
 
-        date_rect, gps_rect, open_rect = (
+        date_rect, gps_rect, open_rect, usage_rect = (
             self._action_rects(option.rect)
         )
 
         position = event.position().toPoint()
+        if usage_rect.contains(position):
+            self.edit_usage_requested.emit(photo)
+            return True
 
         if date_rect.contains(position):
             self.edit_datetime_requested.emit(
@@ -188,11 +215,14 @@ class PhotoActionsDelegate(QStyledItemDelegate):
                 index,
             )
 
-        date_rect, gps_rect, open_rect = (
+        date_rect, gps_rect, open_rect, usage_rect = (
             self._action_rects(option.rect)
         )
 
         position = event.pos()
+        if usage_rect.contains(position):
+            QToolTip.showText(event.globalPos(), self._translator.tr("photos.usage." + photo.usage.value), view)
+            return True
 
         if date_rect.contains(position):
             QToolTip.showText(
@@ -231,10 +261,10 @@ class PhotoActionsDelegate(QStyledItemDelegate):
     def _action_rects(
         cls,
         cell_rect: QRect,
-    ) -> tuple[QRect, QRect, QRect]:
+    ) -> tuple[QRect, QRect, QRect, QRect]:
         total_width = (
-            3 * cls.BUTTON_SIZE
-            + 2 * cls.SPACING
+            4 * cls.BUTTON_SIZE
+            + 3 * cls.SPACING
         )
 
         x = (
@@ -276,7 +306,8 @@ class PhotoActionsDelegate(QStyledItemDelegate):
             cls.BUTTON_SIZE,
         )
 
-        return date_rect, gps_rect, open_rect
+        usage_rect = QRect(x + 3 * (cls.BUTTON_SIZE + cls.SPACING), y, cls.BUTTON_SIZE, cls.BUTTON_SIZE)
+        return date_rect, gps_rect, open_rect, usage_rect
 
     @classmethod
     def _icon_rect(

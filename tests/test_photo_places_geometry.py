@@ -56,7 +56,7 @@ def view():
 
 
 def assert_fits(widget, photo):
-    item, editor, flow = widget._editor_rows[str(photo.path)]
+    item, editor, flow = widget._editor_rows[photo.identity]
     rect = widget._tree.visualItemRect(item)
     assert rect.height() == item.sizeHint(3).height()
     assert item.sizeHint(3).isValid()
@@ -67,7 +67,7 @@ def assert_fits(widget, photo):
         assert flow.parentWidget().height() >= flow.heightForWidth(flow.parentWidget().width())
         for check in flow.parentWidget().findChildren(QCheckBox):
             assert check.geometry().bottom() < flow.parentWidget().height()
-    caption = widget._caption_editors[str(photo.path)]
+    caption = widget._caption_editors[photo.identity]
     assert caption.mapTo(editor, QPoint(0, caption.height())).y() <= editor.height()
     return rect.height()
 
@@ -75,9 +75,9 @@ def assert_fits(widget, photo):
 def test_resize_both_directions_and_mode_switches(view):
     widget, photos, save, settle = view
     photo = photos[0]
-    combo = widget._location_mode_boxes[str(photo.path)]
-    editor = widget._editor_rows[str(photo.path)][1]
-    caption = widget._caption_editors[str(photo.path)]
+    combo = widget._location_mode_boxes[photo.identity]
+    editor = widget._editor_rows[photo.identity][1]
+    caption = widget._caption_editors[photo.identity]
     wide = assert_fits(widget, photo)
     widget.resize(950, 700)
     settle()
@@ -99,10 +99,10 @@ def test_resize_both_directions_and_mode_switches(view):
         widget.resize(width, 700)
         settle()
         assert_fits(widget, photo)
-    assert widget._editor_rows[str(photo.path)][1] is editor
-    assert widget._caption_editors[str(photo.path)] is caption
+    assert widget._editor_rows[photo.identity][1] is editor
+    assert widget._caption_editors[photo.identity] is caption
     assert widget._materialized_months == {(2025, 3)}
-    assert str(photos[2].path) not in widget._editor_rows
+    assert photos[2].identity not in widget._editor_rows
 
 
 def test_truth_text_and_column_width_change_row_height(view):
@@ -144,14 +144,14 @@ def test_hidden_view_and_lazy_month_expansion(view):
 
 def test_custom_location_and_caption_keep_horizontal_alignment(view):
     widget, photos, _, settle = view
-    combo = widget._location_mode_boxes[str(photos[0].path)]
+    combo = widget._location_mode_boxes[photos[0].identity]
     combo.setCurrentIndex(1)
     settle()
     starts = []
     for photo in photos[:2]:
-        root = widget._editor_rows[str(photo.path)][1]
-        location = widget._location_mode_widgets[str(photo.path)][2]
-        caption = widget._caption_editors[str(photo.path)]
+        root = widget._editor_rows[photo.identity][1]
+        location = widget._location_mode_widgets[photo.identity][2]
+        caption = widget._caption_editors[photo.identity]
         x = location.mapTo(root, QPoint()).x()
         assert x == caption.mapTo(root, QPoint()).x()
         assert location.width() == caption.width()

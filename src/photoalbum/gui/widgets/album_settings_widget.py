@@ -83,6 +83,8 @@ class AlbumSettingsWidget(QWidget):
         self._year_dividers_available = False
 
         self._photo_provider = None
+        self._photo_page_overrides = []
+        self._body_insertions = []
 
         self._create_content()
         self._apply_defaults()
@@ -1504,6 +1506,8 @@ class AlbumSettingsWidget(QWidget):
             self._year_divider_instance, self._year_divider_combo,
         )
         return AlbumStructureSettings(
+            photo_page_overrides=list(self._photo_page_overrides),
+            body_insertions=list(self._body_insertions),
             custom_width_mm=self._custom_dimensions[0],
             custom_height_mm=self._custom_dimensions[1],
             page_format=str(
@@ -1593,6 +1597,8 @@ class AlbumSettingsWidget(QWidget):
         settings: AlbumStructureSettings,
     ) -> None:
         self._loading_settings = True
+        self._photo_page_overrides = list(settings.photo_page_overrides)
+        self._body_insertions = list(settings.body_insertions)
 
         self._template_pack_settings = dict(
             settings.template_pack_settings

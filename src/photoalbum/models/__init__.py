@@ -1,6 +1,6 @@
 from .location import Location
 from .location_component import LocationComponent
-from .photo import DateSource, GpsSource, LocationSource, Photo
+from .photo import DateSource, GpsSource, LocationSource, Photo, PhotoUsage
 from .metadata_candidates import GpsCandidate, MetadataCandidates
 
 __all__ = [
@@ -10,6 +10,7 @@ __all__ = [
     "LocationComponent",
     "LocationSource",
     "Photo",
+    "PhotoUsage",
     "GpsCandidate",
     "MetadataCandidates",
 ]

@@ -8,12 +8,54 @@ n’est que la représentation matérialisée utilisée par les renderers exista
 
 La sélection ou l’actualisation d’une collection crée un instantané explicite
 dans le projet. Les changements de l’album distant restent sans effet jusqu’à
-une nouvelle analyse demandée par l’utilisateur. Cette actualisation :
+une synchronisation demandée par l’utilisateur. Cette actualisation :
 
 - met à jour les métadonnées et valeurs d’origine du provider ;
 - préserve dates, coordonnées, légendes et lieux éditoriaux manuels ;
 - marque les assets disparus comme absents sans les supprimer ;
-- conserve les assets de l’ancienne source en les rendant inactifs.
+- ne change l’état absent que pour cette source, sans toucher aux autres.
+
+## Plusieurs sources et utilisation des photos
+
+La table ordonnée `sources` et `SourceRepository` constituent l’unique référence
+de configuration. Chaque occurrence possède un UUID stable, son provider, sa
+configuration non sensible, son activation et sa politique Date/GPS/Lieu/Nominatim.
+Le scan récursif est propre à chaque source locale. Un ID ne détermine jamais le
+type du provider ; plusieurs occurrences peuvent viser le même dossier/serveur.
+
+L’onglet Photos comporte « Ajouter une source », « Source(s) de l’album » et
+« Actualisation des photos ». Désactiver masque immédiatement les photos partout
+en aval, sans perdre instantané ni corrections. Réactiver restaure cet instantané.
+Supprimer demande confirmation et retire seulement cette source et ses photos
+en base. Les sessions coexistent ; les traitements globaux parcourent les sources
+actives séquentiellement et poursuivent après une erreur indépendante.
+Reconnecter la même collection Synology via Modifier ne la resynchronise pas.
+
+L’action d’utilisation propose trois choix explicites : dans le corps (`body`),
+hors corps disponible aux modèles (`template_only`), désactivée (`off`). Cet état
+survit aux rescans et ne remplace ni l’activation source ni l’état absent.
+`list_photos()` inclut OFF pour les sources actives ; `list_album_photos()` exclut
+OFF ; `list_body_photos()` ne conserve que BODY. Les photos manquantes restent
+hors de ces listes effectives. Lieux et légendes et les sélecteurs des modèles
+reçoivent le pool album. `AlbumBuildResult.template_photos` le transmet à
+l’Aperçu, au PDF, au préchauffage et à la préparation des originaux.
+
+Les mutations et sélections utilisent `Photo.identity`, jamais un chemin ambigu.
+Le chemin n’est plus unique en base. Les anciennes API par chemin refusent les
+ambiguïtés. En CLI, `scan --source-id ID` distingue deux occurrences du même dossier.
+
+## Migration
+
+Les projets neufs sont créés directement en SQLite 5. Le schéma publié v0.1.0
+(version 1, fixture issue du tag) est normalisé directement vers 5 dans une seule
+transaction, annulée entièrement en cas d’échec. Les versions de développement
+2/3/4 passent par le même mécanisme. La version courante n’est pas reconstruite.
+Identités, candidats et corrections sont conservés ; l’utilisation initiale est
+BODY. Les anciennes clés de source sont migrées dans la collection puis supprimées.
+Un ancien instantané sans configuration reçoit une source générique séparée.
+Le JSON de réglages album évolue indépendamment de 2 vers 3.
+
+Les directives du Plan sont décrites dans [la pagination éditoriale](editorial-pagination.md).
 
 Le lieu textuel et la légende ou description du provider sont conservés comme
 propositions importées séparées. Ils n’écrasent jamais les champs éditoriaux.

@@ -13,6 +13,7 @@ from photoalbum.models import (
     LocationComponent,
     LocationSource,
     Photo,
+    PhotoUsage,
     MetadataCandidates,
 )
 
@@ -152,14 +153,14 @@ class PhotoRepository:
                 manual_latitude,
                 manual_longitude,
                 manual_location_data,
-                is_missing
+                is_missing, usage
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT(asset_key) DO UPDATE SET
                 path = COALESCE(excluded.path, photos.path),
@@ -308,6 +309,7 @@ class PhotoRepository:
                 manual_longitude,
                 manual_location_data,
                 0,
+                photo.usage.value,
             ),
         )
 
@@ -334,7 +336,11 @@ class PhotoRepository:
             WHERE path = ?
             """,
             (str(path),),
-        ).fetchone()
+        ).fetchall()
+
+        if len(row) > 1:
+            raise ValueError("Ambiguous photo path; use the stable photo identity.")
+        row = row[0] if row else None
 
         if row is None:
             return None
@@ -347,6 +353,23 @@ class PhotoRepository:
             (identity,),
         ).fetchone()
         return self._row_to_photo(row) if row is not None else None
+
+    def _identity_for_target(self, target: Path | str) -> str:
+        if isinstance(target, str):
+            return target
+        photo = self.find_by_path(target.expanduser().resolve())
+        if photo is None:
+            raise KeyError(str(target))
+        return photo.identity
+
+    def set_usage(self, identity: str, usage: PhotoUsage) -> None:
+        cursor = self._database.connection.execute(
+            "UPDATE photos SET usage = ? WHERE asset_key = ?",
+            (PhotoUsage(usage).value, identity),
+        )
+        if not cursor.rowcount:
+            raise KeyError(identity)
+        self._database.connection.commit()
 
     def list_all(
         self,
@@ -400,27 +423,17 @@ class PhotoRepository:
         if commit:
             self._database.connection.commit()
 
-    def set_other_sources_missing(
-        self, source_id: str, *, commit: bool = True
-    ) -> None:
-        self._database.connection.execute(
-            "UPDATE photos SET is_missing = 1 WHERE source_id <> ?",
-            (source_id,),
-        )
-        if commit:
-            self._database.connection.commit()
-
     def is_missing(
         self,
-        path: Path,
+        path: Path | str,
     ) -> bool:
         row = self._database.connection.execute(
             """
             SELECT is_missing
             FROM photos
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
-            (str(path),),
+            (self._identity_for_target(path),),
         ).fetchone()
 
         if row is None:
@@ -430,18 +443,18 @@ class PhotoRepository:
 
     def set_missing(
         self,
-        path: Path,
+        path: Path | str,
         missing: bool,
     ) -> None:
         self._database.connection.execute(
             """
             UPDATE photos
             SET is_missing = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 1 if missing else 0,
-                str(path),
+                self._identity_for_target(path),
             ),
         )
 
@@ -449,11 +462,9 @@ class PhotoRepository:
 
     def restore_original_capture_datetime(
         self,
-        path: Path,
+        path: Path | str,
     ) -> None:
-        normalized_path = str(
-            path.expanduser().resolve()
-        )
+        identity = self._identity_for_target(path)
 
         cursor = self._database.connection.execute(
             """
@@ -462,21 +473,21 @@ class PhotoRepository:
                 capture_datetime = original_capture_datetime,
                 date_source = original_date_source,
                 manual_capture_datetime = NULL
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
-            (normalized_path,),
+            (identity,),
         )
 
         if cursor.rowcount == 0:
             raise KeyError(
-                f"Photo not found: {normalized_path}"
+                f"Photo not found: {identity}"
             )
 
         self._database.connection.commit()
 
     def set_manual_capture_datetime(
         self,
-        path: Path,
+        path: Path | str,
         capture_datetime: datetime,
     ) -> None:
         cursor = self._database.connection.execute(
@@ -485,13 +496,13 @@ class PhotoRepository:
             SET capture_datetime = ?,
                 date_source = ?,
                 manual_capture_datetime = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 capture_datetime.isoformat(),
                 DateSource.MANUAL.value,
                 capture_datetime.isoformat(),
-                str(path),
+                self._identity_for_target(path),
             ),
         )
 
@@ -504,7 +515,7 @@ class PhotoRepository:
 
     def set_manual_gps(
         self,
-        path: Path,
+        path: Path | str,
         latitude: float | None,
         longitude: float | None,
     ) -> None:
@@ -523,9 +534,7 @@ class PhotoRepository:
                 "Longitude must be between -180 and 180."
             )
 
-        normalized_path = str(
-            path.expanduser().resolve()
-        )
+        identity = self._identity_for_target(path)
 
         cursor = self._database.connection.execute(
             """
@@ -541,7 +550,7 @@ class PhotoRepository:
                 address = NULL,
                 raw_location_data = NULL,
                 location_source = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 latitude,
@@ -550,24 +559,22 @@ class PhotoRepository:
                 latitude,
                 longitude,
                 LocationSource.UNKNOWN.value,
-                normalized_path,
+                identity,
             ),
         )
 
         if cursor.rowcount == 0:
             raise KeyError(
-                f"Photo not found: {normalized_path}"
+                f"Photo not found: {identity}"
             )
 
         self._database.connection.commit()
 
     def restore_original_gps(
         self,
-        path: Path,
+        path: Path | str,
     ) -> None:
-        normalized_path = str(
-            path.expanduser().resolve()
-        )
+        identity = self._identity_for_target(path)
 
         cursor = self._database.connection.execute(
             """
@@ -594,46 +601,44 @@ class PhotoRepository:
                 address = NULL,
                 raw_location_data = NULL,
                 location_source = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 LocationSource.UNKNOWN.value,
-                normalized_path,
+                identity,
             ),
         )
 
         if cursor.rowcount == 0:
             raise KeyError(
-                f"Photo not found: {normalized_path}"
+                f"Photo not found: {identity}"
             )
 
         self._database.connection.commit()
 
     def set_geocoded_location(
         self,
-        path: Path,
+        path: Path | str,
         *,
         place_name: str | None,
         city: str | None,
         address: str | None,
         raw_location_data: dict[str, object] | None = None,
     ) -> None:
-        normalized_path = str(
-            path.expanduser().resolve()
-        )
+        identity = self._identity_for_target(path)
 
         row = self._database.connection.execute(
             """
             SELECT latitude, longitude, metadata_candidates
             FROM photos
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
-            (normalized_path,),
+            (identity,),
         ).fetchone()
 
         if row is None:
             raise KeyError(
-                f"Photo not found: {normalized_path}"
+                f"Photo not found: {identity}"
             )
 
         geocoded_location_data = json.dumps(
@@ -670,7 +675,7 @@ class PhotoRepository:
                 geocoded_location_data = ?,
                 metadata_candidates = ?,
                 location_source = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 place_name,
@@ -688,7 +693,7 @@ class PhotoRepository:
                 geocoded_location_data,
                 candidates.to_json(),
                 LocationSource.GEOCODING.value,
-                normalized_path,
+                identity,
             ),
         )
 
@@ -696,12 +701,10 @@ class PhotoRepository:
 
     def set_caption(
         self,
-        path: Path,
+        path: Path | str,
         caption: str | None,
     ) -> None:
-        normalized_path = str(
-            path.expanduser().resolve()
-        )
+        identity = self._identity_for_target(path)
 
         if caption is not None:
             caption = caption.strip()
@@ -710,32 +713,30 @@ class PhotoRepository:
             """
             UPDATE photos
             SET caption = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 caption or None,
-                normalized_path,
+                identity,
             ),
         )
 
         if cursor.rowcount == 0:
             raise KeyError(
-                f"Photo not found: {normalized_path}"
+                f"Photo not found: {identity}"
             )
 
         self._database.connection.commit()
 
     def set_editorial_location(
         self,
-        path: Path,
+        path: Path | str,
         *,
         components: tuple[LocationComponent, ...],
         location_text: str | None,
         manual_location_data_override: dict[str, object] | None = None,
     ) -> None:
-        normalized_path = str(
-            path.expanduser().resolve()
-        )
+        identity = self._identity_for_target(path)
 
         serialized_components = (
             json.dumps(
@@ -787,7 +788,7 @@ class PhotoRepository:
                 location_text = ?,
                 location_selection_edited = 1,
                 manual_location_data = ?
-            WHERE path = ?
+            WHERE asset_key = ?
             """,
             (
                 serialized_components,
@@ -797,13 +798,13 @@ class PhotoRepository:
                     ensure_ascii=False,
                     separators=(",", ":"),
                 ),
-                normalized_path,
+                identity,
             ),
         )
 
         if cursor.rowcount == 0:
             raise KeyError(
-                f"Photo not found: {normalized_path}"
+                f"Photo not found: {identity}"
             )
 
         self._database.connection.commit()
@@ -840,6 +841,7 @@ class PhotoRepository:
             filename=row["filename"],
             source_id=row["source_id"],
             asset_id=row["asset_id"],
+            usage=PhotoUsage(row["usage"]),
             imported_location_text=row["imported_location_text"],
             imported_caption=row["imported_caption"],
             source_metadata=(

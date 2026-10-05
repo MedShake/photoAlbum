@@ -364,6 +364,7 @@ class PhotoPlacesWidget(QWidget):
         self._caption_builder = LocationCaptionBuilder()
         self._candidate_selector = LocationCandidateSelector()
         self._provider_label = self._translator.tr("photos.policy.provider")
+        self._source_labels: dict[str, str] = {}
         self._photos: list[Photo] = []
 
         self._photo_items: dict[str, QTreeWidgetItem] = {}
@@ -454,6 +455,14 @@ class PhotoPlacesWidget(QWidget):
         )
         if self._photos:
             self._rebuild_tree()
+
+    def set_source_labels(self, labels: dict[str, str]) -> None:
+        self._source_labels = dict(labels)
+        if self._photos:
+            self._rebuild_tree()
+
+    def _provider_for(self, photo: Photo) -> str:
+        return self._source_labels.get(photo.source_id, self._provider_label)
 
     def clear(self) -> None:
         self._cancel_photo_preview()
@@ -903,7 +912,7 @@ class PhotoPlacesWidget(QWidget):
                 self.PHOTO_ROLE,
             )
             if isinstance(photo, Photo):
-                selected_path = str(photo.path)
+                selected_path = photo.identity
 
         scroll = (
             self._tree.verticalScrollBar().value()
@@ -1625,7 +1634,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         self._photo_items[
-            str(photo.path)
+            photo.identity
         ] = item
 
     # --------------------------------------------------------
@@ -1683,7 +1692,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -1696,7 +1705,7 @@ class PhotoPlacesWidget(QWidget):
         label: QLabel,
         photo: Photo,
     ) -> None:
-        cached = self._thumbnail_cache.get(str(photo.path))
+        cached = self._thumbnail_cache.get(photo.identity)
         if cached is not None:
             label.setPixmap(cached)
             return
@@ -1733,7 +1742,7 @@ class PhotoPlacesWidget(QWidget):
 
         # The row may have disappeared after a filter/project change.
         if label in self._thumbnail_labels:
-            pixmap = self._thumbnail_cache.get(str(photo.path))
+            pixmap = self._thumbnail_cache.get(photo.identity)
             if pixmap is None:
                 pixmap = self._thumbnail_pixmap(photo.path)
 
@@ -1741,7 +1750,7 @@ class PhotoPlacesWidget(QWidget):
                 # Keep the already-decoded pixmap available for other
                 # lightweight views such as the batch-edit dialog.
                 self._thumbnail_cache[
-                    str(photo.path)
+                    photo.identity
                 ] = pixmap
 
                 label.setText("")
@@ -1801,7 +1810,7 @@ class PhotoPlacesWidget(QWidget):
 
         if isinstance(watched, _PhotoCell) and event.type() == QEvent.Type.Resize:
             if event.size().width() != event.oldSize().width():
-                row = self._editor_rows.get(watched.property("photo_path"))
+                row = self._editor_rows.get(watched.property("photo_identity"))
                 if row is not None:
                     self._update_item_height(row[0])
 
@@ -1875,7 +1884,7 @@ class PhotoPlacesWidget(QWidget):
         layout.addWidget(label)
 
         container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -1925,14 +1934,14 @@ class PhotoPlacesWidget(QWidget):
         layout.addWidget(caption)
 
         self._truth_labels[
-            str(photo.path)
+            photo.identity
         ] = (
             location,
             caption,
         )
 
         container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -2007,7 +2016,7 @@ class PhotoPlacesWidget(QWidget):
             )
             if candidates:
                 label = (
-                    self._provider_label
+                    self._provider_for(photo)
                     if origin == "provider"
                     else self._translator.tr("photos.policy.nominatim")
                 )
@@ -2029,7 +2038,7 @@ class PhotoPlacesWidget(QWidget):
                 label = (
                     self._translator.tr("photos.policy.nominatim")
                     if origin == "geocoding"
-                    else self._provider_label
+                    else self._provider_for(photo)
                 )
                 result.append((origin, label, candidates))
         return tuple(result)
@@ -2356,7 +2365,7 @@ class PhotoPlacesWidget(QWidget):
         outer.setContentsMargins(6, 3, 6, 3)
         outer.setSpacing(2)
 
-        path_key = str(photo.path)
+        path_key = photo.identity
         candidate_groups = self._location_candidate_groups(photo)
         groups_by_origin = {
             origin: candidates
@@ -2550,7 +2559,7 @@ class PhotoPlacesWidget(QWidget):
             provider_caption = QLabel(
                 self._translator.tr(
                     "photos.places.provider_caption",
-                    provider=self._provider_label,
+                    provider=self._provider_for(photo),
                     caption=photo.imported_caption.strip(),
                 )
             )
@@ -2583,7 +2592,8 @@ class PhotoPlacesWidget(QWidget):
         # horizontally.
         source_probe = QComboBox()
         for label in (
-            self._provider_label,
+            *self._source_labels.values(),
+            self._provider_for(photo),
             self._translator.tr("photos.policy.nominatim"),
             self._translator.tr("photos.places.location_source.custom"),
             self._translator.tr("photos.places.location_source.none"),
@@ -2627,7 +2637,7 @@ class PhotoPlacesWidget(QWidget):
             editor.setToolTip(
                 self._translator.tr(
                     "photos.places.provider_caption",
-                    provider=self._provider_label,
+                    provider=self._provider_for(photo),
                     caption=photo.imported_caption.strip(),
                 )
             )
@@ -2673,7 +2683,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -2782,7 +2792,7 @@ class PhotoPlacesWidget(QWidget):
         photo: Photo,
         mode_box: QComboBox,
     ) -> None:
-        path_key = str(photo.path)
+        path_key = photo.identity
         widgets = self._location_mode_widgets.get(
             path_key
         )
@@ -4404,7 +4414,7 @@ class PhotoPlacesWidget(QWidget):
                 i
                 for i, candidate
                 in enumerate(visible)
-                if candidate.path == photo.path
+                if candidate.identity == photo.identity
             )
         except StopIteration:
             return
@@ -4416,7 +4426,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         editor = self._caption_editors.get(
-            str(photo.path)
+            photo.identity
         )
 
         if editor is not None:
@@ -4429,14 +4439,14 @@ class PhotoPlacesWidget(QWidget):
             return
 
         next_editor = self._caption_editors.get(
-            str(next_photo.path)
+            next_photo.identity
         )
 
         if next_editor is not None:
             next_editor.setFocus()
 
             item = self._photo_items.get(
-                str(next_photo.path)
+                next_photo.identity
             )
             if item is not None:
                 self._tree.scrollToItem(
@@ -4477,7 +4487,7 @@ class PhotoPlacesWidget(QWidget):
             self._rebuild_tree()
             return
 
-        path_key = str(photo.path)
+        path_key = photo.identity
 
         truth = self._truth_labels.get(
             path_key

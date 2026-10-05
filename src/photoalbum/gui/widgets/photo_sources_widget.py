@@ -4,7 +4,7 @@ from PySide6.QtCore import QEvent, QPoint, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMenu, QPlainTextEdit, QProgressBar, QPushButton,
-    QSplitter, QTableView, QVBoxLayout, QWidget,
+    QSplitter, QTableView, QVBoxLayout, QWidget, QGroupBox, QScrollArea,
 )
 
 from photoalbum.gui.models import PhotoTableModel
@@ -20,13 +20,16 @@ class PhotoSourcesWidget(QWidget):
 
     source_requested = Signal()
     synology_source_requested = Signal()
-    recursive_changed = Signal(bool)
-    metadata_policy_changed = Signal(str, str, str, bool)
     scan_requested = Signal()
     sync_requested = Signal()
     edit_datetime_requested = Signal(object)
     edit_gps_requested = Signal(object)
     open_photo_requested = Signal(object)
+    edit_usage_requested = Signal(object)
+    source_enabled_changed = Signal(str, bool)
+    edit_source_requested = Signal(str)
+    delete_source_requested = Signal(str)
+    source_policy_changed = Signal(str, object)
 
     def __init__(
         self,
@@ -51,179 +54,46 @@ class PhotoSourcesWidget(QWidget):
     def _create_content(self) -> None:
         sources_layout = QVBoxLayout(self)
 
-        # Photo source.
-        source_layout = QHBoxLayout()
-
-        self.source_edit = QLineEdit()
-        self.source_edit.setReadOnly(True)
-
-        self.modify_source_button = QPushButton(
-            self._translator.tr("photos.source.modify")
-        )
-        self.modify_source_button.setToolTip(
-            self._translator.tr("photos.source.modify_tooltip")
-        )
-
-        source_menu = QMenu(self.modify_source_button)
-        self.browse_action = source_menu.addAction(
-            self._translator.tr("photos.source.local")
-        )
-        self.synology_action = source_menu.addAction(
-            self._translator.tr("source.synology.choose")
-        )
-        self.modify_source_button.setMenu(source_menu)
-
-        self.browse_action.triggered.connect(
-            self.source_requested.emit
-        )
-        self.synology_action.triggered.connect(
-            self.synology_source_requested.emit
-        )
-
-        # Compatibility aliases used by existing MainWindow code/tests.
+        add_group = QGroupBox(self._translator.tr("sources.add"))
+        add_layout = QHBoxLayout(add_group)
+        self.modify_source_button = QPushButton(self._translator.tr("sources.add_button"))
+        menu = QMenu(self.modify_source_button)
+        self.browse_action = menu.addAction(self._translator.tr("photos.source.local"))
+        self.synology_action = menu.addAction(self._translator.tr("source.synology.choose"))
+        self.browse_action.triggered.connect(self.source_requested.emit)
+        self.synology_action.triggered.connect(self.synology_source_requested.emit)
+        self.modify_source_button.setMenu(menu)
         self.browse_button = self.modify_source_button
         self.synology_button = self.modify_source_button
+        add_layout.addWidget(self.modify_source_button)
+        add_layout.addStretch()
+        sources_layout.addWidget(add_group)
 
-        source_layout.addWidget(self.modify_source_button)
+        self.sources_group = QGroupBox(self._translator.tr("sources.list"))
+        source_container = QWidget()
+        self._source_cards = QVBoxLayout(source_container)
+        self._source_cards.setContentsMargins(0, 0, 0, 0)
+        self._sources_scroll = QScrollArea()
+        self._sources_scroll.setWidgetResizable(True)
+        self._sources_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._sources_scroll.setWidget(source_container)
+        self._sources_scroll.setMaximumHeight(240)
+        QVBoxLayout(self.sources_group).addWidget(self._sources_scroll)
+        sources_layout.addWidget(self.sources_group)
+        self._sources = []
 
-        self.current_source_label = QLabel(
-            self._translator.tr("photos.source.current")
-        )
-        source_layout.addWidget(self.current_source_label)
-        source_layout.addWidget(self.source_edit, 1)
-
-        sources_layout.addLayout(source_layout)
-
-        # Recursive scan.
-        self.recursive_checkbox = QCheckBox(self._translator.tr('main.include_subdirectories'))
-
-        self.recursive_checkbox.toggled.connect(self.recursive_changed.emit)
-
-        sources_layout.addWidget(self.recursive_checkbox)
-
-        # Default metadata source-of-truth policy.
-        policy_title = QLabel(
-            self._translator.tr("photos.policy.title")
-        )
-        policy_title_font = policy_title.font()
-        policy_title_font.setBold(True)
-        policy_title.setFont(policy_title_font)
-        sources_layout.addWidget(policy_title)
-
-        policy_explanation = QLabel(
-            self._translator.tr("photos.policy.description")
-        )
-        policy_explanation.setWordWrap(True)
-        sources_layout.addWidget(policy_explanation)
-
-        self.date_source_combo = QComboBox()
-        self.gps_source_combo = QComboBox()
-        self.location_source_combo = QComboBox()
-
-        self.date_source_combo.addItem(
-            self._translator.tr("photos.policy.exif"),
-            "exif",
-        )
-        self.date_source_combo.addItem(
-            self._translator.tr("photos.policy.provider"),
-            "source",
-        )
-        self.date_source_combo.addItem(
-            self._translator.tr("photos.policy.filename"),
-            "filename",
-        )
-
-        self.gps_source_combo.addItem(
-            self._translator.tr("photos.policy.exif"),
-            "exif",
-        )
-        self.gps_source_combo.addItem(
-            self._translator.tr("photos.policy.provider"),
-            "source",
-        )
-
-        self.location_source_combo.addItem(
-            self._translator.tr("photos.policy.provider"),
-            "source",
-        )
-        self.location_source_combo.addItem(
-            self._translator.tr("photos.policy.nominatim"),
-            "geocoding",
-        )
-        self.location_source_combo.addItem(
-            self._translator.tr("photos.policy.none"),
-            "none",
-        )
-
-        for label_key, combo in (
-            ("photos.policy.date", self.date_source_combo),
-            ("photos.policy.gps", self.gps_source_combo),
-            ("photos.policy.location", self.location_source_combo),
-        ):
-            row = QHBoxLayout()
-
-            label = QLabel(self._translator.tr(label_key))
-            label.setMinimumWidth(55)
-
-            combo.setMinimumWidth(220)
-            combo.setMaximumWidth(360)
-
-            row.addWidget(label)
-            row.addWidget(combo)
-            row.addStretch(1)
-
-            sources_layout.addLayout(row)
-
-        self.nominatim_checkbox = QCheckBox(
-            self._translator.tr("photos.policy.nominatim_enabled")
-        )
-
-        nominatim_tooltip = self._translator.tr(
-            "photos.policy.nominatim_tooltip"
-        )
-        self.nominatim_checkbox.setToolTip(nominatim_tooltip)
-
-        self.nominatim_info_label = QLabel("ⓘ")
-        self.nominatim_info_label.setToolTip(nominatim_tooltip)
-
-        nominatim_layout = QHBoxLayout()
-        nominatim_layout.addWidget(self.nominatim_checkbox)
-        nominatim_layout.addWidget(self.nominatim_info_label)
-        nominatim_layout.addStretch(1)
-
-        sources_layout.addLayout(nominatim_layout)
-
-        self.date_source_combo.currentIndexChanged.connect(
-            self._emit_metadata_policy_changed
-        )
-        self.gps_source_combo.currentIndexChanged.connect(
-            self._emit_metadata_policy_changed
-        )
-        self.location_source_combo.currentIndexChanged.connect(
-            self._emit_metadata_policy_changed
-        )
-        self.nominatim_checkbox.toggled.connect(
-            self._emit_metadata_policy_changed
-        )
-
-        # Analysis controls.
+        refresh_group = QGroupBox(self._translator.tr("sources.refresh"))
+        refresh_layout = QVBoxLayout(refresh_group)
         action_layout = QHBoxLayout()
-
-        self.analyze_button = QPushButton(self._translator.tr('main.analyze_photos'))
-
+        self.analyze_button = QPushButton(self._translator.tr("sources.analyze"))
         self.analyze_button.clicked.connect(self.scan_requested.emit)
-
-        self.sync_button = QPushButton(
-            self._translator.tr("source.sync.button")
-        )
+        self.sync_button = QPushButton(self._translator.tr("sources.synchronize"))
         self.sync_button.clicked.connect(self.sync_requested.emit)
-        self.sync_button.setVisible(False)
-
         action_layout.addWidget(self.analyze_button)
         action_layout.addWidget(self.sync_button)
-        action_layout.addStretch(1)
-
-        sources_layout.addLayout(action_layout)
+        action_layout.addStretch()
+        refresh_layout.addLayout(action_layout)
+        sources_layout.addWidget(refresh_group)
 
         # Processing progress.
         self.source_progress_label = QLabel(
@@ -328,6 +198,7 @@ class PhotoSourcesWidget(QWidget):
         self._photo_actions_delegate.open_photo_requested.connect(
             self.open_photo_requested.emit
         )
+        self._photo_actions_delegate.edit_usage_requested.connect(self.edit_usage_requested.emit)
 
         self.table.setItemDelegateForColumn(1, self._photo_actions_delegate)
 
@@ -351,13 +222,14 @@ class PhotoSourcesWidget(QWidget):
 
         # Sensible initial widths. Long filenames must not force
         # the complete table to become excessively wide.
-        self.table.setColumnWidth(1, 116)
+        self.table.setColumnWidth(1, 146)
         self.table.setColumnWidth(2, 170)
         self.table.setColumnWidth(3, 130)
         self.table.setColumnWidth(4, 70)
         self.table.setColumnWidth(5, 150)
         self.table.setColumnWidth(6, 160)
         self.table.setColumnWidth(7, 120)
+        self.table.setColumnWidth(8, 155)
 
         self._update_filename_column_width()
 
@@ -385,129 +257,27 @@ class PhotoSourcesWidget(QWidget):
         sources_layout.addWidget(QLabel(self._translator.tr('main.photos')))
         sources_layout.addWidget(splitter, 1)
 
-    def set_source_kind(self, kind: str | None) -> None:
-        """Adapt policy choices to the configured source type."""
-        remote = kind not in (None, "local")
-        self.sync_button.setVisible(remote)
+    def set_sources(self, sources, available, labels) -> None:
+        from .source_card import SourceCard
+        while self._source_cards.count():
+            item = self._source_cards.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        for source in sources:
+            card = SourceCard(source, available.get(source.id, {}), self._translator)
+            card.enabled_changed.connect(self.source_enabled_changed.emit)
+            card.edit_requested.connect(self.edit_source_requested.emit)
+            card.delete_requested.connect(self.delete_source_requested.emit)
+            card.policy_changed.connect(self.source_policy_changed.emit)
+            self._source_cards.addWidget(card)
+        self.model.set_sources(labels, {source.id: source.collection_name for source in sources})
+        self._sources = list(sources)
+        self._sources_scroll.setFixedHeight(min(240, max(40, len(self._sources) * 78)))
+        self.sync_button.setVisible(True)
 
-    def set_metadata_sources(
-        self,
-        *,
-        provider_label: str,
-        available: dict[str, set[str]],
-        source_kind: str | None,
-    ) -> None:
-        """Expose only candidate origins represented by this project."""
-        self._provider_label = provider_label or self._translator.tr(
-            "photos.policy.provider"
-        )
-        self.model.set_provider_label(self._provider_label)
-        self.set_source_kind(source_kind)
-
-        def label(key: str) -> str:
-            if key == "provider":
-                return self._provider_label
-            return self._translator.tr(
-                {
-                    "exif": "photos.policy.exif",
-                    "filename": "photos.policy.filename",
-                    "geocoding": "photos.policy.nominatim",
-                    "manual": "photos.policy.manual",
-                    "none": "photos.policy.none",
-                }[key]
-            )
-
-        self._replace_combo_items(
-            self.date_source_combo,
-            [
-                (label(key), "source" if key == "provider" else key)
-                for key in ("provider", "exif", "filename")
-                if key in available.get("date", set())
-            ],
-        )
-        self._replace_combo_items(
-            self.gps_source_combo,
-            [
-                (label(key), "source" if key == "provider" else key)
-                for key in ("provider", "exif")
-                if key in available.get("gps", set())
-            ],
-        )
-        location_items = [
-            (label(key), "source" if key == "provider" else key)
-            for key in ("provider", "geocoding")
-            if key in available.get("location", set())
-        ]
-        location_items.append((label("none"), "none"))
-        self._replace_combo_items(self.location_source_combo, location_items)
-        self.date_source_combo.setEnabled(self.date_source_combo.count() > 0)
-        self.gps_source_combo.setEnabled(self.gps_source_combo.count() > 0)
-
-    @staticmethod
-    def _replace_combo_items(
-        combo: QComboBox,
-        items: list[tuple[str, str]],
-    ) -> None:
-        current = combo.currentData()
-        combo.blockSignals(True)
-        try:
-            combo.clear()
-            for text, value in items:
-                combo.addItem(text, value)
-            index = combo.findData(current)
-            if index >= 0:
-                combo.setCurrentIndex(index)
-        finally:
-            combo.blockSignals(False)
-
-    def set_metadata_policy(
-        self,
-        *,
-        date_preference: str,
-        gps_preference: str,
-        location_preference: str,
-        nominatim_enabled: bool,
-    ) -> None:
-        widgets = (
-            self.date_source_combo,
-            self.gps_source_combo,
-            self.location_source_combo,
-            self.nominatim_checkbox,
-        )
-
-        for widget in widgets:
-            widget.blockSignals(True)
-
-        try:
-            for combo, value in (
-                (self.date_source_combo, date_preference),
-                (self.gps_source_combo, gps_preference),
-                (self.location_source_combo, location_preference),
-            ):
-                index = combo.findData(value)
-                if index >= 0:
-                    combo.setCurrentIndex(index)
-
-            self.nominatim_checkbox.setChecked(
-                nominatim_enabled
-            )
-        finally:
-            for widget in widgets:
-                widget.blockSignals(False)
-
-    def _emit_metadata_policy_changed(self, *args) -> None:
-        if (
-            self.date_source_combo.currentData() is None
-            or self.gps_source_combo.currentData() is None
-            or self.location_source_combo.currentData() is None
-        ):
-            return
-        self.metadata_policy_changed.emit(
-            str(self.date_source_combo.currentData()),
-            str(self.gps_source_combo.currentData()),
-            str(self.location_source_combo.currentData()),
-            self.nominatim_checkbox.isChecked(),
-        )
+    @property
+    def has_active_sources(self) -> bool:
+        return any(source.enabled for source in self._sources)
 
     def prepare_source_progress(self, provider_label: str | None = None) -> None:
         """Show source synchronization and hide scan-only phases."""
@@ -713,7 +483,7 @@ class PhotoSourcesWidget(QWidget):
 
             candidate = source_model.data(index, Qt.ItemDataRole.UserRole)
 
-            if isinstance(candidate, Photo) and candidate.path == photo.path:
+            if isinstance(candidate, Photo) and candidate.identity == photo.identity:
                 proxy_index = self.proxy_model.mapFromSource(index)
 
                 if not proxy_index.isValid():

@@ -32,7 +32,7 @@ _VALID_LOCATION_PREFERENCES = {
 
 @dataclass(frozen=True)
 class PhotoMetadataPolicy:
-    """Project-level defaults for choosing effective photo metadata."""
+    """Source-level defaults for choosing effective photo metadata."""
 
     date_preference: str
     gps_preference: str

@@ -34,7 +34,7 @@ class PhotoEditor(QObject):
         self._dialog_parent = parent
         self._gps_thread: QThread | None = None
         self._gps_worker: GpsGeocodingWorker | None = None
-        self._gps_photo_path: Path | None = None
+        self._gps_photo_identity: str | None = None
 
     @property
     def is_running(self) -> bool:
@@ -108,7 +108,7 @@ class PhotoEditor(QObject):
                 return
 
             try:
-                self._project_service.restore_original_capture_datetime(photo.path)
+                self._project_service.restore_original_capture_datetime(photo.identity)
             except Exception as exc:
                 self.error.emit(str(exc))
                 return
@@ -133,7 +133,7 @@ class PhotoEditor(QObject):
         new_datetime = date_time_edit.dateTime().toPython()
 
         try:
-            self._project_service.set_manual_capture_datetime(photo.path, new_datetime)
+            self._project_service.set_manual_capture_datetime(photo.identity, new_datetime)
         except Exception as exc:
             self.error.emit(str(exc))
             return
@@ -274,7 +274,7 @@ class PhotoEditor(QObject):
 
         try:
             if restore_requested:
-                self._project_service.restore_original_gps(photo.path)
+                self._project_service.restore_original_gps(photo.identity)
 
                 latitude = photo.original_latitude
                 longitude = photo.original_longitude
@@ -292,7 +292,7 @@ class PhotoEditor(QObject):
                     longitude = float(longitude_text.replace(",", "."))
 
                 self._project_service.set_manual_gps(
-                    photo.path,
+                    photo.identity,
                     latitude,
                     longitude,
                 )
@@ -317,9 +317,9 @@ class PhotoEditor(QObject):
         self.photos_changed.emit()
 
         if latitude is not None and longitude is not None:
-            self._start_gps_geocoding(photo.path, latitude, longitude)
+            self._start_gps_geocoding(photo.identity, latitude, longitude)
 
-    def _start_gps_geocoding(self, photo_path: Path, latitude: float, longitude: float) -> None:
+    def _start_gps_geocoding(self, photo_identity: str, latitude: float, longitude: float) -> None:
         if self._gps_thread is not None:
             self.log_message.emit(self._translator.tr('photos.gps.geocoding_busy'))
             return
@@ -341,7 +341,7 @@ class PhotoEditor(QObject):
 
         worker.moveToThread(thread)
 
-        self._gps_photo_path = Path(photo_path)
+        self._gps_photo_identity = photo_identity
 
         thread.started.connect(worker.run)
 
@@ -362,9 +362,9 @@ class PhotoEditor(QObject):
         thread.start()
 
     def _gps_geocoding_completed(self, location) -> None:
-        photo_path = self._gps_photo_path
+        photo_identity = self._gps_photo_identity
 
-        if photo_path is None:
+        if photo_identity is None:
             return
 
         if location is None:
@@ -373,7 +373,7 @@ class PhotoEditor(QObject):
 
         try:
             self._project_service.set_geocoded_location(
-                photo_path,
+                photo_identity,
                 place_name=location.place_name,
                 city=location.city,
                 address=location.address,
@@ -405,10 +405,11 @@ class PhotoEditor(QObject):
         self._gps_thread = None
         if thread is not None:
             thread.deleteLater()
-        self._gps_photo_path = None
+        self._gps_photo_identity = None
 
     def open_in_os(self, photo: Photo) -> None:
-        if photo.source_id != "local":
+        source = self._project_service.get_photo_source(photo.source_id)
+        if source is not None and source.kind != "local":
             try:
                 self._project_service.materialize_originals([photo])
             except Exception as exc:

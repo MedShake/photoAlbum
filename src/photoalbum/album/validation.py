@@ -23,6 +23,15 @@ class AlbumSettingsValidator:
                           settings.photo_pages.page))
         instances.extend(settings.front_matter)
         instances.extend(settings.back_matter)
+        instances.extend(item.page for item in settings.photo_page_overrides)
+        instances.extend(item.page for item in settings.body_insertions)
+        anchors = [item.photo_identity for item in settings.photo_page_overrides]
+        if len(set(anchors)) != len(anchors) or any(not anchor for anchor in anchors):
+            raise ValueError("Photo page overrides need distinct nonempty photo identities.")
+        for item in settings.photo_page_overrides:
+            self._require_kind(item.page.template_id, TemplateKind.PHOTO_PAGE)
+        for item in settings.body_insertions:
+            self._require_kind(item.page.template_id, TemplateKind.BODY_SPECIAL_PAGE)
         for instance in instances:
             validate_template_instance(instance)
 

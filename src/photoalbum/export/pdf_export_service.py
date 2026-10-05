@@ -191,22 +191,7 @@ class PdfExportService:
         # Use the exact same canonical project-photo list as
         # AlbumPreviewWidget. Some templates, notably covers,
         # operate on the whole album rather than on one page.
-        project_photos = []
-        seen_photo_paths = set()
-
-        for plan_item in result.plan.items:
-            for photo in plan_item.photos:
-                key = photo.identity
-
-                if key in seen_photo_paths:
-                    continue
-
-                seen_photo_paths.add(key)
-                project_photos.append(photo)
-
-        project_photos.sort(
-            key=lambda photo: photo.identity
-        )
+        project_photos = list(result.template_photos)
 
         painter = QPainter()
 

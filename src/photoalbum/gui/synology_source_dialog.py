@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hashlib import sha256
+from uuid import uuid4
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -34,6 +34,7 @@ class SynologySourceDialog(QDialog):
         provider_factory=None,
         browser_authenticator=None,
         existing_source: ProjectSource | None = None,
+        edit_collection: bool = False,
     ):
         super().__init__(parent)
         self._translator = translator
@@ -42,6 +43,7 @@ class SynologySourceDialog(QDialog):
         # Production authentication uses the DSM WebAPI directly.
         self._browser_authenticator = browser_authenticator
         self._existing_source = existing_source
+        self._edit_collection = edit_collection
         self._connected_base_url: str | None = None
         self._api_path: str | None = None
         self.provider = None
@@ -106,7 +108,7 @@ class SynologySourceDialog(QDialog):
         layout.addWidget(self.status_label)
         self.album_combo = QComboBox()
         self.album_combo.setEnabled(False)
-        self.album_combo.setVisible(existing_source is None)
+        self.album_combo.setVisible(existing_source is None or edit_collection)
         layout.addWidget(self.album_combo)
 
         self.buttons = QDialogButtonBox(
@@ -180,7 +182,7 @@ class SynologySourceDialog(QDialog):
             provider.connect()
             albums = (
                 []
-                if self._existing_source is not None
+                if self._existing_source is not None and not self._edit_collection
                 else provider.list_collections()
             )
         except Exception as exc:
@@ -196,7 +198,7 @@ class SynologySourceDialog(QDialog):
         self.provider = provider
         self._connected_base_url = connected_base_url
         self._api_path = api_path
-        if self._existing_source is not None:
+        if self._existing_source is not None and not self._edit_collection:
             self.source = self._existing_source
             self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
             self.status_label.setText(
@@ -208,6 +210,8 @@ class SynologySourceDialog(QDialog):
             if album.item_count is not None:
                 label += f" ({album.item_count})"
             self.album_combo.addItem(label, album)
+            if self._existing_source and album.id == self._existing_source.collection_id:
+                self.album_combo.setCurrentIndex(self.album_combo.count() - 1)
         self.album_combo.setEnabled(bool(albums))
         self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(bool(albums))
         self.status_label.setText(
@@ -215,7 +219,7 @@ class SynologySourceDialog(QDialog):
         )
 
     def _accept_source(self) -> None:
-        if self._existing_source is not None and self.provider is not None:
+        if self._existing_source is not None and self.provider is not None and not self._edit_collection:
             self.source = self._existing_source
             self.accept()
             return
@@ -223,8 +227,6 @@ class SynologySourceDialog(QDialog):
         if self.provider is None or album is None:
             return
         base_url = self._connected_base_url or self.url_edit.text().strip().rstrip("/")
-        identity = getattr(self.provider, "identity", None) or base_url
-        digest = sha256(f"{base_url}\0{identity}".encode("utf-8")).hexdigest()[:16]
         config = {
             "base_url": base_url,
             "api_path": self._api_path or "/webapi/entry.cgi",
@@ -235,13 +237,15 @@ class SynologySourceDialog(QDialog):
             config["username"] = username
 
         self.source = ProjectSource(
-            id=f"synology-{digest}",
+            id=self._existing_source.id if self._existing_source is not None else uuid4().hex,
             kind="synology-photos",
             name=base_url,
             collection_id=album.id,
             collection_name=album.name,
             config=config,
             provider_label="Synology Photos",
+            enabled=self._existing_source.enabled if self._existing_source else True,
+            metadata_policy=self._existing_source.metadata_policy if self._existing_source else None,
             capabilities=getattr(
                 self.provider,
                 "capabilities",

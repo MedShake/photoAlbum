@@ -91,6 +91,42 @@ class CoverSettings:
 SpecialPage = PageInstance
 
 
+@dataclass(frozen=True)
+class ContentAnchor:
+    """A content boundary, independent of pagination and physical numbers."""
+
+    kind: str
+    photo_identity: str | None = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"photo", "year_divider", "month_divider", "day_divider"}:
+            raise ValueError(f"Invalid content anchor: {self.kind}")
+        if self.kind == "photo" and not self.photo_identity:
+            raise ValueError("A photo anchor needs a stable identity.")
+        if self.kind != "photo" and self.year is None:
+            raise ValueError("A period anchor needs a year.")
+        if self.kind in {"month_divider", "day_divider"} and self.month is None:
+            raise ValueError("A month/day anchor needs a month.")
+        if self.kind == "day_divider" and self.day is None:
+            raise ValueError("A day anchor needs a day.")
+
+
+@dataclass(frozen=True)
+class PhotoPageOverride:
+    photo_identity: str
+    page: PageInstance
+
+
+@dataclass(frozen=True)
+class BodyPageInsertion:
+    anchor: ContentAnchor
+    page: PageInstance
+    enabled: bool = True
+
+
 @dataclass(frozen=True, init=False)
 class DividerSettings:
     enabled: bool
@@ -213,6 +249,8 @@ class AlbumStructureSettings:
     back_matter: list[SpecialPage] = field(
         default_factory=list
     )
+    photo_page_overrides: list[PhotoPageOverride] = field(default_factory=list)
+    body_insertions: list[BodyPageInsertion] = field(default_factory=list)
 
     # Complete project-persisted settings owned by template packs.
     #

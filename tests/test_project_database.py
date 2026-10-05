@@ -275,7 +275,7 @@ def test_v2_project_migrates_metadata_candidates_without_changing_effective_data
 
     assert migrated.connection.execute(
         "SELECT version FROM schema_version"
-    ).fetchone()["version"] == 4
+    ).fetchone()["version"] == 5
 
     migrated.close()
 
@@ -384,7 +384,7 @@ def test_schema_v4_initialization_is_idempotent(tmp_path: Path):
     assert len(first_columns) == len(set(first_columns))
     assert database.connection.execute(
         "SELECT version FROM schema_version"
-    ).fetchone()["version"] == 4
+    ).fetchone()["version"] == 5
 
     database.close()
 

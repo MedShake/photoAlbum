@@ -63,7 +63,7 @@ class PdfExportWorker(QObject):
     def run(self) -> None:
         try:
             if self._prepare_assets is not None:
-                self._prepare_assets(self._arguments["photos"])
+                self._prepare_assets(list(self._arguments["result"].template_photos))
             self._service.export(
                 output_path=self._output_path,
                 progress_callback=self._progress,

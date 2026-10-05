@@ -14,6 +14,7 @@ class TemplateKind(str, Enum):
     DAY_DIVIDER = "day_divider"
     YEAR_DIVIDER = "year_divider"
     SPECIAL_PAGE = "special_page"
+    BODY_SPECIAL_PAGE = "body_special_page"
 
 
 @dataclass(frozen=True)

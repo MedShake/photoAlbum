@@ -20,7 +20,8 @@
       "module": "photoalbum.templates.simplex.full_photo_cover",
       "kinds": [
         "cover",
-        "special_page"
+        "special_page",
+        "body_special_page"
       ],
       "cover_positions": [
         "front",

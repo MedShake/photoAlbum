@@ -27,12 +27,14 @@ class MetadataRefreshWorker(QObject):
         *,
         project_path: Path,
         policy: PhotoMetadataPolicy,
+        source_id: str | None = None,
         language: str | None,
         user_agent: str,
     ) -> None:
         super().__init__()
         self._project_path = project_path
         self._policy = policy
+        self._source_id = source_id
         self._language = language
         self._user_agent = user_agent
         self._cancel_requested = False
@@ -43,7 +45,7 @@ class MetadataRefreshWorker(QObject):
         try:
             database.initialize()
             repository = PhotoRepository(database)
-            photos = repository.list_all()
+            photos = (repository.list_by_source(self._source_id) if self._source_id else repository.list_all())
             total = len(photos)
             self.phase_progress.emit(
                 ScanProgress(ScanProgressPhase.METADATA, 0, total)
@@ -60,7 +62,7 @@ class MetadataRefreshWorker(QObject):
                         ScanProgress(ScanProgressPhase.METADATA, index, total)
                     )
 
-            photos = repository.list_all()
+            photos = (repository.list_by_source(self._source_id) if self._source_id else repository.list_all())
             if self._policy.nominatim_enabled and not self._cancel_requested:
                 resolver = create_nominatim_location_resolver(
                     database,
@@ -84,7 +86,7 @@ class MetadataRefreshWorker(QObject):
                     self.phase_progress.emit(
                         ScanProgress(ScanProgressPhase.NOMINATIM, index, total)
                     )
-            self.completed.emit(repository.list_all())
+            self.completed.emit((repository.list_by_source(self._source_id) if self._source_id else repository.list_all()))
         except Exception as exc:
             self.failed.emit(str(exc))
         finally:
