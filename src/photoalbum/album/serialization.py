@@ -6,6 +6,7 @@ from dataclasses import asdict
 from .models import CoverPosition
 from .settings import (
     AlbumStructureSettings,
+    AutomaticPhotoPageSettings,
     ContentAnchor,
     PhotoPageOverride,
     BodyPageInsertion,
@@ -46,7 +47,7 @@ def album_settings_to_json(
     settings: AlbumStructureSettings,
 ) -> str:
     data = {
-        "schema_version": 3,
+        "schema_version": 4,
         "photo_page_overrides": [
             {"photo_identity": override.photo_identity, "page": _instance_to_data(override.page)}
             for override in settings.photo_page_overrides
@@ -94,11 +95,17 @@ def album_settings_to_json(
             ),
         },
 
-        "photo_pages": {
-            "page": _instance_to_data(
-                settings.photo_pages.page
-            ),
-        },
+        "photo_pages": (
+            {"page": _instance_to_data(settings.photo_pages.page)}
+            if settings.photo_pages.page is not None
+            else {
+                "automatic_mode": {
+                    "mode_id": settings.photo_pages.automatic_mode.mode_id,
+                    "instance_id": settings.photo_pages.automatic_mode.instance_id,
+                    "settings": settings.photo_pages.automatic_mode.settings,
+                }
+            }
+        ),
 
         "page_numbers": {
             "enabled": settings.page_numbers.enabled,
@@ -142,7 +149,7 @@ def album_settings_from_json(
     value: str,
 ) -> AlbumStructureSettings:
     data = json.loads(value)
-    if data.get("schema_version") not in (2, 3):
+    if data.get("schema_version") not in (2, 3, 4):
         raise ValueError("Unsupported album settings schema; recreate this beta album's settings.")
 
     covers = {
@@ -204,7 +211,15 @@ def album_settings_from_json(
             ),
         ),
 
-        photo_pages=PhotoPageSettings(page=_instance_from_data(photo_data["page"])),
+        photo_pages=(
+            PhotoPageSettings(page=_instance_from_data(photo_data["page"]))
+            if "page" in photo_data
+            else PhotoPageSettings(automatic_mode=AutomaticPhotoPageSettings(
+                mode_id=str(photo_data["automatic_mode"]["mode_id"]),
+                instance_id=str(photo_data["automatic_mode"]["instance_id"]),
+                settings=dict(photo_data["automatic_mode"].get("settings", {})),
+            ))
+        ),
 
         page_numbers=PageNumberSettings(
             enabled=bool(

@@ -95,10 +95,14 @@ class AlbumBuilder:
                 page_format.width_mm, page_format.height_mm
             ):
                 excluded_photo_overrides.append(override.page)
-        settings = replace(settings, photo_page_overrides=[
-            replace(item, page=settings.photo_pages.page)
-            if item.page in excluded_photo_overrides else item
+        excluded_override_starts = {
+            item.photo_identity
             for item in settings.photo_page_overrides
+            if item.page in excluded_photo_overrides
+        }
+        settings = replace(settings, photo_page_overrides=[
+            item for item in settings.photo_page_overrides
+            if item.page not in excluded_photo_overrides
         ])
 
         plan = AlbumPlanner().plan(
@@ -111,6 +115,7 @@ class AlbumBuilder:
         ).paginate(
             plan,
             settings,
+            forced_photo_page_starts=excluded_override_starts,
         )
 
         print_diagnostic = PrintDiagnostics().analyze(

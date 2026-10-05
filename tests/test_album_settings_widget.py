@@ -149,15 +149,36 @@ def test_custom_minimum_and_small_page_template_filtering():
     widget.close()
 
 
-def test_default_photo_template_is_two_photos():
+def test_default_photo_choice_is_automatic_orientation_mode():
     widget = create_widget()
 
     settings = widget.settings()
 
-    assert (
-        settings.photo_pages.template_id
-        == "photo-page-2"
-    )
+    assert settings.photo_pages.page is None
+    assert settings.photo_pages.automatic_mode.mode_id == "msb-orientation-1-2"
+    index = widget._photo_page_combo.findData("msb-orientation-1-2")
+    assert "MSB" in widget._photo_page_combo.itemText(index)
+
+
+def test_automatic_photo_mode_keeps_shared_settings_editor(monkeypatch):
+    from PySide6.QtWidgets import QDialog
+    from photoalbum.gui.page_instance_dialog import PageInstanceDialog
+
+    widget = create_widget()
+    seen = []
+
+    def edit(dialog):
+        seen.append(dialog.instance().template_id)
+        dialog._instance = dialog.instance().with_settings({"shared": "caption-style"})
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(PageInstanceDialog, "exec", edit)
+    assert widget._photo_page_settings_button.isEnabled()
+    widget._configure_photo_page_instance()
+    settings = widget.settings().photo_pages
+    assert seen == ["photo-page-1"]
+    assert settings.automatic_mode.settings == {"shared": "caption-style"}
+    widget.close()
 
 
 def test_default_month_dividers_are_enabled():
@@ -338,7 +359,13 @@ def test_target_changes_emit_once_with_compatible_selections():
         target = widget._page_geometry()
         for cover in settings.covers.values():
             assert widget._registry.get(cover.template_id).is_compatible_with_page(*target)
-        assert widget._registry.get(settings.photo_pages.template_id).is_compatible_with_page(*target)
+        mode = widget._registry.get_automatic_photo_page_mode(
+            settings.photo_pages.automatic_mode.mode_id
+        )
+        assert all(
+            widget._registry.get(template_id).is_compatible_with_page(*target)
+            for template_id in mode.template_ids
+        )
     widget.close()
 
 

@@ -38,7 +38,7 @@ register_discovered_template_extensions(found.packs)
 from photoalbum.templates.testpack import components
 
 widget = AlbumSettingsWidget(found.registry, translator=translator)
-assert widget.settings().photo_pages.template_id == "photo-page-2"
+assert widget.settings().photo_pages.automatic_mode.mode_id == "msb-orientation-1-2"
 assert widget._front_cover_combo.findText("Test Pack — Page banane") >= 0
 widget._front_cover_combo.setCurrentIndex(widget._front_cover_combo.findData("testpack-page"))
 instance = widget.settings().covers[CoverPosition.FRONT].page
@@ -146,7 +146,7 @@ remaining = discover_templates()
 register_discovered_template_extensions(remaining.packs)
 assert {p.pack_id for p in remaining.packs} == {"msb"}
 assert template_extension_registry.get("simplex-full-photo-cover") is None
-assert AlbumSettingsWidget(remaining.registry).settings().photo_pages.template_id == "photo-page-2"
+assert AlbumSettingsWidget(remaining.registry).settings().photo_pages.automatic_mode.mode_id == "msb-orientation-1-2"
 shutil.rmtree(remaining.packs[0].path)
 empty = discover_templates()
 register_discovered_template_extensions(empty.packs)

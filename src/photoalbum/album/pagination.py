@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from importlib import import_module
 
 from photoalbum.models import Photo
 
@@ -12,7 +13,7 @@ from .settings import (
     PageInstance,
     ContentAnchor,
 )
-from .templates import TemplateRegistry
+from .templates import AutomaticPhotoPageContext, TemplateKind, TemplateRegistry
 
 
 class PageSide(str, Enum):
@@ -82,9 +83,13 @@ class PaginationEngine:
         self,
         plan: AlbumPlan,
         settings: AlbumStructureSettings | None = None,
+        *,
+        forced_photo_page_starts: set[str] | None = None,
     ) -> PaginationResult:
         result = PaginationResult()
+        self._page_geometry = settings.effective_page_format() if settings else None
         self._overrides = {item.photo_identity: item.page for item in settings.photo_page_overrides} if settings else {}
+        self._override_boundaries = set(self._overrides) | set(forced_photo_page_starts or ())
         self._insertions = {}
         if settings:
             geometry = settings.effective_page_format()
@@ -132,17 +137,29 @@ class PaginationEngine:
     ) -> None:
         start = 0
         while start < len(item.photos):
-            instance = self._overrides.get(item.photos[start].identity, item.page_instance)
-            template_id = instance.template_id if instance else item.template_id
+            override_instance = self._overrides.get(item.photos[start].identity)
+            maximum_capacity = self._maximum_photo_page_capacity(
+                item, override_instance
+            )
+            boundary_stop = min(start + maximum_capacity, len(item.photos))
+            for index in range(start, boundary_stop):
+                if index > start and item.photos[index].identity in self._override_boundaries:
+                    boundary_stop = index
+                    break
+                anchor = ContentAnchor(
+                    "photo", photo_identity=item.photos[index].identity
+                )
+                if anchor in self._insertions:
+                    boundary_stop = index + 1
+                    break
+
+            admissible = item.photos[start:boundary_stop]
+            instance = override_instance
+            if instance is None:
+                instance = self._resolve_default_photo_page(item, admissible)
+            template_id = instance.template_id
             capacity = self._registry.get(template_id).photo_capacity
-            stop = min(start + capacity, len(item.photos))
-            for index in range(start, stop):
-                if index > start and item.photos[index].identity in self._overrides:
-                    stop = index
-                    break
-                if ContentAnchor("photo", photo_identity=item.photos[index].identity) in self._insertions:
-                    stop = index + 1
-                    break
+            stop = min(start + capacity, boundary_stop)
             photos = item.photos[
                 start:stop
             ]
@@ -166,6 +183,81 @@ class PaginationEngine:
             self._append_insertions(result, ContentAnchor("photo", photo_identity=photos[-1].identity), item,
                                     photo=photos[-1])
             start = stop
+
+    def _maximum_photo_page_capacity(
+        self,
+        item: PlanItem,
+        override: PageInstance | None,
+    ) -> int:
+        if override is not None:
+            return self._registry.get(override.template_id).photo_capacity
+        if item.automatic_photo_page_mode is not None:
+            definition = self._registry.get_automatic_photo_page_mode(
+                item.automatic_photo_page_mode.mode_id
+            )
+            return max(
+                self._registry.get(template_id).photo_capacity
+                for template_id in definition.template_ids
+            )
+        instance = item.page_instance
+        template_id = instance.template_id if instance is not None else item.template_id
+        if template_id is None:
+            raise ValueError("Photo group has no fixed template or automatic mode.")
+        return self._registry.get(template_id).photo_capacity
+
+    def _resolve_default_photo_page(
+        self,
+        item: PlanItem,
+        admissible_photos: tuple[Photo, ...],
+    ) -> PageInstance:
+        if item.automatic_photo_page_mode is None:
+            if item.page_instance is not None:
+                return item.page_instance
+            if item.template_id is None:
+                raise ValueError("Photo group has no fixed template or automatic mode.")
+            return PageInstance(template_id=item.template_id)
+
+        if self._page_geometry is None:
+            raise ValueError("Automatic photo-page modes require album page geometry.")
+        selection = item.automatic_photo_page_mode
+        definition = self._registry.get_automatic_photo_page_mode(selection.mode_id)
+        selector = None
+        if definition.selector_reference is not None:
+            module_name, attribute = definition.selector_reference.split(":", 1)
+            selector = getattr(import_module(module_name), attribute, None)
+        if not callable(selector):
+            raise ValueError(
+                f"Automatic mode {selection.mode_id!r} has no callable selector."
+            )
+        template_id = selector(AutomaticPhotoPageContext(
+            photos=tuple(admissible_photos),
+            page_width_mm=self._page_geometry.width_mm,
+            page_height_mm=self._page_geometry.height_mm,
+        ))
+        if template_id not in definition.template_ids:
+            raise ValueError(
+                f"Automatic mode {selection.mode_id!r} returned undeclared template "
+                f"{template_id!r}."
+            )
+        template = self._registry.get(template_id)
+        if (
+            not template.supports(TemplateKind.PHOTO_PAGE)
+            or template.pack_id != definition.pack_id
+        ):
+            raise ValueError(
+                f"Automatic mode {selection.mode_id!r} returned an invalid template."
+            )
+        if not template.is_compatible_with_page(
+            self._page_geometry.width_mm, self._page_geometry.height_mm
+        ):
+            raise ValueError(
+                f"Automatic mode {selection.mode_id!r} returned an incompatible template."
+            )
+        return PageInstance(
+            template_id=template_id,
+            instance_id=selection.instance_id,
+            settings=dict(selection.settings),
+        )
 
     def _append_insertions(self, result, anchor, item, photo=None) -> None:
         date = photo.capture_datetime if photo is not None else None

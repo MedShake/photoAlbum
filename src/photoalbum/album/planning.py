@@ -8,6 +8,7 @@ from photoalbum.models import Photo, PhotoUsage
 
 from .settings import (
     AlbumStructureSettings,
+    AutomaticPhotoPageSettings,
     PageInstance,
 )
 
@@ -24,7 +25,7 @@ class PlanItemKind(str, Enum):
 @dataclass(frozen=True)
 class PlanItem:
     kind: PlanItemKind
-    template_id: str
+    template_id: str | None
 
     year: int | None = None
     month: int | None = None
@@ -34,6 +35,7 @@ class PlanItem:
     # Configurable page occurrence.
     # Used notably by special pages.
     page_instance: PageInstance | None = None
+    automatic_photo_page_mode: AutomaticPhotoPageSettings | None = None
 
 
 @dataclass
@@ -178,12 +180,16 @@ class AlbumPlanner:
                 plan.items.append(
                     PlanItem(
                         kind=PlanItemKind.PHOTO_GROUP,
-                        template_id=settings.photo_pages.template_id,
+                        template_id=(
+                            settings.photo_pages.page.template_id
+                            if settings.photo_pages.page is not None else None
+                        ),
                         year=date.year,
                         month=date.month,
                         day=date.day,
                         photos=tuple(group),
                         page_instance=settings.photo_pages.page,
+                        automatic_photo_page_mode=settings.photo_pages.automatic_mode,
                     )
                 )
             return
@@ -191,11 +197,15 @@ class AlbumPlanner:
         plan.items.append(
             PlanItem(
                 kind=PlanItemKind.PHOTO_GROUP,
-                template_id=settings.photo_pages.template_id,
+                template_id=(
+                    settings.photo_pages.page.template_id
+                    if settings.photo_pages.page is not None else None
+                ),
                 year=year,
                 month=month,
                 photos=tuple(photos),
                 page_instance=settings.photo_pages.page,
+                automatic_photo_page_mode=settings.photo_pages.automatic_mode,
             )
         )
 

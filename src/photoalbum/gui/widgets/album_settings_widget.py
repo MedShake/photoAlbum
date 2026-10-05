@@ -23,7 +23,10 @@ from photoalbum.template_engine.defaults import (
     default_template_choices,
 )
 from photoalbum.i18n import Translator
-from photoalbum.gui.template_labels import template_display_name
+from photoalbum.gui.template_labels import (
+    automatic_photo_page_mode_display_name,
+    template_display_name,
+)
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 from photoalbum.template_engine.discovery import pack_settings_editor
 from photoalbum.template_engine.instances import create_template_instance
@@ -34,6 +37,7 @@ from photoalbum.album import (
     oriented_page_format,
     AlbumStructureSettings,
     AlbumBuilder,
+    AutomaticPhotoPageSettings,
     CoverPosition,
     CoverSettings,
     DividerPlacement,
@@ -79,6 +83,7 @@ class AlbumSettingsWidget(QWidget):
         self._month_divider_instance: PageInstance | None = None
         self._year_divider_instance: PageInstance | None = None
         self._photo_page_instance: PageInstance | None = None
+        self._photo_page_mode: AutomaticPhotoPageSettings | None = None
 
         self._year_dividers_available = False
 
@@ -1034,10 +1039,45 @@ class AlbumSettingsWidget(QWidget):
 
         return self._photo_page_instance
 
+    def _selected_automatic_photo_page_mode(self):
+        selection_id = self._template_id(self._photo_page_combo)
+        try:
+            return self._registry.get_automatic_photo_page_mode(selection_id)
+        except KeyError:
+            return None
+
+    def _automatic_photo_page_settings(self) -> AutomaticPhotoPageSettings:
+        definition = self._selected_automatic_photo_page_mode()
+        if definition is None:
+            raise ValueError("The selected photo-page choice is not automatic.")
+        if (
+            self._photo_page_mode is None
+            or self._photo_page_mode.mode_id != definition.mode_id
+        ):
+            defaults = create_template_instance(definition.settings_template_id)
+            self._photo_page_mode = AutomaticPhotoPageSettings(
+                mode_id=definition.mode_id,
+                instance_id=defaults.instance_id,
+                settings=dict(defaults.settings),
+            )
+        return self._photo_page_mode
+
+    def _photo_settings_instance(self) -> PageInstance:
+        definition = self._selected_automatic_photo_page_mode()
+        if definition is None:
+            return self._photo_instance()
+        selection = self._automatic_photo_page_settings()
+        return PageInstance(
+            template_id=definition.settings_template_id,
+            instance_id=selection.instance_id,
+            settings=dict(selection.settings),
+        )
+
     def _configure_photo_page_instance(
         self,
     ) -> None:
-        instance = self._photo_instance()
+        instance = self._photo_settings_instance()
+        automatic_definition = self._selected_automatic_photo_page_mode()
 
         photos = (
             self._photo_provider()
@@ -1062,9 +1102,15 @@ class AlbumSettingsWidget(QWidget):
         if not result:
             return
 
-        self._photo_page_instance = (
-            dialog.instance()
-        )
+        if automatic_definition is None:
+            self._photo_page_instance = dialog.instance()
+        else:
+            edited = dialog.instance()
+            self._photo_page_mode = AutomaticPhotoPageSettings(
+                mode_id=automatic_definition.mode_id,
+                instance_id=edited.instance_id,
+                settings=dict(edited.settings),
+            )
 
         self._template_pack_settings = (
             dialog.template_pack_settings()
@@ -1294,6 +1340,18 @@ class AlbumSettingsWidget(QWidget):
                     self._template_display_name(template),
                     template.template_id,
                 )
+
+            if kind == TemplateKind.PHOTO_PAGE:
+                width_mm, height_mm = self._page_geometry()
+                for mode in self._registry.automatic_photo_page_modes_for_page(
+                    width_mm, height_mm
+                ):
+                    combo.addItem(
+                        automatic_photo_page_mode_display_name(
+                            mode, self._translator
+                        ),
+                        mode.mode_id,
+                    )
         finally:
             combo.blockSignals(False)
 
@@ -1449,6 +1507,7 @@ class AlbumSettingsWidget(QWidget):
         # template-owned state.
         self._cover_instances.clear()
         self._photo_page_instance = None
+        self._photo_page_mode = None
         self._day_divider_instance = None
 
         self._front_matter_list.clear()
@@ -1568,8 +1627,12 @@ class AlbumSettingsWidget(QWidget):
                     self._year_placement_combo
                 ),
             ),
-            photo_pages=PhotoPageSettings(
-                page=self._photo_instance(),
+            photo_pages=(
+                PhotoPageSettings(
+                    automatic_mode=self._automatic_photo_page_settings(),
+                )
+                if self._selected_automatic_photo_page_mode() is not None
+                else PhotoPageSettings(page=self._photo_instance())
             ),
             page_numbers=PageNumberSettings(
                 enabled=self._page_numbers_checkbox.isChecked(),
@@ -1718,14 +1781,21 @@ class AlbumSettingsWidget(QWidget):
                 settings.year_dividers.placement,
             )
 
-            self._set_combo_template(
-                self._photo_page_combo,
-                settings.photo_pages.template_id,
-            )
-
-            self._photo_page_instance = (
-                settings.photo_pages.page
-            )
+            if settings.photo_pages.automatic_mode is not None:
+                self._set_combo_template(
+                    self._photo_page_combo,
+                    settings.photo_pages.automatic_mode.mode_id,
+                )
+                self._photo_page_mode = settings.photo_pages.automatic_mode
+                self._photo_page_instance = None
+            else:
+                assert settings.photo_pages.page is not None
+                self._set_combo_template(
+                    self._photo_page_combo,
+                    settings.photo_pages.page.template_id,
+                )
+                self._photo_page_instance = settings.photo_pages.page
+                self._photo_page_mode = None
             self._page_numbers_checkbox.setChecked(
                 settings.page_numbers.enabled
             )

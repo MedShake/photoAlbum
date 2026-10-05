@@ -342,7 +342,9 @@ class AlbumPlanWidget(QWidget):
         existing = next((item for item in self._settings.photo_page_overrides
                          if item.photo_identity == page.photos[0].identity), None)
         chosen = choose_page(self, self._registry, self._settings, self._result, self._translator,
-                             page=page, instance=existing.page if existing else None, photo_override=True)
+                             page=page,
+                             instance=existing.page if existing else page.page_instance,
+                             photo_override=True)
         if chosen is not None:
             identity, instance, pack_settings = chosen
             overrides = [item for item in self._settings.photo_page_overrides if item.photo_identity != identity]

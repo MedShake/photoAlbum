@@ -182,13 +182,30 @@
       ]
     }
   ],
+  "automatic_photo_page_modes": [
+    {
+      "id": "msb-orientation-1-2",
+      "name": "Automatic: orientation 1/2",
+      "localized_names": {
+        "en": "Automatic: orientation 1/2",
+        "fr": "Automatique : orientation 1/2"
+      },
+      "module": "photoalbum.templates.msb.photo_page",
+      "selector": "photoalbum.templates.msb.photo_page.automatic:select_orientation_template",
+      "templates": [
+        "photo-page-1",
+        "photo-page-2"
+      ],
+      "settings_template": "photo-page-1"
+    }
+  ],
   "settings_editor": "photoalbum.templates.msb:edit_settings",
   "default_templates": {
     "front_cover": "year-photo-scatter",
     "inside_front_cover": "geographic-word-cloud",
     "inside_back_cover": "dedication",
     "back_cover": "geographic-word-cloud",
-    "photo_page": "photo-page-2",
+    "photo_page": "msb-orientation-1-2",
     "year_divider": "calendar-index",
     "month_divider": "month-divider-classic",
     "day_divider": "day-divider-simple"

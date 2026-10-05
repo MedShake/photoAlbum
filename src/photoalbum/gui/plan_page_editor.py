@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QComboBox, QLabel, QDialogButtonBox
 
-from photoalbum.album import TemplateKind, PlanItemKind
+from photoalbum.album import AlbumBuilder, PhotoPageOverride, TemplateKind, PlanItemKind
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 from photoalbum.gui.template_labels import template_display_name
 from photoalbum.template_engine.instances import create_template_instance
@@ -52,15 +52,38 @@ def choose_page(parent, registry, settings, result, translator, *, page=None,
         created = create_template_instance(template_id)
         instance = replace(created, instance_id=instance.instance_id) if instance else created
     context_page = None
+    context_album_pages = result.pagination.pages
     if page is not None:
         capacity = registry.get(template_id).photo_capacity
         photos = ()
         if photo_override:
-            start = next(i for i, photo in enumerate(page.photos) if photo.identity == identity)
-            photos = page.photos[start:start + capacity]
-        context_page = replace(page, template_id=template_id, page_instance=instance,
-                               kind=PlanItemKind.PHOTO_GROUP if photo_override else PlanItemKind.BODY_SPECIAL_PAGE,
-                               photos=photos, photo_capacity=capacity)
+            preview_settings = replace(
+                settings,
+                photo_page_overrides=[
+                    item for item in settings.photo_page_overrides
+                    if item.photo_identity != identity
+                ] + [PhotoPageOverride(identity, instance)],
+            )
+            preview_result = AlbumBuilder(registry).build(
+                list(result.template_photos), preview_settings
+            )
+            context_album_pages = preview_result.pagination.pages
+            context_page = next(
+                candidate
+                for candidate in preview_result.pagination.pages
+                if candidate.kind == PlanItemKind.PHOTO_GROUP
+                and candidate.photos
+                and candidate.photos[0].identity == identity
+            )
+        else:
+            context_page = replace(
+                page,
+                template_id=template_id,
+                page_instance=instance,
+                kind=PlanItemKind.BODY_SPECIAL_PAGE,
+                photos=photos,
+                photo_capacity=capacity,
+            )
         if not photo_override and page.photos:
             date = page.photos[-1].capture_datetime
             if date is not None:
@@ -72,7 +95,7 @@ def choose_page(parent, registry, settings, result, translator, *, page=None,
         editor = PageInstanceDialog(
             instance, result.template_photos, translator=translator,
             page_format=geometry, template_pack_settings=pack_settings,
-            usage=kind.value, preview_page=context_page, album_pages=result.pagination.pages,
+            usage=kind.value, preview_page=context_page, album_pages=context_album_pages,
             temporal_context=tuple(key for key in ("year", "month", "day") if context_page is not None and getattr(context_page, key) is not None),
             parent=parent,
         )

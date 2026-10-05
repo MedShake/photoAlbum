@@ -345,7 +345,12 @@ class PhotoPageSettingsWidget(
         except (ValueError, IndexError):
             capacity = 1
         capacity = max(1, min(4, capacity))
-        photos = tuple(self._photos[:capacity])
+        source_photos = (
+            self._preview_page.photos
+            if self._preview_page is not None
+            else self._photos
+        )
+        photos = tuple(source_photos[:capacity])
         page = PlannedPage(
             number=1, side=PageSide.RIGHT, kind=PlanItemKind.PHOTO_GROUP,
             template_id=self._instance.template_id, photos=photos,
@@ -365,3 +370,6 @@ class PhotoPageSettingsWidget(
                 project_photos=photos, show_empty_slots=True,
             )
         )
+
+    def _album_context_changed(self) -> None:
+        self._render_preview()

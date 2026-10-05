@@ -36,7 +36,11 @@ def restore_activation(monkeypatch):
 
 def selected_templates(settings):
     return [settings.covers[position].template_id for position in CoverPosition] + [
-        settings.photo_pages.template_id,
+        (
+            settings.photo_pages.automatic_mode.mode_id
+            if settings.photo_pages.automatic_mode is not None
+            else settings.photo_pages.template_id
+        ),
         settings.year_dividers.template_id,
         settings.month_dividers.template_id,
         settings.day_dividers.template_id,
@@ -45,7 +49,7 @@ def selected_templates(settings):
 
 EXPECTED_DEFAULTS = [
     "year-photo-scatter", "geographic-word-cloud", "dedication",
-    "geographic-word-cloud", "photo-page-2", "calendar-index", "month-divider-classic", "day-divider-simple",
+    "geographic-word-cloud", "msb-orientation-1-2", "calendar-index", "month-divider-classic", "day-divider-simple",
 ]
 
 
@@ -79,7 +83,14 @@ def test_msb_defaults_ignore_discovery_and_alphabetical_order(
     try:
         assert DEFAULT_TEMPLATE_PACK == 'msb'
         assert selected_templates(widget.settings()) == EXPECTED_DEFAULTS
-        assert all(registry.get(t).pack_id == DEFAULT_TEMPLATE_PACK for t in EXPECTED_DEFAULTS)
+        assert all(
+            (
+                registry.get_automatic_photo_page_mode(t).pack_id
+                if t == "msb-orientation-1-2"
+                else registry.get(t).pack_id
+            ) == DEFAULT_TEMPLATE_PACK
+            for t in EXPECTED_DEFAULTS
+        )
         widget._front_cover_combo.setCurrentIndex(widget._front_cover_combo.findData(extra_id))
         widget.reset_to_defaults()
         assert selected_templates(widget.settings()) == EXPECTED_DEFAULTS

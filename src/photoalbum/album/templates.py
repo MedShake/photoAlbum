@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from math import isfinite
 
+from photoalbum.models import Photo
+
 from .models import CoverPosition
 
 
@@ -142,12 +144,52 @@ class TemplateDefinition:
         )
 
 
+@dataclass(frozen=True)
+class AutomaticPhotoPageModeDefinition:
+    """Pack-owned strategy which resolves to a concrete photo-page template."""
+
+    mode_id: str
+    name: str
+    pack_id: str
+    pack_name: str
+    template_ids: tuple[str, ...]
+    settings_template_id: str
+    selector_reference: str | None = None
+    localized_names: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.mode_id:
+            raise ValueError("Automatic photo-page mode ID cannot be empty.")
+        if not self.name:
+            raise ValueError("Automatic photo-page mode name cannot be empty.")
+        if not self.pack_id:
+            raise ValueError("Automatic photo-page mode must belong to a pack.")
+        if not self.template_ids:
+            raise ValueError("Automatic photo-page mode must allow at least one template.")
+        if len(set(self.template_ids)) != len(self.template_ids):
+            raise ValueError("Automatic photo-page mode templates must be distinct.")
+        if self.settings_template_id not in self.template_ids:
+            raise ValueError("Automatic mode settings template must be an allowed template.")
+
+
+@dataclass(frozen=True)
+class AutomaticPhotoPageContext:
+    """Pagination-safe inputs exposed to a pack-owned selector."""
+
+    photos: tuple[Photo, ...]
+    page_width_mm: float
+    page_height_mm: float
+
+
 class TemplateRegistry:
     def __init__(
         self,
         templates: list[TemplateDefinition] | None = None,
     ) -> None:
         self._templates: dict[str, TemplateDefinition] = {}
+        self._automatic_photo_page_modes: dict[
+            str, AutomaticPhotoPageModeDefinition
+        ] = {}
         self.pack_defaults: dict[str, dict[str, str]] = {}
 
         for template in templates or []:
@@ -162,8 +204,74 @@ class TemplateRegistry:
                 "Template is already registered: "
                 f"{template.template_id}"
             )
+        if template.template_id in self._automatic_photo_page_modes:
+            raise ValueError(
+                "Template conflicts with automatic photo-page mode: "
+                f"{template.template_id}"
+            )
 
         self._templates[template.template_id] = template
+
+    def register_automatic_photo_page_mode(
+        self,
+        mode: AutomaticPhotoPageModeDefinition,
+    ) -> None:
+        if mode.mode_id in self._automatic_photo_page_modes:
+            raise ValueError(
+                "Automatic photo-page mode is already registered: "
+                f"{mode.mode_id}"
+            )
+        if mode.mode_id in self._templates:
+            raise ValueError(
+                f"Automatic photo-page mode conflicts with template: {mode.mode_id}"
+            )
+        for template_id in mode.template_ids:
+            try:
+                template = self.get(template_id)
+            except KeyError:
+                raise ValueError(
+                    f"Automatic mode {mode.mode_id!r} references unknown template "
+                    f"{template_id!r}."
+                ) from None
+            if not template.supports(TemplateKind.PHOTO_PAGE):
+                raise ValueError(
+                    f"Automatic mode {mode.mode_id!r} references non-photo-page "
+                    f"template {template_id!r}."
+                )
+            if template.pack_id != mode.pack_id:
+                raise ValueError(
+                    f"Automatic mode {mode.mode_id!r} cannot reference template "
+                    f"{template_id!r} from another pack."
+                )
+        self._automatic_photo_page_modes[mode.mode_id] = mode
+
+    def get_automatic_photo_page_mode(
+        self,
+        mode_id: str,
+    ) -> AutomaticPhotoPageModeDefinition:
+        try:
+            return self._automatic_photo_page_modes[mode_id]
+        except KeyError:
+            raise KeyError(f"Unknown automatic photo-page mode: {mode_id}") from None
+
+    def list_automatic_photo_page_modes(
+        self,
+    ) -> list[AutomaticPhotoPageModeDefinition]:
+        return list(self._automatic_photo_page_modes.values())
+
+    def automatic_photo_page_modes_for_page(
+        self,
+        width_mm: float,
+        height_mm: float,
+    ) -> list[AutomaticPhotoPageModeDefinition]:
+        return [
+            mode
+            for mode in self._automatic_photo_page_modes.values()
+            if all(
+                self.get(template_id).is_compatible_with_page(width_mm, height_mm)
+                for template_id in mode.template_ids
+            )
+        ]
 
     def get(
         self,

@@ -140,3 +140,21 @@ class Photo:
     @property
     def is_date_anomaly(self) -> bool:
         return not self.has_capture_datetime
+
+
+def displayed_photo_dimensions(photo: Photo) -> tuple[int, int] | None:
+    """Return positive visual dimensions after the EXIF axis swap."""
+    width = photo.width
+    height = photo.height
+    if (
+        isinstance(width, bool)
+        or isinstance(height, bool)
+        or not isinstance(width, int)
+        or not isinstance(height, int)
+        or width <= 0
+        or height <= 0
+    ):
+        return None
+    if photo.orientation in (5, 6, 7, 8):
+        width, height = height, width
+    return width, height

@@ -117,7 +117,7 @@ def test_semantic_divider_anchor_and_inline_do_not_split_month_diagnostics():
     assert result.pagination.period_end_capacities == baseline.pagination.period_end_capacities
 
 
-def test_schema_three_roundtrip_and_schema_two_defaults():
+def test_current_schema_roundtrip_and_schema_two_defaults():
     _, settings, photos = setup_album()
     settings.photo_page_overrides = [PhotoPageOverride(photos[0].identity, PageInstance("photo-1", settings={"arbitrary": 3}))]
     settings.body_insertions = [BodyPageInsertion(ContentAnchor("photo", photo_identity=photos[1].identity), PageInstance("inline"), False)]

@@ -176,20 +176,46 @@ class DividerSettings:
         return self.page.instance_id
 
 
+@dataclass(frozen=True)
+class AutomaticPhotoPageSettings:
+    """Persisted selection and shared settings for one automatic mode."""
+
+    mode_id: str
+    instance_id: str = field(default_factory=lambda: uuid4().hex)
+    settings: dict[str, object] = field(default_factory=dict)
+
+    def with_settings(
+        self,
+        settings: dict[str, object],
+    ) -> "AutomaticPhotoPageSettings":
+        return AutomaticPhotoPageSettings(
+            mode_id=self.mode_id,
+            instance_id=self.instance_id,
+            settings=dict(settings),
+        )
+
+
 @dataclass(frozen=True, init=False)
 class PhotoPageSettings:
-    page: PageInstance
+    page: PageInstance | None
+    automatic_mode: AutomaticPhotoPageSettings | None
 
     def __init__(
         self,
         template_id: str | None = None,
         *,
         page: PageInstance | None = None,
+        automatic_mode: AutomaticPhotoPageSettings | None = None,
     ) -> None:
-        if page is None:
+        # dataclasses.replace() forwards every current field. Supplying a new
+        # concrete page is therefore also the natural way to leave a mode.
+        if page is not None:
+            automatic_mode = None
+
+        if page is None and automatic_mode is None:
             if template_id is None:
                 raise ValueError(
-                    "template_id or page is required"
+                    "template_id, page or automatic_mode is required"
                 )
 
             page = PageInstance(
@@ -201,13 +227,27 @@ class PhotoPageSettings:
             "page",
             page,
         )
+        object.__setattr__(
+            self,
+            "automatic_mode",
+            automatic_mode,
+        )
+
+    @property
+    def is_automatic(self) -> bool:
+        return self.automatic_mode is not None
 
     @property
     def template_id(self) -> str:
+        if self.page is None:
+            raise AttributeError("Automatic photo-page settings have no template_id.")
         return self.page.template_id
 
     @property
     def instance_id(self) -> str:
+        if self.page is None:
+            assert self.automatic_mode is not None
+            return self.automatic_mode.instance_id
         return self.page.instance_id
 
 
