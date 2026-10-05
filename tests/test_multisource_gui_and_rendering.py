@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QDialog, QComboBox, QPushButton
+from PySide6.QtWidgets import QApplication, QDialog, QComboBox, QPushButton, QToolButton
 
 from photoalbum.album import (
     A4, AlbumBuilder, BodyPageInsertion, ContentAnchor, CoverSettings,
@@ -142,14 +142,14 @@ def test_disabled_inline_is_visible_without_number_and_can_be_enabled_deleted(ap
     widget = AlbumPlanWidget(registry, Translator("en"))
     widget.set_result(AlbumBuilder(registry).build(photos, settings), settings)
     row = widget._tree.topLevelItem(widget._tree.topLevelItemCount() - 1)
-    assert row.text(1) == "—" and row.text(3) == "Disabled"
-    buttons = widget._tree.itemWidget(row, 4).findChildren(QPushButton)
+    assert row.text(1) == "—" and row.text(4) == "Disabled"
+    buttons = widget._tree.itemWidget(row, 3).findChildren(QToolButton)
     received = []
     widget.settings_changed.connect(received.append)
-    next(button for button in buttons if button.text() == "Enable").click()
+    next(button for button in buttons if button.toolTip() == "Enable").click()
     assert received[-1].body_insertions[0].enabled
     assert received[-1].body_insertions[0].page.instance_id == settings.body_insertions[0].page.instance_id
-    next(button for button in buttons if button.text() == "Delete").click()
+    next(button for button in buttons if button.toolTip() == "Delete").click()
     assert received[-1].body_insertions == []
     widget.close()
 
