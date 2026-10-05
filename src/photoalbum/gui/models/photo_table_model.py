@@ -8,7 +8,13 @@ from photoalbum.i18n.date_formatter import (
     format_datetime,
 )
 from photoalbum.i18n import Translator
-from photoalbum.models import DateSource, GpsSource, LocationSource, Photo
+from photoalbum.models import (
+    DateSource,
+    GpsSource,
+    LocationSource,
+    Photo,
+    PhotoUsage,
+)
 
 
 class PhotoTableModel(QAbstractTableModel):
@@ -102,6 +108,11 @@ class PhotoTableModel(QAbstractTableModel):
             if index.column() == 0:
                 return None
 
+            if index.column() == 7:
+                return self._translator.tr(
+                    f"photos.usage.{photo.usage.value}"
+                )
+
             return str(photo.path)
 
         if role == self.SORT_ROLE:
@@ -163,7 +174,7 @@ class PhotoTableModel(QAbstractTableModel):
         column: int,
     ) -> str:
         if column == 0:
-            return f"👁  {photo.filename}"
+            return photo.filename
 
         # Column 1 contains action widgets installed by the view.
         if column == 1:
@@ -207,14 +218,15 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         if column == 7:
-            if photo.is_date_anomaly:
+            if photo.usage == PhotoUsage.TEMPLATE_ONLY:
                 return self._translator.tr(
-                    "photos.value.missing_date"
+                    "photos.status.template_only"
                 )
-
-            return self._translator.tr(
-                "photos.value.ok"
-            )
+            if photo.usage == PhotoUsage.OFF:
+                return self._translator.tr(
+                    "photos.status.off"
+                )
+            return self._translator.tr("photos.value.ok")
 
         if column == 8:
             return self._source_names.get(photo.source_id, self._provider_for(photo))
@@ -299,7 +311,11 @@ class PhotoTableModel(QAbstractTableModel):
             return photo.location_source.value
 
         if column == 7:
-            return 1 if photo.is_date_anomaly else 0
+            return {
+                PhotoUsage.BODY: 0,
+                PhotoUsage.TEMPLATE_ONLY: 1,
+                PhotoUsage.OFF: 2,
+            }[photo.usage]
 
         if column == 8:
             return self._source_names.get(photo.source_id, self._provider_for(photo)).casefold()

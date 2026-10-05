@@ -10,7 +10,10 @@ from PySide6.QtWidgets import (
 from photoalbum.gui.models import PhotoTableModel
 from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
 from photoalbum.gui.preview_image_cache import PreviewImageCache
-from photoalbum.gui.widgets.photo_actions_delegate import PhotoActionsDelegate
+from photoalbum.gui.widgets.photo_actions_delegate import (
+    PhotoActionsDelegate,
+    PhotoFilenameDelegate,
+)
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo
 
@@ -186,20 +189,29 @@ class PhotoSourcesWidget(QWidget):
         self.table.setMouseTracking(True)
         self.table.viewport().installEventFilter(self)
 
+        self._photo_filename_delegate = PhotoFilenameDelegate(
+            self.table,
+            translator=self._translator,
+        )
+        self._photo_filename_delegate.open_photo_requested.connect(
+            self.open_photo_requested.emit
+        )
+
         self._photo_actions_delegate = PhotoActionsDelegate(
             self.table,
             translator=self._translator,
         )
-
         self._photo_actions_delegate.edit_datetime_requested.connect(
             self.edit_datetime_requested.emit
         )
-        self._photo_actions_delegate.edit_gps_requested.connect(self.edit_gps_requested.emit)
-        self._photo_actions_delegate.open_photo_requested.connect(
-            self.open_photo_requested.emit
+        self._photo_actions_delegate.edit_gps_requested.connect(
+            self.edit_gps_requested.emit
         )
-        self._photo_actions_delegate.edit_usage_requested.connect(self.edit_usage_requested.emit)
+        self._photo_actions_delegate.edit_usage_requested.connect(
+            self.edit_usage_requested.emit
+        )
 
+        self.table.setItemDelegateForColumn(0, self._photo_filename_delegate)
         self.table.setItemDelegateForColumn(1, self._photo_actions_delegate)
 
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
@@ -222,7 +234,7 @@ class PhotoSourcesWidget(QWidget):
 
         # Sensible initial widths. Long filenames must not force
         # the complete table to become excessively wide.
-        self.table.setColumnWidth(1, 146)
+        self.table.setColumnWidth(1, 112)
         self.table.setColumnWidth(2, 170)
         self.table.setColumnWidth(3, 130)
         self.table.setColumnWidth(4, 70)
@@ -501,19 +513,26 @@ class PhotoSourcesWidget(QWidget):
                 index = self.table.indexAt(position)
 
                 if index.isValid() and index.column() == 0:
-                    row = index.row()
-                    self._source_preview_position = (
-                        event.globalPosition().toPoint()
-                    )
-
-                    if row != self._source_preview_row:
+                    cell_rect = self.table.visualRect(index)
+                    if PhotoFilenameDelegate.is_over_open_icon(
+                        cell_rect,
+                        position,
+                    ):
                         self._cancel_source_photo_preview()
-                        self._source_preview_row = row
-                        self._schedule_source_photo_preview()
                     else:
-                        self._hover_preview.update_position(
-                            self._source_preview_position
+                        row = index.row()
+                        self._source_preview_position = (
+                            event.globalPosition().toPoint()
                         )
+
+                        if row != self._source_preview_row:
+                            self._cancel_source_photo_preview()
+                            self._source_preview_row = row
+                            self._schedule_source_photo_preview()
+                        else:
+                            self._hover_preview.update_position(
+                                self._source_preview_position
+                            )
                 else:
                     self._cancel_source_photo_preview()
 

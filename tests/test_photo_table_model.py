@@ -9,6 +9,7 @@ from photoalbum.models import (
     DateSource,
     LocationSource,
     Photo,
+    PhotoUsage,
 )
 
 
@@ -43,7 +44,7 @@ def test_model_displays_photo_information():
     assert model.data(
         model.index(0, 0),
         Qt.ItemDataRole.DisplayRole,
-    ) == "👁  example.jpg"
+    ) == "example.jpg"
 
     assert model.data(
         model.index(0, 1),
@@ -69,18 +70,37 @@ def test_model_displays_photo_information():
     ) == "Example City"
 
 
-def test_model_displays_date_anomaly():
-    photo = Photo(
-        path=Path("/photos/example.jpg"),
-        filename="example.jpg",
+def test_model_displays_usage_status():
+    body = Photo(
+        path=Path("/photos/body.jpg"),
+        filename="body.jpg",
+        usage=PhotoUsage.BODY,
+    )
+    template_only = Photo(
+        path=Path("/photos/template.jpg"),
+        filename="template.jpg",
+        usage=PhotoUsage.TEMPLATE_ONLY,
+    )
+    off = Photo(
+        path=Path("/photos/off.jpg"),
+        filename="off.jpg",
+        usage=PhotoUsage.OFF,
     )
 
-    model = PhotoTableModel([photo])
+    model = PhotoTableModel([body, template_only, off])
 
     assert model.data(
         model.index(0, 7),
         Qt.ItemDataRole.DisplayRole,
-    ) == "Missing date"
+    ) == "OK"
+    assert model.data(
+        model.index(1, 7),
+        Qt.ItemDataRole.DisplayRole,
+    ) == "Outside album body"
+    assert model.data(
+        model.index(2, 7),
+        Qt.ItemDataRole.DisplayRole,
+    ) == "Disabled"
 
 
 def test_user_role_returns_photo():
