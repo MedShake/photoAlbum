@@ -118,14 +118,17 @@ def _photo_page_2_cells(
     page_width_mm: float,
     page_height_mm: float,
 ) -> tuple[NormalizedRect, ...]:
+    is_landscape = page_width_mm > page_height_mm
+
     return _grid_cells(
-        rows=2,
-        columns=1,
+        rows=1 if is_landscape else 2,
+        columns=2 if is_landscape else 1,
         capacity=2,
         page_width_mm=page_width_mm,
         page_height_mm=page_height_mm,
         top_margin_mm=6.0,
         bottom_margin_mm=12.0,
+        horizontal_gap_mm=8.0,
         vertical_gap_mm=4.0,
     )
 
