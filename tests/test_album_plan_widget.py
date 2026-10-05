@@ -694,3 +694,85 @@ def test_day_group_weekday_uses_application_language():
                 widget.close()
     finally:
         QLocale.setDefault(previous_locale)
+
+
+def test_plan_columns_are_all_user_resizable():
+    from PySide6.QtWidgets import QHeaderView
+
+    widget = create_widget()
+    try:
+        header = widget._tree.header()
+        assert all(
+            header.sectionResizeMode(column) == QHeaderView.ResizeMode.Interactive
+            for column in range(widget._tree.columnCount())
+        )
+    finally:
+        widget.close()
+
+
+def test_plan_details_colour_intentional_editorial_pages_green_with_warning_priority():
+    from photoalbum.album import AutomaticPhotoPageSettings, PhotoPageOverride
+    from photoalbum.models import Photo
+
+    widget = create_widget()
+    try:
+        photo = Photo(
+            path=None,
+            filename="a.jpg",
+            source_id="source",
+            asset_id="a",
+        )
+        override_page = PageInstance("photo-page-1")
+        settings = create_structure_settings()
+        settings.photo_pages = PhotoPageSettings(
+            automatic_mode=AutomaticPhotoPageSettings("msb-orientation-1-2")
+        )
+        settings.photo_page_overrides = [
+            PhotoPageOverride(photo.identity, override_page)
+        ]
+        widget._settings = settings
+
+        overridden = PlannedPage(
+            1,
+            PageSide.RIGHT,
+            PlanItemKind.PHOTO_GROUP,
+            "photo-page-1",
+            photos=(photo,),
+            photo_capacity=1,
+            page_instance=override_page,
+        )
+        assert widget._page_item(overridden).foreground(3).color().name() == "#2e7d32"
+
+        special = PlannedPage(
+            2,
+            PageSide.LEFT,
+            PlanItemKind.BODY_SPECIAL_PAGE,
+            "blank",
+            page_instance=PageInstance("blank"),
+        )
+        assert widget._page_item(special).foreground(3).color().name() == "#2e7d32"
+
+        unused = PlannedPage(
+            3,
+            PageSide.RIGHT,
+            PlanItemKind.PHOTO_GROUP,
+            "photo-page-2",
+            photos=(photo,),
+            photo_capacity=2,
+            page_instance=override_page,
+        )
+        assert widget._page_item(unused).foreground(3).color().name() == "#ef6c00"
+
+        widget._caption_overflows = {4: [("a.jpg", 4, 3)]}
+        overflow = PlannedPage(
+            4,
+            PageSide.LEFT,
+            PlanItemKind.PHOTO_GROUP,
+            "photo-page-1",
+            photos=(photo,),
+            photo_capacity=1,
+            page_instance=override_page,
+        )
+        assert widget._page_item(overflow).foreground(3).color().name() == "#c62828"
+    finally:
+        widget.close()

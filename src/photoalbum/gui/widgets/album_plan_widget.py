@@ -155,33 +155,18 @@ class AlbumPlanWidget(QWidget):
 
         header = self._tree.header()
         header.setStretchLastSection(False)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
-        # La hiérarchie du document se trouve dans cette colonne.
-        header.setSectionResizeMode(
-            0,
-            QHeaderView.ResizeMode.Stretch,
-        )
+        # Every column remains user-resizable.  Initial widths only provide a
+        # sensible starting layout; the user can then adapt the Plan to the
+        # information that matters for the current album.
+        for column in range(self._tree.columnCount()):
+            header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.Interactive,
+            )
 
-        header.setSectionResizeMode(
-            1,
-            QHeaderView.ResizeMode.ResizeToContents,
-        )
-
-        header.setSectionResizeMode(
-            2,
-            QHeaderView.ResizeMode.ResizeToContents,
-        )
-
-        header.setSectionResizeMode(
-            3,
-            QHeaderView.ResizeMode.Interactive,
-        )
-
-        self._tree.setColumnWidth(
-            3,
-            240,
-        )
+        for column, width in enumerate((520, 70, 70, 300, 320)):
+            self._tree.setColumnWidth(column, width)
 
 
         structure_layout.addWidget(self._tree)
@@ -991,11 +976,35 @@ class AlbumPlanWidget(QWidget):
             "1", str(photo_count), details,
         ])
         item.setData(0, Qt.ItemDataRole.UserRole, page)
+        # Details use a small semantic colour code:
+        # red = a problem to fix, orange = unused capacity, green = an
+        # intentional editorial deviation from the automatic/default flow.
         if overflows:
             item.setForeground(3, QColor("#c62828"))
         elif page.unused_photo_slots:
             item.setForeground(3, QColor("#ef6c00"))
+        elif self._is_intentional_editorial_page(page):
+            item.setForeground(3, QColor("#2e7d32"))
         return item
+
+    def _is_intentional_editorial_page(self, page) -> bool:
+        if page.kind == PlanItemKind.BODY_SPECIAL_PAGE:
+            return True
+
+        settings = getattr(self, "_settings", None)
+        if (
+            settings is None
+            or not settings.photo_pages.is_automatic
+            or page.kind != PlanItemKind.PHOTO_GROUP
+            or not page.photos
+        ):
+            return False
+
+        first_identity = page.photos[0].identity
+        return any(
+            override.photo_identity == first_identity
+            for override in settings.photo_page_overrides
+        )
 
     def _update_group_totals(self) -> None:
         for index in range(

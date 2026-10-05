@@ -7,6 +7,7 @@ from pathlib import Path
 from photoalbum.models import Photo
 
 from .base import PhotoSource, SourceAsset
+from .errors import SourceReconnectRequiredError
 
 
 class SourceAssetCache:
@@ -95,9 +96,10 @@ class SourceAssetCache:
             if provider is None:
                 path = self.path_for(photo, quality)
                 if not path.is_file():
-                    raise RuntimeError(
-                        f"Source {photo.source_id!r} must be reconnected to "
-                        f"retrieve {photo.filename}."
+                    raise SourceReconnectRequiredError(
+                        filename=photo.filename,
+                        source_id=photo.source_id,
+                        operation="retrieve",
                     )
             else:
                 path = self.materialize(photo, provider, quality=quality)

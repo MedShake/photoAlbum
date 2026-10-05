@@ -413,6 +413,7 @@ class PdfExportWidget(QWidget):
             metadata=metadata,
             content=export_content,
             prepare_assets=self._project_service.materialize_originals,
+            translator=self._translator,
         )
 
         worker.moveToThread(thread)

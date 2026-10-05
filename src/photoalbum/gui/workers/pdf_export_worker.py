@@ -9,6 +9,8 @@ from PySide6.QtCore import (
 )
 
 from photoalbum.export import PdfExportService
+from photoalbum.i18n import Translator
+from photoalbum.sources import SourceReconnectRequiredError
 
 
 class PdfExportWorker(QObject):
@@ -39,6 +41,7 @@ class PdfExportWorker(QObject):
         metadata,
         content,
         prepare_assets=None,
+        translator: Translator | None = None,
     ) -> None:
         super().__init__()
 
@@ -58,6 +61,7 @@ class PdfExportWorker(QObject):
             "content": content,
         }
         self._prepare_assets = prepare_assets
+        self._translator = translator or Translator("en")
 
     @Slot()
     def run(self) -> None:
@@ -69,6 +73,19 @@ class PdfExportWorker(QObject):
                 progress_callback=self._progress,
                 **self._arguments,
             )
+        except SourceReconnectRequiredError as exc:
+            key = (
+                "source.export.reconnect_required"
+                if exc.operation == "export"
+                else "source.asset.reconnect_required"
+            )
+            self.failed.emit(
+                self._translator.tr(
+                    key,
+                    filename=exc.filename,
+                )
+            )
+            return
         except Exception as exc:
             self.failed.emit(
                 str(exc)

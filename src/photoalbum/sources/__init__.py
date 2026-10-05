@@ -8,6 +8,7 @@ from .base import (
 )
 from .config import ProjectSource
 from .cache import SourceAssetCache
+from .errors import SourceReconnectRequiredError
 from .importer import SourceImporter, SourceImportResult
 from .local import LocalFolderSource
 from .metadata_policy import (
@@ -37,6 +38,7 @@ __all__ = [
     "SourceCollection",
     "SourceError",
     "SourceProviderRegistry",
+    "SourceReconnectRequiredError",
     "SynologyCredentials",
     "SynologyBrowserSession",
     "SynologyCookie",

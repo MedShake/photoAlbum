@@ -19,6 +19,7 @@ from photoalbum.sources import (
     SourceImporter,
     SourceImportResult,
     SourceCapabilities,
+    SourceReconnectRequiredError,
 )
 
 from photoalbum.album import (
@@ -407,8 +408,10 @@ class ProjectService:
                 if marker.is_file():
                     photo.path = path
                     continue
-                raise RuntimeError(
-                    f"Source for {photo.filename!r} must be reconnected before export."
+                raise SourceReconnectRequiredError(
+                    filename=photo.filename,
+                    source_id=photo.source_id,
+                    operation="export",
                 )
             photo.path = cache.materialize(photo, provider, quality="original")
 

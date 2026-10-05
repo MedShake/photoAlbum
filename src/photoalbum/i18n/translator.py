@@ -10,10 +10,16 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.analyze": "Analyze sources",
         "sources.synchronize": "Synchronize sources",
         "sources.reconnect_required": "Reconnect this source before synchronization (Modify…).",
+        "source.export.reconnect_required": (
+            "Reconnect the source containing ‘{filename}’ before generating the PDF."
+        ),
+        "source.asset.reconnect_required": (
+            "Reconnect the source containing ‘{filename}’ to retrieve this photo."
+        ),
         "sources.active": "Active",
-        "sources.local_folder": "Local folder",
         "sources.modify": "Modify…",
         "sources.delete": "Delete",
+        "sources.local_folder": "Local folder",
         "sources.delete_confirm": "Delete source ‘{name}’ and its project photos? Other sources are preserved.",
         "photos.column.source": "Source",
         "photos.usage.title": "Photo usage",
@@ -758,10 +764,16 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.analyze": "Analyser les sources",
         "sources.synchronize": "Synchroniser les sources",
         "sources.reconnect_required": "Reconnectez cette source avant de la synchroniser (Modifier…).",
+        "source.export.reconnect_required": (
+            "Reconnectez la source contenant « {filename} » avant de générer le PDF."
+        ),
+        "source.asset.reconnect_required": (
+            "Reconnectez la source contenant « {filename} » pour récupérer cette photo."
+        ),
         "sources.active": "Active",
-        "sources.local_folder": "Dossier local",
         "sources.modify": "Modifier…",
         "sources.delete": "Supprimer",
+        "sources.local_folder": "Dossier local",
         "sources.delete_confirm": "Supprimer la source « {name} » et ses photos du projet ? Les autres sources sont conservées.",
         "photos.column.source": "Source",
         "photos.usage.title": "Utilisation de la photo",

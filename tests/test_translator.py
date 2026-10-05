@@ -89,3 +89,23 @@ def test_french_caption_overflow_wording():
         "mais ce modèle n’en affiche au maximum que 2"
         in text
     )
+
+
+def test_source_reconnect_messages_are_translated():
+    en = Translator("en")
+    fr = Translator("fr")
+
+    assert en.tr(
+        "source.export.reconnect_required",
+        filename="photo.jpg",
+    ) == "Reconnect the source containing ‘photo.jpg’ before generating the PDF."
+
+    assert fr.tr(
+        "source.export.reconnect_required",
+        filename="photo.jpg",
+    ) == "Reconnectez la source contenant « photo.jpg » avant de générer le PDF."
+
+    assert fr.tr(
+        "source.asset.reconnect_required",
+        filename="photo.jpg",
+    ) == "Reconnectez la source contenant « photo.jpg » pour récupérer cette photo."
