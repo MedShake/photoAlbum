@@ -7,10 +7,6 @@ from urllib.parse import parse_qs
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from photoalbum.gui.synology_browser_auth import (
-    EphemeralBrowserResources,
-    SynologySessionCapture,
-)
 from photoalbum.gui.synology_source_dialog import SynologySourceDialog
 from photoalbum.i18n import Translator
 from photoalbum.sources import (
@@ -18,8 +14,6 @@ from photoalbum.sources import (
     SourceCollection,
     SourceError,
     SynologyCredentials,
-    SynologyBrowserSession,
-    SynologyCookie,
     SynologyPhotosSource,
 )
 
@@ -49,20 +43,6 @@ class FakeOpener:
         return Response(json.dumps(payload).encode())
 
 
-def _browser_session() -> SynologyBrowserSession:
-    return SynologyBrowserSession(
-        api_url="https://nas.example/webapi/entry.cgi?discard=secret",
-        origin="https://nas.example",
-        referer="https://nas.example/photo/",
-        sid="browser-session",
-        syno_token="browser-token",
-        cookies=(
-            SynologyCookie("id", "browser-session", "nas.example", "/"),
-            SynologyCookie("_SSID", "support-cookie", "nas.example", "/"),
-        ),
-        request_headers=(("User-Agent", "PhotoAlbum test browser"),),
-    )
-
 
 @pytest.mark.parametrize(
     ("width", "height", "orientation", "expected"),
@@ -81,7 +61,7 @@ def test_synology_normalizes_visual_resolution_to_raw_exif_dimensions(
 ):
     source = SynologyPhotosSource(
         "https://nas.example/",
-        _browser_session(),
+        SynologyCredentials("alice", "secret"),
         opener=FakeOpener([]),
     )
     asset = source._asset_from_row({
@@ -102,6 +82,7 @@ def test_synology_normalizes_visual_resolution_to_raw_exif_dimensions(
 
 def test_synology_lists_albums_and_maps_asset_metadata(tmp_path):
     opener = FakeOpener([
+        {"success": True, "data": {"sid": "direct-session", "synotoken": "direct-token"}},
         {"success": True, "data": {"name": "alice"}},
         {"success": True, "data": {"list": [
             {"id": 7, "name": "Summer", "item_count": 1}
@@ -130,10 +111,11 @@ def test_synology_lists_albums_and_maps_asset_metadata(tmp_path):
         }]}},
         b"thumbnail bytes",
         b"original bytes",
+        {"success": True},
     ])
     source = SynologyPhotosSource(
         "https://nas.example/",
-        _browser_session(),
+        SynologyCredentials("alice", "secret"),
         opener=opener,
     )
     albums = source.list_collections()
@@ -165,7 +147,10 @@ def test_synology_lists_albums_and_maps_asset_metadata(tmp_path):
     assert original.read_bytes() == b"original bytes"
     source.close()
 
-    identity = opener.requests[0][1]
+    login = opener.requests[0][1]
+    assert login["api"] == ["SYNO.API.Auth"]
+    assert login["method"] == ["login"]
+    identity = opener.requests[1][1]
     assert identity["api"] == ["SYNO.Foto.UserInfo"]
     assert identity["method"] == ["me"]
     assert all(
@@ -173,22 +158,20 @@ def test_synology_lists_albums_and_maps_asset_metadata(tmp_path):
         for url, _, _ in opener.requests
     )
     headers = {
-        key.casefold(): value for key, value in opener.requests[0][2].items()
+        key.casefold(): value for key, value in opener.requests[1][2].items()
     }
-    assert headers["x-syno-token"] == "browser-token"
-    assert "id=browser-session" in headers["cookie"]
-    assert headers["origin"] == "https://nas.example"
-    item_request = opener.requests[3][1]
+    assert headers["x-syno-token"] == "direct-token"
+    item_request = opener.requests[4][1]
     assert item_request["album_id"] == ["7"]
     assert "gps" in item_request["additional"][0]
-    assert opener.requests[4][1]["api"] == ["SYNO.Foto.Thumbnail"]
-    assert opener.requests[5][1]["api"] == ["SYNO.Foto.Download"]
+    assert opener.requests[5][1]["api"] == ["SYNO.Foto.Thumbnail"]
+    assert opener.requests[6][1]["api"] == ["SYNO.Foto.Download"]
 
 
 def test_synology_read_only_policy_blocks_mutation_before_network():
     opener = FakeOpener([])
     source = SynologyPhotosSource(
-        "https://nas.example/", _browser_session(), opener=opener
+        "https://nas.example/", SynologyCredentials("alice", "secret"), opener=opener
     )
     with pytest.raises(SourceError, match="read-only policy"):
         source._json_request({
@@ -199,88 +182,6 @@ def test_synology_read_only_policy_blocks_mutation_before_network():
         })
     assert opener.requests == []
 
-
-def test_browser_capture_supplies_exact_session_context_to_provider():
-    capture = SynologySessionCapture()
-    capture.add_cookie(
-        SynologyCookie("id", "captured-sid", ".nas.example", "/")
-    )
-    capture.add_cookie(
-        SynologyCookie("_SSID", "captured-cookie", "nas.example", "/")
-    )
-    capture.add_cookie(
-        SynologyCookie("id", "sso-cookie", "login.example.net", "/")
-    )
-    capture.observe_request(
-        "https://nas.example/custom/webapi/entry.cgi?api=SYNO.Foto.Browse.Album",
-        {
-            "X-SYNO-TOKEN": "captured-token",
-            "Origin": "https://nas.example",
-            "Referer": "https://nas.example/custom/",
-            "User-Agent": "Qt WebEngine",
-        },
-    )
-    capture.observe_request(
-        "https://nas.example/webapi/entry.cgi?api=SYNO.Core.System",
-        {"X-SYNO-TOKEN": "unrelated-token"},
-    )
-
-    session = capture.build_session()
-    assert session.api_url == "https://nas.example/custom/webapi/entry.cgi"
-    assert session.api_path == "/custom/webapi/entry.cgi"
-    assert session.sid == "captured-sid"
-    assert session.syno_token == "captured-token"
-    assert {cookie.name for cookie in session.cookies} == {"id", "_SSID"}
-    assert "captured-sid" not in repr(session)
-    assert "captured-token" not in repr(session)
-
-
-class _FakeResource:
-    def __init__(self):
-        self.stopped = False
-        self.deleted = False
-
-    def stop(self):
-        self.stopped = True
-
-    def deleteLater(self):
-        self.deleted = True
-
-
-class _FakeCookieStore:
-    def __init__(self):
-        self.deleted = False
-
-    def deleteAllCookies(self):
-        self.deleted = True
-
-
-class _FakeProfile(_FakeResource):
-    def __init__(self):
-        super().__init__()
-        self.store = _FakeCookieStore()
-
-    def cookieStore(self):
-        return self.store
-
-
-def test_cancelled_browser_auth_clears_ephemeral_resources():
-    capture = SynologySessionCapture()
-    capture.add_cookie(SynologyCookie("id", "secret", "nas.example", "/"))
-    profile = _FakeProfile()
-    page = _FakeResource()
-    view = _FakeResource()
-    resources = EphemeralBrowserResources(profile, page, view, capture)
-
-    resources.close()
-    resources.close()
-
-    assert view.stopped is True
-    assert profile.store.deleted is True
-    assert profile.deleted is True
-    assert page.deleted is True
-    assert view.deleted is True
-    assert capture.is_ready() is False
 
 
 class _DialogProvider:
@@ -311,7 +212,6 @@ def test_dialog_closes_session_when_album_listing_fails():
     dialog = SynologySourceDialog(
         Translator("en"),
         provider_factory=lambda *args, **kwargs: provider,
-        browser_authenticator=lambda *args, **kwargs: _browser_session(),
     )
     dialog._connect()
     assert provider.connected is True
@@ -332,7 +232,6 @@ def test_reconnect_dialog_does_not_list_collections():
     dialog = SynologySourceDialog(
         Translator("en"),
         provider_factory=lambda *args, **kwargs: provider,
-        browser_authenticator=lambda *args, **kwargs: _browser_session(),
         existing_source=existing,
     )
     dialog._connect()
@@ -343,22 +242,8 @@ def test_reconnect_dialog_does_not_list_collections():
     assert provider.closed is True
 
 
-def test_dialog_cancelled_auth_does_not_create_partial_provider():
-    QApplication.instance() or QApplication([])
-    created = []
-    dialog = SynologySourceDialog(
-        Translator("en"),
-        provider_factory=lambda *args, **kwargs: created.append(args),
-        browser_authenticator=lambda *args, **kwargs: None,
-    )
-    dialog._connect()
-    assert created == []
-    assert dialog.provider is None
-    assert dialog.source is None
-    dialog.close()
 
-
-def test_new_source_persists_endpoint_but_no_browser_session_secrets():
+def test_new_source_persists_endpoint_without_credentials_secrets():
     QApplication.instance() or QApplication([])
     provider = _DialogProvider(
         albums=[SourceCollection(id="7", name="Summer", item_count=1)]
@@ -366,9 +251,11 @@ def test_new_source_persists_endpoint_but_no_browser_session_secrets():
     dialog = SynologySourceDialog(
         Translator("en"),
         provider_factory=lambda *args, **kwargs: provider,
-        browser_authenticator=lambda *args, **kwargs: _browser_session(),
     )
     dialog.url_edit.setText("https://nas.example")
+    dialog.username_edit.setText("alice")
+    dialog.password_edit.setText("secret-password")
+    dialog.otp_edit.setText("123456")
     dialog._connect()
     dialog._accept_source()
 
@@ -376,11 +263,11 @@ def test_new_source_persists_endpoint_but_no_browser_session_secrets():
     assert dialog.source.config == {
         "base_url": "https://nas.example",
         "api_path": "/webapi/entry.cgi",
+        "username": "alice",
         "verify_tls": True,
     }
-    assert "browser-session" not in serialized
-    assert "browser-token" not in serialized
-    assert "support-cookie" not in serialized
+    assert "secret-password" not in serialized
+    assert "123456" not in serialized
     provider.close()
 
 
@@ -393,8 +280,7 @@ def test_synology_occurrences_are_unique_and_collection_edits_keep_identity():
     for _ in range(2):
         provider = _DialogProvider(albums=albums)
         dialog = SynologySourceDialog(Translator("en"),
-            provider_factory=lambda *args, **kwargs: provider,
-            browser_authenticator=lambda *args, **kwargs: _browser_session())
+            provider_factory=lambda *args, **kwargs: provider)
         dialog.url_edit.setText("https://nas.example")
         dialog._connect()
         dialog._accept_source()
@@ -405,8 +291,7 @@ def test_synology_occurrences_are_unique_and_collection_edits_keep_identity():
         metadata_policy=PhotoMetadataPolicy("filename", "exif", "none", False))
     provider = _DialogProvider(albums=albums)
     editor = SynologySourceDialog(Translator("en"), existing_source=original, edit_collection=True,
-        provider_factory=lambda *args, **kwargs: provider,
-        browser_authenticator=lambda *args, **kwargs: _browser_session())
+        provider_factory=lambda *args, **kwargs: provider)
     editor._connect()
     assert editor.album_combo.currentData().id == original.collection_id
     editor.album_combo.setCurrentIndex(1)

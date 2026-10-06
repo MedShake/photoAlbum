@@ -7,7 +7,7 @@ from pathlib import Path
 import ssl
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import urlencode, urljoin
 from urllib.request import HTTPSHandler, Request, build_opener
 
 from photoalbum.models import GpsCandidate, MetadataCandidates
@@ -29,60 +29,6 @@ class SynologyCredentials:
     username: str
     password: str = field(repr=False)
     otp_code: str | None = field(default=None, repr=False)
-
-
-@dataclass(frozen=True)
-class SynologyCookie:
-    """One in-memory browser cookie; its value is deliberately not repr'd."""
-
-    name: str
-    value: str = field(repr=False)
-    domain: str = ""
-    path: str = "/"
-    secure: bool = False
-
-
-@dataclass(frozen=True)
-class SynologyBrowserSession:
-    """Ephemeral session captured from an authenticated Photos browser tab."""
-
-    api_url: str
-    origin: str
-    referer: str
-    sid: str = field(repr=False)
-    syno_token: str = field(repr=False)
-    cookies: tuple[SynologyCookie, ...] = field(repr=False)
-    token_header: str = "X-SYNO-TOKEN"
-    request_headers: tuple[tuple[str, str], ...] = field(default=(), repr=False)
-
-    def __post_init__(self) -> None:
-        parsed = urlsplit(self.api_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("Invalid Synology Photos API URL.")
-        if not self.sid or not self.syno_token:
-            raise ValueError("The Synology browser session is incomplete.")
-        if urlsplit(self.origin).netloc != parsed.netloc:
-            raise ValueError("The Synology session origin does not match its API.")
-        if urlsplit(self.referer).netloc != parsed.netloc:
-            raise ValueError("The Synology session referer does not match its API.")
-        if not any(
-            cookie.name == "id"
-            and cookie.value == self.sid
-            and _cookie_domain_matches(cookie.domain, parsed.hostname or "")
-            for cookie in self.cookies
-        ):
-            raise ValueError("The Synology session has no matching DSM cookie.")
-        # Query parameters from the observed request may contain session data.
-        # The provider always builds a fresh form body, so retain only endpoint.
-        object.__setattr__(
-            self,
-            "api_url",
-            urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", "")),
-        )
-
-    @property
-    def api_path(self) -> str:
-        return urlsplit(self.api_url).path
 
 
 class SynologyPhotosSource:
@@ -122,7 +68,7 @@ class SynologyPhotosSource:
     def __init__(
         self,
         base_url: str,
-        authentication: SynologyCredentials | SynologyBrowserSession,
+        authentication: SynologyCredentials,
         *,
         verify_tls: bool = True,
         api_path: str = "/webapi/entry.cgi",
@@ -130,21 +76,13 @@ class SynologyPhotosSource:
     ) -> None:
         self.base_url = base_url.rstrip("/") + "/"
 
-        if isinstance(authentication, SynologyBrowserSession):
-            self._credentials: SynologyCredentials | None = None
-            self._session: SynologyBrowserSession | None = authentication
-            self._sid: str | None = authentication.sid
-            self._syno_token: str | None = authentication.syno_token
-            self._api_url: str | None = authentication.api_url
-        else:
-            self._credentials = authentication
-            self._session = None
-            self._sid = None
-            self._syno_token = None
-            self._api_url = urljoin(
-                self.base_url,
-                api_path.lstrip("/") or "webapi/entry.cgi",
-            )
+        self._credentials = authentication
+        self._sid: str | None = None
+        self._syno_token: str | None = None
+        self._api_url = urljoin(
+            self.base_url,
+            api_path.lstrip("/") or "webapi/entry.cgi",
+        )
 
         self._connected = False
         self.identity: str | None = None
@@ -162,35 +100,29 @@ class SynologyPhotosSource:
 
     def connect(self) -> None:
         try:
-            if self._credentials is not None:
-                parameters: dict[str, object] = {
-                    "api": "SYNO.API.Auth",
-                    "version": 7,
-                    "method": "login",
-                    "account": self._credentials.username,
-                    "passwd": self._credentials.password,
-                    "session": "SynologyPhotos",
-                    "format": "sid",
-                    "enable_syno_token": "yes",
-                }
-                if self._credentials.otp_code:
-                    parameters["otp_code"] = self._credentials.otp_code
+            parameters: dict[str, object] = {
+                "api": "SYNO.API.Auth",
+                "version": 7,
+                "method": "login",
+                "account": self._credentials.username,
+                "passwd": self._credentials.password,
+                "session": "SynologyPhotos",
+                "format": "sid",
+                "enable_syno_token": "yes",
+            }
+            if self._credentials.otp_code:
+                parameters["otp_code"] = self._credentials.otp_code
 
-                auth_data = self._json_request(parameters, auth=False)
-                sid = auth_data.get("sid")
-                if not sid:
-                    raise AuthenticationError(
-                        "Synology authentication returned no session id."
-                    )
-
-                self._sid = str(sid)
-                token = auth_data.get("synotoken")
-                self._syno_token = str(token) if token else None
-
-            elif self._session is None:
+            auth_data = self._json_request(parameters, auth=False)
+            sid = auth_data.get("sid")
+            if not sid:
                 raise AuthenticationError(
-                    "The Synology browser session is closed."
+                    "Synology authentication returned no session id."
                 )
+
+            self._sid = str(sid)
+            token = auth_data.get("synotoken")
+            self._syno_token = str(token) if token else None
 
             data = self._json_request(
                 {
@@ -342,8 +274,6 @@ class SynologyPhotosSource:
 
     def close(self) -> None:
         # A direct DSM login belongs to Photo-Album, so explicitly close it.
-        # A browser-captured session belongs to the user's browser and must not
-        # be invalidated here.
         if self._credentials is not None and self._sid is not None:
             try:
                 self._json_request(
@@ -580,36 +510,9 @@ class SynologyPhotosSource:
             method="POST",
         )
 
-        if self._session is not None:
-            cookies = _cookies_for_url(self._session.cookies, self._api_url)
-            if cookies:
-                request.add_header(
-                    "Cookie",
-                    "; ".join(
-                        f"{cookie.name}={cookie.value}" for cookie in cookies
-                    ),
-                )
-            request.add_header("Origin", self._session.origin)
-            request.add_header("Referer", self._session.referer)
-            request.add_header("X-Requested-With", "XMLHttpRequest")
-            for name, value in self._session.request_headers:
-                if name.casefold() not in {
-                    "cookie",
-                    "authorization",
-                    "origin",
-                    "referer",
-                    "x-requested-with",
-                    self._session.token_header.casefold(),
-                }:
-                    request.add_header(name, value)
 
         if auth and self._syno_token:
-            token_header = (
-                self._session.token_header
-                if self._session is not None
-                else "X-SYNO-TOKEN"
-            )
-            request.add_header(token_header, self._syno_token)
+            request.add_header("X-SYNO-TOKEN", self._syno_token)
 
         try:
             return self._opener.open(request, timeout=30)
@@ -652,31 +555,6 @@ class SynologyPhotosSource:
 
 def _mapping(value: object) -> dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
-
-
-def _cookies_for_url(
-    cookies: tuple[SynologyCookie, ...], url: str
-) -> tuple[SynologyCookie, ...]:
-    parsed = urlsplit(url)
-    hostname = parsed.hostname or ""
-    path = parsed.path or "/"
-    selected = [
-        cookie
-        for cookie in cookies
-        if _cookie_domain_matches(cookie.domain, hostname)
-        and path.startswith(cookie.path or "/")
-        and (not cookie.secure or parsed.scheme == "https")
-    ]
-    selected.sort(key=lambda cookie: len(cookie.path or "/"), reverse=True)
-    return tuple(selected)
-
-
-def _cookie_domain_matches(domain: str, hostname: str) -> bool:
-    domain = domain.lstrip(".").casefold()
-    hostname = hostname.casefold()
-    return bool(domain) and (
-        hostname == domain or hostname.endswith("." + domain)
-    )
 
 
 def _optional_int(value: object) -> int | None:

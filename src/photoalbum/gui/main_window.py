@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QSettings, QTimer, Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QDialog,
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         self._previous_tab_index = 0
 
         self.setWindowTitle(APPLICATION_NAME)
-        self.resize(1100, 700)
+        self._restore_or_set_initial_geometry()
 
         self._photo_editor = PhotoEditor(
             self._project_service, self._translator, language=language, parent=self,
@@ -98,6 +98,24 @@ class MainWindow(QMainWindow):
         self._create_content()
 
         self._update_project_state()
+
+
+    def _restore_or_set_initial_geometry(self) -> None:
+        """Restore the previous window geometry or choose a screen-safe default."""
+        settings = QSettings("PhotoAlbum", APPLICATION_NAME)
+        saved_geometry = settings.value("main_window/geometry")
+        if saved_geometry is not None and self.restoreGeometry(saved_geometry):
+            return
+
+        screen = self.screen()
+        if screen is None:
+            self.resize(1100, 700)
+            return
+
+        available = screen.availableGeometry()
+        width = min(available.width(), max(1000, int(available.width() * 0.90)), 1440)
+        height = min(available.height(), max(650, int(available.height() * 0.90)), 900)
+        self.resize(width, height)
 
     def closeEvent(self, event) -> None:
         if self._pdf_widget.is_running:
@@ -118,6 +136,10 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
 
+        QSettings("PhotoAlbum", APPLICATION_NAME).setValue(
+            "main_window/geometry",
+            self.saveGeometry(),
+        )
         self._hover_photo_preview.clear()
         self._project_service.close()
         super().closeEvent(event)

@@ -20,11 +20,10 @@ from photoalbum.sources import (
     SynologyCredentials,
     SynologyPhotosSource,
 )
-from photoalbum.gui.synology_browser_auth import authenticate_synology_browser
 
 
 class SynologySourceDialog(QDialog):
-    """Acquire an ephemeral browser session, then select an album."""
+    """Authenticate with Synology Photos, then select an album."""
 
     def __init__(
         self,
@@ -32,16 +31,12 @@ class SynologySourceDialog(QDialog):
         parent=None,
         *,
         provider_factory=None,
-        browser_authenticator=None,
         existing_source: ProjectSource | None = None,
         edit_collection: bool = False,
     ):
         super().__init__(parent)
         self._translator = translator
         self._provider_factory = provider_factory or SynologyPhotosSource
-        # Kept temporarily for deterministic compatibility tests.
-        # Production authentication uses the DSM WebAPI directly.
-        self._browser_authenticator = browser_authenticator
         self._existing_source = existing_source
         self._edit_collection = edit_collection
         self._connected_base_url: str | None = None
@@ -131,53 +126,29 @@ class SynologySourceDialog(QDialog):
         self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         provider = None
         try:
-            if self._browser_authenticator is not None:
-                # Temporary compatibility path for the existing deterministic
-                # browser-session tests. Production does not enter this branch.
-                session = self._browser_authenticator(
-                    self.url_edit.text().strip(),
-                    self.verify_tls_checkbox.isChecked(),
-                    self._translator,
-                    self,
-                )
-                if session is None:
-                    self.status_label.setText(
-                        self._translator.tr(
-                            "source.synology.browser_cancelled"
-                        )
+            connected_base_url = (
+                self.url_edit.text().strip().rstrip("/")
+            )
+            api_path = (
+                str(
+                    self._existing_source.config.get(
+                        "api_path",
+                        "/webapi/entry.cgi",
                     )
-                    return
-                provider = self._provider_factory(
-                    session.origin,
-                    session,
-                    verify_tls=self.verify_tls_checkbox.isChecked(),
                 )
-                connected_base_url = session.origin.rstrip("/")
-                api_path = session.api_path
-            else:
-                connected_base_url = (
-                    self.url_edit.text().strip().rstrip("/")
-                )
-                api_path = (
-                    str(
-                        self._existing_source.config.get(
-                            "api_path",
-                            "/webapi/entry.cgi",
-                        )
-                    )
-                    if self._existing_source is not None
-                    else "/webapi/entry.cgi"
-                )
-                provider = self._provider_factory(
-                    connected_base_url,
-                    SynologyCredentials(
-                        username=self.username_edit.text().strip(),
-                        password=self.password_edit.text(),
-                        otp_code=self.otp_edit.text().strip() or None,
-                    ),
-                    verify_tls=self.verify_tls_checkbox.isChecked(),
-                    api_path=api_path,
-                )
+                if self._existing_source is not None
+                else "/webapi/entry.cgi"
+            )
+            provider = self._provider_factory(
+                connected_base_url,
+                SynologyCredentials(
+                    username=self.username_edit.text().strip(),
+                    password=self.password_edit.text(),
+                    otp_code=self.otp_edit.text().strip() or None,
+                ),
+                verify_tls=self.verify_tls_checkbox.isChecked(),
+                api_path=api_path,
+            )
 
             provider.connect()
             albums = (

@@ -743,7 +743,9 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
         )
         overridden_item = widget._page_item(overridden)
         assert overridden_item.foreground(4).color().name() == "#2e7d32"
-        assert overridden_item.text(4).endswith("— Custom template")
+        assert overridden_item.text(4) == "MSB — One photo"
+        assert overridden_item.foreground(5).color().name() == "#2e7d32"
+        assert overridden_item.text(5) == "Custom template"
 
         special = PlannedPage(
             2,
@@ -753,8 +755,9 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
             page_instance=PageInstance("blank"),
         )
         special_item = widget._page_item(special)
-        assert special_item.foreground(4).color().name() == "#2e7d32"
-        assert special_item.text(4).endswith("— Special page")
+        assert special_item.text(4) == "MSB — Blank page"
+        assert special_item.foreground(5).color().name() == "#2e7d32"
+        assert special_item.text(5) == "Special page"
 
         unused = PlannedPage(
             3,
@@ -765,7 +768,7 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
             photo_capacity=2,
             page_instance=override_page,
         )
-        assert widget._page_item(unused).foreground(4).color().name() == "#ef6c00"
+        assert widget._page_item(unused).foreground(5).color().name() == "#ef6c00"
 
         widget._caption_overflows = {4: [("a.jpg", 4, 3)]}
         overflow = PlannedPage(
@@ -777,7 +780,7 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
             photo_capacity=1,
             page_instance=override_page,
         )
-        assert widget._page_item(overflow).foreground(4).color().name() == "#c62828"
+        assert widget._page_item(overflow).foreground(5).color().name() == "#c62828"
     finally:
         widget.close()
 
@@ -826,7 +829,8 @@ def test_plan_actions_precede_details_are_compact_left_aligned_and_page_rows_are
     widget = create_widget()
     try:
         assert widget._tree.headerItem().text(3) == widget._translator.tr("photos.column.actions")
-        assert widget._tree.headerItem().text(4) == widget._translator.tr("plan.details")
+        assert widget._tree.headerItem().text(4) == widget._translator.tr("plan.model")
+        assert widget._tree.headerItem().text(5) == widget._translator.tr("plan.observations")
         assert widget._tree.columnWidth(3) == 86
 
         from photoalbum.album import PlannedPage, PlanItemKind
@@ -853,6 +857,7 @@ def test_plan_cover_details_are_in_details_column_after_action_column():
         front_cover = widget._tree.topLevelItem(0)
         assert front_cover.text(3) == ""
         assert front_cover.text(4) == "front-template"
+        assert front_cover.text(5) == ""
     finally:
         widget.close()
 

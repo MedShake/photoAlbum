@@ -142,7 +142,7 @@ def test_disabled_inline_is_visible_without_number_and_can_be_enabled_deleted(ap
     widget = AlbumPlanWidget(registry, Translator("en"))
     widget.set_result(AlbumBuilder(registry).build(photos, settings), settings)
     row = widget._tree.topLevelItem(widget._tree.topLevelItemCount() - 1)
-    assert row.text(1) == "—" and row.text(4) == "Disabled"
+    assert row.text(1) == "—" and row.text(5) == "Disabled"
     buttons = widget._tree.itemWidget(row, 3).findChildren(QToolButton)
     received = []
     widget.settings_changed.connect(received.append)

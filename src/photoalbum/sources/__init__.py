@@ -18,8 +18,6 @@ from .metadata_policy import (
 from .registry import SourceProviderRegistry
 from .synology import (
     SynologyCredentials,
-    SynologyBrowserSession,
-    SynologyCookie,
     SynologyPhotosSource,
 )
 
@@ -40,7 +38,5 @@ __all__ = [
     "SourceProviderRegistry",
     "SourceReconnectRequiredError",
     "SynologyCredentials",
-    "SynologyBrowserSession",
-    "SynologyCookie",
     "SynologyPhotosSource",
 ]

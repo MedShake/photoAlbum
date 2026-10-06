@@ -50,21 +50,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
         "source.synology.connect": "Connect with Synology",
         "source.synology.reconnect": "Reconnect with Synology",
-        "source.synology.browser_memory": (
-            "Authentication is handled by Synology. Browser cookies and "
-            "session tokens remain in memory and are not saved in the project."
-        ),
-        "source.synology.browser_title": "Sign in to Synology Photos",
-        "source.synology.browser_instructions": (
-            "Sign in normally, open Synology Photos, then open Albums. "
-            "When the session is detected, use the button below."
-        ),
-        "source.synology.browser_waiting": (
-            "Waiting for an authenticated Synology Photos request…"
-        ),
-        "source.synology.browser_ready": "Synology Photos session detected.",
-        "source.synology.browser_use_session": "Use this session",
-        "source.synology.browser_cancelled": "Authentication cancelled.",
         "source.synology.connection_error": "Connection failed.",
         "source.synology.connected": "Connected — {count} albums available.",
         "source.synology.reconnected": "Connected to the project source.",
@@ -72,7 +57,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Synology Photos reconnected without changing the project snapshot."
         ),
         "source.sync.running": "Synchronizing photo source…",
-        "source.sync.button": "Synchronize with source",
         "source.sync.running_button": "Synchronizing…",
         "source.sync.failed": "Photo source synchronization failed.",
         "source.sync.reconnect_required": "Reconnect the photo source before synchronizing.",
@@ -87,21 +71,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.refresh.source_failed": "Source {source}: operation failed.",
         "sources.refresh.file_failed": "Source {source}: could not analyze {filename}.",
         "tab.places_captions": "Places and captions",
-        "main.analyze_photos": "Analyze photos",
-        "main.analyze_again": "Analyze photos again",
         "main.progress_photos": "{current} photos analyzed out of {total}",
-        "photos.source.title": "Photo source",
-        "photos.source.modify": "Choose the album photo source…",
-        "photos.source.modify_tooltip": (
-            "Choose where the photos used by this album come from."
-        ),
-        "photos.source.current": "Current source:",
         "photos.source.local": "Local folder…",
-        "photos.policy.title": "Photo information to use",
-        "photos.policy.description": (
-            "When several values are available for a photo, choose which "
-            "information should be used by default."
-        ),
         "photos.policy.date": "Date",
         "photos.policy.gps": "GPS",
         "photos.policy.location": "Location",
@@ -521,9 +492,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.quit": "Quit",
 
         "main.choose_source": "Choose Source Folder...",
-        "main.source_folder": "Source folder:",
         "main.include_subdirectories": "Include subdirectories",
-        "main.analyze_photos": "Analyze Photos",
         "main.photos": "Photos:",
 
         "main.no_analysis": "No analysis performed.",
@@ -585,15 +554,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.configure_remote_source_error": "Could not configure the remote photo source.",
         "main.save_photo_date_error": "Could not save the photo date.",
         "main.save_photo_location_error": "Could not save the photo location.",
-        "main.choose_source_error": (
-            "Choose a source photo folder first."
-        ),
-        "main.source_missing_error": (
-            "Source folder does not exist: {path}"
-        ),
-        "main.analysis_log_header": (
-            "Analysis of source folder: {path}"
-        ),
         "main.missing_photos_title": (
             "Missing files"
         ),
@@ -668,7 +628,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.month_separators": "Month separators",
         "album.year_separators": "Year separators",
 
-        "album.photo_pages": "Photo pages",
+        "album.photo_pages": "Default photo page template",
         "album.page_numbering": "Page numbering",
         "album.show_page_numbers": "Show page numbers",
         "album.printing": "Printing",
@@ -705,6 +665,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.album_body": "Album body",
         "plan.section": "Section",
         "plan.details": "Details",
+        "plan.model": "Template",
+        "plan.observations": "Observations",
         "plan.page_label": "Page {number} — {type}",
 
         "plan.no_plan": "No album plan available.",
@@ -817,21 +779,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
         "source.synology.connect": "Se connecter avec Synology",
         "source.synology.reconnect": "Se reconnecter avec Synology",
-        "source.synology.browser_memory": (
-            "L’authentification est gérée par Synology. Les cookies et jetons "
-            "de session restent en mémoire et ne sont pas enregistrés dans le projet."
-        ),
-        "source.synology.browser_title": "Connexion à Synology Photos",
-        "source.synology.browser_instructions": (
-            "Connectez-vous normalement, ouvrez Synology Photos, puis Albums. "
-            "Lorsque la session est détectée, utilisez le bouton ci-dessous."
-        ),
-        "source.synology.browser_waiting": (
-            "En attente d’une requête Synology Photos authentifiée…"
-        ),
-        "source.synology.browser_ready": "Session Synology Photos détectée.",
-        "source.synology.browser_use_session": "Utiliser cette session",
-        "source.synology.browser_cancelled": "Authentification annulée.",
         "source.synology.connection_error": "Échec de la connexion.",
         "source.synology.connected": "Connecté — {count} albums disponibles.",
         "source.synology.reconnected": "Connexion établie avec la source du projet.",
@@ -839,7 +786,6 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Synology Photos reconnecté sans modifier l’instantané du projet."
         ),
         "source.sync.running": "Synchronisation de la source des photos…",
-        "source.sync.button": "Synchroniser avec la source",
         "source.sync.running_button": "Synchronisation…",
         "source.sync.failed": "Échec de la synchronisation de la source des photos.",
         "source.sync.reconnect_required": "Reconnectez la source des photos avant de la synchroniser.",
@@ -854,21 +800,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.refresh.source_failed": "Source {source} : échec de l’opération.",
         "sources.refresh.file_failed": "Source {source} : impossible d’analyser {filename}.",
         "tab.places_captions": "Lieux et légendes",
-        "main.analyze_photos": "Analyser les photos",
-        "main.analyze_again": "Analyser à nouveau les photos",
         "main.progress_photos": "{current} photos analysées sur {total}",
-        "photos.source.title": "Source des photos",
-        "photos.source.modify": "Choisir la source des photos de l’album…",
-        "photos.source.modify_tooltip": (
-            "Choisir d’où proviennent les photos utilisées par cet album."
-        ),
-        "photos.source.current": "Source actuelle :",
         "photos.source.local": "Dossier local…",
-        "photos.policy.title": "Informations utilisées pour les photos",
-        "photos.policy.description": (
-            "Quand plusieurs informations sont disponibles pour une photo, "
-            "choisir celles à utiliser par défaut."
-        ),
         "photos.policy.date": "Date",
         "photos.policy.gps": "GPS",
         "photos.policy.location": "Lieu",
@@ -1297,9 +1230,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.quit": "Quitter",
 
         "main.choose_source": "Choisir le dossier source...",
-        "main.source_folder": "Dossier source :",
         "main.include_subdirectories": "Inclure les sous-dossiers",
-        "main.analyze_photos": "Analyser les photos",
         "main.photos": "Photos :",
 
         "main.no_analysis": "Aucune analyse effectuée.",
@@ -1361,15 +1292,6 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.configure_remote_source_error": "Impossible de configurer la source de photos distante.",
         "main.save_photo_date_error": "Impossible d’enregistrer la date de la photo.",
         "main.save_photo_location_error": "Impossible d’enregistrer la localisation de la photo.",
-        "main.choose_source_error": (
-            "Choisissez d’abord un dossier source."
-        ),
-        "main.source_missing_error": (
-            "Le dossier source n’existe pas : {path}"
-        ),
-        "main.analysis_log_header": (
-            "Analyse du dossier source : {path}"
-        ),
         "main.missing_photos_title": (
             "Fichiers manquants"
         ),
@@ -1446,7 +1368,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.month_separators": "Séparateurs de mois",
         "album.year_separators": "Séparateurs d’année",
 
-        "album.photo_pages": "Pages photo",
+        "album.photo_pages": "Modèle par défaut des pages photo",
         "album.page_numbering": "Numérotation",
         "album.show_page_numbers": "Afficher les numéros de page",
         "album.printing": "Impression",
@@ -1484,6 +1406,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.album_body": "Corps de l’album",
         "plan.section": "Section",
         "plan.details": "Détails",
+        "plan.model": "Modèle",
+        "plan.observations": "Observations",
         "plan.page_label": "Page {number} — {type}",
 
         "plan.no_plan": "Aucun plan d’album disponible.",

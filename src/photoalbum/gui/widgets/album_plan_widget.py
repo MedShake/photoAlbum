@@ -169,7 +169,8 @@ class AlbumPlanWidget(QWidget):
                 self._translator.tr("plan.pages"),
                 self._translator.tr("plan.photos"),
                 self._translator.tr("photos.column.actions"),
-                self._translator.tr("plan.details"),
+                self._translator.tr("plan.model"),
+                self._translator.tr("plan.observations"),
             ]
         )
 
@@ -185,7 +186,7 @@ class AlbumPlanWidget(QWidget):
                 QHeaderView.ResizeMode.Interactive,
             )
 
-        for column, width in enumerate((520, 70, 70, 86, 300)):
+        for column, width in enumerate((500, 70, 70, 86, 260, 300)):
             self._tree.setColumnWidth(column, width)
 
 
@@ -307,8 +308,8 @@ class AlbumPlanWidget(QWidget):
             if insertion.page.instance_id in effective_ids:
                 continue
             state = "plan.disabled" if not insertion.enabled else "plan.dormant"
-            item = QTreeWidgetItem([self._template_name(insertion.page.template_id), "—", "—", "", self._translator.tr(state)])
-            for column in range(5):
+            item = QTreeWidgetItem([self._template_name(insertion.page.template_id), "—", "—", "", "", self._translator.tr(state)])
+            for column in range(6):
                 item.setForeground(column, QColor("#777777"))
             self._tree.addTopLevelItem(item)
             container = QWidget()
@@ -652,7 +653,7 @@ class AlbumPlanWidget(QWidget):
 
             if year_item is None or current_year != year:
                 year_item = QTreeWidgetItem(
-                    [str(year), "", "", "", ""]
+                    [str(year), "", "", "", "", ""]
                 )
                 append(root, year_item)
                 current_year = year
@@ -672,7 +673,7 @@ class AlbumPlanWidget(QWidget):
                 if month_name:
                     month_name = month_name[0].upper() + month_name[1:]
                 month_item = QTreeWidgetItem(
-                    [month_name, "", "", "", ""]
+                    [month_name, "", "", "", "", ""]
                 )
                 year_item.addChild(month_item)
                 current_month = month
@@ -688,7 +689,7 @@ class AlbumPlanWidget(QWidget):
                     QDate(year, month, page.day).dayOfWeek()
                 )
                 day_item = QTreeWidgetItem(
-                    [f"{page.day}  {weekday.capitalize()}", "", "", "", ""]
+                    [f"{page.day}  {weekday.capitalize()}", "", "", "", "", ""]
                 )
                 month_item.addChild(day_item)
                 current_day = page.day
@@ -846,6 +847,8 @@ class AlbumPlanWidget(QWidget):
                     "",
                     "",
                     "",
+                    "",
+                    "",
                 ]
             )
 
@@ -896,6 +899,8 @@ class AlbumPlanWidget(QWidget):
                     self._translator.tr(
                         "album.back_matter"
                     ),
+                    "",
+                    "",
                     "",
                     "",
                     "",
@@ -977,6 +982,7 @@ class AlbumPlanWidget(QWidget):
                 self._template_name(
                     cover.template_id
                 ),
+                "",
             ]
         )
 
@@ -1016,80 +1022,57 @@ class AlbumPlanWidget(QWidget):
             )
 
         photo_count = len(page.photos)
-
-        details = ""
-
+        model = ""
         if page.template_id:
             try:
-                template = self._registry.get(
-                    page.template_id
-                )
-
-                details = template_display_name(
-                    template,
-                    self._translator,
-                )
+                template = self._registry.get(page.template_id)
+                model = template_display_name(template, self._translator)
             except KeyError:
                 # Unknown external template: retain its stable ID
                 # as a technical fallback.
-                details = page.template_id
+                model = page.template_id
 
+        observation_parts: list[str] = []
         editorial_detail_key = self._editorial_detail_key(page)
         if editorial_detail_key is not None:
-            editorial_detail = self._translator.tr(editorial_detail_key)
-            details = (
-                f"{details} — {editorial_detail}"
-                if details
-                else editorial_detail
-            )
+            observation_parts.append(self._translator.tr(editorial_detail_key))
 
         if page.unused_photo_slots:
             unused_count = page.unused_photo_slots
-            unused_slots = self._translator.tr(
-                (
-                    "plan.unused_slot"
-                    if unused_count == 1
-                    else "plan.unused_slots"
-                ),
-                count=unused_count,
-            )
-
-            details = (
-                f"{details} — {unused_slots}"
+            observation_parts.append(
+                self._translator.tr(
+                    "plan.unused_slot" if unused_count == 1 else "plan.unused_slots",
+                    count=unused_count,
+                )
             )
 
         overflows = self._caption_overflows.get(page.number, [])
         if overflows:
-            overflow_details = self._translator.tr(
-                (
-                    "plan.caption_too_long"
-                    if len(overflows) == 1
-                    else "plan.captions_too_long"
+            observation_parts.append(
+                self._translator.tr(
+                    "plan.caption_too_long" if len(overflows) == 1 else "plan.captions_too_long"
                 )
             )
-            details = (
-                f"{details} — {overflow_details}"
-                if details
-                else overflow_details
-            )
 
+        observations = " — ".join(observation_parts)
         item = QTreeWidgetItem([
             self._translator.tr("plan.page_label", number=page.number, type=page_type),
-            "1", str(photo_count), "", details,
+            "1", str(photo_count), "", model, observations,
         ])
         item.setData(0, Qt.ItemDataRole.UserRole, page)
-        # Keep every actual page row tall enough for 24 px action buttons, even
-        # when the row has no actions (technical blanks, covers, etc.).
         item.setSizeHint(0, QSize(0, 26))
-        # Details use a small semantic colour code:
-        # red = a problem to fix, orange = unused capacity, green = an
-        # intentional editorial deviation from the automatic/default flow.
-        if overflows:
-            item.setForeground(4, QColor("#c62828"))
-        elif page.unused_photo_slots:
-            item.setForeground(4, QColor("#ef6c00"))
-        elif self._is_intentional_editorial_page(page):
+
+        # The model name is green only when an automatic photo-page choice was
+        # manually overridden. Observations retain the semantic warning colours.
+        if editorial_detail_key == "plan.custom_template":
             item.setForeground(4, QColor("#2e7d32"))
+
+        if overflows:
+            item.setForeground(5, QColor("#c62828"))
+        elif page.unused_photo_slots:
+            item.setForeground(5, QColor("#ef6c00"))
+        elif editorial_detail_key is not None:
+            item.setForeground(5, QColor("#2e7d32"))
         return item
 
     def _editorial_detail_key(self, page) -> str | None:
