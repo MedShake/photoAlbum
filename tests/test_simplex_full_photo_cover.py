@@ -18,6 +18,7 @@ from photoalbum.templates.simplex.full_photo_cover.title import (
     title_visible,
 )
 from photoalbum.templates.simplex.full_photo_cover.widget_renderer import (
+    _title_render_font,
     selected_photo,
 )
 
@@ -313,3 +314,21 @@ def test_simplex_invalid_title_font_size_uses_automatic_default(value):
         settings,
         "2024",
     ) == 72.0
+
+
+def test_simplex_title_font_uses_output_pixel_scaling():
+    requested = []
+
+    def font_pixel_size(point_size):
+        requested.append(point_size)
+        return 123
+
+    font = _title_render_font(
+        {},
+        "Nantes !",
+        font_pixel_size,
+    )
+
+    assert requested == [44.0]
+    assert font.pixelSize() == 123
+    assert font.pointSizeF() == -1.0

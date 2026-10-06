@@ -8,7 +8,7 @@ templates.
 Its first template is `simplex-full-photo-cover`, a full-page
 photographic template usable as a cover or special page.
 
-## Full-page photo cover
+## Full-page photo
 
 The template is available as a **special page** and at all four cover positions: front, inside front, inside back, and back.
 
@@ -21,21 +21,21 @@ scaled to cover the page and the excess is cropped symmetrically.
 
 ## Image sources
 
-The cover supports two image-source modes.
+The template supports two image-source modes.
 
 ### Project photo
 
 A photo already present in the project can be selected.
 
-Using a project photo for the cover does not remove it from the album
-or reserve it exclusively for the cover. It remains available to the
+Using a project photo for this page does not remove it from the album
+or reserve it exclusively for this page. It remains available to the
 normal album composition.
 
 ### External file
 
 An image can instead be selected directly from the filesystem.
 
-The external image is used by the cover without being added to the
+The external image is used by the page without being added to the
 project's photo collection.
 
 As with the application's existing source-photo model, the project

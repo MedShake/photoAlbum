@@ -33,6 +33,19 @@ SOURCE_PROJECT = "project"
 SOURCE_EXTERNAL = "external"
 
 
+def _title_render_font(settings, text, font_pixel_size):
+    font = QFont(title_font_family(settings))
+    font.setPixelSize(
+        max(
+            1,
+            font_pixel_size(
+                title_font_size(settings, text)
+            ),
+        )
+    )
+    return font
+
+
 def selected_photo(instance, photos):
     """
     Resolve the selected project photo.
@@ -210,16 +223,10 @@ class SimplexFullPhotoCoverRenderer:
         if not text.strip():
             return
 
-        font = QFont(
-            title_font_family(
-                instance.settings
-            )
-        )
-        font.setPointSizeF(
-            title_font_size(
-                instance.settings,
-                text,
-            )
+        font = _title_render_font(
+            instance.settings,
+            text,
+            font_pixel_size,
         )
 
         custom = (

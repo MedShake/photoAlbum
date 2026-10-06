@@ -92,7 +92,7 @@ def test_simplex_translations_are_present_in_english_and_french():
     expected = {
         "en": {
             "template.simplex-full-photo-cover":
-                "Full-page photo cover",
+                "Full-page photo",
             "simplex.full-photo-cover.source":
                 "Image source",
             "simplex.full-photo-cover.source-project":
@@ -116,7 +116,7 @@ def test_simplex_translations_are_present_in_english_and_french():
         },
         "fr": {
             "template.simplex-full-photo-cover":
-                "Couverture pleine page",
+                "Photo pleine page",
             "simplex.full-photo-cover.source":
                 "Source de l’image",
             "simplex.full-photo-cover.source-project":
