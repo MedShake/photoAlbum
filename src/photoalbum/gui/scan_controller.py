@@ -323,11 +323,6 @@ class ScanController(QObject):
         self._view.summary_label.setText(message)
         self.status_message.emit(message)
 
-    def _scan_discovered(self, total: int) -> None:
-        """Initialize scan progress after file discovery."""
-        self._scan_total_files = max(total, 0)
-        self._update_scan_progress(0)
-
     def _scan_phase_progress(self, progress) -> None:
         """Display progress for one logical scan phase."""
         phase = getattr(progress.phase, "value", progress.phase)
@@ -338,28 +333,23 @@ class ScanController(QObject):
             progress.total,
         )
 
-    def _scan_progress(self, current: int, total: int) -> None:
-        """Update scan progress from the scanner."""
-        self._scan_total_files = max(total, 0)
-        self._update_scan_progress(current)
-
     def _update_scan_progress(self, current: int) -> None:
         total = self._scan_total_files
 
         if total <= 0:
-            self._view.progress_bar.setRange(0, 0)
-            self._view.progress_bar.setFormat(
+            self._view.metadata_progress_bar.setRange(0, 0)
+            self._view.metadata_progress_bar.setFormat(
                 self._translator.tr('main.analysis_in_progress')
             )
             return
 
         current = min(max(current, 0), total)
 
-        self._view.progress_bar.setRange(0, total)
+        self._view.metadata_progress_bar.setRange(0, total)
 
-        self._view.progress_bar.setValue(current)
+        self._view.metadata_progress_bar.setValue(current)
 
-        self._view.progress_bar.setFormat(
+        self._view.metadata_progress_bar.setFormat(
             self._translator.tr('main.progress_photos', current=current, total=total)
         )
 

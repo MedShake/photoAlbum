@@ -305,15 +305,6 @@ class PhotoPlacesWidget(QWidget):
     def __init__(
         self,
         translator: Translator | None = None,
-        save_location: Callable[
-            [
-                Photo,
-                tuple[LocationComponent, ...],
-                str | None,
-            ],
-            None,
-        ]
-        | None = None,
         save_caption: Callable[
             [Photo, str | None],
             None,
@@ -353,7 +344,6 @@ class PhotoPlacesWidget(QWidget):
         super().__init__(parent)
 
         self._translator = translator or Translator("en")
-        self._save_location = save_location
         self._save_caption = save_caption
         self._save_locations = save_locations
         self._save_location_override = save_location_override
@@ -2298,8 +2288,6 @@ class PhotoPlacesWidget(QWidget):
                 location_text,
                 override_data,
             )
-        elif self._save_location is not None:
-            self._save_location(photo, components, location_text)
 
     def _effective_components(
         self,
@@ -2322,12 +2310,6 @@ class PhotoPlacesWidget(QWidget):
         ).strip()
 
         return text or None
-
-    def _has_custom_location(
-        self,
-        photo: Photo,
-    ) -> bool:
-        return self._active_location_origin(photo) == "manual"
 
     def _effective_location(
         self,
@@ -4339,24 +4321,8 @@ class PhotoPlacesWidget(QWidget):
                 )
             )
 
-        if pending_saves:
-            if self._save_locations is not None:
-                self._save_locations(
-                    pending_saves
-                )
-            elif self._save_location is not None:
-                # Compatibility fallback for callers that only
-                # provide the historical per-photo callback.
-                for (
-                    photo,
-                    selected,
-                    location_text,
-                ) in pending_saves:
-                    self._save_location(
-                        photo,
-                        selected,
-                        location_text,
-                    )
+        if pending_saves and self._save_locations is not None:
+            self._save_locations(pending_saves)
 
         # One widget refresh after the complete grouped operation.
         self._rebuild_tree()

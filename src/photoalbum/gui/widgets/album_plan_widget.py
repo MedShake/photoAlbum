@@ -1096,9 +1096,6 @@ class AlbumPlanWidget(QWidget):
             return "plan.custom_template"
         return None
 
-    def _is_intentional_editorial_page(self, page) -> bool:
-        return self._editorial_detail_key(page) is not None
-
     def _update_group_totals(self) -> None:
         for index in range(
             self._tree.topLevelItemCount()

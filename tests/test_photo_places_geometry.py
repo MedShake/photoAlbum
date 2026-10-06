@@ -26,7 +26,7 @@ def view():
 
     widget = PhotoPlacesWidget(
         parent=host,
-        save_location=save,
+        save_location_override=save,
     )
     components = tuple(LocationComponent(key=k, value=v) for k, v in [
         ('road', 'Boulevard des longues promenades'),

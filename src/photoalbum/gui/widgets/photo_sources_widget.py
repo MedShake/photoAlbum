@@ -126,9 +126,6 @@ class PhotoSourcesWidget(QWidget):
         self.metadata_progress_bar = QProgressBar()
         self.metadata_progress_bar.setVisible(False)
 
-        # Backward-compatible name used by existing controller/tests.
-        self.progress_bar = self.metadata_progress_bar
-
         self.metadata_progress_layout = QHBoxLayout()
         self.metadata_progress_layout.addWidget(
             self.metadata_progress_label

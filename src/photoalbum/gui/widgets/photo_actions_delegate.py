@@ -330,12 +330,6 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         return date_rect, gps_rect, usage_rect
 
     @classmethod
-    def _icon_rect(cls, button_rect: QRect) -> QRect:
-        x = button_rect.x() + (button_rect.width() - cls.ICON_SIZE) // 2
-        y = button_rect.y() + (button_rect.height() - cls.ICON_SIZE) // 2
-        return QRect(x, y, cls.ICON_SIZE, cls.ICON_SIZE)
-
-    @classmethod
     def _paint_calendar(
         cls,
         painter: QPainter,

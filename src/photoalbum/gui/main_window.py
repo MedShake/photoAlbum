@@ -316,7 +316,6 @@ class MainWindow(QMainWindow):
 
         self._photos_places_widget = PhotoPlacesWidget(
             translator=self._translator,
-            save_location=self._save_photo_editorial_location,
             save_location_override=self._save_photo_location_override,
             save_caption=self._save_photo_caption,
             save_locations=self._save_photo_editorial_locations,
@@ -943,25 +942,6 @@ class MainWindow(QMainWindow):
         finally:
             if changed:
                 self._mark_editorial_album_dirty()
-
-    def _save_photo_editorial_location(
-        self,
-        photo: Photo,
-        components,
-        location_text: str | None,
-    ) -> None:
-        try:
-            self._project_service.set_editorial_location(
-                photo.identity,
-                components=components,
-                location_text=location_text,
-            )
-
-            # Persist immediately, but defer the expensive album
-            # rebuild until "Places and captions" is left.
-            self._mark_editorial_album_dirty()
-        except Exception as exc:
-            self._show_error(self._translator.tr("main.save_photo_location_error"))
 
     def _save_photo_location_override(
         self,
