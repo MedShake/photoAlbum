@@ -2,9 +2,9 @@
 
 **English** | [Français](developer.fr.md)
 
-**MSB** is the original template pack bundled with Photo Album.
+**MSB** is the default template pack bundled with Photo Album.
 
-It contains the historical templates used for covers, special pages,
+It contains the templates used for covers, special pages,
 year, month, and day dividers, and ordinary photo pages.
 
 The pack is identified by `msb`. Its catalog is declared in:
@@ -33,6 +33,7 @@ MSB currently contains the following templates.
 | --- | --- | --- |
 | `year-photo-scatter` | Year photo scatter | Cover, special page |
 | `geographic-word-cloud` | Geographic word cloud | Cover, special page |
+| `geographic-map` | Geographic map | Cover, special page |
 | `calendar-index` | Annual calendar | Cover, special page, year divider |
 | `year-divider-classic` | Simple year divider | Year divider |
 | `month-divider-classic` | Month divider with city list | Month divider |
@@ -42,8 +43,8 @@ MSB currently contains the following templates.
 | `photo-page-2` | Two photos | Photo page |
 | `photo-page-3` | Three photos | Photo page |
 | `photo-page-4` | Four photos | Photo page |
-| `dedication` | Dedication | Special page, inside front/inside back/back cover |
-| `blank` | Blank page | Special page |
+| `dedication` | Dedication | Special page and body special page, inside front/inside back/back cover |
+| `blank` | Blank page | Special page and body special page, inside front/inside back/back cover |
 
 The user-visible names are translated by Photo Album. For example,
 the French catalog uses names such as *Pêle-mêle annuel*,
@@ -52,10 +53,11 @@ the French catalog uses names such as *Pêle-mêle annuel*,
 
 ## Covers
 
-Three general MSB templates can be used at all four cover positions:
+Four general MSB templates can be used at all four cover positions:
 
 - `year-photo-scatter`;
 - `geographic-word-cloud`;
+- `geographic-map`;
 - `calendar-index`.
 
 Their allowed positions are:
@@ -65,7 +67,7 @@ Their allowed positions are:
 - inside back cover;
 - back cover.
 
-`dedication` has a more restricted role as a cover template: it is
+`dedication` and `blank` have a more restricted cover role: they are
 available for the inside front, inside back, and back covers, but not the front cover.
 
 The same templates can also be used as special pages where declared
@@ -73,12 +75,12 @@ by the manifest.
 
 ## Year photo scatter
 
-`year-photo-scatter` creates a photographic composition from project
-photos associated with a year.
+`year-photo-scatter` creates a photographic composition from all dated
+photos supplied to the template.
 
 The template owns its composition, preview, settings, and rendering
 code. Its preview backend filters the supplied project photos and
-ignores photos without a capture date. Duplicate paths are reduced
+ignores photos without a capture date. Duplicate identities (`source_id + asset_id`) are reduced
 to one photo before the effective photo set is built.
 
 The template can be used as:
@@ -105,6 +107,12 @@ The template can be used as:
 
 - a cover;
 - a special page.
+
+## Geographic map
+
+`geographic-map` offers Web Mercator, Equal Earth and Robinson projections. The year filter, markers, monthly palette or single color, and legend belong to the instance. The palette can inherit the MSB theme.
+
+Preview uses a background raster calculation; PDF paints the vector map directly. Both paths share preparation and painting. See [coordinates and rendering](../geographic_map/README.md) for geographic rules and [data provenance](../assets/geographic_map/README.md) for Natural Earth.
 
 ## Annual calendar
 
@@ -186,6 +194,10 @@ All four templates share the `photo_page` implementation and a common
 renderer/settings editor, while each template ID has its own physical
 layout.
 
+### Automatic modes
+
+`photo_page/automatic.py` owns the `msb-orientation-1-2` and `msb-orientation-1-2-3` selectors. They use dimensions after EXIF orientation correction and the supplied physical page dimensions. The 1/2/3 mode is the pack default. Grouping rules are described in the [user catalog](https://github.com/MedShake/photoAlbum/wiki/Templates).
+
 ### Captions
 
 MSB photo pages support three sources of caption information:
@@ -217,7 +229,7 @@ The built-in layouts support up to three caption lines per photo.
 
 `dedication` provides a dedicated text page.
 
-It is declared both as a special page and as a cover template, but
+It is declared as a special page, body special page and cover template, but
 its cover use is deliberately restricted to the inside front, inside back, and back covers.
 
 This keeps it out of the front-cover choices while allowing a dedication on the other cover positions.
@@ -226,8 +238,8 @@ This keeps it out of the front-cover choices while allowing a dedication on the 
 
 `blank` is the simplest MSB template.
 
-It creates an intentionally empty special page and has no photo
-capacity.
+It creates an intentionally empty page and has no photo capacity.
+It supports special pages, body special pages and all cover positions except front.
 
 Besides being useful in an album layout, it is also a useful reference
 implementation for the minimum template rendering/settings contract.
@@ -325,10 +337,7 @@ requires:
 6. covering discovery, settings, preview, composition, and PDF export
    with tests.
 
-For the general template-pack architecture, see:
-
-- [`docs/template-packs.md`](../../../../../docs/template-packs.md);
-- [`docs/gui-architecture.md`](../../../../../docs/gui-architecture.md).
+For shared contracts, see [Creating packs](https://github.com/MedShake/photoAlbum/wiki/Template-packs) and [Development](https://github.com/MedShake/photoAlbum/wiki/Development).
 
 ### Minimum page dimensions
 

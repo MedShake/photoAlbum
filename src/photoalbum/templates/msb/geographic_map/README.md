@@ -1,7 +1,7 @@
 # Geographic Map coordinates and rendering
 
 Photos keep canonical GPS coordinates. Composition ignores missing, non-finite
-or out-of-range coordinates, filters by year and deduplicates photo paths just
+or out-of-range coordinates, filters by year and deduplicates photo identities (`source_id + asset_id`) just
 like the preview backend. The normalized marker x/y fields are retained for
 compatibility; the painter projects longitude/latitude itself.
 

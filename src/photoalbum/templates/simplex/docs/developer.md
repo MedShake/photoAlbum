@@ -5,12 +5,12 @@
 The **Simplex** template pack contains deliberately minimal page
 templates.
 
-Its first template is `simplex-full-photo-cover`, a full-page
+Its template is `simplex-full-photo-cover`, a full-page
 photographic template usable as a cover or special page.
 
 ## Full-page photo
 
-The template is available as a **special page** and at all four cover positions: front, inside front, inside back, and back.
+The template is available as a **special page**, including inside the album body, and at all four cover positions: front, inside front, inside back, and back.
 
 The template declares no geometric bounds. The host supplies physical page
 width and height; named formats and orientations do not restrict compatibility.
@@ -25,11 +25,10 @@ The template supports two image-source modes.
 
 ### Project photo
 
-A photo already present in the project can be selected.
-
-Using a project photo for this page does not remove it from the album
-or reserve it exclusively for this page. It remains available to the
-normal album composition.
+The selector uses active photos available to templates, identified by
+`source_id + asset_id`. Selecting a photo does not change its usage:
+`BODY` remains in the body; `TEMPLATE_ONLY` stays reserved for templates;
+`OFF` is not offered.
 
 ### External file
 
@@ -41,6 +40,10 @@ project's photo collection.
 As with the application's existing source-photo model, the project
 keeps a reference to the source path. Moving or deleting the referenced
 file can therefore make the image unavailable.
+
+## Title
+
+The optional title is automatic or custom Markdown (bold and italic). Automatic text describes the period of the dated photo pool supplied to the template: month and year, year, or year range. Settings control title visibility, vertical position, font, size and color.
 
 ## Settings UI
 
@@ -60,5 +63,4 @@ than being implemented as a Simplex-specific branch in the main GUI.
 
 Cover choices are filtered by the declared cover position and by any physical page bounds declared by the template. This template declares no geometric bounds.
 
-See [`docs/template-packs.md`](../../../../../docs/template-packs.md) for the general pack architecture and
-[`docs/gui-architecture.md`](../../../../../docs/gui-architecture.md) for GUI responsibilities.
+See [Creating packs](https://github.com/MedShake/photoAlbum/wiki/Template-packs) for shared contracts and [Development](https://github.com/MedShake/photoAlbum/wiki/Development) for GUI responsibilities.

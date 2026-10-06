@@ -4,11 +4,11 @@
 
 Le pack **Simplex** contient volontairement des templates de page minimaux.
 
-Son premier template, `simplex-full-photo-cover`, est un template photographique pleine page utilisable comme couverture ou comme page spéciale.
+Son template, `simplex-full-photo-cover`, est un template photographique pleine page utilisable comme couverture ou comme page spéciale.
 
 ## Photo pleine page
 
-Le template est disponible comme **page spéciale** et aux quatre positions de couverture : première de couverture, intérieur de première, intérieur de quatrième et quatrième de couverture.
+Le template est disponible comme **page spéciale**, y compris dans le corps de l’album, et aux quatre positions de couverture : première de couverture, intérieur de première, intérieur de quatrième et quatrième de couverture.
 
 Il ne déclare aucune limite géométrique. L’hôte fournit la largeur et la hauteur physiques de la page ; les formats nommés et orientations ne restreignent pas sa compatibilité.
 
@@ -20,13 +20,17 @@ La page accepte deux modes de source.
 
 ### Photo du projet
 
-Une photo déjà présente dans le projet peut être sélectionnée. Son utilisation ici ne la retire pas de l’album et ne la réserve pas exclusivement à cette page : elle reste disponible pour la composition normale de l’album.
+Le sélecteur utilise les photos actives disponibles pour les templates, identifiées par `source_id + asset_id`. Choisir une photo ne change pas son utilisation : une photo `BODY` reste dans le corps ; une photo `TEMPLATE_ONLY` reste réservée aux templates ; une photo `OFF` n’est pas proposée.
 
 ### Fichier externe
 
 Une image peut aussi être choisie directement dans le système de fichiers. Elle est utilisée sans être ajoutée à la collection de photos du projet.
 
 Comme pour le modèle existant des photos sources, le projet conserve une référence vers le chemin du fichier. Déplacer ou supprimer ce fichier peut donc rendre l’image indisponible.
+
+## Titre
+
+Le titre facultatif est automatique ou personnalisé en Markdown (gras et italique). Le titre automatique décrit la période du jeu de photos datées fourni au template : mois et année, année, ou plage d’années. Les réglages permettent de masquer le titre et de choisir sa position verticale, sa police, sa taille et sa couleur.
 
 ## Interface de réglages
 
@@ -43,4 +47,4 @@ Simplex est découvert par le mécanisme standard des packs de templates. Son co
 
 Les choix de couverture sont filtrés selon la position déclarée et selon les éventuelles limites physiques déclarées par le template. Ce template ne déclare aucune limite géométrique.
 
-Voir [`docs/template-packs.md`](../../../../../docs/template-packs.md) pour l’architecture générale des packs et [`docs/gui-architecture.md`](../../../../../docs/gui-architecture.md) pour les responsabilités de l’interface. Les versions françaises sont [`docs/template-packs.fr.md`](../../../../../docs/template-packs.fr.md) et [`docs/gui-architecture.fr.md`](../../../../../docs/gui-architecture.fr.md).
+Voir [Créer des packs](https://github.com/MedShake/photoAlbum/wiki/Template-packs-fr) pour les contrats communs et [Développement](https://github.com/MedShake/photoAlbum/wiki/Development-fr) pour les responsabilités de l’interface.

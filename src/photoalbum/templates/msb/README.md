@@ -1,8 +1,8 @@
 # MSB
 
-**English** | [Français](README.fr.md)
+[Français](README.fr.md) | **English**
 
-MSB is the original template pack bundled with Photo Album.
+MSB is the default template pack bundled with Photo Album.
 
 Its `manifest.json` file is the source of truth for the template
 catalog.
@@ -25,13 +25,4 @@ settings, rendering architecture, and catalog is available in:
     docs/developer.md
     docs/developer.fr.md
 
-For the general template-pack API and instructions for creating a new
-pack, see:
-
-    ../../../../docs/template-packs.md
-    ../../../../docs/template-packs.fr.md
-
-## Screenshots
-
-The `screenshots/` directory is reserved for future screenshots
-intended for Photo Album's built-in catalog.
+For shared contracts and pack authoring, see [the wiki](https://github.com/MedShake/photoAlbum/wiki/Template-packs).

@@ -46,7 +46,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.synology.password": "Password",
         "source.synology.otp": "2FA code (optional)",
         "source.synology.credentials_memory": (
-            "Credentials are used only for this connection and are never saved."
+            "The password and 2FA code are used only for this connection "
+            "and are never saved."
         ),
         "source.synology.connect": "Connect with Synology",
         "source.synology.reconnect": "Reconnect with Synology",
@@ -86,8 +87,9 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.policy.nominatim_tooltip": (
             "Nominatim is OpenStreetMap’s reverse-geocoding service. GPS "
             "coordinates are sent over the Internet to look up a city, place, "
-            "road or point of interest. No request is sent when this option "
-            "is disabled."
+            "road or point of interest. Disabling this option prevents "
+            "automatic lookups during source analysis. Saving or restoring "
+            "GPS coordinates in the photo editor still triggers a lookup."
         ),
         "photos.progress.source": "Source",
         "photos.progress.source_provider": "Source — {provider}",
@@ -393,17 +395,19 @@ CATALOGS: dict[str, dict[str, str]] = {
             "result as a PDF.</p>"
 
             "<h3>1. Photos</h3>"
-            "<p>Create or open a project, select the folder containing "
-            "your photographs, and start the analysis.</p>"
+            "<p>Create or open a project, then add local folders or Synology "
+            "Photos albums. Adding a folder starts its analysis.</p>"
+            "<p>Photo usage can include a photo in the album body, reserve "
+            "it for templates, or disable it. Confirmed changes are saved "
+            "in the project without modifying the original images.</p>"
             "<p>Photo Album reads the available metadata, including "
             "capture dates and GPS coordinates. This screen also helps "
             "identify missing or incorrect information and, when "
             "necessary, correct some of the photo data.</p>"
 
             "<h3>2. Places &amp; Captions</h3>"
-            "<p>When photographs contain GPS coordinates, Photo Album "
-            "uses reverse geocoding to determine the corresponding "
-            "locations.</p>"
+            "<p>Places can come from the photo source or from reverse "
+            "geocoding of GPS coordinates, depending on source settings.</p>"
             "<p>Individual location components can be enabled or "
             "disabled to build a description appropriate for the album. "
             "Changes can be made to individual photographs or applied "
@@ -420,30 +424,31 @@ CATALOGS: dict[str, dict[str, str]] = {
             "<h3>3. Album</h3>"
             "<p>Choose the album's general characteristics: paper size "
             "and orientation, along with the templates used for covers, "
-            "month or year transitions, photo pages, and special-purpose "
+            "day, month or year transitions, photo pages, and special-purpose "
             "pages.</p>"
-            "<p>You can also request that the total page count be "
-            "adjusted to a multiple of four when required for "
-            "printing.</p>"
+            "<p>The multiple-of-four option reports how many pages are "
+            "missing for printing; it does not add them automatically.</p>"
 
             "<h3>4. Plan</h3>"
             "<p>The plan displays the complete album structure as "
             "calculated by Photo Album.</p>"
-            "<p>It can highlight unused photo slots and provide "
-            "suggestions for pages that may be useful to add. Use it "
-            "as a structural review before moving on to the preview.</p>"
+            "<p>It highlights unused photo slots and layout warnings. "
+            "You can modify an individual photo page or insert a special "
+            "page after a photo or divider. Review the structure before "
+            "moving on to the preview.</p>"
 
             "<h3>5. Preview</h3>"
-            "<p>The preview displays the album in <b>WYSIWYG</b> mode: "
-            "pages appear as they will be produced in the final "
-            "document.</p>"
+            "<p>The preview uses the final document’s page layout, with "
+            "image resolution adapted to the screen. Remote thumbnails "
+            "do not represent the quality of the originals.</p>"
             "<p>Browse through the album to check photographs, captions, "
             "locations, and page layouts before exporting it.</p>"
 
             "<h3>6. PDF Export</h3>"
             "<p>Once you are satisfied with the result, generate the "
             "final PDF. Several quality levels are available to adapt "
-            "the file to its intended use.</p>"
+            "the file to its intended use. Choose the complete album, covers "
+            "only or interior only, and set the PDF metadata if needed.</p>"
 
             "<h3>Typical workflow</h3>"
             "<p><b>Photos → Places &amp; Captions → Album → Plan → "
@@ -775,8 +780,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.synology.password": "Mot de passe",
         "source.synology.otp": "Code 2FA (facultatif)",
         "source.synology.credentials_memory": (
-            "Les identifiants sont utilisés uniquement pour cette connexion "
-            "et ne sont jamais enregistrés."
+            "Le mot de passe et le code 2FA servent uniquement à cette "
+            "connexion et ne sont jamais enregistrés."
         ),
         "source.synology.connect": "Se connecter avec Synology",
         "source.synology.reconnect": "Se reconnecter avec Synology",
@@ -816,8 +821,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.policy.nominatim_tooltip": (
             "Nominatim est le service de géocodage inverse d’OpenStreetMap. "
             "Les coordonnées GPS sont envoyées sur Internet pour rechercher "
-            "une ville, un lieu, une rue ou un point d’intérêt. Aucune requête "
-            "n’est envoyée lorsque cette option est désactivée."
+            "une ville, un lieu, une rue ou un point d’intérêt. Désactiver "
+            "cette option empêche les recherches automatiques pendant "
+            "l’analyse des sources. Enregistrer ou restaurer le GPS dans "
+            "l’éditeur d’une photo déclenche encore une recherche."
         ),
         "photos.progress.source": "Source",
         "photos.progress.source_provider": "Source — {provider}",
@@ -1128,8 +1135,13 @@ CATALOGS: dict[str, dict[str, str]] = {
             "puis de générer le résultat en PDF.</p>"
 
             "<h3>1. Photos</h3>"
-            "<p>Créez ou ouvrez un projet, puis choisissez le dossier "
-            "contenant vos photos et lancez leur analyse.</p>"
+            "<p>Créez ou ouvrez un projet, puis ajoutez des dossiers locaux "
+            "ou des albums Synology Photos. L’ajout d’un dossier lance "
+            "son analyse.</p>"
+            "<p>L’utilisation d’une photo permet de l’inclure dans le corps "
+            "de l’album, de la réserver aux templates ou de la désactiver. "
+            "Les modifications validées sont enregistrées dans le projet "
+            "sans modifier les images originales.</p>"
             "<p>Photo Album lit les métadonnées disponibles, notamment "
             "la date de prise de vue et les coordonnées GPS. Cet écran "
             "permet également de repérer les informations manquantes ou "
@@ -1137,9 +1149,9 @@ CATALOGS: dict[str, dict[str, str]] = {
             "données.</p>"
 
             "<h3>2. Lieux et légendes</h3>"
-            "<p>Lorsque les photos contiennent des coordonnées GPS, "
-            "Photo Album utilise la géolocalisation inverse pour "
-            "retrouver les lieux correspondants.</p>"
+            "<p>Les lieux peuvent provenir de la source des photos ou du "
+            "géocodage inverse des coordonnées GPS, selon les réglages "
+            "de la source.</p>"
             "<p>Les différents éléments d’un lieu peuvent être activés "
             "ou désactivés afin de construire une indication adaptée à "
             "l’album. Les modifications peuvent être effectuées photo "
@@ -1157,31 +1169,32 @@ CATALOGS: dict[str, dict[str, str]] = {
             "<h3>3. Album</h3>"
             "<p>Choisissez les caractéristiques générales de l’album : "
             "format et orientation du papier, ainsi que les templates "
-            "utilisés pour les couvertures, les transitions entre mois "
-            "ou années, les pages de photos et les pages spécifiques.</p>"
-            "<p>Vous pouvez également demander que le nombre total de "
-            "pages soit ajusté à un multiple de quatre lorsque cela est "
-            "nécessaire pour l’impression.</p>"
+            "utilisés pour les couvertures, les transitions entre jours, "
+            "mois ou années, les pages de photos et les pages spécifiques.</p>"
+            "<p>L’option multiple de quatre indique les pages manquantes "
+            "pour l’impression ; elle ne les ajoute pas automatiquement.</p>"
 
             "<h3>4. Plan</h3>"
             "<p>Le plan présente la structure complète de l’album telle "
             "qu’elle a été calculée.</p>"
-            "<p>Il permet notamment de repérer les emplacements photo "
-            "restés libres et fournit des conseils sur les pages qu’il "
-            "peut être utile d’ajouter. Utilisez-le comme une vue de "
-            "contrôle avant de passer à l’aperçu.</p>"
+            "<p>Il signale les emplacements photo libres et les avertissements "
+            "de mise en page. Vous pouvez modifier une page photo ou insérer "
+            "une page spéciale après une photo ou un séparateur. Contrôlez "
+            "la structure avant de passer à l’aperçu.</p>"
 
             "<h3>5. Aperçu</h3>"
-            "<p>L’aperçu affiche l’album en mode <b>WYSIWYG</b> : les "
-            "pages y apparaissent telles qu’elles seront produites dans "
-            "le document final.</p>"
+            "<p>L’aperçu reprend la mise en page du document final, avec une "
+            "résolution d’image adaptée à l’écran. Les miniatures distantes "
+            "ne représentent pas la qualité des originaux.</p>"
             "<p>Parcourez l’album pour contrôler les photos, les "
             "légendes, les lieux et la mise en page avant l’export.</p>"
 
             "<h3>6. Export PDF</h3>"
             "<p>Lorsque le résultat vous convient, générez le PDF final. "
             "Plusieurs niveaux de qualité permettent d’adapter le "
-            "fichier à son utilisation.</p>"
+            "fichier à son utilisation. Choisissez l’album complet, les "
+            "couvertures seules ou le corps seul, et renseignez si besoin "
+            "les métadonnées du PDF.</p>"
 
             "<h3>Parcours habituel</h3>"
             "<p><b>Photos → Lieux et légendes → Album → Plan → "

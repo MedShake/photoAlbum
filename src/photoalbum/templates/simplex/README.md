@@ -1,6 +1,6 @@
 # Simplex
 
-**English** | [Français](README.fr.md)
+[Français](README.fr.md) | **English**
 
 Simplex is a built-in Photo Album template pack focused on minimal
 photographic layouts.
@@ -8,7 +8,7 @@ photographic layouts.
 Its `manifest.json` file is the source of truth for template
 availability, page kinds, cover positions, optional physical page bounds.
 
-The pack currently provides a full-page photographic template usable as a cover at any cover position or as a special page. Its image source may be either a project photo or an external file.
+The pack currently provides a full-page photographic template usable as a cover at any cover position or as a special page, including inside the album body. Its image source may be either a project photo or an external file.
 
 ## Documentation
 
@@ -22,7 +22,4 @@ Developer documentation is available in:
     docs/developer.md
     docs/developer.fr.md
 
-For the general template-pack architecture, see:
-
-    ../../../../docs/template-packs.md
-    ../../../../docs/template-packs.fr.md
+For shared contracts and pack authoring, see [the wiki](https://github.com/MedShake/photoAlbum/wiki/Template-packs).
