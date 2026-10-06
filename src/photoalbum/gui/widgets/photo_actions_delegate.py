@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from functools import lru_cache
+from importlib.resources import files
+
 from PySide6.QtCore import (
     QEvent,
     QRect,
@@ -8,10 +11,9 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtGui import (
-    QColor,
+    QIcon,
     QMouseEvent,
     QPainter,
-    QPen,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -25,10 +27,16 @@ from photoalbum.i18n import Translator
 from photoalbum.models import Photo, PhotoUsage
 
 
-class _PhotoIconPainter:
-    """Shared painter for the photo-shaped action icons."""
+@lru_cache(maxsize=None)
+def _photo_action_icon(filename: str) -> QIcon:
+    path = files("photoalbum.resources").joinpath("icons", filename)
+    return QIcon(str(path))
 
-    ICON_SIZE = 20
+
+class _PhotoIconPainter:
+    """Paint cached outline SVG icons used by the Photos table."""
+
+    ICON_SIZE = 18
 
     @classmethod
     def icon_rect(cls, button_rect: QRect) -> QRect:
@@ -37,79 +45,13 @@ class _PhotoIconPainter:
         return QRect(x, y, cls.ICON_SIZE, cls.ICON_SIZE)
 
     @classmethod
-    def paint_photo_icon(
+    def paint_icon(
         cls,
         painter: QPainter,
         button_rect: QRect,
-        *,
-        color: QColor | None = None,
-        badge_color: QColor | None = None,
-        badge_symbol: str | None = None,
+        filename: str,
     ) -> None:
-        rect = cls.icon_rect(button_rect)
-
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
-        base_color = color or QColor(90, 90, 90)
-        pen = QPen(base_color)
-        pen.setWidth(2)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        # Same image/frame symbol for both "open" and usage actions.
-        frame = rect.adjusted(2, 3, -2, -3)
-        painter.drawRect(frame)
-
-        painter.drawLine(
-            frame.left() + 2,
-            frame.bottom() - 2,
-            frame.left() + 7,
-            frame.top() + 7,
-        )
-        painter.drawLine(
-            frame.left() + 7,
-            frame.top() + 7,
-            frame.left() + 10,
-            frame.bottom() - 5,
-        )
-        painter.drawLine(
-            frame.left() + 10,
-            frame.bottom() - 5,
-            frame.right() - 2,
-            frame.bottom() - 2,
-        )
-        painter.drawEllipse(
-            frame.right() - 5,
-            frame.top() + 2,
-            2,
-            2,
-        )
-
-        if badge_color is not None and badge_symbol:
-            badge_size = 10
-            badge = QRect(
-                rect.right() - badge_size + 2,
-                rect.bottom() - badge_size + 2,
-                badge_size,
-                badge_size,
-            )
-            painter.setPen(QPen(badge_color, 1))
-            painter.setBrush(badge_color)
-            painter.drawEllipse(badge)
-
-            font = painter.font()
-            font.setPixelSize(9)
-            font.setBold(True)
-            painter.setFont(font)
-            painter.setPen(QColor("white"))
-            painter.drawText(
-                badge,
-                Qt.AlignmentFlag.AlignCenter,
-                badge_symbol,
-            )
-
-        painter.restore()
+        _photo_action_icon(filename).paint(painter, cls.icon_rect(button_rect))
 
 
 class PhotoFilenameDelegate(QStyledItemDelegate):
@@ -171,7 +113,7 @@ class PhotoFilenameDelegate(QStyledItemDelegate):
         )
 
         button_rect = self.open_button_rect(option.rect)
-        _PhotoIconPainter.paint_photo_icon(painter, button_rect)
+        _PhotoIconPainter.paint_icon(painter, button_rect, "photo-open.svg")
 
         text_rect = option.rect.adjusted(
             self.LEFT_PADDING + self.BUTTON_SIZE + self.TEXT_GAP,
@@ -297,17 +239,12 @@ class PhotoActionsDelegate(QStyledItemDelegate):
             missing=not photo.has_gps,
         )
 
-        color, symbol = {
-            PhotoUsage.BODY: (QColor("#707070"), "+"),
-            PhotoUsage.TEMPLATE_ONLY: (QColor("#B8860B"), "−"),
-            PhotoUsage.OFF: (QColor("#C62828"), "×"),
+        usage_icon = {
+            PhotoUsage.BODY: "photo-usage-body.svg",
+            PhotoUsage.TEMPLATE_ONLY: "photo-usage-template-only.svg",
+            PhotoUsage.OFF: "photo-usage-off.svg",
         }[photo.usage]
-        _PhotoIconPainter.paint_photo_icon(
-            painter,
-            usage_rect,
-            badge_color=color,
-            badge_symbol=symbol,
-        )
+        _PhotoIconPainter.paint_icon(painter, usage_rect, usage_icon)
 
     def editorEvent(self, event, model, option, index) -> bool:
         if (
@@ -406,49 +343,8 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         *,
         missing: bool,
     ) -> None:
-        rect = cls._icon_rect(button_rect)
-        color = QColor(205, 45, 45) if missing else QColor(145, 145, 145)
-
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
-        pen = QPen(color)
-        pen.setWidth(2)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        body = rect.adjusted(2, 4, -2, -2)
-        painter.drawRoundedRect(body, 2, 2)
-        painter.drawLine(
-            body.left(),
-            body.top() + 4,
-            body.right(),
-            body.top() + 4,
-        )
-        painter.drawLine(
-            body.left() + 4,
-            rect.top() + 1,
-            body.left() + 4,
-            body.top() + 3,
-        )
-        painter.drawLine(
-            body.right() - 4,
-            rect.top() + 1,
-            body.right() - 4,
-            body.top() + 3,
-        )
-
-        if missing:
-            center_x = body.center().x()
-            painter.drawLine(
-                center_x,
-                body.top() + 7,
-                center_x,
-                body.bottom() - 4,
-            )
-            painter.drawPoint(center_x, body.bottom() - 2)
-
-        painter.restore()
+        filename = "photo-date-missing.svg" if missing else "photo-date.svg"
+        _PhotoIconPainter.paint_icon(painter, button_rect, filename)
 
     @classmethod
     def _paint_gps(
@@ -458,42 +354,8 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         *,
         missing: bool,
     ) -> None:
-        rect = cls._icon_rect(button_rect)
-        color = QColor(205, 45, 45) if missing else QColor(145, 145, 145)
-
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
-        pen = QPen(color)
-        pen.setWidth(2)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        center_x = rect.center().x()
-        top = rect.top() + 2
-
-        painter.drawEllipse(center_x - 5, top, 10, 10)
-        painter.drawEllipse(center_x - 1, top + 4, 2, 2)
-        painter.drawLine(
-            center_x - 4,
-            top + 9,
-            center_x,
-            rect.bottom() - 1,
+        filename = (
+            "photo-location-missing.svg" if missing else "photo-location.svg"
         )
-        painter.drawLine(
-            center_x + 4,
-            top + 9,
-            center_x,
-            rect.bottom() - 1,
-        )
+        _PhotoIconPainter.paint_icon(painter, button_rect, filename)
 
-        if missing:
-            painter.drawLine(
-                rect.right() - 3,
-                rect.top() + 2,
-                rect.right() - 3,
-                rect.top() + 8,
-            )
-            painter.drawPoint(rect.right() - 3, rect.top() + 11)
-
-        painter.restore()
