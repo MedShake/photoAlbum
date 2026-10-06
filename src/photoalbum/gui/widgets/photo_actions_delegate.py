@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from functools import lru_cache
-from importlib.resources import files
-
 from PySide6.QtCore import (
     QEvent,
     QRect,
@@ -11,7 +8,6 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtGui import (
-    QIcon,
     QMouseEvent,
     QPainter,
 )
@@ -23,14 +19,10 @@ from PySide6.QtWidgets import (
     QToolTip,
 )
 
+from photoalbum.gui.icon_resources import resource_icon
 from photoalbum.i18n import Translator
 from photoalbum.models import Photo, PhotoUsage
 
-
-@lru_cache(maxsize=None)
-def _photo_action_icon(filename: str) -> QIcon:
-    path = files("photoalbum.resources").joinpath("icons", filename)
-    return QIcon(str(path))
 
 
 class _PhotoIconPainter:
@@ -51,7 +43,7 @@ class _PhotoIconPainter:
         button_rect: QRect,
         filename: str,
     ) -> None:
-        _photo_action_icon(filename).paint(painter, cls.icon_rect(button_rect))
+        resource_icon(filename).paint(painter, cls.icon_rect(button_rect))
 
 
 class PhotoFilenameDelegate(QStyledItemDelegate):

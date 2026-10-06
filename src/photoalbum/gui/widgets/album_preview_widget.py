@@ -42,9 +42,7 @@ from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
 )
-from photoalbum.template_engine import (
-    translator_for_template,
-)
+from photoalbum.gui.template_labels import template_display_name
 from photoalbum.i18n import Translator
 from photoalbum.rendering import (
     PageRenderer,
@@ -79,6 +77,7 @@ class _PreviewPageBase(QWidget):
         )
 
         self._page_ratio = ratio
+        self._shared_preview_key = None
 
         self.set_page_width(
             self.PAGE_WIDTH
@@ -103,6 +102,17 @@ class _PreviewPageBase(QWidget):
         # Font sizes and all other print-scaled elements depend
         # on the current preview width. Repaint after resizing.
         self.update()
+
+    def _set_template_preview_key(self, key) -> None:
+        self._shared_preview_key = key
+
+    def _shared_preview_ready(self, key) -> None:
+        if key == self._shared_preview_key:
+            self.update()
+
+    def _shared_preview_failed(self, key, message: str) -> None:
+        if key == self._shared_preview_key:
+            self.update()
 
     def _pixel_rect(
         self,
@@ -205,8 +215,6 @@ class AlbumCoverPreview(_PreviewPageBase):
             template_pack_settings or {}
         )
 
-        self._shared_preview_key = None
-
         self._render_service.preview_ready.connect(
             self._shared_preview_ready
         )
@@ -263,14 +271,10 @@ class AlbumCoverPreview(_PreviewPageBase):
             self._template_id
         )
 
-        template_key = (
-            f"template.{template.template_id}"
+        template_name = template_display_name(
+            template,
+            self._translator,
         )
-
-        template_name = translator_for_template(self._template_id, self._translator).tr(template_key)
-
-        if template_name == template_key:
-            template_name = template.name
 
         font = QFont(
             resolve_font_family(None)
@@ -318,41 +322,11 @@ class AlbumCoverPreview(_PreviewPageBase):
             template_name,
         )
 
-    def _set_template_preview_key(
-        self,
-        key,
-    ) -> None:
-        self._shared_preview_key = key
-
     def _project_photos(
         self,
     ):
         return list(self._result.template_photos)
 
-    def _shared_preview_ready(
-        self,
-        key,
-    ) -> None:
-        if (
-            key
-            != self._shared_preview_key
-        ):
-            return
-
-        self.update()
-
-    def _shared_preview_failed(
-        self,
-        key,
-        message: str,
-    ) -> None:
-        if (
-            key
-            != self._shared_preview_key
-        ):
-            return
-
-        self.update()
 
 
 
@@ -399,14 +373,13 @@ class AlbumPagePreview(_PreviewPageBase):
         )
 
         self._render_service = render_service
-        self._shared_preview_key = None
 
         if self._render_service is not None:
             self._render_service.preview_ready.connect(
-                self._shared_template_preview_ready
+                self._shared_preview_ready
             )
             self._render_service.preview_failed.connect(
-                self._shared_template_preview_failed
+                self._shared_preview_failed
             )
 
 
@@ -462,31 +435,6 @@ class AlbumPagePreview(_PreviewPageBase):
             self._paint_border(painter)
         finally:
             painter.end()
-
-    def _set_template_preview_key(
-        self,
-        key,
-    ) -> None:
-        self._shared_preview_key = key
-
-    def _shared_template_preview_ready(
-        self,
-        key,
-    ) -> None:
-        if key != self._shared_preview_key:
-            return
-
-        self.update()
-
-    def _shared_template_preview_failed(
-        self,
-        key,
-        message: str,
-    ) -> None:
-        if key != self._shared_preview_key:
-            return
-
-        self.update()
 
     def _paint_non_photo_page(
         self,

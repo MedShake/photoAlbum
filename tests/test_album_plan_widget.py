@@ -83,6 +83,7 @@ def create_widget() -> AlbumPlanWidget:
 
 def create_result() -> AlbumBuildResult:
     return AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(
             pages=[
@@ -161,6 +162,7 @@ def create_structure_settings() -> AlbumStructureSettings:
 
 def result_with_pages(pages: list[PlannedPage]) -> AlbumBuildResult:
     return AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(pages=pages),
         print_diagnostic=PrintDiagnostic(
@@ -426,6 +428,7 @@ def test_plan_widget_hides_warnings_when_print_is_compatible():
     result = create_result()
 
     constrained_result = AlbumBuildResult(
+        album_photos=(),
         plan=result.plan,
         pagination=result.pagination,
         print_diagnostic=PrintDiagnostic(
@@ -448,6 +451,7 @@ def test_plan_widget_displays_incompatible_print_as_warning():
     result = create_result()
 
     constrained_result = AlbumBuildResult(
+        album_photos=(),
         plan=result.plan,
         pagination=result.pagination,
         print_diagnostic=PrintDiagnostic(

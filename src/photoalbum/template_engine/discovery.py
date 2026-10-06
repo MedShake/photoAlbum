@@ -250,15 +250,12 @@ def _documentation_paths(
     if value is None:
         return {}
 
-    if isinstance(value, str):
-        entries = {"en": value}
-    elif isinstance(value, dict):
-        entries = value
-    else:
+    if not isinstance(value, dict):
         raise ValueError(
-            "Template pack documentation must be a path "
-            "or a language/path mapping"
+            "Template pack documentation must be a language/path mapping"
         )
+
+    entries = value
 
     pack_root = pack_path.resolve()
     result: dict[str, Path] = {}

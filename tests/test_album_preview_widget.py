@@ -86,6 +86,7 @@ def make_result() -> AlbumBuildResult:
     )
 
     return AlbumBuildResult(
+        album_photos=(photo,),
         plan=AlbumPlan(),
         pagination=PaginationResult(
             pages=[

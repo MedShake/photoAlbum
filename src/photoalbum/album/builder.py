@@ -21,17 +21,13 @@ class AlbumBuildResult:
     plan: AlbumPlan
     pagination: PaginationResult
     print_diagnostic: PrintDiagnostic
+    album_photos: tuple[Photo, ...]
     excluded_special_pages: tuple[PageInstance, ...] = ()
-    album_photos: tuple[Photo, ...] | None = None
     excluded_photo_overrides: tuple[PageInstance, ...] = ()
 
     @property
     def template_photos(self) -> tuple[Photo, ...]:
-        if self.album_photos is not None:
-            return self.album_photos
-        # Compatibility for callers constructing a build result directly.
-        return tuple({photo.identity: photo for item in self.plan.items
-                      for photo in item.photos if photo.usage != PhotoUsage.OFF}.values())
+        return self.album_photos
 
     # pagination.pages contains the physical interior pages
     # of the album. Covers are rendered separately and are

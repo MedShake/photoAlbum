@@ -15,7 +15,6 @@ from photoalbum.gui.workers import (
 )
 from photoalbum.i18n import Translator
 from photoalbum.scanner import LibraryScanResult, ProcessingEvent, ProcessingEventType
-from photoalbum.sources import PhotoMetadataPolicy
 
 
 class ScanController(QObject):

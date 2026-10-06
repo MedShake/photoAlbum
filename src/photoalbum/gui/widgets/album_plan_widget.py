@@ -1,14 +1,14 @@
 from __future__ import annotations
 from dataclasses import replace
-from importlib.resources import files
 
 from photoalbum.i18n import Translator
 from photoalbum.album.composition import PageComposer
 
+from photoalbum.gui.icon_resources import resource_icon
 from photoalbum.gui.template_labels import template_display_name
 
 from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QIcon
+from PySide6.QtGui import QBrush, QColor
 from shiboken6 import isValid
 
 from PySide6.QtWidgets import (
@@ -34,10 +34,6 @@ from photoalbum.album import (
     TemplateRegistry,
 )
 
-
-def _plan_action_icon(filename: str) -> QIcon:
-    path = files("photoalbum.resources").joinpath("icons", filename)
-    return QIcon(str(path))
 
 
 class AlbumPlanWidget(QWidget):
@@ -280,7 +276,7 @@ class AlbumPlanWidget(QWidget):
                 self._register_action_hover(container, item)
                 def button(key, icon_name, callback):
                     action = QToolButton()
-                    action.setIcon(_plan_action_icon(icon_name))
+                    action.setIcon(resource_icon(icon_name))
                     action.setIconSize(QSize(16, 16))
                     action.setFixedSize(24, 24)
                     action.setAutoRaise(True)
@@ -380,7 +376,7 @@ class AlbumPlanWidget(QWidget):
             ("sources.delete", "plan-delete.svg", lambda: self._replace_insertion(insertion, None)),
         ):
             action = QToolButton()
-            action.setIcon(_plan_action_icon(icon_name))
+            action.setIcon(resource_icon(icon_name))
             action.setIconSize(QSize(16, 16))
             action.setFixedSize(24, 24)
             action.setAutoRaise(True)

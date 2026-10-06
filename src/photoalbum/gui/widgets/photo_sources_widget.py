@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QPoint, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QHeaderView,
-    QLabel, QLineEdit, QMenu, QPlainTextEdit, QProgressBar, QPushButton,
+    QAbstractItemView, QHBoxLayout, QHeaderView,
+    QLabel, QMenu, QPlainTextEdit, QProgressBar, QPushButton,
     QSplitter, QTableView, QVBoxLayout, QWidget, QGroupBox, QScrollArea,
 )
 
