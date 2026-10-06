@@ -351,6 +351,7 @@ class AlbumPagePreview(_PreviewPageBase):
 
         self._composition = composition
         self._thumbnail_cache = thumbnail_cache
+        self._thumbnail_cache.ready.connect(self._thumbnail_ready)
         self._translator = (
             translator
             or Translator("en")
@@ -382,6 +383,10 @@ class AlbumPagePreview(_PreviewPageBase):
                 self._shared_preview_failed
             )
 
+
+    def _thumbnail_ready(self, path: str) -> None:
+        if any(str(photo.path) == path for photo in self._composition.page.photos):
+            self.update()
 
     def paintEvent(
         self,
@@ -618,15 +623,26 @@ class AlbumPreviewWidget(QWidget):
             Qt.AlignmentFlag.AlignTop,
         )
 
-    def _cover_widget(
+    def create_cover_preview(
         self,
         settings: AlbumStructureSettings,
         position: CoverPosition,
-        page_format: PageFormat,
+        *,
+        page_format: PageFormat | None = None,
+        page_width: int | None = None,
+        parent: QWidget | None = None,
     ) -> AlbumCoverPreview:
-        cover = settings.covers[position]
+        """Create a cover preview through the exact same path as the Preview tab.
 
-        return AlbumCoverPreview(
+        This is intentionally public so other UI surfaces (notably Plan hover
+        previews) can reuse the Preview tab's composer, render service and image
+        cache instead of building a parallel rendering path.
+        """
+        if page_format is None:
+            page_format = settings.effective_page_format()
+
+        cover = settings.covers[position]
+        preview = AlbumCoverPreview(
             position=position,
             template_id=cover.template_id,
             registry=self._registry,
@@ -639,6 +655,83 @@ class AlbumPreviewWidget(QWidget):
             template_pack_settings=(
                 settings.template_pack_settings
             ),
+            parent=parent,
+        )
+        if page_width is not None:
+            preview.set_page_width(page_width)
+        return preview
+
+    def _cover_widget(
+        self,
+        settings: AlbumStructureSettings,
+        position: CoverPosition,
+        page_format: PageFormat,
+    ) -> AlbumCoverPreview:
+        return self.create_cover_preview(
+            settings,
+            position,
+            page_format=page_format,
+        )
+
+    def create_page_preview(
+        self,
+        page,
+        settings: AlbumStructureSettings,
+        *,
+        page_format: PageFormat | None = None,
+        page_width: int | None = None,
+        parent: QWidget | None = None,
+        prioritize_images: bool = False,
+    ) -> AlbumPagePreview:
+        """Create an interior-page preview using the Preview tab machinery."""
+        if page_format is None:
+            page_format = settings.effective_page_format()
+
+        pages = self._current_result.pagination.pages
+        reserved_caption_lines = self._composer.spread_caption_lines(
+            page,
+            pages,
+            settings.photo_pages,
+            page_width_mm=page_format.width_mm,
+            page_height_mm=page_format.height_mm,
+        )
+        composition = self._composer.compose(
+            page,
+            settings.photo_pages,
+            settings.page_numbers,
+            page_width_mm=page_format.width_mm,
+            page_height_mm=page_format.height_mm,
+            reserved_caption_lines=reserved_caption_lines,
+        )
+        preview = AlbumPagePreview(
+            composition,
+            thumbnail_cache=self._thumbnail_cache,
+            page_format=page_format,
+            translator=self._translator,
+            render_service=self._render_service,
+            project_photos=list(self._current_result.template_photos),
+            album_pages=pages,
+            template_pack_settings=settings.template_pack_settings,
+            parent=parent,
+        )
+        if page_width is not None:
+            preview.set_page_width(page_width)
+        if prioritize_images:
+            self.prioritize_preview_images(preview)
+        return preview
+
+    def prioritize_preview_images(self, preview: AlbumPagePreview) -> None:
+        """Prioritize one page in the Preview tab's shared image cache."""
+        self._thumbnail_cache.set_resolution(
+            PREVIEW_PAGE_MAX_WIDTH,
+            PREVIEW_PAGE_MAX_WIDTH * preview._page_ratio,
+            preview.devicePixelRatioF(),
+        )
+        self._thumbnail_cache.prioritize(
+            photo.path
+            for photo in preview._composition.page.photos[
+                :len(preview._composition.photo_slots)
+            ]
         )
 
     def _image_ready(self, path: str) -> None:
@@ -780,43 +873,14 @@ class AlbumPreviewWidget(QWidget):
 
         pages = result.pagination.pages
 
-        # One canonical list of project photos for templates
-        # that operate on the whole album.
-        project_photos = list(result.template_photos)
-
         # Interior starts on the right opposite the inside
-        # front cover.
+        # front cover. The factory is also used by Plan hover previews, so
+        # composition/render/cache behavior cannot drift between the two UIs.
         for page in pages:
-            reserved_caption_lines = (
-                self._composer.spread_caption_lines(
-                    page,
-                    pages,
-                    settings.photo_pages,
-                    page_width_mm=page_format.width_mm,
-                    page_height_mm=page_format.height_mm,
-                )
-            )
-
-            composition = self._composer.compose(
+            preview = self.create_page_preview(
                 page,
-                settings.photo_pages,
-                settings.page_numbers,
-                page_width_mm=page_format.width_mm,
-                page_height_mm=page_format.height_mm,
-                reserved_caption_lines=reserved_caption_lines,
-            )
-
-            preview = AlbumPagePreview(
-                composition,
-                thumbnail_cache=self._thumbnail_cache,
+                settings,
                 page_format=page_format,
-                translator=self._translator,
-                render_service=self._render_service,
-                project_photos=project_photos,
-                album_pages=result.pagination.pages,
-                template_pack_settings=(
-                    settings.template_pack_settings
-                ),
             )
 
             # Interior spread row:

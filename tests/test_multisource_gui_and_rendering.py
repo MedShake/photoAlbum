@@ -219,7 +219,15 @@ def test_inline_and_overrides_keep_right_dividers_and_editorial_blanks(app, plac
     assert [photo.identity for page in pages for photo in page.photos] == [photo.identity for photo in photos]
     inline = next(page for page in pages if page.kind == PlanItemKind.BODY_SPECIAL_PAGE)
     assert pages[inline.number - 2].photos[-1].identity == photos[2].identity
-    assert len(result.pagination.period_end_capacities) == 1
+    capacities = result.pagination.period_end_capacities
+    assert [
+        (capacity.scope, capacity.year, capacity.month, capacity.day,
+         capacity.unused_photo_slots)
+        for capacity in capacities
+    ] == [
+        ("day", 2025, 3, 1, 0),
+        ("day", 2025, 3, 2, 0),
+    ]
 
 
 def test_facing_override_and_default_share_caption_reserve(app):

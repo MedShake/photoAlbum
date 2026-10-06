@@ -9,9 +9,11 @@ from .planning import PlanItemKind
 
 @dataclass(frozen=True)
 class PeriodFillSuggestion:
-    year: int
-    month: int
+    year: int | None
+    month: int | None
     available_photo_slots: int
+    day: int | None = None
+    scope: str = "month"
 
 
 @dataclass(frozen=True)
@@ -95,6 +97,8 @@ class AlbumSummaryBuilder:
                 available_photo_slots=(
                     period.unused_photo_slots
                 ),
+                day=period.day,
+                scope=period.scope,
             )
             for period
             in result.pagination.period_end_capacities

@@ -29,6 +29,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.status.template_only": "Outside album body",
         "photos.status.off": "Disabled",
         "plan.modify": "Modify…",
+        "plan.page_preview": "Page preview",
         "plan.insert_special": "Add a special page after…",
         "plan.start_photo": "Start this page with",
         "plan.use_default": "Use the default photo template",
@@ -708,6 +709,30 @@ CATALOGS: dict[str, dict[str, str]] = {
             "{month} {year}: up to {slots} additional photos can be added "
             "without increasing the number of pages before the next period."
         ),
+        "plan.suggestion_day_one": (
+            "{month} {day}, {year}: 1 additional photo can be added "
+            "without creating an additional page before the next day."
+        ),
+        "plan.suggestion_day_many": (
+            "{month} {day}, {year}: up to {slots} additional photos can be added "
+            "without creating an additional page before the next day."
+        ),
+        "plan.suggestion_year_one": (
+            "{year}: 1 additional photo can be added without creating "
+            "an additional page before the next year."
+        ),
+        "plan.suggestion_year_many": (
+            "{year}: up to {slots} additional photos can be added without "
+            "creating an additional page before the next year."
+        ),
+        "plan.suggestion_album_one": (
+            "End of album: 1 additional photo can be added without creating "
+            "an additional page."
+        ),
+        "plan.suggestion_album_many": (
+            "End of album: up to {slots} additional photos can be added without "
+            "creating an additional page."
+        ),
 
         "plan.photos_page": "Photos",
         "plan.day_divider": "Day divider",
@@ -763,6 +788,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.status.template_only": "Hors corps album",
         "photos.status.off": "Désactivée",
         "plan.modify": "Modifier…",
+        "plan.page_preview": "Aperçu de la page",
         "plan.insert_special": "Ajouter une page spéciale après…",
         "plan.start_photo": "Commencer cette page avec",
         "plan.use_default": "Revenir au modèle photo par défaut",
@@ -1459,6 +1485,30 @@ CATALOGS: dict[str, dict[str, str]] = {
             "{month} {year} : jusqu’à {slots} photos supplémentaires "
             "peuvent être ajoutées sans augmenter le nombre de pages "
             "avant la période suivante."
+        ),
+        "plan.suggestion_day_one": (
+            "{day} {month} {year} : 1 photo supplémentaire peut être ajoutée "
+            "sans créer de page supplémentaire avant le jour suivant."
+        ),
+        "plan.suggestion_day_many": (
+            "{day} {month} {year} : jusqu’à {slots} photos supplémentaires "
+            "peuvent être ajoutées sans créer de page supplémentaire avant le jour suivant."
+        ),
+        "plan.suggestion_year_one": (
+            "{year} : 1 photo supplémentaire peut être ajoutée sans créer "
+            "de page supplémentaire avant l’année suivante."
+        ),
+        "plan.suggestion_year_many": (
+            "{year} : jusqu’à {slots} photos supplémentaires peuvent être ajoutées "
+            "sans créer de page supplémentaire avant l’année suivante."
+        ),
+        "plan.suggestion_album_one": (
+            "Fin de l’album : 1 photo supplémentaire peut être ajoutée "
+            "sans créer de page supplémentaire."
+        ),
+        "plan.suggestion_album_many": (
+            "Fin de l’album : jusqu’à {slots} photos supplémentaires peuvent être ajoutées "
+            "sans créer de page supplémentaire."
         ),
 
         "plan.photos_page": "Photos",

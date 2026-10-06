@@ -154,3 +154,27 @@ def test_summary_ignores_periods_without_free_slots():
 
     assert summary.period_fill_suggestions == ()
 
+
+
+def test_summary_preserves_capacity_scope_and_day():
+    result = AlbumBuildResult(
+        album_photos=(),
+        plan=AlbumPlan(),
+        pagination=PaginationResult(
+            period_end_capacities=[
+                PeriodEndCapacity(
+                    year=2025, month=6, day=15, scope="day", unused_photo_slots=2,
+                ),
+                PeriodEndCapacity(
+                    year=None, month=None, scope="album", unused_photo_slots=1,
+                ),
+            ]
+        ),
+        print_diagnostic=PrintDiagnostic(compatible=True, pages_to_add=0),
+    )
+
+    suggestions = AlbumSummaryBuilder().build(result).period_fill_suggestions
+    assert [(s.scope, s.year, s.month, s.day, s.available_photo_slots) for s in suggestions] == [
+        ("day", 2025, 6, 15, 2),
+        ("album", None, None, None, 1),
+    ]

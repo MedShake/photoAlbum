@@ -116,21 +116,33 @@ def test_day_pagination_reuses_all_placements(widget, placement, first_day_photo
             assert pages[days[1].number - 2].blank_reason == BlankPageReason.EDITORIAL
     assert [p.day for p in pages if p.photos] == [1] * first_day_photos + [5]
     assert AlbumSummaryBuilder().build(result).divider_pages == 2
-    assert [(c.year, c.month) for c in result.pagination.period_end_capacities] == [(2025, 3)]
-    # The daily split never creates daily capacity reports.
+    assert [
+        (c.year, c.month, c.day, c.scope)
+        for c in result.pagination.period_end_capacities
+    ] == [
+        (2025, 3, 1, "day"),
+        (2025, 3, 5, "day"),
+    ]
+    # Day is the finest active separator, so it owns capacity reports.
     natural = PaginationEngine(widget._registry).paginate(result.plan)
     assert not any(p.is_blank for p in natural.pages)
 
 
-def test_month_capacity_stays_at_month_boundaries(widget):
+def test_day_capacity_takes_priority_over_month_and_year(widget):
     settings = daily_settings(widget, months=True, years=True)
     photos = [photo(str(i), date) for i, date in enumerate([
         datetime(2024, 12, 1), datetime(2024, 12, 5),
         datetime(2025, 1, 1), datetime(2025, 1, 2),
     ])]
     result = AlbumBuilder(widget._registry).build(photos, settings)
-    assert [(c.year, c.month, c.unused_photo_slots) for c in result.pagination.period_end_capacities] == [
-        (2024, 12, 0), (2025, 1, 0),
+    assert [
+        (c.year, c.month, c.day, c.scope)
+        for c in result.pagination.period_end_capacities
+    ] == [
+        (2024, 12, 1, "day"),
+        (2024, 12, 5, "day"),
+        (2025, 1, 1, "day"),
+        (2025, 1, 2, "day"),
     ]
 
 

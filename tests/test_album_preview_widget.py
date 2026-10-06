@@ -440,3 +440,25 @@ def test_preview_prioritizes_visible_pages_and_reuses_resize_requests(monkeypatc
     assert {worker.edge for worker in cache._active.values()} == {cache._edge}
     widget.clear()
     widget.close()
+
+
+def test_public_preview_factories_reuse_preview_tab_cache():
+    widget = create_widget()
+    try:
+        result = make_result()
+        settings = make_settings()
+        widget.set_result(result, settings)
+
+        page_preview = widget.create_page_preview(
+            result.pagination.pages[0], settings
+        )
+        cover_preview = widget.create_cover_preview(
+            settings, CoverPosition.FRONT
+        )
+
+        assert page_preview._thumbnail_cache is widget._thumbnail_cache
+        assert cover_preview._thumbnail_cache is widget._thumbnail_cache
+        assert page_preview._render_service is widget._render_service
+        assert cover_preview._render_service is widget._render_service
+    finally:
+        widget.close()

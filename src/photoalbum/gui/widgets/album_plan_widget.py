@@ -7,8 +7,8 @@ from photoalbum.album.composition import PageComposer
 from photoalbum.gui.icon_resources import resource_icon
 from photoalbum.gui.template_labels import template_display_name
 
-from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtCore import QDate, QEvent, QLocale, QPoint, QRect, QSize, QTimer, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QGuiApplication, QPainter
 from shiboken6 import isValid
 
 from PySide6.QtWidgets import (
@@ -22,6 +22,9 @@ from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QToolButton,
+    QStyle,
+    QStyleOptionGroupBox,
+    QFrame,
 )
 
 from photoalbum.album import (
@@ -36,6 +39,56 @@ from photoalbum.album import (
 
 
 
+class _IconTitleGroupBox(QGroupBox):
+    """Native QGroupBox title with a small SVG icon before the text.
+
+    The group box itself is left entirely to the platform style.  A leading
+    em-space reserves room inside the native title area, and the icon is
+    painted into that reserved area.  This avoids QSS title styling, whose
+    frame/title rendering differs between Linux and Windows.
+    """
+
+    _TITLE_PREFIX = "\u2003 "
+
+    def __init__(
+        self,
+        title: str,
+        icon_filename: str,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(self._TITLE_PREFIX + title, parent)
+        self._title_icon = resource_icon(icon_filename)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
+        super().paintEvent(event)
+
+        option = QStyleOptionGroupBox()
+        self.initStyleOption(option)
+        title_rect = self.style().subControlRect(
+            QStyle.ComplexControl.CC_GroupBox,
+            option,
+            QStyle.SubControl.SC_GroupBoxLabel,
+            self,
+        )
+        if not title_rect.isValid():
+            return
+
+        icon_size = max(10, min(14, title_rect.height() - 2))
+        icon_rect = QRect(
+            title_rect.left() + 1,
+            title_rect.center().y() - icon_size // 2,
+            icon_size,
+            icon_size,
+        )
+        painter = QPainter(self)
+        self._title_icon.paint(painter, icon_rect)
+
+
+_COVER_POSITION_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+_PAGE_PREVIEW_WIDTH = 450
+_PAGE_PREVIEW_DELAY_MS = 350
+
+
 class AlbumPlanWidget(QWidget):
     settings_changed = Signal(object)
     def __init__(
@@ -43,6 +96,7 @@ class AlbumPlanWidget(QWidget):
         registry: TemplateRegistry,
         translator: Translator | None = None,
         parent: QWidget | None = None,
+        preview_widget=None,
     ) -> None:
         super().__init__(parent)
 
@@ -52,6 +106,14 @@ class AlbumPlanWidget(QWidget):
         self._caption_overflows = {}
         self._hovered_plan_item = None
         self._action_hover_items = {}
+        self._preview_hover_items = {}
+        self._preview_widget = preview_widget
+        self._pending_page_preview = None
+        self._page_preview_popup = None
+        self._page_preview_timer = QTimer(self)
+        self._page_preview_timer.setSingleShot(True)
+        self._page_preview_timer.setInterval(_PAGE_PREVIEW_DELAY_MS)
+        self._page_preview_timer.timeout.connect(self._show_pending_page_preview)
 
         self._create_ui()
         self.clear()
@@ -73,11 +135,9 @@ class AlbumPlanWidget(QWidget):
 
         # Warnings are exceptional: the whole panel disappears
         # when there is nothing requiring the user's attention.
-        self._warnings_group = QGroupBox(
-            self._translator.tr("plan.warnings")
-        )
-        self._warnings_group.setStyleSheet(
-            "QGroupBox::title { color: #c62828; background: transparent; }"
+        self._warnings_group = _IconTitleGroupBox(
+            self._translator.tr("plan.warnings"),
+            "plan-warning-red.svg",
         )
         warnings_layout = QVBoxLayout(
             self._warnings_group
@@ -89,6 +149,7 @@ class AlbumPlanWidget(QWidget):
             Qt.AlignmentFlag.AlignTop
             | Qt.AlignmentFlag.AlignLeft
         )
+        self._warnings_label.setContentsMargins(4, 2, 4, 2)
 
         self._warnings_scroll = QScrollArea()
         self._warnings_scroll.setWidgetResizable(True)
@@ -98,6 +159,7 @@ class AlbumPlanWidget(QWidget):
         self._warnings_scroll.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
+        self._warnings_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._warnings_scroll.setMaximumHeight(90)
         self._warnings_scroll.setWidget(
             self._warnings_label
@@ -109,13 +171,12 @@ class AlbumPlanWidget(QWidget):
 
         layout.addWidget(self._warnings_group)
 
-        # Optimizations are useful information even when there is
-        # currently nothing to optimize, so this panel always remains.
-        self._optimizations_group = QGroupBox(
-            self._translator.tr("plan.optimizations")
-        )
-        self._optimizations_group.setStyleSheet(
-            "QGroupBox::title { color: #ef6c00; background: transparent; }"
+        # Optimizations are contextual: hide the whole panel when there is
+        # nothing to suggest and show it again whenever a recalculation
+        # produces at least one optimization.
+        self._optimizations_group = _IconTitleGroupBox(
+            self._translator.tr("plan.optimizations"),
+            "plan-warning-orange.svg",
         )
         optimizations_layout = QVBoxLayout(
             self._optimizations_group
@@ -127,6 +188,7 @@ class AlbumPlanWidget(QWidget):
             Qt.AlignmentFlag.AlignTop
             | Qt.AlignmentFlag.AlignLeft
         )
+        self._suggestions_label.setContentsMargins(4, 2, 4, 2)
 
         self._suggestions_scroll = QScrollArea()
         self._suggestions_scroll.setWidgetResizable(True)
@@ -136,6 +198,7 @@ class AlbumPlanWidget(QWidget):
         self._suggestions_scroll.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
+        self._suggestions_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._suggestions_scroll.setMaximumHeight(90)
         self._suggestions_scroll.setWidget(
             self._suggestions_label
@@ -191,14 +254,14 @@ class AlbumPlanWidget(QWidget):
         layout.addWidget(structure_group, 1)
 
     def clear(self) -> None:
+        self._cancel_page_preview()
         self._summary_label.setText(
             self._translator.tr("plan.no_plan")
         )
         self._warnings_label.clear()
         self._warnings_group.setVisible(False)
-        self._suggestions_label.setText(
-            self._translator.tr("plan.no_optimization")
-        )
+        self._suggestions_label.clear()
+        self._optimizations_group.setVisible(False)
         self._reset_tree()
 
     def set_result(
@@ -267,6 +330,10 @@ class AlbumPlanWidget(QWidget):
             # row height as rows containing 24 px action buttons.
             item.setSizeHint(0, QSize(0, 26))
             page = item.data(0, Qt.ItemDataRole.UserRole)
+            cover_value = item.data(0, _COVER_POSITION_ROLE)
+            if page is not None or cover_value:
+                cover_position = CoverPosition(cover_value) if cover_value else None
+                self._install_preview_button(item, page=page, cover_position=cover_position)
             if page is not None:
                 container = QWidget()
                 row = QHBoxLayout(container)
@@ -318,6 +385,106 @@ class AlbumPlanWidget(QWidget):
             self._tree.setItemWidget(item, 3, container)
             item.setSizeHint(0, QSize(0, 26))
 
+    def _install_preview_button(
+        self,
+        item: QTreeWidgetItem,
+        *,
+        page=None,
+        cover_position: CoverPosition | None = None,
+    ) -> None:
+        container = QWidget()
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        icon = QLabel()
+        icon.setPixmap(resource_icon("plan-page-preview.svg").pixmap(QSize(16, 16)))
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setFixedSize(22, 22)
+        icon.setToolTip(self._translator.tr("plan.page_preview"))
+        icon.setAccessibleName(self._translator.tr("plan.page_preview"))
+        icon.installEventFilter(self)
+        row.addWidget(icon)
+
+        self._preview_hover_items[icon] = (item, page, cover_position)
+        self._tree.setItemWidget(item, 1, container)
+        item.setText(1, "")
+
+    def _schedule_page_preview(
+        self,
+        button: QWidget,
+        item: QTreeWidgetItem,
+        page,
+        cover_position: CoverPosition | None,
+    ) -> None:
+        self._cancel_page_preview()
+        if self._preview_widget is None or self._settings is None:
+            return
+        anchor = button.mapToGlobal(QPoint(button.width(), button.height() // 2))
+        self._pending_page_preview = (item, page, cover_position, anchor)
+        self._page_preview_timer.start()
+
+    def _show_pending_page_preview(self) -> None:
+        pending = self._pending_page_preview
+        self._pending_page_preview = None
+        if pending is None or self._preview_widget is None or self._settings is None:
+            return
+        item, page, cover_position, anchor = pending
+        if not isValid(item):
+            return
+
+        popup = QFrame(None, Qt.WindowType.ToolTip)
+        popup.setFrameShape(QFrame.Shape.Box)
+        layout = QVBoxLayout(popup)
+        layout.setContentsMargins(5, 5, 5, 5)
+
+        try:
+            if cover_position is not None:
+                preview = self._preview_widget.create_cover_preview(
+                    self._settings,
+                    cover_position,
+                    page_width=_PAGE_PREVIEW_WIDTH,
+                    parent=popup,
+                )
+            else:
+                preview = self._preview_widget.create_page_preview(
+                    page,
+                    self._settings,
+                    page_width=_PAGE_PREVIEW_WIDTH,
+                    parent=popup,
+                    prioritize_images=True,
+                )
+        except Exception:
+            popup.deleteLater()
+            return
+
+        layout.addWidget(preview)
+        popup.adjustSize()
+
+        screen = QGuiApplication.screenAt(anchor) or QGuiApplication.primaryScreen()
+        x = anchor.x() + 12
+        y = anchor.y() - popup.height() // 2
+        if screen is not None:
+            area = screen.availableGeometry()
+            if x + popup.width() > area.right():
+                x = anchor.x() - popup.width() - 12
+            x = max(area.left(), min(x, area.right() - popup.width() + 1))
+            y = max(area.top(), min(y, area.bottom() - popup.height() + 1))
+        popup.move(x, y)
+        popup.show()
+        self._page_preview_popup = popup
+
+    def _cancel_page_preview(self) -> None:
+        if hasattr(self, "_page_preview_timer"):
+            self._page_preview_timer.stop()
+        self._pending_page_preview = None
+        popup = getattr(self, "_page_preview_popup", None)
+        if popup is not None:
+            popup.close()
+            popup.deleteLater()
+            self._page_preview_popup = None
+
     def _register_action_hover(self, container: QWidget, item: QTreeWidgetItem) -> None:
         self._action_hover_items[container] = item
         container.setMouseTracking(True)
@@ -335,6 +502,8 @@ class AlbumPlanWidget(QWidget):
             for column in range(self._tree.columnCount()):
                 hovered.setBackground(column, QBrush())
         self._action_hover_items.clear()
+        self._preview_hover_items.clear()
+        self._cancel_page_preview()
         self._tree.clear()
 
     def _set_hovered_plan_item(self, item: QTreeWidgetItem | None) -> None:
@@ -353,7 +522,16 @@ class AlbumPlanWidget(QWidget):
                 item.setBackground(column, background)
 
     def eventFilter(self, watched, event):
-        if watched is self._tree.viewport():
+        if watched in self._preview_hover_items:
+            item, page, cover_position = self._preview_hover_items.get(watched, (None, None, None))
+            if event.type() == QEvent.Type.Enter:
+                if item is not None and isValid(item):
+                    self._set_hovered_plan_item(item)
+                    self._schedule_page_preview(watched, item, page, cover_position)
+            elif event.type() == QEvent.Type.Leave:
+                self._cancel_page_preview()
+                self._set_hovered_plan_item(None)
+        elif watched is self._tree.viewport():
             if event.type() == QEvent.Type.MouseMove:
                 self._set_hovered_plan_item(self._tree.itemAt(event.position().toPoint()))
             elif event.type() == QEvent.Type.Leave:
@@ -479,42 +657,53 @@ class AlbumPlanWidget(QWidget):
         optimization_lines = []
 
         for suggestion in summary.period_fill_suggestions:
-            month_name = self._translator.month_name(
-                suggestion.month
-            )
-
-            # A month starts the sentence here, so capitalize it even
-            # in locales whose normal month names are lowercase.
-            if month_name:
-                month_name = (
-                    month_name[0].upper()
-                    + month_name[1:]
-                )
-
             slots = suggestion.available_photo_slots
+            count_key = "one" if slots == 1 else "many"
 
-            optimization_lines.append(
-                self._translator.tr(
-                    (
-                        "plan.suggestion_one"
-                        if slots == 1
-                        else "plan.suggestion_many"
-                    ),
-                    month=month_name,
-                    year=suggestion.year,
-                    slots=slots,
+            if suggestion.scope == "day":
+                month_name = self._translator.month_name(suggestion.month)
+                optimization_lines.append(
+                    self._translator.tr(
+                        f"plan.suggestion_day_{count_key}",
+                        day=suggestion.day,
+                        month=month_name,
+                        year=suggestion.year,
+                        slots=slots,
+                    )
                 )
-            )
-
-        if not optimization_lines:
-            optimization_lines.append(
-                self._translator.tr(
-                    "plan.no_optimization"
+            elif suggestion.scope == "year":
+                optimization_lines.append(
+                    self._translator.tr(
+                        f"plan.suggestion_year_{count_key}",
+                        year=suggestion.year,
+                        slots=slots,
+                    )
                 )
-            )
+            elif suggestion.scope == "album":
+                optimization_lines.append(
+                    self._translator.tr(
+                        f"plan.suggestion_album_{count_key}",
+                        slots=slots,
+                    )
+                )
+            else:
+                month_name = self._translator.month_name(suggestion.month)
+                if month_name:
+                    month_name = month_name[0].upper() + month_name[1:]
+                optimization_lines.append(
+                    self._translator.tr(
+                        f"plan.suggestion_{count_key}",
+                        month=month_name,
+                        year=suggestion.year,
+                        slots=slots,
+                    )
+                )
 
         self._suggestions_label.setText(
             "\n".join(optimization_lines)
+        )
+        self._optimizations_group.setVisible(
+            bool(optimization_lines)
         )
 
     def _collect_caption_overflows(self, result, settings):
@@ -967,12 +1156,12 @@ class AlbumPlanWidget(QWidget):
             position
         ]
 
-        return QTreeWidgetItem(
+        item = QTreeWidgetItem(
             [
                 self._translator.tr(
                     label_key
                 ),
-                "—",
+                "",
                 "—",
                 "",
                 self._template_name(
@@ -981,6 +1170,8 @@ class AlbumPlanWidget(QWidget):
                 "",
             ]
         )
+        item.setData(0, _COVER_POSITION_ROLE, position.value)
+        return item
 
     def _page_item(
         self,
@@ -1053,7 +1244,7 @@ class AlbumPlanWidget(QWidget):
         observations = " — ".join(observation_parts)
         item = QTreeWidgetItem([
             self._translator.tr("plan.page_label", number=page.number, type=page_type),
-            "1", str(photo_count), "", model, observations,
+            "", str(photo_count), "", model, observations,
         ])
         item.setData(0, Qt.ItemDataRole.UserRole, page)
         item.setSizeHint(0, QSize(0, 26))
@@ -1105,10 +1296,13 @@ class AlbumPlanWidget(QWidget):
         item: QTreeWidgetItem,
     ) -> tuple[int, int]:
         if item.childCount() == 0:
-            try:
-                pages = int(item.text(1))
-            except ValueError:
-                pages = 0
+            if item.data(0, Qt.ItemDataRole.UserRole) is not None:
+                pages = 1
+            else:
+                try:
+                    pages = int(item.text(1))
+                except ValueError:
+                    pages = 0
 
             try:
                 photos = int(item.text(2))

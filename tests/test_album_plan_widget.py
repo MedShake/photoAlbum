@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QFrame
 
 from photoalbum.album import (
     AlbumBuildResult,
@@ -174,13 +175,12 @@ def result_with_pages(pages: list[PlannedPage]) -> AlbumBuildResult:
 
 def page_numbers_in_visual_order(item) -> list[int]:
     numbers = []
-    # Production does not currently attach PlannedPage (or a dedicated role)
-    # to the item. A real page is nevertheless the only leaf whose page-count
-    # column is exactly 1; covers use an em dash and structural nodes have
-    # children. Only the number extraction remains tied to the rendered label.
-    if item.childCount() == 0 and item.text(1) == "1":
-        number_label = item.text(0).split(" — ", 1)[0]
-        numbers.append(int(number_label.rsplit(" ", 1)[1]))
+    # Page rows now use the Pages column for the preview icon instead of the
+    # historical literal "1". Production stores the PlannedPage itself on the
+    # tree item, so use that stable model data rather than rendered text.
+    page = item.data(0, Qt.ItemDataRole.UserRole)
+    if isinstance(page, PlannedPage):
+        numbers.append(page.number)
     for index in range(item.childCount()):
         numbers.extend(page_numbers_in_visual_order(item.child(index)))
     return numbers
@@ -483,6 +483,59 @@ def test_plan_widget_displays_period_suggestion():
     assert "Optimization —" not in text
     assert "3 additional photos" in text
     assert not widget._optimizations_group.isHidden()
+
+
+def test_plan_widget_does_not_promote_local_unused_slots_to_optimization():
+    widget = create_widget()
+    try:
+        result = result_with_pages([
+            PlannedPage(
+                number=108,
+                side=PageSide.LEFT,
+                kind=PlanItemKind.PHOTO_GROUP,
+                template_id="photo-page-2",
+                photo_capacity=2,
+                photos=(),
+            ),
+        ])
+
+        widget.set_result(result)
+
+        assert widget._suggestions_label.text() == ""
+        assert widget._optimizations_group.isHidden()
+    finally:
+        widget.close()
+
+
+def test_plan_widget_hides_optimizations_when_no_suggestion_and_shows_them_again():
+    from dataclasses import replace
+
+    widget = create_widget()
+    try:
+        result = create_result()
+        no_suggestion = replace(
+            result,
+            pagination=replace(
+                result.pagination,
+                pages=[
+                    replace(page, photo_capacity=0)
+                    if page.kind == PlanItemKind.PHOTO_GROUP
+                    else page
+                    for page in result.pagination.pages
+                ],
+                period_end_capacities=[],
+            ),
+        )
+
+        widget.set_result(no_suggestion)
+        assert widget._suggestions_label.text() == ""
+        assert widget._optimizations_group.isHidden()
+
+        widget.set_result(result)
+        assert not widget._optimizations_group.isHidden()
+        assert "3 additional photos" in widget._suggestions_label.text()
+    finally:
+        widget.close()
 
 
 def test_plan_widget_groups_pages_by_year_and_month():
@@ -866,15 +919,19 @@ def test_plan_cover_details_are_in_details_column_after_action_column():
         widget.close()
 
 
-def test_plan_warning_and_optimization_titles_use_plan_semantic_colours():
+def test_plan_warning_and_optimization_titles_keep_native_groupbox_style():
     widget = create_widget()
     try:
-        warning_style = widget._warnings_group.styleSheet().lower()
-        optimization_style = widget._optimizations_group.styleSheet().lower()
-        assert "#c62828" in warning_style
-        assert "#ef6c00" in optimization_style
-        assert "background: transparent" in warning_style
-        assert "background: transparent" in optimization_style
+        assert widget._warnings_group.styleSheet() == ""
+        assert widget._optimizations_group.styleSheet() == ""
+        assert widget._warnings_group.title().endswith(
+            widget._translator.tr("plan.warnings")
+        )
+        assert widget._optimizations_group.title().endswith(
+            widget._translator.tr("plan.optimizations")
+        )
+        assert widget._warnings_scroll.frameShape() == QFrame.Shape.NoFrame
+        assert widget._suggestions_scroll.frameShape() == QFrame.Shape.NoFrame
     finally:
         widget.close()
 
@@ -915,5 +972,35 @@ def test_plan_rebuild_clears_hover_references_before_qt_items_are_destroyed():
         assert widget._action_hover_items == {} or all(
             item is not hovered for item in widget._action_hover_items.values()
         )
+    finally:
+        widget.close()
+
+
+def test_plan_physical_pages_and_covers_use_preview_icon_in_pages_column():
+    widget = create_widget()
+    try:
+        widget.set_result(create_result(), create_structure_settings())
+
+        front_cover = widget._tree.topLevelItem(0)
+        assert front_cover.text(1) == ""
+        assert widget._tree.itemWidget(front_cover, 1) is not None
+
+        def walk(item):
+            yield item
+            for child_index in range(item.childCount()):
+                yield from walk(item.child(child_index))
+
+        physical_page = None
+        for top_index in range(widget._tree.topLevelItemCount()):
+            for item in walk(widget._tree.topLevelItem(top_index)):
+                if item.data(0, Qt.ItemDataRole.UserRole) is not None:
+                    physical_page = item
+                    break
+            if physical_page is not None:
+                break
+
+        assert physical_page is not None
+        assert physical_page.text(1) == ""
+        assert widget._tree.itemWidget(physical_page, 1) is not None
     finally:
         widget.close()

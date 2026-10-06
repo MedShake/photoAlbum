@@ -57,9 +57,11 @@ class PlannedPage:
 
 @dataclass(frozen=True)
 class PeriodEndCapacity:
-    year: int
-    month: int
+    year: int | None
+    month: int | None
     unused_photo_slots: int
+    day: int | None = None
+    scope: str = "month"
 
 
 @dataclass
@@ -126,7 +128,7 @@ class PaginationEngine:
                 item,
             )
             
-        self._record_period_capacities(result)
+        self._record_period_capacities(result, settings)
 
         return result
 
@@ -270,32 +272,97 @@ class PaginationEngine:
                 day=date.day if date else item.day,
             ))
 
-    def _record_period_capacities(self, result: PaginationResult) -> None:
-        # Periods are semantic, not delimited by arbitrary non-photo pages.
-        periods = {}
+    def _record_period_capacities(
+        self,
+        result: PaginationResult,
+        settings: AlbumStructureSettings | None,
+    ) -> None:
+        """Record reusable capacity at the active structural boundary.
+
+        Only one granularity is meaningful at a time: the finest enabled
+        divider wins (day, then month, then year).  With no divider enabled,
+        the album itself is one period.  This keeps optimization suggestions
+        aligned with the chronological boundary that newly appended photos
+        are actually allowed to cross.
+        """
+        if settings is not None and settings.day_dividers.enabled:
+            scope = "day"
+        elif settings is not None and settings.month_dividers.enabled:
+            scope = "month"
+        elif settings is not None and settings.year_dividers.enabled:
+            scope = "year"
+        else:
+            scope = "album"
+
+        def period_key(page: PlannedPage) -> tuple[int, ...] | None:
+            if scope == "day":
+                if page.year is None or page.month is None or page.day is None:
+                    return None
+                return (page.year, page.month, page.day)
+            if scope == "month":
+                if page.year is None or page.month is None:
+                    return None
+                return (page.year, page.month)
+            if scope == "year":
+                if page.year is None:
+                    return None
+                return (page.year,)
+            return ()
+
+        # Remember only the final photo page of each active period. Pages that
+        # do not carry enough calendar information for the selected scope are
+        # outside that structural period and must not create a synthetic key.
+        periods: dict[tuple[int, ...], int] = {}
         for index, page in enumerate(result.pages):
-            if page.kind == PlanItemKind.PHOTO_GROUP:
-                periods[(page.year, page.month)] = index
-        for (year, month), last in periods.items():
-            if year is None or month is None:
+            if page.kind != PlanItemKind.PHOTO_GROUP:
                 continue
-            unused = result.pages[last].unused_photo_slots
-            last_photo = result.pages[last].photos[-1]
-            if ContentAnchor("photo", photo_identity=last_photo.identity) in self._insertions:
-                # New photos must follow this insertion, so the forced end's
-                # spare slots cannot absorb additional chronological content.
-                unused = 0
-            # Only terminal spare capacity is reusable across a month boundary.
-            # Earlier forced cuts (day, override, insertion) are intentional.
-            for page in result.pages[last + 1:]:
-                if page.kind in (PlanItemKind.MONTH_DIVIDER, PlanItemKind.YEAR_DIVIDER):
+            key = period_key(page)
+            if key is not None:
+                periods[key] = index
+
+        divider_for_scope = {
+            "day": {PlanItemKind.DAY_DIVIDER, PlanItemKind.MONTH_DIVIDER, PlanItemKind.YEAR_DIVIDER},
+            "month": {PlanItemKind.MONTH_DIVIDER, PlanItemKind.YEAR_DIVIDER},
+            "year": {PlanItemKind.YEAR_DIVIDER},
+            "album": set(),
+        }[scope]
+
+        for key, last in periods.items():
+            page = result.pages[last]
+            unused = page.unused_photo_slots
+            if page.photos:
+                last_photo = page.photos[-1]
+                if ContentAnchor("photo", photo_identity=last_photo.identity) in self._insertions:
+                    # New photos must follow this insertion, so spare slots on
+                    # the preceding photo page are not chronologically reusable.
+                    unused = 0
+
+            # Preserve the historical treatment of technical blanks introduced
+            # to position the next divider: they can absorb photo pages without
+            # increasing the physical page count of the current period.
+            for following in result.pages[last + 1:]:
+                if following.kind == PlanItemKind.PHOTO_GROUP:
                     break
-                if page.kind == PlanItemKind.PHOTO_GROUP:
+                if following.kind in divider_for_scope:
                     break
-                if (page.blank_reason == BlankPageReason.TECHNICAL
-                        and (page.year, page.month) == (year, month)):
-                    unused += page.photo_capacity
-            result.period_end_capacities.append(PeriodEndCapacity(year, month, unused))
+                if (
+                    following.blank_reason == BlankPageReason.TECHNICAL
+                    and (scope == "album" or period_key(following) == key)
+                ):
+                    unused += following.photo_capacity
+
+            year = key[0] if scope != "album" else None
+            month = key[1] if scope in {"month", "day"} else None
+            day = key[2] if scope == "day" else None
+            result.period_end_capacities.append(
+                PeriodEndCapacity(
+                    year=year,
+                    month=month,
+                    day=day,
+                    scope=scope,
+                    unused_photo_slots=unused,
+                )
+            )
 
     def _append_divider_page(
         self,
@@ -334,6 +401,7 @@ class PaginationEngine:
         capacity = 0
         year = None
         month = None
+        day = None
 
         for page in reversed(result.pages):
             if page.kind == PlanItemKind.PHOTO_GROUP:
@@ -341,6 +409,7 @@ class PaginationEngine:
                 capacity = page.photo_capacity
                 year = page.year
                 month = page.month
+                day = page.day
                 break
 
             if not page.is_blank:
@@ -356,6 +425,7 @@ class PaginationEngine:
                 template_id=template_id,
                 year=year,
                 month=month,
+                day=day,
                 photo_capacity=capacity,
                 blank_reason=BlankPageReason.TECHNICAL,
             )

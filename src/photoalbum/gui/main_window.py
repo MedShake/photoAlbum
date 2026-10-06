@@ -375,20 +375,23 @@ class MainWindow(QMainWindow):
 
         self._tabs.addTab(self._album_settings_widget, self._translator.tr('tab.album'))
 
-        self._album_plan_widget = AlbumPlanWidget(
-            self._template_registry,
-            translator=self._translator,
-            parent=self,
-        )
-        self._album_plan_widget.settings_changed.connect(self._plan_settings_changed)
-
+        # The Plan's hover previews deliberately delegate to this very widget.
+        # That guarantees identical composition/rendering and, importantly,
+        # the exact same PreviewImageCache used by the Preview tab.
         self._album_preview_widget = AlbumPreviewWidget(
             self._template_registry,
             translator=self._translator,
             parent=self,
             render_service=self._preview_render_service,
-
         )
+
+        self._album_plan_widget = AlbumPlanWidget(
+            self._template_registry,
+            translator=self._translator,
+            parent=self,
+            preview_widget=self._album_preview_widget,
+        )
+        self._album_plan_widget.settings_changed.connect(self._plan_settings_changed)
 
         self._tabs.addTab(self._album_plan_widget, self._translator.tr('tab.plan'))
 
@@ -930,15 +933,16 @@ class MainWindow(QMainWindow):
             # background so they are usually ready when the
             # Preview tab is opened.
 
-            self._album_plan_widget.set_result(result, settings)
-
             page_format = settings.effective_page_format()
 
+            # Build the canonical Preview state first. Plan hover previews
+            # delegate to it, including its already-warmed image cache.
             self._album_preview_widget.set_result(
                 result,
                 settings,
                 page_format=page_format,
             )
+            self._album_plan_widget.set_result(result, settings)
 
             # Preview prewarming is strictly optional.
             #
