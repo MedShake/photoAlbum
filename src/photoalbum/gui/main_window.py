@@ -748,21 +748,16 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(self._translator.tr('main.analysis_in_progress'))
 
         else:
-            if self._scan_controller.analysis_completed:
-                self._photos_widget.analyze_button.setText(
-                    self._translator.tr('sources.analyze')
-                )
-            else:
-                self._photos_widget.analyze_button.setText(
-                    self._translator.tr('sources.analyze')
-                )
+            self._photos_widget.analyze_button.setText(
+                self._translator.tr('sources.analyze')
+            )
 
     def _update_project_state(self) -> None:
         is_open = self._project_service.is_open
         has_source = self._photos_widget.has_active_sources
 
         self._close_project_action.setEnabled(is_open)
-        self._photos_widget.browse_button.setEnabled(is_open)
+        self._photos_widget.modify_source_button.setEnabled(is_open)
         self._photos_widget.analyze_button.setEnabled(is_open and has_source)
 
         if is_open:

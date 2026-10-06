@@ -67,8 +67,6 @@ class PhotoSourcesWidget(QWidget):
         self.browse_action.triggered.connect(self.source_requested.emit)
         self.synology_action.triggered.connect(self.synology_source_requested.emit)
         self.modify_source_button.setMenu(menu)
-        self.browse_button = self.modify_source_button
-        self.synology_button = self.modify_source_button
         add_layout.addWidget(self.modify_source_button)
         add_layout.addStretch()
         sources_layout.addWidget(add_group)

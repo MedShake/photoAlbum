@@ -117,25 +117,10 @@ class PreviewRenderService(QObject):
         if backend is None:
             value = instance.settings
         else:
-            try:
-                value = backend.render_settings_signature(
-                    instance,
-                    template_pack_settings=template_pack_settings,
-                )
-            except TypeError as exc:
-                if (
-                    "unexpected keyword argument"
-                    not in str(exc)
-                    or "template_pack_settings"
-                    not in str(exc)
-                ):
-                    raise
-
-                # Compatibility with preview backends implementing
-                # the original API.
-                value = backend.render_settings_signature(
-                    instance
-                )
+            value = backend.render_settings_signature(
+                instance,
+                template_pack_settings=template_pack_settings,
+            )
 
         # repr is sufficient here because this is an in-memory
         # cache key, not a persistent serialization format.
@@ -421,26 +406,10 @@ class PreviewRenderService(QObject):
             ),
         }
 
-        from inspect import signature
-
-        create_job_parameters = signature(
-            backend.create_job
-        ).parameters
-
-        if (
-            "template_pack_settings"
-            in create_job_parameters
-        ):
-            job = backend.create_job(
-                **create_job_kwargs,
-                template_pack_settings=template_pack_settings,
-            )
-        else:
-            # Backwards compatibility with existing expensive
-            # preview backends implementing the original interface.
-            job = backend.create_job(
-                **create_job_kwargs,
-            )
+        job = backend.create_job(
+            **create_job_kwargs,
+            template_pack_settings=template_pack_settings,
+        )
 
         worker = job.worker
 

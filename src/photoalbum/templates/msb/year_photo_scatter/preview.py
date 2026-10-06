@@ -87,6 +87,8 @@ class YearPhotoScatterPreviewBackend(
     def render_settings_signature(
         self,
         instance: PageInstance,
+        *,
+        template_pack_settings=None,
     ) -> object:
         # The expensive raster contains the photo scatter only.
         # Title font, size and color are painted later by the
@@ -107,6 +109,7 @@ class YearPhotoScatterPreviewBackend(
         page_width_mm: float,
         page_height_mm: float,
         translator: Translator,
+        template_pack_settings=None,
     ) -> PreviewJob:
         composition = compose_cover_scatter(
             list(photos),

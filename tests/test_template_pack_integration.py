@@ -56,7 +56,9 @@ class Worker(QRunnable):
 class Preview(TemplatePreviewBackend):
     template_id = "independent-cover"
 
-    def create_job(self, *, request_id, translator, **kwargs):
+    def create_job(
+        self, *, request_id, translator, template_pack_settings=None, **kwargs
+    ):
         assert translator.tr("probe") == "Translated probe"
         def finalize(data):
             assert data == b"preview"
