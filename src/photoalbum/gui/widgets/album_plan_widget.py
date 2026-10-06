@@ -204,6 +204,13 @@ class AlbumPlanWidget(QWidget):
             self._suggestions_label
         )
 
+        # Install the resize filters only after both scroll areas exist.
+        # Qt can synchronously deliver resize/layout events as soon as a widget
+        # is inserted into the layout, so installing the warnings filter earlier
+        # could call eventFilter() before _suggestions_scroll was created.
+        self._warnings_scroll.viewport().installEventFilter(self)
+        self._suggestions_scroll.viewport().installEventFilter(self)
+
         optimizations_layout.addWidget(
             self._suggestions_scroll
         )
@@ -259,8 +266,10 @@ class AlbumPlanWidget(QWidget):
             self._translator.tr("plan.no_plan")
         )
         self._warnings_label.clear()
+        self._warnings_label.setMinimumHeight(0)
         self._warnings_group.setVisible(False)
         self._suggestions_label.clear()
+        self._suggestions_label.setMinimumHeight(0)
         self._optimizations_group.setVisible(False)
         self._reset_tree()
 
@@ -485,6 +494,25 @@ class AlbumPlanWidget(QWidget):
             popup.deleteLater()
             self._page_preview_popup = None
 
+    @staticmethod
+    def _sync_wrapped_label_height(scroll: QScrollArea, label: QLabel) -> None:
+        """Keep a wrapped QLabel taller than the viewport when its text overflows.
+
+        QScrollArea with widgetResizable=True does not reliably propagate a
+        QLabel's height-for-width when word wrapping is enabled.  Without an
+        explicit minimum height, long warning/optimization text can therefore
+        be clipped while Qt still believes no vertical scrollbar is needed.
+        """
+        width = max(1, scroll.viewport().width())
+        height = label.heightForWidth(width)
+        if height < 0:
+            height = label.sizeHint().height()
+        label.setMinimumHeight(max(0, height))
+
+    def _sync_message_scroll_heights(self) -> None:
+        self._sync_wrapped_label_height(self._warnings_scroll, self._warnings_label)
+        self._sync_wrapped_label_height(self._suggestions_scroll, self._suggestions_label)
+
     def _register_action_hover(self, container: QWidget, item: QTreeWidgetItem) -> None:
         self._action_hover_items[container] = item
         container.setMouseTracking(True)
@@ -522,8 +550,26 @@ class AlbumPlanWidget(QWidget):
                 item.setBackground(column, background)
 
     def eventFilter(self, watched, event):
-        if watched in self._preview_hover_items:
-            item, page, cover_position = self._preview_hover_items.get(watched, (None, None, None))
+        # Qt can synchronously deliver events while _create_ui() is still
+        # constructing this widget.  Never assume that later UI members already
+        # exist here.  Message-scroll resize events are self-contained and must
+        # not fall through to the tree/hover handling below.
+        warnings_scroll = getattr(self, "_warnings_scroll", None)
+        suggestions_scroll = getattr(self, "_suggestions_scroll", None)
+        message_scrolls = tuple(
+            scroll for scroll in (warnings_scroll, suggestions_scroll)
+            if scroll is not None
+        )
+        if any(watched is scroll.viewport() for scroll in message_scrolls):
+            if event.type() == QEvent.Type.Resize and warnings_scroll is not None and suggestions_scroll is not None:
+                self._sync_message_scroll_heights()
+            return super().eventFilter(watched, event)
+
+        preview_hover_items = getattr(self, "_preview_hover_items", {})
+        if watched in preview_hover_items:
+            item, page, cover_position = preview_hover_items.get(
+                watched, (None, None, None)
+            )
             if event.type() == QEvent.Type.Enter:
                 if item is not None and isValid(item):
                     self._set_hovered_plan_item(item)
@@ -531,17 +577,26 @@ class AlbumPlanWidget(QWidget):
             elif event.type() == QEvent.Type.Leave:
                 self._cancel_page_preview()
                 self._set_hovered_plan_item(None)
-        elif watched is self._tree.viewport():
+            return super().eventFilter(watched, event)
+
+        tree = getattr(self, "_tree", None)
+        if tree is not None and watched is tree.viewport():
             if event.type() == QEvent.Type.MouseMove:
-                self._set_hovered_plan_item(self._tree.itemAt(event.position().toPoint()))
+                self._set_hovered_plan_item(tree.itemAt(event.position().toPoint()))
             elif event.type() == QEvent.Type.Leave:
                 self._set_hovered_plan_item(None)
-        elif watched in self._action_hover_items:
+            return super().eventFilter(watched, event)
+
+        action_hover_items = getattr(self, "_action_hover_items", {})
+        if watched in action_hover_items:
             if event.type() == QEvent.Type.Enter:
-                item = self._action_hover_items.get(watched)
-                self._set_hovered_plan_item(item if item is not None and isValid(item) else None)
+                item = action_hover_items.get(watched)
+                self._set_hovered_plan_item(
+                    item if item is not None and isValid(item) else None
+                )
             elif event.type() == QEvent.Type.Leave:
                 self._set_hovered_plan_item(None)
+
         return super().eventFilter(watched, event)
 
     def _insertion_buttons(self, row, instance_id, page):
@@ -705,6 +760,7 @@ class AlbumPlanWidget(QWidget):
         self._optimizations_group.setVisible(
             bool(optimization_lines)
         )
+        QTimer.singleShot(0, self._sync_message_scroll_heights)
 
     def _collect_caption_overflows(self, result, settings):
         if result is None or settings is None:

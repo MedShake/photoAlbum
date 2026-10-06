@@ -976,6 +976,30 @@ def test_plan_rebuild_clears_hover_references_before_qt_items_are_destroyed():
         widget.close()
 
 
+
+def test_warning_and_optimization_panels_scroll_when_wrapped_text_overflows():
+    widget = create_widget()
+    try:
+        widget.resize(900, 700)
+        widget.show()
+        QApplication.processEvents()
+
+        long_text = "A long wrapped message that must remain readable in the panel. " * 40
+        for group, scroll, label in (
+            (widget._warnings_group, widget._warnings_scroll, widget._warnings_label),
+            (widget._optimizations_group, widget._suggestions_scroll, widget._suggestions_label),
+        ):
+            group.setVisible(True)
+            label.setText(long_text)
+
+        widget._sync_message_scroll_heights()
+        QApplication.processEvents()
+
+        assert widget._warnings_scroll.verticalScrollBar().maximum() > 0
+        assert widget._suggestions_scroll.verticalScrollBar().maximum() > 0
+    finally:
+        widget.close()
+
 def test_plan_physical_pages_and_covers_use_preview_icon_in_pages_column():
     widget = create_widget()
     try:
