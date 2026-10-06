@@ -427,7 +427,7 @@ class MainWindow(QMainWindow):
             self._project_service.create(project_path)
 
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.create_project_error"))
             return
 
         self._scan_controller.reset()
@@ -472,7 +472,7 @@ class MainWindow(QMainWindow):
         try:
             self._project_service.open(path)
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.open_project_error"))
             return
 
         self._album_preview_widget.clear()
@@ -519,7 +519,7 @@ class MainWindow(QMainWindow):
         try:
             self._project_service.add_local_source(Path(directory))
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.add_local_source_error"))
             return
 
         self._refresh_source_cards()
@@ -567,7 +567,7 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
                 dialog.provider = None
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.configure_remote_source_error"))
             return
 
     def _source_import_completed(self) -> None:
@@ -900,7 +900,7 @@ class MainWindow(QMainWindow):
             # rebuild until "Places and captions" is left.
             self._mark_editorial_album_dirty()
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
 
     def _go_to_source_photo(self, photo: Photo) -> None:
         self._tabs.setCurrentIndex(0)
@@ -922,7 +922,7 @@ class MainWindow(QMainWindow):
                 )
                 changed = True
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
         finally:
             if changed:
                 self._mark_editorial_album_dirty()
@@ -944,7 +944,7 @@ class MainWindow(QMainWindow):
             # rebuild until "Places and captions" is left.
             self._mark_editorial_album_dirty()
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
 
     def _save_photo_location_override(
         self,
@@ -962,7 +962,7 @@ class MainWindow(QMainWindow):
             )
             self._mark_editorial_album_dirty()
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
 
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(self, APPLICATION_NAME, message)

@@ -38,6 +38,7 @@ class SourcesRefreshWorker(QObject):
 
     @Slot()
     def run(self):
+        translator = Translator(self._language)
         for source in self._sources:
             if self._cancelled:
                 break
@@ -55,12 +56,18 @@ class SourcesRefreshWorker(QObject):
                         on_phase_progress=self.phase_progress.emit,
                     )
                     for error in result.errors:
-                        self.log_message.emit(f"{source.name}: {error.path}: {error.message}")
+                        self.log_message.emit(
+                            translator.tr(
+                                "sources.refresh.file_failed",
+                                source=source.name,
+                                filename=error.path.name,
+                            )
+                        )
                     continue
                 if self._synchronize:
                     provider = self._providers.get(source.id)
                     if provider is None:
-                        raise RuntimeError(Translator(self._language).tr("sources.reconnect_required"))
+                        raise RuntimeError(translator.tr("sources.reconnect_required"))
                     database = ProjectDatabase(self._path)
                     try:
                         database.initialize()
@@ -74,11 +81,20 @@ class SourcesRefreshWorker(QObject):
                     language=self._language, user_agent=self._user_agent,
                 )
                 self._current.phase_progress.connect(self.phase_progress.emit)
-                self._current.failed.connect(self.log_message.emit)
+                self._current.failed.connect(
+                    lambda _message, source_name=source.name: self.log_message.emit(
+                        translator.tr("sources.refresh.source_failed", source=source_name)
+                    )
+                )
                 self._current.run()
                 self._current = None
-            except Exception as exc:
-                self.log_message.emit(f"⚠ {source.name}: {exc}")
+            except Exception:
+                self.log_message.emit(
+                    "⚠ " + translator.tr(
+                        "sources.refresh.source_failed",
+                        source=source.name,
+                    )
+                )
         database = ProjectDatabase(self._path)
         try:
             active = {source.id for source in self._sources}

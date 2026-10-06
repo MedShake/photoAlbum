@@ -65,7 +65,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.synology.browser_ready": "Synology Photos session detected.",
         "source.synology.browser_use_session": "Use this session",
         "source.synology.browser_cancelled": "Authentication cancelled.",
-        "source.synology.connection_error": "Connection failed: {error}",
+        "source.synology.connection_error": "Connection failed.",
         "source.synology.connected": "Connected — {count} albums available.",
         "source.synology.reconnected": "Connected to the project source.",
         "source.synology.session_attached": (
@@ -82,6 +82,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "refreshed, {missing} no longer in the collection."
         ),
         "source.metadata.completed": "Metadata updated for {count} photos.",
+        "source.metadata.failed": "Could not update photo metadata.",
+        "source.scan.failed": "Could not analyze the photo sources.",
+        "sources.refresh.source_failed": "Source {source}: operation failed.",
+        "sources.refresh.file_failed": "Source {source}: could not analyze {filename}.",
         "tab.places_captions": "Places and captions",
         "main.analyze_photos": "Analyze photos",
         "main.analyze_again": "Analyze photos again",
@@ -157,7 +161,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "No geographic information found."
         ),
         "processing.event.geocoding_error": (
-            "Geocoding failed: {error}"
+            "Geocoding failed."
         ),
         "processing.event.analysis_completed": (
             "Photo processing completed."
@@ -283,13 +287,14 @@ CATALOGS: dict[str, dict[str, str]] = {
             "No location found for these coordinates."
         ),
         "photos.gps.geocoding_failed": (
-            "Reverse geocoding failed: {error}"
+            "Reverse geocoding failed."
         ),
         "photos.gps.geocoding_busy": (
             "A reverse geocoding operation is already running."
         ),
         "photos.open_image.not_found": "Image file not found: {path}",
         "photos.open_image.error": "Unable to open image: {path}",
+        "photos.open_image.prepare_error": "Could not retrieve the photo before opening it.",
         "photos.datetime.title": "Set capture date and time",
         "photos.datetime.photo": "Photo:",
         "photos.datetime.value": "Date and time:",
@@ -368,7 +373,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Choose an output PDF file first."
         ),
         "render.generate_error": (
-            "Could not generate the PDF: {error}"
+            "Could not generate the PDF."
         ),
         "render.generate_success_title": (
             "PDF generated"
@@ -574,6 +579,12 @@ CATALOGS: dict[str, dict[str, str]] = {
             "A photo analysis is still running."
         ),
         "main.no_project_error": "No project is open.",
+        "main.create_project_error": "Could not create the project.",
+        "main.open_project_error": "Could not open the project.",
+        "main.add_local_source_error": "Could not add the local photo source.",
+        "main.configure_remote_source_error": "Could not configure the remote photo source.",
+        "main.save_photo_date_error": "Could not save the photo date.",
+        "main.save_photo_location_error": "Could not save the photo location.",
         "main.choose_source_error": (
             "Choose a source photo folder first."
         ),
@@ -609,10 +620,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "but is no longer present in the source folder."
         ),
         "main.save_album_error": (
-            "Could not save album settings: {error}"
+            "Could not save album settings."
         ),
         "main.build_plan_error": (
-            "Could not build album plan: {error}"
+            "Could not build album plan."
         ),
 
         "main.discovered": "Discovered: {count}",
@@ -821,7 +832,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.synology.browser_ready": "Session Synology Photos détectée.",
         "source.synology.browser_use_session": "Utiliser cette session",
         "source.synology.browser_cancelled": "Authentification annulée.",
-        "source.synology.connection_error": "Échec de la connexion : {error}",
+        "source.synology.connection_error": "Échec de la connexion.",
         "source.synology.connected": "Connecté — {count} albums disponibles.",
         "source.synology.reconnected": "Connexion établie avec la source du projet.",
         "source.synology.session_attached": (
@@ -838,6 +849,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "actualisées, {missing} absentes de la collection."
         ),
         "source.metadata.completed": "Métadonnées mises à jour pour {count} photos.",
+        "source.metadata.failed": "Impossible de mettre à jour les métadonnées des photos.",
+        "source.scan.failed": "Impossible d’analyser les sources de photos.",
+        "sources.refresh.source_failed": "Source {source} : échec de l’opération.",
+        "sources.refresh.file_failed": "Source {source} : impossible d’analyser {filename}.",
         "tab.places_captions": "Lieux et légendes",
         "main.analyze_photos": "Analyser les photos",
         "main.analyze_again": "Analyser à nouveau les photos",
@@ -914,7 +929,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Aucune information géographique trouvée."
         ),
         "processing.event.geocoding_error": (
-            "Échec du géocodage : {error}"
+            "Échec du géocodage."
         ),
         "processing.event.analysis_completed": (
             "Traitement de la photo terminé."
@@ -1041,13 +1056,14 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Aucune localisation trouvée pour ces coordonnées."
         ),
         "photos.gps.geocoding_failed": (
-            "Échec du géocodage inverse : {error}"
+            "Échec du géocodage inverse."
         ),
         "photos.gps.geocoding_busy": (
             "Un géocodage inverse est déjà en cours."
         ),
         "photos.open_image.not_found": "Fichier image introuvable : {path}",
         "photos.open_image.error": "Impossible d’ouvrir l’image : {path}",
+        "photos.open_image.prepare_error": "Impossible de récupérer la photo avant de l’ouvrir.",
         "photos.datetime.title": "Définir la date et l’heure de prise de vue",
         "photos.datetime.photo": "Photo :",
         "photos.datetime.value": "Date et heure :",
@@ -1129,7 +1145,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Choisissez d’abord le fichier PDF de destination."
         ),
         "render.generate_error": (
-            "Impossible de générer le PDF : {error}"
+            "Impossible de générer le PDF."
         ),
         "render.generate_success_title": (
             "PDF généré"
@@ -1339,6 +1355,12 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Une analyse des photos est encore en cours."
         ),
         "main.no_project_error": "Aucun projet n’est ouvert.",
+        "main.create_project_error": "Impossible de créer le projet.",
+        "main.open_project_error": "Impossible d’ouvrir le projet.",
+        "main.add_local_source_error": "Impossible d’ajouter la source de photos locale.",
+        "main.configure_remote_source_error": "Impossible de configurer la source de photos distante.",
+        "main.save_photo_date_error": "Impossible d’enregistrer la date de la photo.",
+        "main.save_photo_location_error": "Impossible d’enregistrer la localisation de la photo.",
         "main.choose_source_error": (
             "Choisissez d’abord un dossier source."
         ),
@@ -1376,10 +1398,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "mais n’est plus présent dans le dossier source."
         ),
         "main.save_album_error": (
-            "Impossible d’enregistrer les réglages de l’album : {error}"
+            "Impossible d’enregistrer les réglages de l’album."
         ),
         "main.build_plan_error": (
-            "Impossible de construire le plan de l’album : {error}"
+            "Impossible de construire le plan de l’album."
         ),
 
         "main.discovered": "Détectées : {count}",

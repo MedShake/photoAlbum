@@ -554,7 +554,7 @@ def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_p
     assert 'Starting rendering engine…' in log
 
     if failure:
-        assert 'ERROR: test export failure' in log
+        assert 'ERROR: Could not generate the PDF.' in log
     else:
         assert 'PDF created successfully.' in log
         assert widget._pdf_progress_bar.value() == 4

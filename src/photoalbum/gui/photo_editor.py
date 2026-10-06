@@ -110,7 +110,7 @@ class PhotoEditor(QObject):
             try:
                 self._project_service.restore_original_capture_datetime(photo.identity)
             except Exception as exc:
-                self.error.emit(str(exc))
+                self.error.emit(self._translator.tr("main.save_photo_date_error"))
                 return
 
             old_date_text = (
@@ -135,7 +135,7 @@ class PhotoEditor(QObject):
         try:
             self._project_service.set_manual_capture_datetime(photo.identity, new_datetime)
         except Exception as exc:
-            self.error.emit(str(exc))
+            self.error.emit(self._translator.tr("main.save_photo_date_error"))
             return
 
         new_date_text = format_datetime(new_datetime, include_seconds=True)
@@ -300,7 +300,7 @@ class PhotoEditor(QObject):
                 action_key = "photos.gps.log_changed"
 
         except Exception as exc:
-            self.error.emit(str(exc))
+            self.error.emit(self._translator.tr("main.save_photo_location_error"))
             return
 
         self.log_message.emit(
@@ -380,7 +380,7 @@ class PhotoEditor(QObject):
                 raw_location_data=location.raw_data,
             )
         except Exception as exc:
-            self.error.emit(str(exc))
+            self.error.emit(self._translator.tr("main.save_photo_location_error"))
             return
 
         self.log_message.emit(
@@ -413,7 +413,7 @@ class PhotoEditor(QObject):
             try:
                 self._project_service.materialize_originals([photo])
             except Exception as exc:
-                self.error.emit(str(exc))
+                self.error.emit(self._translator.tr("photos.open_image.prepare_error"))
                 return
         path = Path(photo.path)
 

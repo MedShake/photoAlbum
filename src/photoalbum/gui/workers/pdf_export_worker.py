@@ -86,9 +86,9 @@ class PdfExportWorker(QObject):
                 )
             )
             return
-        except Exception as exc:
+        except Exception:
             self.failed.emit(
-                str(exc)
+                self._translator.tr("render.generate_error")
             )
             return
 

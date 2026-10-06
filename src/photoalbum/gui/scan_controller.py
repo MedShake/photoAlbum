@@ -276,7 +276,7 @@ class ScanController(QObject):
         self._view.summary_label.setText(
             self._translator.tr("source.sync.failed")
         )
-        self.error.emit(message)
+        self.error.emit(self._translator.tr("source.sync.failed"))
 
     def refresh_metadata(self, source_id: str | None = None) -> None:
         if self._scan_thread is not None:
@@ -513,7 +513,12 @@ class ScanController(QObject):
     def _scan_failed(self, message: str) -> None:
         self._view.summary_label.setText(self._translator.tr('main.analysis_failed'))
 
-        self.error.emit(message)
+        key = (
+            "source.metadata.failed"
+            if self._operation_kind == "metadata"
+            else "source.scan.failed"
+        )
+        self.error.emit(self._translator.tr(key))
 
     def _scan_thread_finished(self) -> None:
         thread = self._scan_thread

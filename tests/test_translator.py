@@ -109,3 +109,33 @@ def test_source_reconnect_messages_are_translated():
         "source.asset.reconnect_required",
         filename="photo.jpg",
     ) == "Reconnectez la source contenant « photo.jpg » pour récupérer cette photo."
+
+
+def test_user_facing_operation_errors_do_not_expose_raw_exception_text():
+    raw = "database is locked / provider exploded"
+
+    for language in ("en", "fr"):
+        translator = Translator(language)
+        messages = (
+            translator.tr("source.synology.connection_error", error=raw),
+            translator.tr("photos.gps.geocoding_failed", error=raw),
+            translator.tr("processing.event.geocoding_error", error=raw),
+            translator.tr("render.generate_error", error=raw),
+            translator.tr("main.save_album_error", error=raw),
+            translator.tr("main.build_plan_error", error=raw),
+        )
+        assert all(raw not in message for message in messages)
+
+
+def test_operation_error_messages_are_translated_in_french():
+    fr = Translator("fr")
+
+    assert fr.tr("main.create_project_error") == "Impossible de créer le projet."
+    assert fr.tr("main.open_project_error") == "Impossible d’ouvrir le projet."
+    assert fr.tr("source.scan.failed") == "Impossible d’analyser les sources de photos."
+    assert fr.tr("source.metadata.failed") == "Impossible de mettre à jour les métadonnées des photos."
+    assert fr.tr(
+        "sources.refresh.file_failed",
+        source="Vacances",
+        filename="photo.jpg",
+    ) == "Source Vacances : impossible d’analyser photo.jpg."
