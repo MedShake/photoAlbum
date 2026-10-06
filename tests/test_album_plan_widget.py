@@ -83,6 +83,7 @@ def create_widget() -> AlbumPlanWidget:
 
 def create_result() -> AlbumBuildResult:
     return AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(
             pages=[
@@ -161,6 +162,7 @@ def create_structure_settings() -> AlbumStructureSettings:
 
 def result_with_pages(pages: list[PlannedPage]) -> AlbumBuildResult:
     return AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(pages=pages),
         print_diagnostic=PrintDiagnostic(
@@ -426,6 +428,7 @@ def test_plan_widget_hides_warnings_when_print_is_compatible():
     result = create_result()
 
     constrained_result = AlbumBuildResult(
+        album_photos=(),
         plan=result.plan,
         pagination=result.pagination,
         print_diagnostic=PrintDiagnostic(
@@ -448,6 +451,7 @@ def test_plan_widget_displays_incompatible_print_as_warning():
     result = create_result()
 
     constrained_result = AlbumBuildResult(
+        album_photos=(),
         plan=result.plan,
         pagination=result.pagination,
         print_diagnostic=PrintDiagnostic(
@@ -694,3 +698,222 @@ def test_day_group_weekday_uses_application_language():
                 widget.close()
     finally:
         QLocale.setDefault(previous_locale)
+
+
+def test_plan_columns_are_all_user_resizable():
+    from PySide6.QtWidgets import QHeaderView
+
+    widget = create_widget()
+    try:
+        header = widget._tree.header()
+        assert all(
+            header.sectionResizeMode(column) == QHeaderView.ResizeMode.Interactive
+            for column in range(widget._tree.columnCount())
+        )
+    finally:
+        widget.close()
+
+
+def test_plan_details_colour_intentional_editorial_pages_green_with_warning_priority():
+    from photoalbum.album import AutomaticPhotoPageSettings, PhotoPageOverride
+    from photoalbum.models import Photo
+
+    widget = create_widget()
+    try:
+        photo = Photo(
+            path=None,
+            filename="a.jpg",
+            source_id="source",
+            asset_id="a",
+        )
+        override_page = PageInstance("photo-page-1")
+        settings = create_structure_settings()
+        settings.photo_pages = PhotoPageSettings(
+            automatic_mode=AutomaticPhotoPageSettings("msb-orientation-1-2")
+        )
+        settings.photo_page_overrides = [
+            PhotoPageOverride(photo.identity, override_page)
+        ]
+        widget._settings = settings
+
+        overridden = PlannedPage(
+            1,
+            PageSide.RIGHT,
+            PlanItemKind.PHOTO_GROUP,
+            "photo-page-1",
+            photos=(photo,),
+            photo_capacity=1,
+            page_instance=override_page,
+        )
+        overridden_item = widget._page_item(overridden)
+        assert overridden_item.foreground(4).color().name() == "#2e7d32"
+        assert overridden_item.text(4) == "MSB — One photo"
+        assert overridden_item.foreground(5).color().name() == "#2e7d32"
+        assert overridden_item.text(5) == "Custom template"
+
+        special = PlannedPage(
+            2,
+            PageSide.LEFT,
+            PlanItemKind.BODY_SPECIAL_PAGE,
+            "blank",
+            page_instance=PageInstance("blank"),
+        )
+        special_item = widget._page_item(special)
+        assert special_item.text(4) == "MSB — Blank page"
+        assert special_item.foreground(5).color().name() == "#2e7d32"
+        assert special_item.text(5) == "Special page"
+
+        unused = PlannedPage(
+            3,
+            PageSide.RIGHT,
+            PlanItemKind.PHOTO_GROUP,
+            "photo-page-2",
+            photos=(photo,),
+            photo_capacity=2,
+            page_instance=override_page,
+        )
+        assert widget._page_item(unused).foreground(5).color().name() == "#ef6c00"
+
+        widget._caption_overflows = {4: [("a.jpg", 4, 3)]}
+        overflow = PlannedPage(
+            4,
+            PageSide.LEFT,
+            PlanItemKind.PHOTO_GROUP,
+            "photo-page-1",
+            photos=(photo,),
+            photo_capacity=1,
+            page_instance=override_page,
+        )
+        assert widget._page_item(overflow).foreground(5).color().name() == "#c62828"
+    finally:
+        widget.close()
+
+
+def test_plan_page_actions_use_small_embedded_icons():
+    from PySide6.QtCore import QSize, Qt
+    from PySide6.QtWidgets import QToolButton
+    from photoalbum.models import Photo
+
+    widget = create_widget()
+    try:
+        photo = Photo(path=None, filename="a.jpg", source_id="source", asset_id="a")
+        page = PlannedPage(
+            1, PageSide.RIGHT, PlanItemKind.PHOTO_GROUP, "photo-page-1",
+            photos=(photo,), photo_capacity=1, page_instance=PageInstance("photo-page-1"),
+        )
+        settings = create_structure_settings()
+        widget.set_result(result_with_pages([page]), settings)
+
+        def find_page_item(item):
+            if item.data(0, Qt.ItemDataRole.UserRole) is page:
+                return item
+            for index in range(item.childCount()):
+                found = find_page_item(item.child(index))
+                if found is not None:
+                    return found
+            return None
+
+        page_item = None
+        for index in range(widget._tree.topLevelItemCount()):
+            page_item = find_page_item(widget._tree.topLevelItem(index))
+            if page_item is not None:
+                break
+        assert page_item is not None
+        container = widget._tree.itemWidget(page_item, 3)
+        buttons = container.findChildren(QToolButton)
+        assert [button.toolTip() for button in buttons] == ["Modify…", "Add a special page after…"]
+        assert all(not button.icon().isNull() for button in buttons)
+        assert all(button.iconSize() == QSize(16, 16) for button in buttons)
+        assert all(button.size() == QSize(24, 24) for button in buttons)
+    finally:
+        widget.close()
+
+
+def test_plan_actions_precede_details_are_compact_left_aligned_and_page_rows_are_tall_enough():
+    widget = create_widget()
+    try:
+        assert widget._tree.headerItem().text(3) == widget._translator.tr("photos.column.actions")
+        assert widget._tree.headerItem().text(4) == widget._translator.tr("plan.model")
+        assert widget._tree.headerItem().text(5) == widget._translator.tr("plan.observations")
+        assert widget._tree.columnWidth(3) == 86
+
+        from photoalbum.album import PlannedPage, PlanItemKind
+        page = PlannedPage(
+            8,
+            PageSide.LEFT,
+            None,
+            "photo-page-1",
+            photo_capacity=1,
+            page_instance=PageInstance("photo-page-1"),
+            blank_reason=BlankPageReason.TECHNICAL,
+        )
+        item = widget._page_item(page)
+        assert item.sizeHint(0).height() >= 26
+    finally:
+        widget.close()
+
+
+def test_plan_cover_details_are_in_details_column_after_action_column():
+    widget = create_widget()
+    try:
+        settings = create_structure_settings()
+        widget.set_result(create_result(), settings)
+        front_cover = widget._tree.topLevelItem(0)
+        assert front_cover.text(3) == ""
+        assert front_cover.text(4) == "front-template"
+        assert front_cover.text(5) == ""
+    finally:
+        widget.close()
+
+
+def test_plan_warning_and_optimization_titles_use_plan_semantic_colours():
+    widget = create_widget()
+    try:
+        warning_style = widget._warnings_group.styleSheet().lower()
+        optimization_style = widget._optimizations_group.styleSheet().lower()
+        assert "#c62828" in warning_style
+        assert "#ef6c00" in optimization_style
+        assert "background: transparent" in warning_style
+        assert "background: transparent" in optimization_style
+    finally:
+        widget.close()
+
+
+def test_plan_all_structure_rows_use_uniform_height():
+    widget = create_widget()
+    try:
+        widget.set_result(create_result(), create_structure_settings())
+
+        def walk(item):
+            yield item
+            for child_index in range(item.childCount()):
+                yield from walk(item.child(child_index))
+
+        items = []
+        for top_index in range(widget._tree.topLevelItemCount()):
+            items.extend(walk(widget._tree.topLevelItem(top_index)))
+
+        assert items
+        assert all(item.sizeHint(0).height() >= 26 for item in items)
+    finally:
+        widget.close()
+
+
+def test_plan_rebuild_clears_hover_references_before_qt_items_are_destroyed():
+    widget = create_widget()
+    try:
+        settings = create_structure_settings()
+        result = create_result()
+        widget.set_result(result, settings)
+        hovered = widget._tree.topLevelItem(0)
+        widget._set_hovered_plan_item(hovered)
+        assert widget._hovered_plan_item is hovered
+
+        widget.set_result(result, settings)
+
+        assert widget._hovered_plan_item is None
+        assert widget._action_hover_items == {} or all(
+            item is not hovered for item in widget._action_hover_items.values()
+        )
+    finally:
+        widget.close()

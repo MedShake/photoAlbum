@@ -67,7 +67,7 @@ class AlbumSummaryBuilder:
         special_pages = sum(
             1
             for page in pages
-            if page.kind == PlanItemKind.SPECIAL_PAGE
+            if page.kind in (PlanItemKind.SPECIAL_PAGE, PlanItemKind.BODY_SPECIAL_PAGE)
         )
 
         technical_blank_pages = sum(
@@ -125,4 +125,3 @@ class AlbumSummaryBuilder:
             ),
             period_fill_suggestions=suggestions,
         )
-

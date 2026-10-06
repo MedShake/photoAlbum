@@ -8,7 +8,11 @@ from PySide6.QtWidgets import QMessageBox
 from photoalbum.app_info import user_agent
 from photoalbum.app import ProjectService
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
-from photoalbum.gui.workers import ScanWorker
+from photoalbum.gui.workers import (
+    MetadataRefreshWorker,
+    ScanWorker,
+    SourceSyncWorker,
+)
 from photoalbum.i18n import Translator
 from photoalbum.scanner import LibraryScanResult, ProcessingEvent, ProcessingEventType
 
@@ -21,6 +25,7 @@ class ScanController(QObject):
     running_changed = Signal(bool)
     photos_ready = Signal(object)
     source_unavailable = Signal()
+    source_changed = Signal()
 
     def __init__(self, project_service: ProjectService, view: PhotoSourcesWidget,
                  translator: Translator, *, language: str, parent=None) -> None:
@@ -30,7 +35,11 @@ class ScanController(QObject):
         self._translator = translator
         self._language = language
         self._scan_thread: QThread | None = None
-        self._scan_worker: ScanWorker | None = None
+        self._scan_worker: ScanWorker | SourceSyncWorker | MetadataRefreshWorker | None = None
+        self._operation_kind: str | None = None
+        self._source_sync_name: str | None = None
+        self._pending_source = None
+        self._pending_provider = None
         self.reset()
 
     @property
@@ -56,7 +65,16 @@ class ScanController(QObject):
         if worker is None:
             return
 
-        worker.request_cancel()
+        request_cancel = getattr(
+            worker,
+            "request_cancel",
+            None,
+        )
+
+        if not callable(request_cancel):
+            return
+
+        request_cancel()
 
         self._view.analyze_button.setEnabled(False)
         self._view.analyze_button.setText(
@@ -68,121 +86,269 @@ class ScanController(QObject):
         self.status_message.emit(self._translator.tr('main.analysis_stopping'))
 
     def start(self) -> None:
-        if self._scan_thread is not None:
+        self._start_sources_operation(synchronize=False)
+
+    def sync_source(self) -> None:
+        self._start_sources_operation(synchronize=True)
+
+    def _start_sources_operation(self, *, synchronize: bool) -> None:
+        from photoalbum.gui.workers.sources_refresh_worker import SourcesRefreshWorker
+        if self.is_running:
             return
-
-        project_path = self._project_service.project_path
-
-        if project_path is None:
+        if self._project_service.project_path is None:
             self.error.emit(self._translator.tr('main.no_project_error'))
             return
-
-        source_directory = self._project_service.get_source_directory()
-        if source_directory is None:
-            self.error.emit(self._translator.tr('main.choose_source_error'))
+        sources = [source for source in self._project_service.list_sources() if source.enabled]
+        if not sources:
             return
+        self._operation_kind = "sources"
+        self.running_changed.emit(True)
+        self._view.prepare_scan_progress(nominatim_enabled=any(
+            source.effective_metadata_policy.nominatim_enabled for source in sources))
+        thread = QThread(self)
+        worker = SourcesRefreshWorker(
+            project_path=self._project_service.project_path, sources=sources,
+            providers={source.id: self._project_service.get_photo_source_session(source.id) for source in sources},
+            synchronize=synchronize, language=self._language, user_agent=user_agent())
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.phase_progress.connect(self._scan_phase_progress)
+        worker.source_progress.connect(self._source_sync_progress)
+        worker.event_received.connect(self._handle_processing_event)
+        worker.log_message.connect(self._view.log_view.appendPlainText)
+        worker.completed.connect(self._metadata_refresh_completed)
+        worker.failed.connect(self._scan_failed)
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._scan_thread_finished)
+        self._scan_thread = thread
+        self._scan_worker = worker
+        thread.start()
 
-        if not source_directory.exists():
-            message = self._translator.tr('main.source_missing_error', path=source_directory)
-
-            if self._view.log_view.document().blockCount() > 1:
-                self._view.log_view.appendPlainText('')
-
-            self._view.log_view.appendPlainText(
-                "────────────────────────────────────────"
-            )
-            self._view.log_view.appendPlainText(f'⚠ {message}')
-            self._view.log_view.appendPlainText(
-                "────────────────────────────────────────"
-            )
-
-            self._view.summary_label.setText(message)
-
-            self.error.emit(message)
-
-            # The source folder is unavailable: Photos is the
-            # only meaningful tab until the source is fixed.
-            self.running_changed.emit(False)
-
-            self.source_unavailable.emit()
-
+    def import_remote_source(self, source, provider) -> None:
+        if self._scan_thread is not None:
             return
-
-        # Keep the analysis log for the whole project session.
-        # A new scan starts a new section instead of erasing
-        # previous events.
-        if self._view.log_view.document().blockCount() > 1:
-            self._view.log_view.appendPlainText('')
-
-        self._view.log_view.appendPlainText('────────────────────────────────────────')
-        self._view.log_view.appendPlainText(
-            self._translator.tr('main.analysis_log_header', path=source_directory)
+        self._sync_remote_source(
+            source,
+            publish_source=True,
+            provider=provider,
         )
-        self._view.log_view.appendPlainText('────────────────────────────────────────')
 
-        self._view.summary_label.setText(self._translator.tr('main.analysis_running'))
+    def _sync_remote_source(
+        self,
+        source,
+        *,
+        publish_source: bool,
+        provider=None,
+    ) -> None:
+        """Refresh a provider snapshot without blocking the GUI thread."""
+        project_path = self._project_service.project_path
+        if project_path is None:
+            self.error.emit(
+                self._translator.tr("main.no_project_error")
+            )
+            return
+
+        provider = provider or self._project_service.get_photo_source_session(source.id)
+        if provider is None:
+            self.error.emit(
+                self._translator.tr(
+                    "source.sync.reconnect_required"
+                )
+            )
+            return
+
+        self._source_sync_name = (
+            getattr(provider, "label", None)
+            or source.provider_label
+            or source.kind.replace("-", " ").title()
+        )
+        self._operation_kind = "source_import" if publish_source else "source_sync"
+        self._pending_source = source if publish_source else None
+        self._pending_provider = provider if publish_source else None
+
+        self._view.prepare_source_progress(self._source_sync_name)
+        self._view.summary_label.setText(
+            self._translator.tr("source.sync.running")
+        )
 
         self.running_changed.emit(True)
 
-        thread = QThread(self)
+        # A source synchronization is currently not cancellable midway:
+        # the provider/importer contract is snapshot-atomic.
+        self._view.analyze_button.setEnabled(False)
+        self._view.analyze_button.setText(
+            self._translator.tr("source.sync.running_button")
+        )
 
-        worker = ScanWorker(
+        thread = QThread(self)
+        worker = SourceSyncWorker(
             project_path=project_path,
-            source_directory=source_directory,
-            recursive=self._project_service.get_recursive_scan(),
-            language=self._language,
-            geocode=True,
-            user_agent=user_agent(),
+            source=source,
+            provider=provider,
+            metadata_policy=(
+                self._project_service.get_photo_metadata_policy(source.id)
+                if not publish_source
+                else source.effective_metadata_policy
+            ),
+            publish_source=publish_source,
         )
 
         worker.moveToThread(thread)
 
         thread.started.connect(worker.run)
-
-        worker.event_received.connect(self._handle_processing_event)
-        worker.discovered.connect(self._scan_discovered)
-        worker.progress.connect(self._scan_progress)
-        worker.completed.connect(self._scan_completed)
-        worker.failed.connect(self._scan_failed)
+        worker.progress.connect(
+            self._source_sync_progress
+        )
+        worker.completed.connect(
+            self._source_sync_completed
+        )
+        worker.failed.connect(
+            self._source_sync_failed
+        )
 
         worker.completed.connect(thread.quit)
         worker.failed.connect(thread.quit)
 
         thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(self._scan_thread_finished)
+        thread.finished.connect(
+            self._scan_thread_finished
+        )
 
         self._scan_thread = thread
         self._scan_worker = worker
 
         thread.start()
 
-    def _scan_discovered(self, total: int) -> None:
-        """Initialize scan progress after file discovery."""
-        self._scan_total_files = max(total, 0)
-        self._update_scan_progress(0)
+    def _source_sync_progress(
+        self,
+        current: int,
+        total: int,
+    ) -> None:
+        self._view.update_source_progress(
+            current,
+            total,
+        )
 
-    def _scan_progress(self, current: int, total: int) -> None:
-        """Update scan progress from the scanner."""
-        self._scan_total_files = max(total, 0)
-        self._update_scan_progress(current)
+    def _source_sync_completed(self, result) -> None:
+        self.analysis_completed = True
+
+        if self._pending_source is not None and self._pending_provider is not None:
+            self._project_service.activate_source_session(
+                self._pending_source.id,
+                self._pending_provider,
+            )
+            self.source_changed.emit()
+
+        photos = list(result.photos)
+        self.photos_ready.emit(photos)
+
+        self._view.summary_label.setText(
+            self._translator.tr(
+                "source.sync.completed",
+                count=len(photos),
+            )
+        )
+
+        self._view.log_view.appendPlainText(
+            self._translator.tr(
+                "source.sync.log",
+                source=self._source_sync_name or "",
+                count=len(photos),
+                added=result.added,
+                updated=result.updated,
+                missing=result.missing,
+            )
+        )
+
+    def _source_sync_failed(
+        self,
+        message: str,
+    ) -> None:
+        self.analysis_completed = False
+        if self._pending_provider is not None:
+            try:
+                self._pending_provider.close()
+            except Exception:
+                pass
+        self._view.summary_label.setText(
+            self._translator.tr("source.sync.failed")
+        )
+        self.error.emit(self._translator.tr("source.sync.failed"))
+
+    def refresh_metadata(self, source_id: str | None = None) -> None:
+        if self._scan_thread is not None:
+            return
+        project_path = self._project_service.project_path
+        if project_path is None:
+            return
+        policy = self._project_service.get_photo_metadata_policy(source_id)
+        self._operation_kind = "metadata"
+        self._view.prepare_scan_progress(
+            nominatim_enabled=policy.nominatim_enabled
+        )
+        self._view.summary_label.setText(
+            self._translator.tr("main.analysis_running")
+        )
+        self.running_changed.emit(True)
+        thread = QThread(self)
+        worker = MetadataRefreshWorker(
+            project_path=project_path,
+            policy=policy,
+            source_id=source_id,
+            language=self._language,
+            user_agent=user_agent(),
+        )
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.phase_progress.connect(self._scan_phase_progress)
+        worker.completed.connect(self._metadata_refresh_completed)
+        worker.failed.connect(self._scan_failed)
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._scan_thread_finished)
+        self._scan_thread = thread
+        self._scan_worker = worker
+        thread.start()
+
+    def _metadata_refresh_completed(self, photos) -> None:
+        self.analysis_completed = True
+        self.photos_ready.emit(list(photos))
+        message = self._translator.tr(
+            "source.metadata.completed", count=len(photos)
+        )
+        self._view.summary_label.setText(message)
+        self.status_message.emit(message)
+
+    def _scan_phase_progress(self, progress) -> None:
+        """Display progress for one logical scan phase."""
+        phase = getattr(progress.phase, "value", progress.phase)
+
+        self._view.update_scan_phase_progress(
+            str(phase),
+            progress.current,
+            progress.total,
+        )
 
     def _update_scan_progress(self, current: int) -> None:
         total = self._scan_total_files
 
         if total <= 0:
-            self._view.progress_bar.setRange(0, 0)
-            self._view.progress_bar.setFormat(
+            self._view.metadata_progress_bar.setRange(0, 0)
+            self._view.metadata_progress_bar.setFormat(
                 self._translator.tr('main.analysis_in_progress')
             )
             return
 
         current = min(max(current, 0), total)
 
-        self._view.progress_bar.setRange(0, total)
+        self._view.metadata_progress_bar.setRange(0, total)
 
-        self._view.progress_bar.setValue(current)
+        self._view.metadata_progress_bar.setValue(current)
 
-        self._view.progress_bar.setFormat(
+        self._view.metadata_progress_bar.setFormat(
             self._translator.tr('main.progress_photos', current=current, total=total)
         )
 
@@ -336,7 +502,12 @@ class ScanController(QObject):
     def _scan_failed(self, message: str) -> None:
         self._view.summary_label.setText(self._translator.tr('main.analysis_failed'))
 
-        self.error.emit(message)
+        key = (
+            "source.metadata.failed"
+            if self._operation_kind == "metadata"
+            else "source.scan.failed"
+        )
+        self.error.emit(self._translator.tr(key))
 
     def _scan_thread_finished(self) -> None:
         thread = self._scan_thread
@@ -345,12 +516,18 @@ class ScanController(QObject):
             thread.wait()
         self._scan_worker = None
         self._scan_thread = None
+        self._operation_kind = None
+        self._source_sync_name = None
+        self._pending_source = None
+        self._pending_provider = None
+
         if thread is not None:
             thread.deleteLater()
 
+        self._view.finish_processing_progress()
         self.running_changed.emit(False)
 
-        if self._project_service.is_open and bool(self._view.source_edit.text()):
+        if self._project_service.is_open and self._view.has_active_sources:
             self._view.analyze_button.setText(
-                self._translator.tr('main.analyze_again')
+                self._translator.tr('sources.analyze')
             )

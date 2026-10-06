@@ -130,7 +130,7 @@ def test_month_capacity_stays_at_month_boundaries(widget):
     ])]
     result = AlbumBuilder(widget._registry).build(photos, settings)
     assert [(c.year, c.month, c.unused_photo_slots) for c in result.pagination.period_end_capacities] == [
-        (2024, 12, 1), (2025, 1, 1),
+        (2024, 12, 0), (2025, 1, 0),
     ]
 
 
@@ -178,7 +178,7 @@ def test_day_settings_round_trip_and_gui_preserve_instance(widget, placement):
         template_id="day-divider-simple", settings={"day_divider_simple": {"title_font_size": 35}},
     ))
     encoded = album_settings_to_json(original)
-    assert json.loads(encoded)["schema_version"] == 2
+    assert json.loads(encoded)["schema_version"] == 4
     restored = album_settings_from_json(encoded)
     assert restored == original
     widget.set_settings(restored)

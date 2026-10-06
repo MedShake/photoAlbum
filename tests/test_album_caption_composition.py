@@ -361,7 +361,7 @@ def test_caption_row_reserves_largest_actual_requirement():
     assert len(rows) == 1
     assert next(iter(rows.values())) == 2
 
-def test_builtin_two_photo_layout_keeps_vertical_gap():
+def test_builtin_two_photo_layout_stacks_photos_on_portrait_page():
     from photoalbum.album.composition import (
         create_builtin_layout_registry,
     )
@@ -375,6 +375,9 @@ def test_builtin_two_photo_layout_keeps_vertical_gap():
     )
 
     assert len(cells) == 2
+    assert cells[0].x == pytest.approx(cells[1].x)
+    assert cells[0].width == pytest.approx(cells[1].width)
+    assert cells[1].y > cells[0].y
 
     first_bottom = (
         cells[0].y + cells[0].height
@@ -387,6 +390,39 @@ def test_builtin_two_photo_layout_keeps_vertical_gap():
 
     assert gap_mm == pytest.approx(
         4.0,
+        abs=0.01,
+    )
+
+
+def test_builtin_two_photo_layout_places_photos_side_by_side_on_landscape_page():
+    from photoalbum.album.composition import (
+        create_builtin_layout_registry,
+    )
+
+    layout = create_builtin_layout_registry().get(
+        "photo-page-2"
+    )
+    cells = layout.cells_factory(
+        297.0,
+        210.0,
+    )
+
+    assert len(cells) == 2
+    assert cells[0].y == pytest.approx(cells[1].y)
+    assert cells[0].height == pytest.approx(cells[1].height)
+    assert cells[1].x > cells[0].x
+
+    first_right = (
+        cells[0].x + cells[0].width
+    )
+    second_left = cells[1].x
+
+    gap_mm = (
+        second_left - first_right
+    ) * 297.0
+
+    assert gap_mm == pytest.approx(
+        8.0,
         abs=0.01,
     )
 
@@ -976,3 +1012,42 @@ def test_zero_caption_spread_keeps_four_mm_interphoto_gap():
         4.0,
         abs=0.01,
     )
+
+
+def test_three_photo_layout_is_vertical_hierarchy_on_portrait_page():
+    composer = PageComposer()
+    layout = composer._registry.get("photo-page-3")
+
+    cells = layout.cells_factory(210.0, 297.0)
+
+    assert len(cells) == 3
+
+    # First photo spans the full usable width above the other two.
+    assert cells[0].width > cells[1].width
+    assert cells[0].width > cells[2].width
+    assert cells[1].y > cells[0].y
+    assert cells[2].y == pytest.approx(cells[1].y)
+    assert cells[2].x > cells[1].x
+
+
+def test_three_photo_layout_is_horizontal_hierarchy_on_landscape_page():
+    composer = PageComposer()
+    layout = composer._registry.get("photo-page-3")
+
+    cells = layout.cells_factory(297.0, 210.0)
+
+    assert len(cells) == 3
+
+    # First photo spans the full usable height on the left; the other
+    # two are stacked on the right.
+    assert cells[0].height > cells[1].height
+    assert cells[0].height > cells[2].height
+    assert cells[1].x > cells[0].x
+    assert cells[2].x == pytest.approx(cells[1].x)
+    assert cells[2].y > cells[1].y
+
+    gap_mm = (
+        cells[2].y
+        - (cells[1].y + cells[1].height)
+    ) * 210.0
+    assert gap_mm == pytest.approx(4.0, abs=0.01)

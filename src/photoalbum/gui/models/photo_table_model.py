@@ -8,7 +8,13 @@ from photoalbum.i18n.date_formatter import (
     format_datetime,
 )
 from photoalbum.i18n import Translator
-from photoalbum.models import Photo
+from photoalbum.models import (
+    DateSource,
+    GpsSource,
+    LocationSource,
+    Photo,
+    PhotoUsage,
+)
 
 
 class PhotoTableModel(QAbstractTableModel):
@@ -21,6 +27,7 @@ class PhotoTableModel(QAbstractTableModel):
         "photos.column.city",
         "photos.column.location_source",
         "photos.column.status",
+        "photos.column.source",
     )
 
     SORT_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -35,6 +42,25 @@ class PhotoTableModel(QAbstractTableModel):
 
         self._translator = translator or Translator("en")
         self._photos = list(photos or [])
+        self._provider_label = self._translator.tr("photos.policy.provider")
+        self._source_labels = {}
+        self._source_names = {}
+
+    def set_sources(self, labels: dict[str, str], names: dict[str, str]) -> None:
+        self._source_labels = dict(labels)
+        self._source_names = dict(names)
+        self.set_provider_label(self._provider_label)
+
+    def _provider_for(self, photo: Photo) -> str:
+        return self._source_labels.get(photo.source_id, self._provider_label)
+
+    def set_provider_label(self, label: str) -> None:
+        self._provider_label = label or self._translator.tr("photos.policy.provider")
+        if self._photos:
+            self.dataChanged.emit(
+                self.index(0, 0),
+                self.index(len(self._photos) - 1, len(self.HEADER_KEYS) - 1),
+            )
 
     def rowCount(
         self,
@@ -81,6 +107,11 @@ class PhotoTableModel(QAbstractTableModel):
 
             if index.column() == 0:
                 return None
+
+            if index.column() == 7:
+                return self._translator.tr(
+                    f"photos.usage.{photo.usage.value}"
+                )
 
             return str(photo.path)
 
@@ -143,7 +174,7 @@ class PhotoTableModel(QAbstractTableModel):
         column: int,
     ) -> str:
         if column == 0:
-            return f"👁  {photo.filename}"
+            return photo.filename
 
         # Column 1 contains action widgets installed by the view.
         if column == 1:
@@ -159,36 +190,46 @@ class PhotoTableModel(QAbstractTableModel):
             )
 
         if column == 3:
+            if photo.date_source == DateSource.SOURCE:
+                return self._provider_for(photo)
             return self._translator.tr(
                 f"photos.date_source.{photo.date_source.value}"
             )
 
         if column == 4:
-            return self._translator.tr(
+            value = self._translator.tr(
                 "photos.value.yes"
                 if photo.has_gps
                 else "photos.value.no"
             )
+            if photo.has_gps and photo.gps_source != GpsSource.UNKNOWN:
+                value = f"{value} — {self._gps_source_label(photo)}"
+            return value
 
         if column == 5:
             return photo.city or "—"
 
         if column == 6:
+            if photo.location_source == LocationSource.SOURCE:
+                return self._provider_for(photo)
             return self._translator.tr(
                 "photos.location_source."
                 f"{photo.location_source.value}"
             )
 
         if column == 7:
-            if photo.is_date_anomaly:
+            if photo.usage == PhotoUsage.TEMPLATE_ONLY:
                 return self._translator.tr(
-                    "photos.value.missing_date"
+                    "photos.status.template_only"
                 )
+            if photo.usage == PhotoUsage.OFF:
+                return self._translator.tr(
+                    "photos.status.off"
+                )
+            return self._translator.tr("photos.value.ok")
 
-            return self._translator.tr(
-                "photos.value.ok"
-            )
-
+        if column == 8:
+            return self._source_names.get(photo.source_id, self._provider_for(photo))
         return ""
 
     def _location_tooltip(
@@ -220,17 +261,28 @@ class PhotoTableModel(QAbstractTableModel):
         lines.append(
             self._translator.tr(
                 "photos.location_tooltip.source",
-                value=self._translator.tr(
-                    "photos.location_source."
-                    f"{photo.location_source.value}"
+                value=(
+                    self._provider_for(photo)
+                    if photo.location_source == LocationSource.SOURCE
+                    else self._translator.tr(
+                        "photos.location_source."
+                        f"{photo.location_source.value}"
+                    )
                 ),
             )
         )
 
         return "\n".join(lines)
 
-    @staticmethod
+    def _gps_source_label(self, photo: Photo) -> str:
+        if photo.gps_source == GpsSource.SOURCE:
+            return self._provider_for(photo)
+        return self._translator.tr(
+            f"photos.gps_source.{photo.gps_source.value}"
+        )
+
     def _sort_value(
+        self,
         photo: Photo,
         column: int,
     ):
@@ -259,6 +311,13 @@ class PhotoTableModel(QAbstractTableModel):
             return photo.location_source.value
 
         if column == 7:
-            return 1 if photo.is_date_anomaly else 0
+            return {
+                PhotoUsage.BODY: 0,
+                PhotoUsage.TEMPLATE_ONLY: 1,
+                PhotoUsage.OFF: 2,
+            }[photo.usage]
+
+        if column == 8:
+            return self._source_names.get(photo.source_id, self._provider_for(photo)).casefold()
 
         return ""

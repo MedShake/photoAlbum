@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from photoalbum.models import DateSource, Photo
+from photoalbum.models import (
+    DateSource,
+    GpsCandidate,
+    GpsSource,
+    MetadataCandidates,
+    Photo,
+)
 
 from .exif_reader import ExifReader
 from .filename_date_parser import FilenameDateParser
@@ -24,15 +30,21 @@ class PhotoAnalyzer:
         metadata = self._exif_reader.read(path)
 
         capture_datetime = metadata.capture_datetime
+        filename_datetime = self._filename_date_parser.parse(path.name)
         date_source = DateSource.UNKNOWN
 
         if capture_datetime is not None:
             date_source = DateSource.EXIF
         else:
-            capture_datetime = self._filename_date_parser.parse(path.name)
+            capture_datetime = filename_datetime
 
             if capture_datetime is not None:
                 date_source = DateSource.FILENAME
+
+        has_exif_gps = (
+            metadata.latitude is not None
+            and metadata.longitude is not None
+        )
 
         return Photo(
             path=path,
@@ -46,4 +58,49 @@ class PhotoAnalyzer:
             date_source=date_source,
             latitude=metadata.latitude,
             longitude=metadata.longitude,
+            gps_source=(
+                GpsSource.EXIF
+                if has_exif_gps
+                else GpsSource.UNKNOWN
+            ),
+            original_orientation=metadata.orientation,
+            original_capture_datetime=capture_datetime,
+            original_date_source=date_source,
+            original_latitude=metadata.latitude,
+            original_longitude=metadata.longitude,
+            exif_capture_datetime=metadata.capture_datetime,
+            exif_latitude=(
+                metadata.latitude
+                if has_exif_gps
+                else None
+            ),
+            exif_longitude=(
+                metadata.longitude
+                if has_exif_gps
+                else None
+            ),
+            metadata_candidates=MetadataCandidates(
+                date={
+                    **(
+                        {"exif": metadata.capture_datetime}
+                        if metadata.capture_datetime is not None
+                        else {}
+                    ),
+                    **(
+                        {"filename": filename_datetime}
+                        if filename_datetime is not None
+                        else {}
+                    ),
+                },
+                gps=(
+                    {
+                        "exif": GpsCandidate(
+                            metadata.latitude,
+                            metadata.longitude,
+                        )
+                    }
+                    if has_exif_gps
+                    else {}
+                ),
+            ),
         )

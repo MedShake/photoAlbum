@@ -29,8 +29,8 @@ def test_display_options_are_enabled_by_default():
 
     settings = widget.settings()
 
-    assert caption_show_datetime(settings.photo_pages.page.settings)
-    assert caption_show_location(settings.photo_pages.page.settings)
+    assert caption_show_datetime(settings.photo_pages.automatic_mode.settings)
+    assert caption_show_location(settings.photo_pages.automatic_mode.settings)
     assert settings.page_numbers.enabled
 
 
@@ -43,7 +43,9 @@ def test_display_options_can_be_restored():
         original,
         photo_pages=replace(
             original.photo_pages,
-            page=original.photo_pages.page.with_settings({"photo_caption": {"show_datetime": False, "show_location": True}}),
+            automatic_mode=original.photo_pages.automatic_mode.with_settings(
+                {"photo_caption": {"show_datetime": False, "show_location": True}}
+            ),
         ),
         page_numbers=PageNumberSettings(
             enabled=False,
@@ -64,6 +66,6 @@ def test_reset_restores_display_defaults():
 
     settings = widget.settings()
 
-    assert caption_show_datetime(settings.photo_pages.page.settings)
-    assert caption_show_location(settings.photo_pages.page.settings)
+    assert caption_show_datetime(settings.photo_pages.automatic_mode.settings)
+    assert caption_show_location(settings.photo_pages.automatic_mode.settings)
     assert settings.page_numbers.enabled

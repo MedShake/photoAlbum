@@ -258,17 +258,32 @@ def test_library_scanner_reanalyzes_modified_photo(
     result = scanner.scan(tmp_path)
 
     assert len(result.photos) == 1
+
+    # Reanalysis refreshes source candidates but must not destroy an
+    # explicit editorial override.
     assert result.photos[0].capture_datetime == datetime(
+        2000,
+        1,
+        1,
+    )
+    assert result.photos[0].date_source == DateSource.MANUAL
+
+    assert result.photos[0].original_capture_datetime == datetime(
         2025,
         6,
         15,
     )
-    assert result.photos[0].date_source == DateSource.FILENAME
+    assert (
+        result.photos[0].original_date_source
+        == DateSource.FILENAME
+    )
 
     cached = repository.find_by_path(image_path)
 
     assert cached is not None
-    assert cached.capture_datetime == datetime(2025, 6, 15)
+    assert cached.capture_datetime == datetime(2000, 1, 1)
+    assert cached.date_source == DateSource.MANUAL
+    assert cached.original_capture_datetime == datetime(2025, 6, 15)
 
     database.close()
 
@@ -327,13 +342,21 @@ class FakePhotoProcessor:
     ) -> bool:
         self.enrich_calls += 1
 
-        photo.city = "Resolved City"
-        photo.location_source = LocationSource.GEOCODING
+        photo.geocoded_location_data = {
+            "provider": "nominatim",
+            "latitude": photo.latitude,
+            "longitude": photo.longitude,
+            "city": "Resolved City",
+        }
+
+        if photo.location_source != LocationSource.MANUAL:
+            photo.city = "Resolved City"
+            photo.location_source = LocationSource.GEOCODING
 
         return True
 
 
-def test_cached_photo_with_unresolved_gps_is_enriched(
+def test_cached_photo_with_unresolved_gps_is_not_enriched_by_metadata_scan(
     tmp_path: Path,
 ):
     database = ProjectDatabase(tmp_path / "library.sqlite3")
@@ -370,18 +393,15 @@ def test_cached_photo_with_unresolved_gps_is_enriched(
     result = scanner.scan(tmp_path)
 
     assert processor.process_calls == 0
-    assert processor.enrich_calls == 1
+    assert processor.enrich_calls == 0
 
-    assert result.photos[0].city == "Resolved City"
+    assert result.photos[0].city is None
 
     persisted = repository.find_by_path(image_path)
 
     assert persisted is not None
-    assert persisted.city == "Resolved City"
-    assert (
-        persisted.location_source
-        == LocationSource.GEOCODING
-    )
+    assert persisted.city is None
+    assert persisted.location_source == LocationSource.UNKNOWN
 
     database.close()
 
@@ -411,6 +431,12 @@ def test_cached_geocoded_photo_is_not_enriched_again(
             longitude=-1.5536,
             city="Existing City",
             location_source=LocationSource.GEOCODING,
+            geocoded_location_data={
+                "provider": "nominatim",
+                "latitude": 47.2184,
+                "longitude": -1.5536,
+                "city": "Existing City",
+            },
         )
     )
 
@@ -469,6 +495,7 @@ def test_cached_manual_location_is_preserved(
 
     assert processor.enrich_calls == 0
     assert result.photos[0].city == "Manual City"
+    assert result.photos[0].geocoded_location_data is None
     assert (
         result.photos[0].location_source
         == LocationSource.MANUAL
@@ -586,6 +613,6 @@ def test_scan_statistics_count_cached_geocoding(
     assert result.statistics.discovered == 1
     assert result.statistics.reused == 1
     assert result.statistics.analyzed == 0
-    assert result.statistics.geocoded == 1
+    assert result.statistics.geocoded == 0
 
     database.close()

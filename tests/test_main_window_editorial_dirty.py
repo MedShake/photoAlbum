@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 from photoalbum.gui.main_window import MainWindow
+from photoalbum.i18n import Translator
 
 
 class _WindowStub:
@@ -97,6 +98,7 @@ def test_open_project_clears_image_cache_before_loading_new_preview():
         _photos_widget=Mock(),
         _scan_controller=Mock(),
         _show_error=Mock(),
+        _translator=Translator("en"),
     )
     window._album_preview_widget.clear.side_effect = lambda: events.append("clear")
     window._photos_widget.source_edit.text.return_value = ""
@@ -116,6 +118,7 @@ def test_failed_project_open_does_not_discard_current_image_cache():
         _project_service=Mock(),
         _album_preview_widget=Mock(),
         _show_error=Mock(),
+        _translator=Translator("en"),
     )
     window._project_service.open.side_effect = OSError("Cannot open project")
     MainWindow._open_project_path(window, Path("missing.photoalbum"))

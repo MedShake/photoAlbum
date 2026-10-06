@@ -61,7 +61,7 @@ def photo_location_text(
         photo.raw_location_data
     )
 
-    return result.caption or None
+    return result.caption or photo.imported_location_text or None
 
 
 def build_photo_caption(

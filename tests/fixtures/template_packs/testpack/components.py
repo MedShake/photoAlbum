@@ -82,7 +82,9 @@ class Worker(QRunnable):
 class Preview(TemplatePreviewBackend):
     template_id = "testpack-page"
 
-    def create_job(self, *, request_id, instance, translator, **kwargs):
+    def create_job(
+        self, *, request_id, instance, translator, template_pack_settings=None, **kwargs
+    ):
         preview_calls.append((dict(instance.settings), translator.tr("banana.label")))
 
         def finalize(data):

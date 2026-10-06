@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from photoalbum.models import Photo
+from photoalbum.models import Photo, PhotoUsage
 
 from .pagination import PaginationEngine, PaginationResult
 from .planning import AlbumPlan, AlbumPlanner
@@ -21,7 +21,13 @@ class AlbumBuildResult:
     plan: AlbumPlan
     pagination: PaginationResult
     print_diagnostic: PrintDiagnostic
+    album_photos: tuple[Photo, ...]
     excluded_special_pages: tuple[PageInstance, ...] = ()
+    excluded_photo_overrides: tuple[PageInstance, ...] = ()
+
+    @property
+    def template_photos(self) -> tuple[Photo, ...]:
+        return self.album_photos
 
     # pagination.pages contains the physical interior pages
     # of the album. Covers are rendered separately and are
@@ -62,6 +68,8 @@ class AlbumBuilder:
         # that cannot fit the current physical geometry.
         page_format = settings.effective_page_format()
         excluded_special_pages = []
+        excluded_photo_overrides = []
+        album_photos = tuple(photo for photo in photos if photo.usage != PhotoUsage.OFF)
 
         def compatible(page):
             accepted = self._registry.get(page.template_id).is_compatible_with_page(
@@ -75,10 +83,26 @@ class AlbumBuilder:
             settings,
             front_matter=[page for page in settings.front_matter if compatible(page)],
             back_matter=[page for page in settings.back_matter if compatible(page)],
+            body_insertions=[item for item in settings.body_insertions
+                             if item.enabled and compatible(item.page)],
         )
+        for override in settings.photo_page_overrides:
+            if not self._registry.get(override.page.template_id).is_compatible_with_page(
+                page_format.width_mm, page_format.height_mm
+            ):
+                excluded_photo_overrides.append(override.page)
+        excluded_override_starts = {
+            item.photo_identity
+            for item in settings.photo_page_overrides
+            if item.page in excluded_photo_overrides
+        }
+        settings = replace(settings, photo_page_overrides=[
+            item for item in settings.photo_page_overrides
+            if item.page not in excluded_photo_overrides
+        ])
 
         plan = AlbumPlanner().plan(
-            photos,
+            list(album_photos),
             settings,
         )
 
@@ -87,6 +111,7 @@ class AlbumBuilder:
         ).paginate(
             plan,
             settings,
+            forced_photo_page_starts=excluded_override_starts,
         )
 
         print_diagnostic = PrintDiagnostics().analyze(
@@ -99,4 +124,6 @@ class AlbumBuilder:
             pagination=pagination,
             print_diagnostic=print_diagnostic,
             excluded_special_pages=tuple(excluded_special_pages),
+            excluded_photo_overrides=tuple(excluded_photo_overrides),
+            album_photos=album_photos,
         )

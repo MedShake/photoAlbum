@@ -270,7 +270,7 @@ class PdfExportWidget(QWidget):
         photos = []
 
         if self._project_service.is_open:
-            photos = self._project_service.list_photos()
+            photos = self._project_service.list_album_photos()
 
         self._pdf_photos_label.setText(str(len(photos)))
 
@@ -318,7 +318,7 @@ class PdfExportWidget(QWidget):
 
             dpi = int(self._pdf_dpi_combo.currentData())
 
-            photos = self._project_service.list_photos()
+            photos = self._project_service.list_album_photos()
 
             if self._pdf_content_covers_radio.isChecked():
                 export_content = PdfExportContent.COVERS
@@ -412,6 +412,8 @@ class PdfExportWidget(QWidget):
             dpi=dpi,
             metadata=metadata,
             content=export_content,
+            prepare_assets=self._project_service.materialize_originals,
+            translator=self._translator,
         )
 
         worker.moveToThread(thread)

@@ -14,6 +14,7 @@ from photoalbum.album import (
 
 def test_summary_counts_pages():
     result = AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(
             pages=[
@@ -71,6 +72,7 @@ def test_summary_counts_pages():
 
 def test_summary_exposes_print_warning():
     result = AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(),
         print_diagnostic=PrintDiagnostic(
@@ -87,6 +89,7 @@ def test_summary_exposes_print_warning():
 
 def test_summary_contains_period_fill_suggestions():
     result = AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(
             period_end_capacities=[
@@ -130,6 +133,7 @@ def test_summary_contains_period_fill_suggestions():
 
 def test_summary_ignores_periods_without_free_slots():
     result = AlbumBuildResult(
+        album_photos=(),
         plan=AlbumPlan(),
         pagination=PaginationResult(
             period_end_capacities=[

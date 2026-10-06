@@ -82,6 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Scan subdirectories recursively.",
     )
+    scan_parser.add_argument(
+        "--source-id", help="Refresh this existing local source occurrence.",
+    )
 
     scan_parser.add_argument(
         "--language",
@@ -395,6 +398,30 @@ def run_scan(args: argparse.Namespace) -> int:
     try:
         repository = PhotoRepository(database)
 
+        from dataclasses import replace
+        from uuid import uuid4
+        from photoalbum.database.source_repository import SourceRepository
+        from photoalbum.sources import ProjectSource, PhotoMetadataPolicy
+        sources = SourceRepository(database)
+        source_id = getattr(args, "source_id", None)
+        matches = [source for source in sources.list_all()
+                   if source.kind == "local" and source.config.get("directory") == str(source_path)]
+        source = sources.find(source_id) if source_id else (matches[0] if len(matches) == 1 else None)
+        if source_id and (source is None or source.kind != "local"):
+            print("Error: --source-id must identify a configured local source.", file=sys.stderr)
+            return 2
+        if not source_id and len(matches) > 1:
+            print("Error: multiple sources use this directory; specify --source-id.", file=sys.stderr)
+            return 2
+        source = source or ProjectSource(
+            id=uuid4().hex, kind="local", name=source_path.name,
+            collection_id="folder", collection_name=source_path.name,
+            provider_label="Local folder",
+            metadata_policy=PhotoMetadataPolicy("exif", "exif", "geocoding", args.geocode),
+        )
+        source = replace(source, config={**source.config, "directory": str(source_path),
+                                         "recursive": args.recursive})
+        sources.save(source)
         processor = create_photo_processor(
             args,
             database,
@@ -403,6 +430,7 @@ def run_scan(args: argparse.Namespace) -> int:
         scanner = LibraryScanner(
             photo_repository=repository,
             photo_processor=processor,
+            source_id=source.id,
         )
 
         try:
@@ -419,6 +447,9 @@ def run_scan(args: argparse.Namespace) -> int:
             )
             return 2
 
+        from photoalbum.sources import resolve_photo_metadata
+        for photo in [*result.photos, *result.date_anomalies]:
+            repository.save(resolve_photo_metadata(photo, source.effective_metadata_policy))
         print_summary(result)
 
         return 0 if not result.errors else 1
@@ -650,7 +681,7 @@ def run_pdf(
             )
             return 2
 
-        photos = service.list_photos()
+        photos = service.list_album_photos()
 
         if not photos:
             print(
@@ -714,6 +745,7 @@ def run_pdf(
         print()
         print("Generating PDF...")
 
+        service.materialize_originals(list(result.template_photos))
         exporter.export(
             output_path=output_path,
             result=result,

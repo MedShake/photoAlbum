@@ -44,16 +44,14 @@ class TemplatePreviewBackend(ABC):
 
         for photo in photos:
             unique.setdefault(
-                str(photo.path),
+                photo.identity,
                 photo,
             )
 
         return tuple(
             sorted(
                 unique.values(),
-                key=lambda photo: str(
-                    photo.path
-                ),
+                key=lambda photo: photo.identity,
             )
         )
 

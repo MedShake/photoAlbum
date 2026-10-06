@@ -128,19 +128,27 @@ def test_page_renderer_receives_its_pack_translator(routed_pack):
     assert_pack_translator(received[0])
 
 
-def test_async_preview_backend_receives_its_pack_translator(routed_pack):
+def test_async_preview_backend_receives_pack_context_and_translator(routed_pack):
     class ExpectedCall(Exception):
         pass
+
+    pack_settings = {PACK_ID: {"probe": True}}
 
     class Backend:
         def effective_photos(self, instance, photos):
             return tuple(photos)
 
-        def render_settings_signature(self, instance):
+        def render_settings_signature(
+            self, instance, *, template_pack_settings=None
+        ):
+            assert template_pack_settings is pack_settings
             return instance.settings
 
-        def create_job(self, **kwargs):
-            assert_pack_translator(kwargs["translator"])
+        def create_job(
+            self, *, translator, template_pack_settings=None, **kwargs
+        ):
+            assert_pack_translator(translator)
+            assert template_pack_settings is pack_settings
             raise ExpectedCall
 
     template_extension_registry.register(PageTemplateExtension(
@@ -157,6 +165,7 @@ def test_async_preview_backend_receives_its_pack_translator(routed_pack):
             height=100,
             page_width_mm=210,
             page_height_mm=297,
+            template_pack_settings=pack_settings,
         )
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QDialog,
@@ -48,6 +48,7 @@ from photoalbum.template_engine import (
 from photoalbum.i18n import Translator
 from photoalbum.gui.scan_controller import ScanController
 from photoalbum.gui.photo_editor import PhotoEditor
+from photoalbum.gui.synology_source_dialog import SynologySourceDialog
 from photoalbum.gui.widgets.pdf_export_widget import PdfExportWidget
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
 from photoalbum.models import Photo
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow):
         self._previous_tab_index = 0
 
         self.setWindowTitle(APPLICATION_NAME)
-        self.resize(1100, 700)
+        self._restore_or_set_initial_geometry()
 
         self._photo_editor = PhotoEditor(
             self._project_service, self._translator, language=language, parent=self,
@@ -97,6 +98,24 @@ class MainWindow(QMainWindow):
         self._create_content()
 
         self._update_project_state()
+
+
+    def _restore_or_set_initial_geometry(self) -> None:
+        """Restore the previous window geometry or choose a screen-safe default."""
+        settings = QSettings("PhotoAlbum", APPLICATION_NAME)
+        saved_geometry = settings.value("main_window/geometry")
+        if saved_geometry is not None and self.restoreGeometry(saved_geometry):
+            return
+
+        screen = self.screen()
+        if screen is None:
+            self.resize(1100, 700)
+            return
+
+        available = screen.availableGeometry()
+        width = min(available.width(), max(1000, int(available.width() * 0.90)), 1440)
+        height = min(available.height(), max(650, int(available.height() * 0.90)), 900)
+        self.resize(width, height)
 
     def closeEvent(self, event) -> None:
         if self._pdf_widget.is_running:
@@ -117,6 +136,10 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
 
+        QSettings("PhotoAlbum", APPLICATION_NAME).setValue(
+            "main_window/geometry",
+            self.saveGeometry(),
+        )
         self._hover_photo_preview.clear()
         self._project_service.close()
         super().closeEvent(event)
@@ -262,11 +285,27 @@ class MainWindow(QMainWindow):
         self._scan_controller.running_changed.connect(self._set_scan_running)
         self._scan_controller.photos_ready.connect(self._scan_photos_ready)
         self._scan_controller.source_unavailable.connect(lambda: self._tabs.setCurrentIndex(0))
+        self._scan_controller.source_changed.connect(
+            self._source_import_completed
+        )
         self._photos_widget.source_requested.connect(self._choose_source_directory)
-        self._photos_widget.recursive_changed.connect(self._recursive_changed)
+        self._photos_widget.synology_source_requested.connect(
+            self._choose_synology_source
+        )
         self._photos_widget.scan_requested.connect(self._scan_controller.toggle)
+        self._photos_widget.sync_requested.connect(
+            self._scan_controller.sync_source
+        )
         self._photos_widget.edit_datetime_requested.connect(self._photo_editor.edit_datetime)
         self._photos_widget.edit_gps_requested.connect(self._photo_editor.edit_gps)
+        self._photos_widget.edit_usage_requested.connect(self._edit_photo_usage)
+        self._photos_widget.source_enabled_changed.connect(self._source_enabled_changed)
+        self._photos_widget.edit_source_requested.connect(self._edit_source)
+        self._photos_widget.delete_source_requested.connect(self._delete_source)
+        self._photos_widget.source_policy_changed.connect(self._source_policy_changed)
+        self._photos_widget.source_recursive_changed.connect(
+            self._source_recursive_changed
+        )
         self._photos_widget.open_photo_requested.connect(self._photo_editor.open_in_os)
         self._photo_editor.log_message.connect(self._photos_widget.log_view.appendPlainText)
         self._tabs.addTab(self._photos_widget, self._translator.tr("tab.photos"))
@@ -277,7 +316,7 @@ class MainWindow(QMainWindow):
 
         self._photos_places_widget = PhotoPlacesWidget(
             translator=self._translator,
-            save_location=self._save_photo_editorial_location,
+            save_location_override=self._save_photo_location_override,
             save_caption=self._save_photo_caption,
             save_locations=self._save_photo_editorial_locations,
             edit_source_photo=self._go_to_source_photo,
@@ -299,7 +338,7 @@ class MainWindow(QMainWindow):
             render_service=self._preview_render_service,
         )
 
-        self._album_settings_widget.set_photo_provider(self._project_service.list_photos)
+        self._album_settings_widget.set_photo_provider(self._project_service.list_album_photos)
 
         self._album_settings_widget.settings_changed.connect(self._save_album_settings)
 
@@ -310,6 +349,7 @@ class MainWindow(QMainWindow):
             translator=self._translator,
             parent=self,
         )
+        self._album_plan_widget.settings_changed.connect(self._plan_settings_changed)
 
         self._album_preview_widget = AlbumPreviewWidget(
             self._template_registry,
@@ -408,18 +448,12 @@ class MainWindow(QMainWindow):
             self._project_service.create(project_path)
 
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.create_project_error"))
             return
 
         self._scan_controller.reset()
 
-        self._photos_widget.source_edit.clear()
-
-        previous = self._photos_widget.recursive_checkbox.blockSignals(True)
-
-        self._photos_widget.recursive_checkbox.setChecked(False)
-
-        self._photos_widget.recursive_checkbox.blockSignals(previous)
+        self._refresh_source_cards()
 
         self._photos_widget.summary_label.setText(self._translator.tr('main.no_analysis'))
 
@@ -459,7 +493,7 @@ class MainWindow(QMainWindow):
         try:
             self._project_service.open(path)
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.open_project_error"))
             return
 
         self._album_preview_widget.clear()
@@ -467,11 +501,10 @@ class MainWindow(QMainWindow):
         self._load_project_photos()
         self._update_project_state()
 
-        # Opening an existing project also synchronizes it with
-        # its source directory. The scanner already reuses
-        # unchanged photos, so only new or changed files require
-        # actual analysis.
-        if self._photos_widget.source_edit.text().strip():
+        # The persisted snapshot is already visible. Necessary local analysis
+        # or remote metadata resolution now continues in the background;
+        # provider synchronization remains an explicit user action.
+        if self._photos_widget.has_active_sources:
             self._scan_controller.start()
 
     def _close_project(self) -> None:
@@ -485,8 +518,7 @@ class MainWindow(QMainWindow):
         self._album_plan_widget.clear()
         self._album_preview_widget.clear()
 
-        self._photos_widget.source_edit.clear()
-        self._photos_widget.recursive_checkbox.setChecked(False)
+        self._refresh_source_cards()
         self._photos_widget.summary_label.setText(self._translator.tr('main.no_analysis'))
         self._photos_widget.log_view.clear()
         self._photos_widget.model.clear()
@@ -506,12 +538,12 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._project_service.set_source_directory(Path(directory))
+            self._project_service.add_local_source(Path(directory))
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.add_local_source_error"))
             return
 
-        self._photos_widget.source_edit.setText(directory)
+        self._refresh_source_cards()
 
         self._scan_controller.reset()
 
@@ -521,28 +553,141 @@ class MainWindow(QMainWindow):
         # analysis therefore starts immediately.
         self._scan_controller.start()
 
-    def _recursive_changed(self, checked: bool) -> None:
+    def _choose_synology_source(self, source_id: str | None = None) -> None:
         if not self._project_service.is_open:
             return
+        current_source = self._project_service.get_photo_source(source_id) if source_id else None
+        reconnecting = (
+            current_source is not None
+            and current_source.kind == "synology-photos"
+        )
+        dialog = SynologySourceDialog(
+            self._translator,
+            self,
+            existing_source=current_source if reconnecting else None,
+            edit_collection=reconnecting,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            if (current_source is not None
+                    and dialog.source.collection_id == current_source.collection_id
+                    and dialog.source.config.get("base_url") == current_source.config.get("base_url")):
+                # Authentication/configuration is separate from refreshing an
+                # unchanged collection: reconnect without replacing its snapshot.
+                self._project_service.set_photo_source(dialog.source, dialog.provider)
+                self._refresh_source_cards()
+                self.statusBar().showMessage(
+                    self._translator.tr("source.synology.session_attached"), 5000)
+                return
+            self._scan_controller.import_remote_source(dialog.source, dialog.provider)
+        except Exception as exc:
+            if dialog.provider is not None:
+                try:
+                    dialog.provider.close()
+                except Exception:
+                    pass
+                dialog.provider = None
+            self._show_error(self._translator.tr("main.configure_remote_source_error"))
+            return
 
-        self._project_service.set_recursive_scan(checked)
+    def _source_import_completed(self) -> None:
+        self._load_project_settings()
+        self._update_project_state()
 
-        source_directory = self._project_service.get_source_directory()
+    def _refresh_source_cards(self) -> None:
+        sources = self._project_service.list_sources() if self._project_service.is_open else []
+        labels = self._project_service.source_labels() if sources else {}
+        available = {source.id: self._project_service.available_metadata_candidates(source.id) for source in sources}
+        self._photos_widget.set_sources(sources, available, labels)
+        self._photos_places_widget.set_source_labels(labels)
 
-        if source_directory is not None and not self._scan_controller.is_running:
-            self._scan_controller.reset()
-            self._scan_controller.start()
+    def _source_enabled_changed(self, source_id, enabled) -> None:
+        self._project_service.set_source_enabled(source_id, enabled)
+        self._load_project_photos()
+        self._update_project_state()
+
+
+    def _source_recursive_changed(self, source_id, recursive) -> None:
+        from dataclasses import replace
+
+        source = self._project_service.get_photo_source(source_id)
+        if source is None or source.kind != "local":
+            return
+
+        recursive = bool(recursive)
+        if bool(source.config.get("recursive", False)) == recursive:
+            return
+
+        config = dict(source.config)
+        config["recursive"] = recursive
+        self._project_service.set_photo_source(replace(source, config=config))
+        self._refresh_source_cards()
+        self._scan_controller.reset()
+        self._update_project_state()
+        self._scan_controller.start()
+
+    def _source_policy_changed(self, source_id, policy) -> None:
+        self._project_service.set_photo_metadata_policy(policy, source_id)
+        self._project_service.apply_photo_metadata_policy(source_id=source_id)
+        self._load_project_photos()
+        if not self._scan_controller.is_running:
+            self._scan_controller.refresh_metadata(source_id)
+
+    def _delete_source(self, source_id) -> None:
+        source = self._project_service.get_photo_source(source_id)
+        if source is None:
+            return
+        if QMessageBox.question(self, self._translator.tr("sources.delete"),
+                self._translator.tr("sources.delete_confirm", name=source.collection_name)) != QMessageBox.StandardButton.Yes:
+            return
+        self._project_service.delete_source(source_id)
+        self._load_project_photos()
+        self._update_project_state()
+
+    def _edit_source(self, source_id) -> None:
+        from dataclasses import replace
+        from PySide6.QtWidgets import QDialogButtonBox, QLineEdit, QVBoxLayout
+        source = self._project_service.get_photo_source(source_id)
+        if source is None:
+            return
+        if source.kind == "synology-photos":
+            self._choose_synology_source(source_id)
+            return
+        if source.kind != "local":
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self._translator.tr("sources.modify"))
+        layout = QVBoxLayout(dialog)
+        path = QLineEdit(str(source.config["directory"]))
+        layout.addWidget(path)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            directory = Path(path.text()).expanduser().resolve()
+            config = dict(source.config)
+            config["directory"] = str(directory)
+            self._project_service.set_photo_source(replace(
+                source,
+                name=directory.name,
+                collection_name=directory.name,
+                config=config,
+            ))
+            self._refresh_source_cards()
+
+    def _edit_photo_usage(self, photo) -> None:
+        from photoalbum.gui.photo_usage_dialog import PhotoUsageDialog
+        dialog = PhotoUsageDialog(photo, self._translator, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._project_service.set_photo_usage(photo.identity, dialog.usage())
+            self._load_project_photos()
+            self._photos_widget.select_photo(photo)
+            self._update_project_state()
 
     def _load_project_settings(self) -> None:
-        source_directory = self._project_service.get_source_directory()
-
-        self._photos_widget.source_edit.setText(
-            str(source_directory) if source_directory is not None else ''
-        )
-
-        self._photos_widget.recursive_checkbox.setChecked(
-            self._project_service.get_recursive_scan()
-        )
+        self._refresh_source_cards()
 
         album_settings = self._project_service.get_album_structure_settings()
 
@@ -558,16 +703,8 @@ class MainWindow(QMainWindow):
 
         self._close_project_action.setEnabled(not running and self._project_service.is_open)
 
-        self._photos_widget.browse_button.setEnabled(
-            (
-                not running and self._project_service.is_open
-            )
-        )
-
-        self._photos_widget.recursive_checkbox.setEnabled(
-            (
-                not running and self._project_service.is_open
-            )
+        self._photos_widget.modify_source_button.setEnabled(
+            not running and self._project_service.is_open
         )
 
         self._photos_widget.analyze_button.setEnabled(
@@ -575,9 +712,13 @@ class MainWindow(QMainWindow):
                 running
                 or (
                     self._project_service.is_open
-                    and bool(self._photos_widget.source_edit.text())
+                    and self._photos_widget.has_active_sources
                 )
             )
+        )
+        self._photos_widget.sources_group.setEnabled(not running)
+        self._photos_widget.sync_button.setEnabled(
+            not running and self._project_service.is_open and self._photos_widget.has_active_sources
         )
 
         # Photos remains the project entry point. Every other
@@ -586,7 +727,7 @@ class MainWindow(QMainWindow):
         photos_available = (
             self._project_service.is_open
             and not running
-            and bool(self._project_service.list_photos())
+            and bool(self._project_service.list_album_photos())
         )
 
         # Photos is always available. It is the entry point
@@ -598,8 +739,6 @@ class MainWindow(QMainWindow):
         for index in range(1, self._tabs.count()):
             self._tabs.setTabEnabled(index, photos_available)
 
-        self._photos_widget.progress_bar.setVisible(running)
-
         if running:
             self._photos_widget.analyze_button.setText(
                 self._translator.tr('main.stop_analysis')
@@ -608,22 +747,16 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(self._translator.tr('main.analysis_in_progress'))
 
         else:
-            if self._scan_controller.analysis_completed:
-                self._photos_widget.analyze_button.setText(
-                    self._translator.tr('main.analyze_again')
-                )
-            else:
-                self._photos_widget.analyze_button.setText(
-                    self._translator.tr('main.analyze_photos')
-                )
+            self._photos_widget.analyze_button.setText(
+                self._translator.tr('sources.analyze')
+            )
 
     def _update_project_state(self) -> None:
         is_open = self._project_service.is_open
-        has_source = bool(self._photos_widget.source_edit.text())
+        has_source = self._photos_widget.has_active_sources
 
         self._close_project_action.setEnabled(is_open)
-        self._photos_widget.browse_button.setEnabled(is_open)
-        self._photos_widget.recursive_checkbox.setEnabled(is_open)
+        self._photos_widget.modify_source_button.setEnabled(is_open)
         self._photos_widget.analyze_button.setEnabled(is_open and has_source)
 
         if is_open:
@@ -657,26 +790,13 @@ class MainWindow(QMainWindow):
         Pre-render expensive templates using exactly the same
         photo set as the album preview.
 
-        Do NOT use the raw repository photo list here: the album
-        plan may exclude undated/anomalous photos or otherwise
-        expose a different ordering.
+        The canonical pool also contains TEMPLATE_ONLY photos, even though
+        they never appear in chronological photo pages.
         """
 
         page_format = settings.effective_page_format()
 
-        project_photos = []
-        seen_paths = set()
-
-        for item in result.plan.items:
-            for photo in item.photos:
-                key = str(photo.path)
-
-                if key in seen_paths:
-                    continue
-
-                seen_paths.add(key)
-
-                project_photos.append(photo)
+        project_photos = list(result.template_photos)
 
         instances = []
 
@@ -688,7 +808,7 @@ class MainWindow(QMainWindow):
                 instances.append(page)
 
         # Special-page instances.
-        for item in result.plan.items:
+        for item in result.pagination.pages:
             page = item.page_instance
             if page is not None and self._preview_render_service.supports(page.template_id):
                 instances.append(page)
@@ -708,6 +828,7 @@ class MainWindow(QMainWindow):
                 height=PREVIEW_RENDER_HEIGHT,
                 page_width_mm=page_format.width_mm,
                 page_height_mm=page_format.height_mm,
+                template_pack_settings=settings.template_pack_settings,
             )
 
     def _refresh_album_plan(self) -> None:
@@ -717,7 +838,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            photos = self._project_service.list_photos()
+            photos = self._project_service.list_album_photos()
 
             settings = self._album_settings_widget.settings()
 
@@ -782,15 +903,20 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._show_error(self._translator.tr('main.save_album_error', error=exc))
 
+    def _plan_settings_changed(self, settings) -> None:
+        self._album_settings_widget.set_settings(settings)
+        self._preview_render_service.clear()
+        self._save_album_settings()
+
     def _save_photo_caption(self, photo: Photo, caption: str | None) -> None:
         try:
-            self._project_service.set_photo_caption(photo.path, caption)
+            self._project_service.set_photo_caption(photo.identity, caption)
 
             # Persist immediately, but defer the expensive album
             # rebuild until "Places and captions" is left.
             self._mark_editorial_album_dirty()
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
 
     def _go_to_source_photo(self, photo: Photo) -> None:
         self._tabs.setCurrentIndex(0)
@@ -806,35 +932,34 @@ class MainWindow(QMainWindow):
         try:
             for photo, components, location_text in changes:
                 self._project_service.set_editorial_location(
-                    photo.path,
+                    photo.identity,
                     components=components,
                     location_text=location_text,
                 )
                 changed = True
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
         finally:
             if changed:
                 self._mark_editorial_album_dirty()
 
-    def _save_photo_editorial_location(
+    def _save_photo_location_override(
         self,
         photo: Photo,
         components,
         location_text: str | None,
+        manual_location_data: dict[str, object],
     ) -> None:
         try:
             self._project_service.set_editorial_location(
-                photo.path,
+                photo.identity,
                 components=components,
                 location_text=location_text,
+                manual_location_data_override=manual_location_data,
             )
-
-            # Persist immediately, but defer the expensive album
-            # rebuild until "Places and captions" is left.
             self._mark_editorial_album_dirty()
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(self._translator.tr("main.save_photo_location_error"))
 
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(self, APPLICATION_NAME, message)
@@ -846,9 +971,14 @@ class MainWindow(QMainWindow):
 
         photos = self._project_service.list_photos()
 
+        selected = self._photos_widget.table.currentIndex().data(Qt.ItemDataRole.UserRole)
+        self._refresh_source_cards()
         self._photos_widget.model.set_photos(photos)
-        self._photos_places_widget.set_photos(photos)
-        self._update_album_years(photos)
+        if isinstance(selected, Photo):
+            self._photos_widget.select_photo(selected)
+        album_photos = self._project_service.list_album_photos()
+        self._photos_places_widget.set_photos(album_photos)
+        self._update_album_years(album_photos)
 
         total = len(photos)
 
@@ -872,8 +1002,4 @@ class MainWindow(QMainWindow):
         self._update_pdf_summary()
 
     def _scan_photos_ready(self, photos: list[Photo]) -> None:
-        self._photos_widget.model.set_photos(photos)
-        self._photos_places_widget.set_photos(photos)
-        self._update_album_years(photos)
-        self._refresh_album_plan()
-        self._update_pdf_summary()
+        self._load_project_photos()

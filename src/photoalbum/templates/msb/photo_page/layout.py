@@ -118,14 +118,17 @@ def _photo_page_2_cells(
     page_width_mm: float,
     page_height_mm: float,
 ) -> tuple[NormalizedRect, ...]:
+    is_landscape = page_width_mm > page_height_mm
+
     return _grid_cells(
-        rows=2,
-        columns=1,
+        rows=1 if is_landscape else 2,
+        columns=2 if is_landscape else 1,
         capacity=2,
         page_width_mm=page_width_mm,
         page_height_mm=page_height_mm,
         top_margin_mm=6.0,
         bottom_margin_mm=12.0,
+        horizontal_gap_mm=8.0,
         vertical_gap_mm=4.0,
     )
 
@@ -138,13 +141,54 @@ def _photo_page_3_cells(
     margin_top = 6.0 / page_height_mm
     margin_bottom = 12.0 / page_height_mm
 
-    horizontal_gap = (
-        8.0 / page_width_mm
-    )
+    horizontal_gap = 8.0 / page_width_mm
+    vertical_gap = 4.0 / page_height_mm
 
-    vertical_gap = (
-        4.0 / page_height_mm
-    )
+    is_landscape = page_width_mm > page_height_mm
+
+    if is_landscape:
+        # Transpose the historical portrait composition:
+        # one large photograph on the left, two smaller ones stacked
+        # on the right.
+        available_width = (
+            1
+            - 2 * margin_x
+            - horizontal_gap
+        )
+
+        left_width = available_width * 0.48
+        right_width = available_width - left_width
+        right_x = margin_x + left_width + horizontal_gap
+
+        available_height = (
+            1
+            - margin_top
+            - margin_bottom
+            - vertical_gap
+        )
+        right_height = available_height / 2
+        lower_y = margin_top + right_height + vertical_gap
+
+        return (
+            NormalizedRect(
+                x=margin_x,
+                y=margin_top,
+                width=left_width,
+                height=1 - margin_top - margin_bottom,
+            ),
+            NormalizedRect(
+                x=right_x,
+                y=margin_top,
+                width=right_width,
+                height=right_height,
+            ),
+            NormalizedRect(
+                x=right_x,
+                y=lower_y,
+                width=right_width,
+                height=right_height,
+            ),
+        )
 
     available_height = (
         1
@@ -153,31 +197,18 @@ def _photo_page_3_cells(
         - vertical_gap
     )
 
-    # Keep the historical visual hierarchy:
+    # Historical portrait composition:
     # one large photograph above two smaller ones.
-    top_height = (
-        available_height * 0.48
-    )
-
-    bottom_height = (
-        available_height - top_height
-    )
-
-    bottom_y = (
-        margin_top
-        + top_height
-        + vertical_gap
-    )
+    top_height = available_height * 0.48
+    bottom_height = available_height - top_height
+    bottom_y = margin_top + top_height + vertical_gap
 
     available_width = (
         1
         - 2 * margin_x
         - horizontal_gap
     )
-
-    bottom_width = (
-        available_width / 2
-    )
+    bottom_width = available_width / 2
 
     return (
         NormalizedRect(

@@ -55,7 +55,7 @@ def test_set_manual_gps_can_clear_effective_coordinates(tmp_path: Path):
     assert loaded.city is None
     assert loaded.address is None
     assert loaded.raw_location_data is None
-    assert loaded.location_source == LocationSource.MANUAL
+    assert loaded.location_source == LocationSource.UNKNOWN
 
     repository.restore_original_gps(path)
     restored = repository.find_by_path(path)
@@ -513,4 +513,162 @@ def test_repository_preserves_explicit_empty_location_selection(
     assert loaded.location_text is None
     assert loaded.location_selection_edited is True
 
+    database.close()
+
+
+def test_manual_gps_marks_provenance_and_preserves_geocoded_candidate(
+    tmp_path: Path,
+):
+    from photoalbum.models import GpsSource
+
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+
+    repository.save(
+        Photo(
+            path=path,
+            filename=path.name,
+            latitude=48.0,
+            longitude=2.0,
+            gps_source=GpsSource.EXIF,
+            exif_latitude=48.0,
+            exif_longitude=2.0,
+            geocoded_location_data={
+                "provider": "nominatim",
+                "latitude": 48.0,
+                "longitude": 2.0,
+                "city": "Old city",
+            },
+            place_name="Old place",
+            city="Old city",
+            location_source=LocationSource.GEOCODING,
+        )
+    )
+
+    repository.set_manual_gps(path, 45.0, 4.0)
+
+    loaded = repository.find_by_path(path)
+    assert loaded is not None
+    assert loaded.gps_source == GpsSource.MANUAL
+    assert (loaded.latitude, loaded.longitude) == (45.0, 4.0)
+    assert loaded.geocoded_location_data is not None
+    assert loaded.geocoded_location_data["city"] == "Old city"
+    assert loaded.place_name is None
+    assert loaded.city is None
+    assert loaded.address is None
+
+    database.close()
+
+
+def test_restore_original_gps_restores_provenance_and_keeps_cached_candidate(
+    tmp_path: Path,
+):
+    from photoalbum.models import GpsSource
+
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+
+    repository.save(
+        Photo(
+            path=path,
+            filename=path.name,
+            latitude=45.0,
+            longitude=4.0,
+            gps_source=GpsSource.MANUAL,
+            original_latitude=48.0,
+            original_longitude=2.0,
+            exif_latitude=48.0,
+            exif_longitude=2.0,
+            geocoded_location_data={
+                "provider": "nominatim",
+                "latitude": 45.0,
+                "longitude": 4.0,
+                "city": "Stale city",
+            },
+        )
+    )
+
+    repository.restore_original_gps(path)
+
+    loaded = repository.find_by_path(path)
+    assert loaded is not None
+    assert loaded.gps_source == GpsSource.EXIF
+    assert (loaded.latitude, loaded.longitude) == (48.0, 2.0)
+    assert loaded.geocoded_location_data is not None
+    assert loaded.geocoded_location_data["city"] == "Stale city"
+
+    database.close()
+
+
+def test_set_geocoded_location_persists_candidate_with_coordinates(
+    tmp_path: Path,
+):
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+
+    repository.save(
+        Photo(
+            path=path,
+            filename=path.name,
+            latitude=47.2184,
+            longitude=-1.5536,
+        )
+    )
+
+    raw = {
+        "address": {
+            "city": "Nantes",
+            "country": "France",
+        }
+    }
+
+    repository.set_geocoded_location(
+        path,
+        place_name="Example Place",
+        city="Nantes",
+        address="Example Place, Nantes, France",
+        raw_location_data=raw,
+    )
+
+    loaded = repository.find_by_path(path)
+    assert loaded is not None
+    assert loaded.geocoded_location_data == {
+        "provider": "nominatim",
+        "latitude": 47.2184,
+        "longitude": -1.5536,
+        "place_name": "Example Place",
+        "city": "Nantes",
+        "address": "Example Place, Nantes, France",
+        "raw": raw,
+    }
+
+    database.close()
+
+
+def test_editorial_location_persists_provider_source_override(tmp_path: Path):
+    database, repository = create_repository(tmp_path)
+    path = (tmp_path / "photo.jpg").resolve()
+    repository.save(Photo(path=path, filename=path.name))
+    components = (LocationComponent(key="city", value="Paris"),)
+    override = {
+        "photo_places": {
+            "origin": "provider",
+            "selections": {
+                "provider": [{"key": "city", "value": "Paris"}],
+            },
+            "texts": {"provider": "Paris"},
+        }
+    }
+
+    repository.set_editorial_location(
+        path,
+        components=components,
+        location_text="Paris",
+        manual_location_data_override=override,
+    )
+
+    loaded = repository.find_by_path(path)
+    assert loaded is not None
+    assert loaded.manual_location_data == override
+    assert loaded.selected_location_components == components
     database.close()

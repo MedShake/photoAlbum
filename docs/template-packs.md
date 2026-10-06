@@ -52,7 +52,7 @@ field) and an optional `description`. These values are preserved by discovery,
 independently of whether the UI displays them.
 
 A pack can provide only some page types, with MSB providing the others. Available
-types are `photo_page`, `cover`, `special_page`, `day_divider`,
+types are `photo_page`, `cover`, `special_page`, `body_special_page`, `day_divider`,
 `month_divider`, and `year_divider`. For covers, specify `cover_positions`: `front`, `inside_front`,
 `inside_back`, and `back`. See the MSB manifest for a complete example.
 
@@ -88,6 +88,12 @@ non-applicable cover position. `--format json` exposes the same collected data,
 using null for absent bounds and non-applicable positions.
 
 ## Public authoring API
+
+The opt-in `body_special_page` role allows an occurrence inside the chronological
+body from Plan; `special_page` does not imply it. Built-ins opting in are MSB
+`dedication`/`blank` and Simplex `simplex-full-photo-cover`. Manifest schema 1
+is unchanged structurally. These occurrences use ordinary rendering and receive
+their anchor's temporal context. See [editorial pagination](editorial-pagination.md).
 
 Pack code imports host primitives from `photoalbum.template_engine.api`:
 

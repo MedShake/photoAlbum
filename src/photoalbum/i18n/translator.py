@@ -3,11 +3,99 @@ from __future__ import annotations
 
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
+        "sources.add": "Add a source",
+        "sources.add_button": "Add…",
+        "sources.list": "Album sources",
+        "sources.refresh": "Refresh photos",
+        "sources.analyze": "Analyze sources",
+        "sources.synchronize": "Synchronize sources",
+        "sources.reconnect_required": "Reconnect this source before synchronization (Modify…).",
+        "source.export.reconnect_required": (
+            "Reconnect the source containing ‘{filename}’ before generating the PDF."
+        ),
+        "source.asset.reconnect_required": (
+            "Reconnect the source containing ‘{filename}’ to retrieve this photo."
+        ),
+        "sources.active": "Active",
+        "sources.local_folder": "Local folder",
+        "sources.modify": "Modify…",
+        "sources.delete": "Delete",
+        "sources.delete_confirm": "Delete source ‘{name}’ and its project photos? Other sources are preserved.",
+        "photos.column.source": "Source",
+        "photos.usage.title": "Photo usage",
+        "photos.usage.body": "In the album body",
+        "photos.usage.template_only": "Outside the body, available to templates",
+        "photos.usage.off": "Disabled",
+        "photos.status.template_only": "Outside album body",
+        "photos.status.off": "Disabled",
+        "plan.modify": "Modify…",
+        "plan.insert_special": "Add a special page after…",
+        "plan.start_photo": "Start this page with",
+        "plan.use_default": "Use the default photo template",
+        "plan.disable": "Disable",
+        "plan.enable": "Enable",
+        "plan.disabled": "Disabled",
+        "plan.dormant": "Inactive anchor or incompatible page format",
+        "plan.override_incompatible": "Photo template {template} is incompatible with this format; the default template is used. Use Modify to change it.",
         "tab.photos": "Photos",
+        "source.synology.choose": "Synology Photos…",
+        "source.synology.title": "Synology Photos source",
+        "source.synology.url": "NAS address:",
+        "source.synology.verify_tls": "Verify the TLS certificate",
+        "source.synology.username": "Username",
+        "source.synology.password": "Password",
+        "source.synology.otp": "2FA code (optional)",
+        "source.synology.credentials_memory": (
+            "Credentials are used only for this connection and are never saved."
+        ),
+        "source.synology.connect": "Connect with Synology",
+        "source.synology.reconnect": "Reconnect with Synology",
+        "source.synology.connection_error": "Connection failed.",
+        "source.synology.connected": "Connected — {count} albums available.",
+        "source.synology.reconnected": "Connected to the project source.",
+        "source.synology.session_attached": (
+            "Synology Photos reconnected without changing the project snapshot."
+        ),
+        "source.sync.running": "Synchronizing photo source…",
+        "source.sync.running_button": "Synchronizing…",
+        "source.sync.failed": "Photo source synchronization failed.",
+        "source.sync.reconnect_required": "Reconnect the photo source before synchronizing.",
+        "source.sync.completed": "Source snapshot updated: {count} photos.",
+        "source.sync.log": (
+            "Source {source}: {count} photos; {added} added, {updated} "
+            "refreshed, {missing} no longer in the collection."
+        ),
+        "source.metadata.completed": "Metadata updated for {count} photos.",
+        "source.metadata.failed": "Could not update photo metadata.",
+        "source.scan.failed": "Could not analyze the photo sources.",
+        "sources.refresh.source_failed": "Source {source}: operation failed.",
+        "sources.refresh.file_failed": "Source {source}: could not analyze {filename}.",
         "tab.places_captions": "Places and captions",
-        "main.analyze_photos": "Analyze photos",
-        "main.analyze_again": "Analyze photos again",
         "main.progress_photos": "{current} photos analyzed out of {total}",
+        "photos.source.local": "Local folder…",
+        "photos.policy.date": "Date",
+        "photos.policy.gps": "GPS",
+        "photos.policy.location": "Location",
+        "photos.policy.exif": "EXIF",
+        "photos.policy.provider": "Photo source",
+        "photos.policy.filename": "Filename",
+        "photos.policy.nominatim": "Nominatim",
+        "photos.policy.none": "None",
+        "photos.policy.manual": "Manual",
+        "photos.policy.nominatim_enabled": "Complete locations from GPS with Nominatim",
+        "photos.policy.nominatim_tooltip": (
+            "Nominatim is OpenStreetMap’s reverse-geocoding service. GPS "
+            "coordinates are sent over the Internet to look up a city, place, "
+            "road or point of interest. No request is sent when this option "
+            "is disabled."
+        ),
+        "photos.progress.source": "Source",
+        "photos.progress.source_provider": "Source — {provider}",
+        "photos.progress.source_waiting": "Reading {provider}…",
+        "photos.progress.metadata": "Metadata",
+        "photos.progress.nominatim": "Nominatim",
+        "photos.progress.value": "{current} / {total}",
+        "photos.progress.waiting": "Waiting…",
         "main.analysis_progress": (
             "{current} / {total} photos — "
             "{remaining} remaining"
@@ -44,7 +132,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "No geographic information found."
         ),
         "processing.event.geocoding_error": (
-            "Geocoding failed: {error}"
+            "Geocoding failed."
         ),
         "processing.event.analysis_completed": (
             "Photo processing completed."
@@ -86,6 +174,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.date": "Date",
         "photos.places.group.apply": "Apply to {count} photos",
         "photos.places.caption": "Caption",
+        "photos.places.provider_caption": "{provider} caption: {caption}",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
             "{visible} / {total} photos"
@@ -109,6 +198,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.photo": "Photo",
         "photos.places.location_auto": "Automatic place",
         "photos.places.location_custom": "Custom place",
+        "photos.places.location_source.custom": "Custom",
+        "photos.places.location_source.none": "None",
 
         "photos.column.filename": "Filename",
         "photos.column.actions": "Actions",
@@ -167,13 +258,14 @@ CATALOGS: dict[str, dict[str, str]] = {
             "No location found for these coordinates."
         ),
         "photos.gps.geocoding_failed": (
-            "Reverse geocoding failed: {error}"
+            "Reverse geocoding failed."
         ),
         "photos.gps.geocoding_busy": (
             "A reverse geocoding operation is already running."
         ),
         "photos.open_image.not_found": "Image file not found: {path}",
         "photos.open_image.error": "Unable to open image: {path}",
+        "photos.open_image.prepare_error": "Could not retrieve the photo before opening it.",
         "photos.datetime.title": "Set capture date and time",
         "photos.datetime.photo": "Photo:",
         "photos.datetime.value": "Date and time:",
@@ -195,6 +287,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.date_source.manual": "Manual",
         "photos.date_source.unknown": "Unknown",
 
+        "photos.date_source.source": "Photo source",
+        "photos.gps_source.source": "Photo source",
+        "photos.gps_source.exif": "EXIF",
+        "photos.gps_source.manual": "Manual",
+        "photos.gps_source.unknown": "Unknown",
+        "photos.location_source.source": "Photo source",
         "photos.location_source.geocoding": "Geocoding",
         "photos.location_source.manual": "Manual",
         "photos.location_source.unknown": "Unknown",
@@ -246,7 +344,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Choose an output PDF file first."
         ),
         "render.generate_error": (
-            "Could not generate the PDF: {error}"
+            "Could not generate the PDF."
         ),
         "render.generate_success_title": (
             "PDF generated"
@@ -394,9 +492,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.quit": "Quit",
 
         "main.choose_source": "Choose Source Folder...",
-        "main.source_folder": "Source folder:",
         "main.include_subdirectories": "Include subdirectories",
-        "main.analyze_photos": "Analyze Photos",
         "main.photos": "Photos:",
 
         "main.no_analysis": "No analysis performed.",
@@ -452,15 +548,12 @@ CATALOGS: dict[str, dict[str, str]] = {
             "A photo analysis is still running."
         ),
         "main.no_project_error": "No project is open.",
-        "main.choose_source_error": (
-            "Choose a source photo folder first."
-        ),
-        "main.source_missing_error": (
-            "Source folder does not exist: {path}"
-        ),
-        "main.analysis_log_header": (
-            "Analysis of source folder: {path}"
-        ),
+        "main.create_project_error": "Could not create the project.",
+        "main.open_project_error": "Could not open the project.",
+        "main.add_local_source_error": "Could not add the local photo source.",
+        "main.configure_remote_source_error": "Could not configure the remote photo source.",
+        "main.save_photo_date_error": "Could not save the photo date.",
+        "main.save_photo_location_error": "Could not save the photo location.",
         "main.missing_photos_title": (
             "Missing files"
         ),
@@ -487,10 +580,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "but is no longer present in the source folder."
         ),
         "main.save_album_error": (
-            "Could not save album settings: {error}"
+            "Could not save album settings."
         ),
         "main.build_plan_error": (
-            "Could not build album plan: {error}"
+            "Could not build album plan."
         ),
 
         "main.discovered": "Discovered: {count}",
@@ -535,7 +628,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.month_separators": "Month separators",
         "album.year_separators": "Year separators",
 
-        "album.photo_pages": "Photo pages",
+        "album.photo_pages": "Default photo page template",
         "album.page_numbering": "Page numbering",
         "album.show_page_numbers": "Show page numbers",
         "album.printing": "Printing",
@@ -572,6 +665,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.album_body": "Album body",
         "plan.section": "Section",
         "plan.details": "Details",
+        "plan.model": "Template",
+        "plan.observations": "Observations",
         "plan.page_label": "Page {number} — {type}",
 
         "plan.no_plan": "No album plan available.",
@@ -613,6 +708,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.month_divider": "Month divider",
         "plan.year_divider": "Year divider",
         "plan.special_page": "Special page",
+        "plan.custom_template": "Custom template",
         "plan.technical_blank": "Technical blank",
         "plan.editorial_blank": "Editorial blank",
         "plan.caption_too_long": "Caption too long",
@@ -635,11 +731,100 @@ CATALOGS: dict[str, dict[str, str]] = {
     },
 
     "fr": {
+        "sources.add": "Ajouter une source",
+        "sources.add_button": "Ajouter…",
+        "sources.list": "Source(s) de l’album",
+        "sources.refresh": "Actualisation des photos",
+        "sources.analyze": "Analyser les sources",
+        "sources.synchronize": "Synchroniser les sources",
+        "sources.reconnect_required": "Reconnectez cette source avant de la synchroniser (Modifier…).",
+        "source.export.reconnect_required": (
+            "Reconnectez la source contenant « {filename} » avant de générer le PDF."
+        ),
+        "source.asset.reconnect_required": (
+            "Reconnectez la source contenant « {filename} » pour récupérer cette photo."
+        ),
+        "sources.active": "Active",
+        "sources.local_folder": "Dossier local",
+        "sources.modify": "Modifier…",
+        "sources.delete": "Supprimer",
+        "sources.delete_confirm": "Supprimer la source « {name} » et ses photos du projet ? Les autres sources sont conservées.",
+        "photos.column.source": "Source",
+        "photos.usage.title": "Utilisation de la photo",
+        "photos.usage.body": "Dans le corps de l’album",
+        "photos.usage.template_only": "Hors corps, disponible aux modèles",
+        "photos.usage.off": "Désactivée",
+        "photos.status.template_only": "Hors corps album",
+        "photos.status.off": "Désactivée",
+        "plan.modify": "Modifier…",
+        "plan.insert_special": "Ajouter une page spéciale après…",
+        "plan.start_photo": "Commencer cette page avec",
+        "plan.use_default": "Revenir au modèle photo par défaut",
+        "plan.disable": "Désactiver",
+        "plan.enable": "Activer",
+        "plan.disabled": "Désactivée",
+        "plan.dormant": "Ancrage inactif ou format de page incompatible",
+        "plan.override_incompatible": "Le modèle photo {template} est incompatible avec ce format ; le modèle par défaut est utilisé. L’action Modifier permet de le corriger.",
         "tab.photos": "Photos",
+        "source.synology.choose": "Synology Photos…",
+        "source.synology.title": "Source Synology Photos",
+        "source.synology.url": "Adresse du NAS :",
+        "source.synology.verify_tls": "Vérifier le certificat TLS",
+        "source.synology.username": "Nom d’utilisateur",
+        "source.synology.password": "Mot de passe",
+        "source.synology.otp": "Code 2FA (facultatif)",
+        "source.synology.credentials_memory": (
+            "Les identifiants sont utilisés uniquement pour cette connexion "
+            "et ne sont jamais enregistrés."
+        ),
+        "source.synology.connect": "Se connecter avec Synology",
+        "source.synology.reconnect": "Se reconnecter avec Synology",
+        "source.synology.connection_error": "Échec de la connexion.",
+        "source.synology.connected": "Connecté — {count} albums disponibles.",
+        "source.synology.reconnected": "Connexion établie avec la source du projet.",
+        "source.synology.session_attached": (
+            "Synology Photos reconnecté sans modifier l’instantané du projet."
+        ),
+        "source.sync.running": "Synchronisation de la source des photos…",
+        "source.sync.running_button": "Synchronisation…",
+        "source.sync.failed": "Échec de la synchronisation de la source des photos.",
+        "source.sync.reconnect_required": "Reconnectez la source des photos avant de la synchroniser.",
+        "source.sync.completed": "Instantané mis à jour : {count} photos.",
+        "source.sync.log": (
+            "Source {source} : {count} photos ; {added} ajoutées, {updated} "
+            "actualisées, {missing} absentes de la collection."
+        ),
+        "source.metadata.completed": "Métadonnées mises à jour pour {count} photos.",
+        "source.metadata.failed": "Impossible de mettre à jour les métadonnées des photos.",
+        "source.scan.failed": "Impossible d’analyser les sources de photos.",
+        "sources.refresh.source_failed": "Source {source} : échec de l’opération.",
+        "sources.refresh.file_failed": "Source {source} : impossible d’analyser {filename}.",
         "tab.places_captions": "Lieux et légendes",
-        "main.analyze_photos": "Analyser les photos",
-        "main.analyze_again": "Analyser à nouveau les photos",
         "main.progress_photos": "{current} photos analysées sur {total}",
+        "photos.source.local": "Dossier local…",
+        "photos.policy.date": "Date",
+        "photos.policy.gps": "GPS",
+        "photos.policy.location": "Lieu",
+        "photos.policy.exif": "EXIF",
+        "photos.policy.provider": "Source des photos",
+        "photos.policy.filename": "Nom du fichier",
+        "photos.policy.nominatim": "Nominatim",
+        "photos.policy.none": "Aucune",
+        "photos.policy.manual": "Manuel",
+        "photos.policy.nominatim_enabled": "Compléter les lieux à partir du GPS avec Nominatim",
+        "photos.policy.nominatim_tooltip": (
+            "Nominatim est le service de géocodage inverse d’OpenStreetMap. "
+            "Les coordonnées GPS sont envoyées sur Internet pour rechercher "
+            "une ville, un lieu, une rue ou un point d’intérêt. Aucune requête "
+            "n’est envoyée lorsque cette option est désactivée."
+        ),
+        "photos.progress.source": "Source",
+        "photos.progress.source_provider": "Source — {provider}",
+        "photos.progress.source_waiting": "Lecture de {provider}…",
+        "photos.progress.metadata": "Métadonnées",
+        "photos.progress.nominatim": "Nominatim",
+        "photos.progress.value": "{current} / {total}",
+        "photos.progress.waiting": "En attente…",
         "main.analysis_progress": (
             "{current} / {total} photos — "
             "{remaining} restantes"
@@ -677,7 +862,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Aucune information géographique trouvée."
         ),
         "processing.event.geocoding_error": (
-            "Échec du géocodage : {error}"
+            "Échec du géocodage."
         ),
         "processing.event.analysis_completed": (
             "Traitement de la photo terminé."
@@ -720,6 +905,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.group.date": "Date",
         "photos.places.group.apply": "Appliquer à {count} photos",
         "photos.places.caption": "Légende",
+        "photos.places.provider_caption": "Légende {provider} : {caption}",
         "photos.places.counter": "{count} photos",
         "photos.places.counter_filtered": (
             "{visible} / {total} photos"
@@ -743,6 +929,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.places.column.photo": "Photo",
         "photos.places.location_auto": "Lieu automatique",
         "photos.places.location_custom": "Lieu personnalisé",
+        "photos.places.location_source.custom": "Personnalisé",
+        "photos.places.location_source.none": "Aucun",
 
         "photos.column.filename": "Nom du fichier",
         "photos.column.actions": "Actions",
@@ -801,13 +989,14 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Aucune localisation trouvée pour ces coordonnées."
         ),
         "photos.gps.geocoding_failed": (
-            "Échec du géocodage inverse : {error}"
+            "Échec du géocodage inverse."
         ),
         "photos.gps.geocoding_busy": (
             "Un géocodage inverse est déjà en cours."
         ),
         "photos.open_image.not_found": "Fichier image introuvable : {path}",
         "photos.open_image.error": "Impossible d’ouvrir l’image : {path}",
+        "photos.open_image.prepare_error": "Impossible de récupérer la photo avant de l’ouvrir.",
         "photos.datetime.title": "Définir la date et l’heure de prise de vue",
         "photos.datetime.photo": "Photo :",
         "photos.datetime.value": "Date et heure :",
@@ -832,6 +1021,12 @@ CATALOGS: dict[str, dict[str, str]] = {
         "photos.date_source.manual": "Manuelle",
         "photos.date_source.unknown": "Inconnue",
 
+        "photos.date_source.source": "Source des photos",
+        "photos.gps_source.source": "Source des photos",
+        "photos.gps_source.exif": "EXIF",
+        "photos.gps_source.manual": "Manuel",
+        "photos.gps_source.unknown": "Inconnu",
+        "photos.location_source.source": "Source des photos",
         "photos.location_source.geocoding": "Géocodage",
         "photos.location_source.manual": "Manuelle",
         "photos.location_source.unknown": "Inconnue",
@@ -883,7 +1078,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Choisissez d’abord le fichier PDF de destination."
         ),
         "render.generate_error": (
-            "Impossible de générer le PDF : {error}"
+            "Impossible de générer le PDF."
         ),
         "render.generate_success_title": (
             "PDF généré"
@@ -1035,9 +1230,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.quit": "Quitter",
 
         "main.choose_source": "Choisir le dossier source...",
-        "main.source_folder": "Dossier source :",
         "main.include_subdirectories": "Inclure les sous-dossiers",
-        "main.analyze_photos": "Analyser les photos",
         "main.photos": "Photos :",
 
         "main.no_analysis": "Aucune analyse effectuée.",
@@ -1093,15 +1286,12 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Une analyse des photos est encore en cours."
         ),
         "main.no_project_error": "Aucun projet n’est ouvert.",
-        "main.choose_source_error": (
-            "Choisissez d’abord un dossier source."
-        ),
-        "main.source_missing_error": (
-            "Le dossier source n’existe pas : {path}"
-        ),
-        "main.analysis_log_header": (
-            "Analyse du dossier source : {path}"
-        ),
+        "main.create_project_error": "Impossible de créer le projet.",
+        "main.open_project_error": "Impossible d’ouvrir le projet.",
+        "main.add_local_source_error": "Impossible d’ajouter la source de photos locale.",
+        "main.configure_remote_source_error": "Impossible de configurer la source de photos distante.",
+        "main.save_photo_date_error": "Impossible d’enregistrer la date de la photo.",
+        "main.save_photo_location_error": "Impossible d’enregistrer la localisation de la photo.",
         "main.missing_photos_title": (
             "Fichiers manquants"
         ),
@@ -1130,10 +1320,10 @@ CATALOGS: dict[str, dict[str, str]] = {
             "mais n’est plus présent dans le dossier source."
         ),
         "main.save_album_error": (
-            "Impossible d’enregistrer les réglages de l’album : {error}"
+            "Impossible d’enregistrer les réglages de l’album."
         ),
         "main.build_plan_error": (
-            "Impossible de construire le plan de l’album : {error}"
+            "Impossible de construire le plan de l’album."
         ),
 
         "main.discovered": "Détectées : {count}",
@@ -1178,7 +1368,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.month_separators": "Séparateurs de mois",
         "album.year_separators": "Séparateurs d’année",
 
-        "album.photo_pages": "Pages photo",
+        "album.photo_pages": "Modèle par défaut des pages photo",
         "album.page_numbering": "Numérotation",
         "album.show_page_numbers": "Afficher les numéros de page",
         "album.printing": "Impression",
@@ -1216,6 +1406,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.album_body": "Corps de l’album",
         "plan.section": "Section",
         "plan.details": "Détails",
+        "plan.model": "Modèle",
+        "plan.observations": "Observations",
         "plan.page_label": "Page {number} — {type}",
 
         "plan.no_plan": "Aucun plan d’album disponible.",
@@ -1259,6 +1451,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "plan.month_divider": "Séparateur de mois",
         "plan.year_divider": "Séparateur d’année",
         "plan.special_page": "Page spéciale",
+        "plan.custom_template": "Modèle personnalisé",
         "plan.technical_blank": "Page blanche technique",
         "plan.editorial_blank": "Page blanche éditoriale",
         "plan.caption_too_long": "Légende trop longue",

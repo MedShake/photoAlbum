@@ -4,16 +4,18 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import groupby
 
-from photoalbum.models import Photo
+from photoalbum.models import Photo, PhotoUsage
 
 from .settings import (
     AlbumStructureSettings,
+    AutomaticPhotoPageSettings,
     PageInstance,
 )
 
 
 class PlanItemKind(str, Enum):
     SPECIAL_PAGE = "special_page"
+    BODY_SPECIAL_PAGE = "body_special_page"
     YEAR_DIVIDER = "year_divider"
     MONTH_DIVIDER = "month_divider"
     DAY_DIVIDER = "day_divider"
@@ -23,7 +25,7 @@ class PlanItemKind(str, Enum):
 @dataclass(frozen=True)
 class PlanItem:
     kind: PlanItemKind
-    template_id: str
+    template_id: str | None
 
     year: int | None = None
     month: int | None = None
@@ -33,6 +35,7 @@ class PlanItem:
     # Configurable page occurrence.
     # Used notably by special pages.
     page_instance: PageInstance | None = None
+    automatic_photo_page_mode: AutomaticPhotoPageSettings | None = None
 
 
 @dataclass
@@ -49,11 +52,11 @@ class AlbumPlanner:
         dated_photos = [
             photo
             for photo in photos
-            if photo.capture_datetime is not None
+            if photo.capture_datetime is not None and photo.usage == PhotoUsage.BODY
         ]
 
         dated_photos.sort(
-            key=lambda photo: photo.capture_datetime
+            key=lambda photo: (photo.capture_datetime, photo.identity)
         )
 
         plan = AlbumPlan()
@@ -177,12 +180,16 @@ class AlbumPlanner:
                 plan.items.append(
                     PlanItem(
                         kind=PlanItemKind.PHOTO_GROUP,
-                        template_id=settings.photo_pages.template_id,
+                        template_id=(
+                            settings.photo_pages.page.template_id
+                            if settings.photo_pages.page is not None else None
+                        ),
                         year=date.year,
                         month=date.month,
                         day=date.day,
                         photos=tuple(group),
                         page_instance=settings.photo_pages.page,
+                        automatic_photo_page_mode=settings.photo_pages.automatic_mode,
                     )
                 )
             return
@@ -190,11 +197,15 @@ class AlbumPlanner:
         plan.items.append(
             PlanItem(
                 kind=PlanItemKind.PHOTO_GROUP,
-                template_id=settings.photo_pages.template_id,
+                template_id=(
+                    settings.photo_pages.page.template_id
+                    if settings.photo_pages.page is not None else None
+                ),
                 year=year,
                 month=month,
                 photos=tuple(photos),
                 page_instance=settings.photo_pages.page,
+                automatic_photo_page_mode=settings.photo_pages.automatic_mode,
             )
         )
 
@@ -211,4 +222,3 @@ class AlbumPlanner:
                     page_instance=page,
                 )
             )
-

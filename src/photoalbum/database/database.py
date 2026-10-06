@@ -8,11 +8,10 @@ class ProjectDatabase:
     """
     SQLite database attached to a single photo album project.
 
-    During early development, the schema may still change directly.
-    Migration support will be introduced before the first stable release.
+    Schema upgrades are performed in place so projects remain reproducible.
     """
 
-    CURRENT_SCHEMA_VERSION = 1
+    CURRENT_SCHEMA_VERSION = 5
 
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -23,18 +22,50 @@ class ProjectDatabase:
         self.connection.close()
 
     def initialize(self) -> None:
+        if not self.connection.in_transaction:
+            self.connection.execute("BEGIN")
+        try:
+            self._initialize_schema()
+        except Exception:
+            self.connection.rollback()
+            raise
+        else:
+            self.connection.commit()
+
+    def _initialize_schema(self) -> None:
         self._create_schema_version_table()
         self._create_project_metadata_table()
-        self._create_photos_table()
         self._create_geocoding_cache_table()
-        self._set_schema_version(self.CURRENT_SCHEMA_VERSION)
+        version = self._schema_version()
 
-        self.connection.commit()
+        if version > self.CURRENT_SCHEMA_VERSION:
+            raise RuntimeError(
+                f"Project schema {version} is newer than supported "
+                f"schema {self.CURRENT_SCHEMA_VERSION}."
+            )
+
+        if version == self.CURRENT_SCHEMA_VERSION:
+            return
+        self.connection.execute(
+            """CREATE TABLE IF NOT EXISTS sources (
+                source_id TEXT PRIMARY KEY,
+                position INTEGER NOT NULL,
+                configuration TEXT NOT NULL
+            )"""
+        )
+        if self._table_exists("photos"):
+            self._normalize_legacy_project()
+        else:
+            self._create_photos_table()
+        self.connection.execute("CREATE INDEX IF NOT EXISTS photos_path ON photos(path)")
+        self._set_schema_version(self.CURRENT_SCHEMA_VERSION)
 
     def set_project_metadata(
         self,
         key: str,
         value: str,
+        *,
+        commit: bool = True,
     ) -> None:
         self.connection.execute(
             """
@@ -49,7 +80,8 @@ class ProjectDatabase:
             (key, value),
         )
 
-        self.connection.commit()
+        if commit:
+            self.connection.commit()
 
     def get_project_metadata(
         self,
@@ -78,6 +110,10 @@ class ProjectDatabase:
             """
         )
 
+    def _normalize_legacy_project(self) -> None:
+        from .legacy_project import normalize_project
+        normalize_project(self)
+
     def _create_project_metadata_table(self) -> None:
         self.connection.execute(
             """
@@ -93,7 +129,10 @@ class ProjectDatabase:
             """
             CREATE TABLE IF NOT EXISTS photos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                path TEXT NOT NULL UNIQUE,
+                asset_key TEXT NOT NULL UNIQUE,
+                source_id TEXT NOT NULL DEFAULT 'local',
+                asset_id TEXT NOT NULL,
+                path TEXT,
                 filename TEXT NOT NULL,
                 file_size INTEGER,
                 modified_time_ns INTEGER,
@@ -113,6 +152,17 @@ class ProjectDatabase:
                 original_latitude REAL,
                 original_longitude REAL,
 
+                exif_capture_datetime TEXT,
+                source_capture_datetime TEXT,
+                exif_latitude REAL,
+                exif_longitude REAL,
+                source_latitude REAL,
+                source_longitude REAL,
+                gps_source TEXT NOT NULL DEFAULT 'unknown',
+
+                source_location_data TEXT,
+                geocoded_location_data TEXT,
+
                 place_name TEXT,
                 city TEXT,
                 address TEXT,
@@ -123,11 +173,34 @@ class ProjectDatabase:
                 location_text TEXT,
                 location_selection_edited INTEGER NOT NULL DEFAULT 0,
                 caption TEXT,
+                imported_location_text TEXT,
+                imported_caption TEXT,
+                source_metadata TEXT,
+                metadata_candidates TEXT NOT NULL DEFAULT '{}',
+                manual_capture_datetime TEXT,
+                manual_latitude REAL,
+                manual_longitude REAL,
+                manual_location_data TEXT,
 
-                is_missing INTEGER NOT NULL DEFAULT 0
+                is_missing INTEGER NOT NULL DEFAULT 0,
+                usage TEXT NOT NULL DEFAULT 'body'
+                    CHECK (usage IN ('body', 'template_only', 'off'))
             )
             """
         )
+
+    def _schema_version(self) -> int:
+        row = self.connection.execute(
+            "SELECT version FROM schema_version LIMIT 1"
+        ).fetchone()
+        return int(row["version"]) if row is not None else 0
+
+    def _table_exists(self, name: str) -> bool:
+        row = self.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (name,),
+        ).fetchone()
+        return row is not None
 
     def _set_schema_version(
         self,

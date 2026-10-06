@@ -80,12 +80,10 @@ def test_pack_without_documentation_is_supported(tmp_path):
     assert loaded.documentation_path("fr") is None
 
 
-def test_legacy_string_documentation_is_supported(tmp_path):
+
+def test_documentation_must_use_language_mapping(tmp_path):
     pack = tmp_path / "example"
     pack.mkdir()
-
-    readme = pack / "README.md"
-    readme.write_text("# Example", encoding="utf-8")
 
     manifest = pack / "manifest.json"
     manifest.write_text(
@@ -93,10 +91,8 @@ def test_legacy_string_documentation_is_supported(tmp_path):
         encoding="utf-8",
     )
 
-    loaded = load_template_pack(manifest)
-
-    assert loaded.documentation_path("en") == readme.resolve()
-    assert loaded.documentation_path("fr") == readme.resolve()
+    with pytest.raises(ValueError, match="language/path mapping"):
+        load_template_pack(manifest)
 
 
 def test_localized_documentation_is_resolved(tmp_path):

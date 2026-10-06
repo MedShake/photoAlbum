@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from photoalbum.album import TemplateDefinition
+from photoalbum.album import AutomaticPhotoPageModeDefinition, TemplateDefinition
 from photoalbum.i18n import Translator
 from photoalbum.template_engine.translations import translator_for_template
 
@@ -56,3 +56,12 @@ def template_display_name(
         return f"{template.pack_name} — {name}"
 
     return name
+
+
+def automatic_photo_page_mode_display_name(
+    mode: AutomaticPhotoPageModeDefinition,
+    translator: Translator,
+) -> str:
+    provider_name = mode.localized_names.get(translator.language)
+    name = provider_name or mode.localized_names.get("en") or mode.name
+    return f"{mode.pack_name} — {name}" if mode.pack_name else name

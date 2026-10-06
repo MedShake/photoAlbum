@@ -44,17 +44,22 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from photoalbum.geocoding.location_caption_builder import (
     LocationCaptionBuilder,
 )
+from photoalbum.geocoding.location_candidate_selector import (
+    LocationCandidateSelector,
+)
+from photoalbum.geocoding import order_location_components
 from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
 from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.i18n import Translator
 from photoalbum.i18n.date_formatter import (
     format_datetime,
 )
-from photoalbum.models import LocationComponent, Photo
+from photoalbum.models import LocationComponent, LocationSource, Photo
 
 
 
@@ -246,7 +251,6 @@ class PhotoPlacesWidget(QWidget):
     """
 
     GROUP_LOCATION_PRIORITIES = {
-        # Named places.
         "aerialway": 1,
         "tourism": 1,
         "amenity": 1,
@@ -256,47 +260,41 @@ class PhotoPlacesWidget(QWidget):
         "building": 1,
         "office": 1,
         "attraction": 1,
-
-        # Roads.
-        "road": 2,
-        "pedestrian": 2,
-        "square": 2,
-        "residential": 2,
-        "footway": 2,
-        "path": 2,
-
-        # Local context.
-        "neighbourhood": 3,
-        "quarter": 3,
-        "suburb": 3,
-        "borough": 3,
-        "city_district": 3,
-
-        # Small localities.
-        "hamlet": 4,
-        "isolated_dwelling": 4,
-
-        # Localities.
-        "city": 5,
-        "town": 5,
-        "village": 5,
-        "municipality": 5,
-
-        # Administrative context.
-        "county": 6,
-        "state_district": 6,
-        "state": 6,
-        "region": 6,
-
-        # Country.
-        "country": 8,
+        "name": 1,
+        "landmark": 1,
+        "house_number": 2,
+        "road": 3,
+        "route": 3,
+        "pedestrian": 3,
+        "square": 3,
+        "residential": 3,
+        "footway": 3,
+        "path": 3,
+        "neighbourhood": 4,
+        "quarter": 4,
+        "suburb": 5,
+        "borough": 5,
+        "city_district": 6,
+        "district": 6,
+        "hamlet": 7,
+        "isolated_dwelling": 7,
+        "city": 7,
+        "town": 7,
+        "village": 7,
+        "municipality": 7,
+        "county": 8,
+        "state_district": 8,
+        "state": 9,
+        "region": 9,
+        "postcode": 10,
+        "country": 11,
     }
 
     HIDDEN_COMPONENT_KEYS = {
         "country_code",
-        "house_number",
-        "postcode",
     }
+
+    LOCATION_UI_STATE_KEY = "photo_places"
 
     PHOTO_ROLE = Qt.ItemDataRole.UserRole
     GROUP_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -307,17 +305,18 @@ class PhotoPlacesWidget(QWidget):
     def __init__(
         self,
         translator: Translator | None = None,
-        save_location: Callable[
+        save_caption: Callable[
+            [Photo, str | None],
+            None,
+        ]
+        | None = None,
+        save_location_override: Callable[
             [
                 Photo,
                 tuple[LocationComponent, ...],
                 str | None,
+                dict[str, object],
             ],
-            None,
-        ]
-        | None = None,
-        save_caption: Callable[
-            [Photo, str | None],
             None,
         ]
         | None = None,
@@ -345,15 +344,18 @@ class PhotoPlacesWidget(QWidget):
         super().__init__(parent)
 
         self._translator = translator or Translator("en")
-        self._save_location = save_location
         self._save_caption = save_caption
         self._save_locations = save_locations
+        self._save_location_override = save_location_override
         self._edit_source_photo = edit_source_photo
         self._hover_preview = hover_preview or HoverPhotoPreview(
             PreviewImageCache(self), self
         )
 
         self._caption_builder = LocationCaptionBuilder()
+        self._candidate_selector = LocationCandidateSelector()
+        self._provider_label = self._translator.tr("photos.policy.provider")
+        self._source_labels: dict[str, str] = {}
         self._photos: list[Photo] = []
 
         self._photo_items: dict[str, QTreeWidgetItem] = {}
@@ -388,6 +390,7 @@ class PhotoPlacesWidget(QWidget):
             str,
             tuple[QWidget, QWidget, QLineEdit],
         ] = {}
+        self._location_flows: dict[str, FlowLayout] = {}
 
         self._filter_text = ""
 
@@ -408,6 +411,10 @@ class PhotoPlacesWidget(QWidget):
         ] = []
         self._thumbnail_loading = False
         self._thumbnail_generation = 0
+        # Geometry notifications are delivered asynchronously by Qt. A view
+        # generation prevents notifications from cells belonging to a previous
+        # tree build from touching QTreeWidgetItems already destroyed by clear().
+        self._tree_generation = 0
 
         self._preview_position = QPoint()
 
@@ -437,6 +444,21 @@ class PhotoPlacesWidget(QWidget):
         self._thumbnail_loading = False
         self._rebuild_tree()
 
+    def set_provider_context(self, provider_label: str) -> None:
+        self._provider_label = provider_label or self._translator.tr(
+            "photos.policy.provider"
+        )
+        if self._photos:
+            self._rebuild_tree()
+
+    def set_source_labels(self, labels: dict[str, str]) -> None:
+        self._source_labels = dict(labels)
+        if self._photos:
+            self._rebuild_tree()
+
+    def _provider_for(self, photo: Photo) -> str:
+        return self._source_labels.get(photo.source_id, self._provider_label)
+
     def clear(self) -> None:
         self._cancel_photo_preview()
         self._photos = []
@@ -448,9 +470,11 @@ class PhotoPlacesWidget(QWidget):
         self._truth_labels.clear()
         self._location_mode_boxes.clear()
         self._location_mode_widgets.clear()
+        self._location_flows.clear()
         self._month_photos.clear()
         self._materialized_months.clear()
         self._thumbnail_generation += 1
+        self._tree_generation += 1
         self._thumbnail_queue.clear()
         self._thumbnail_loading = False
         self._tree.clear()
@@ -849,6 +873,7 @@ class PhotoPlacesWidget(QWidget):
             photo.filename,
             self._effective_location(photo),
             photo.caption or "",
+            photo.imported_caption or "",
         )
 
         return any(
@@ -883,7 +908,7 @@ class PhotoPlacesWidget(QWidget):
                 self.PHOTO_ROLE,
             )
             if isinstance(photo, Photo):
-                selected_path = str(photo.path)
+                selected_path = photo.identity
 
         scroll = (
             self._tree.verticalScrollBar().value()
@@ -896,6 +921,10 @@ class PhotoPlacesWidget(QWidget):
     # --------------------------------------------------------
 
     def _rebuild_tree(self) -> None:
+        self._tree_generation += 1
+        self._thumbnail_generation += 1
+        self._thumbnail_queue.clear()
+        self._thumbnail_loading = False
         (
             expanded,
             selected_path,
@@ -907,18 +936,23 @@ class PhotoPlacesWidget(QWidget):
         self._tree.setUpdatesEnabled(False)
 
         try:
-            self._tree.clear()
-            self._clear_undated_panel()
-
+            # Header/resize/layout events can be emitted synchronously while
+            # QTreeWidget destroys its item widgets. Drop every lookup first,
+            # so those events cannot resolve an item from the old generation.
             self._photo_items.clear()
             self._caption_editors.clear()
             self._thumbnail_labels.clear()
             self._editor_rows.clear()
             self._truth_labels.clear()
             self._location_mode_boxes.clear()
+            self._location_mode_widgets.clear()
+            self._location_flows.clear()
 
             self._month_photos.clear()
             self._materialized_months.clear()
+
+            self._tree.clear()
+            self._clear_undated_panel()
 
             undated = [
                 photo
@@ -1605,7 +1639,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         self._photo_items[
-            str(photo.path)
+            photo.identity
         ] = item
 
     # --------------------------------------------------------
@@ -1662,8 +1696,8 @@ class PhotoPlacesWidget(QWidget):
             Qt.AlignmentFlag.AlignCenter,
         )
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        self._connect_item_geometry(container, photo.identity)
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -1676,7 +1710,7 @@ class PhotoPlacesWidget(QWidget):
         label: QLabel,
         photo: Photo,
     ) -> None:
-        cached = self._thumbnail_cache.get(str(photo.path))
+        cached = self._thumbnail_cache.get(photo.identity)
         if cached is not None:
             label.setPixmap(cached)
             return
@@ -1713,7 +1747,7 @@ class PhotoPlacesWidget(QWidget):
 
         # The row may have disappeared after a filter/project change.
         if label in self._thumbnail_labels:
-            pixmap = self._thumbnail_cache.get(str(photo.path))
+            pixmap = self._thumbnail_cache.get(photo.identity)
             if pixmap is None:
                 pixmap = self._thumbnail_pixmap(photo.path)
 
@@ -1721,7 +1755,7 @@ class PhotoPlacesWidget(QWidget):
                 # Keep the already-decoded pixmap available for other
                 # lightweight views such as the batch-edit dialog.
                 self._thumbnail_cache[
-                    str(photo.path)
+                    photo.identity
                 ] = pixmap
 
                 label.setText("")
@@ -1781,7 +1815,7 @@ class PhotoPlacesWidget(QWidget):
 
         if isinstance(watched, _PhotoCell) and event.type() == QEvent.Type.Resize:
             if event.size().width() != event.oldSize().width():
-                row = self._editor_rows.get(watched.property("photo_path"))
+                row = self._editor_rows.get(watched.property("photo_identity"))
                 if row is not None:
                     self._update_item_height(row[0])
 
@@ -1854,8 +1888,8 @@ class PhotoPlacesWidget(QWidget):
         )
         layout.addWidget(label)
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        self._connect_item_geometry(container, photo.identity)
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -1905,14 +1939,14 @@ class PhotoPlacesWidget(QWidget):
         layout.addWidget(caption)
 
         self._truth_labels[
-            str(photo.path)
+            photo.identity
         ] = (
             location,
             caption,
         )
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        self._connect_item_geometry(container, photo.identity)
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -1943,27 +1977,325 @@ class PhotoPlacesWidget(QWidget):
             photo.raw_location_data
         )
 
+    def _location_candidate_groups(self, photo: Photo):
+        locations = dict(photo.metadata_candidates.location)
+        if photo.source_location_data is not None:
+            locations.setdefault("provider", photo.source_location_data)
+        if photo.geocoded_location_data is not None:
+            locations.setdefault("geocoding", photo.geocoded_location_data)
+
+        result = []
+        for origin in ("provider", "geocoding"):
+            candidate = locations.get(origin)
+            if not isinstance(candidate, dict):
+                continue
+            raw = candidate.get("raw")
+            components = candidate.get("components")
+            if isinstance(raw, dict) and isinstance(raw.get("address"), dict):
+                normalized = raw
+            elif isinstance(components, list):
+                normalized = {
+                    "address": {
+                        str(item["key"]): str(item["value"])
+                        for item in components
+                        if isinstance(item, dict)
+                        and item.get("key")
+                        and item.get("value")
+                    }
+                }
+            elif isinstance(raw, dict):
+                normalized = {"address": raw}
+            else:
+                normalized = None
+            if not normalized and candidate.get("address"):
+                normalized = {
+                    "address": {
+                        "address": str(candidate["address"]),
+                    }
+                }
+            caption_result = self._caption_builder.build(normalized)
+            candidates = order_location_components(
+                item
+                for item in caption_result.candidates
+                if self._component_is_visible(item.key) and item.value.strip()
+            )
+            if candidates:
+                label = (
+                    self._provider_for(photo)
+                    if origin == "provider"
+                    else self._translator.tr("photos.policy.nominatim")
+                )
+                result.append((origin, label, candidates))
+
+        if not result:
+            candidates = order_location_components(
+                candidate
+                for candidate in self._caption_result(photo).candidates
+                if self._component_is_visible(candidate.key)
+                and candidate.value.strip()
+            )
+            if candidates:
+                origin = (
+                    "geocoding"
+                    if photo.location_source == LocationSource.GEOCODING
+                    else "provider"
+                )
+                label = (
+                    self._translator.tr("photos.policy.nominatim")
+                    if origin == "geocoding"
+                    else self._provider_for(photo)
+                )
+                result.append((origin, label, candidates))
+        return tuple(result)
+
+    def _candidate_groups_by_origin(self, photo: Photo) -> dict[str, tuple]:
+        return {
+            origin: candidates
+            for origin, _label, candidates in self._location_candidate_groups(photo)
+        }
+
+    def _location_ui_state(self, photo: Photo) -> dict[str, object]:
+        manual = photo.manual_location_data
+        if not isinstance(manual, dict):
+            return {}
+        state = manual.get(self.LOCATION_UI_STATE_KEY)
+        return dict(state) if isinstance(state, dict) else {}
+
+    @staticmethod
+    def _deserialize_components(value: object) -> tuple[LocationComponent, ...]:
+        if not isinstance(value, list):
+            return ()
+        return order_location_components(
+            LocationComponent(key=str(item["key"]), value=str(item["value"]))
+            for item in value
+            if isinstance(item, dict)
+            and item.get("key")
+            and item.get("value")
+        )
+
+    @staticmethod
+    def _serialize_components(
+        components: Sequence[LocationComponent],
+    ) -> list[dict[str, str]]:
+        return [
+            {"key": component.key, "value": component.value}
+            for component in components
+        ]
+
+    def _stored_components(
+        self,
+        photo: Photo,
+        origin: str,
+    ) -> tuple[LocationComponent, ...] | None:
+        state = self._location_ui_state(photo)
+        selections = state.get("selections")
+        if isinstance(selections, dict) and origin in selections:
+            return self._deserialize_components(selections[origin])
+        return None
+
+    def _default_components(
+        self,
+        candidates: Sequence,
+        photo: Photo | None = None,
+    ) -> tuple[LocationComponent, ...]:
+        if candidates and not all(
+            hasattr(candidate, "priority") for candidate in candidates
+        ):
+            selected = (
+                self._caption_result(photo).selected
+                if photo is not None
+                else candidates
+            )
+            return order_location_components(
+                LocationComponent(
+                    key=candidate.key,
+                    value=candidate.value,
+                )
+                for candidate in selected
+                if self._component_is_visible(candidate.key)
+            )
+        return order_location_components(
+            LocationComponent(key=candidate.key, value=candidate.value)
+            for candidate in self._candidate_selector.select(candidates)
+            if self._component_is_visible(candidate.key)
+        )
+
+    def _components_for_origin(
+        self,
+        photo: Photo,
+        origin: str,
+        groups: dict[str, tuple] | None = None,
+    ) -> tuple[LocationComponent, ...]:
+        stored = self._stored_components(photo, origin)
+        if stored is not None:
+            return stored
+
+        source_for_origin = {
+            "provider": LocationSource.SOURCE,
+            "geocoding": LocationSource.GEOCODING,
+            "manual": LocationSource.MANUAL,
+        }.get(origin)
+        if (
+            photo.location_selection_edited
+            and photo.location_source == source_for_origin
+        ):
+            return order_location_components(photo.selected_location_components)
+
+        if origin == "manual":
+            state = self._location_ui_state(photo)
+            manual_data = state.get("manual_data")
+            if isinstance(manual_data, dict):
+                components = self._deserialize_components(
+                    manual_data.get("components")
+                )
+                if components:
+                    return components
+            return order_location_components(photo.selected_location_components)
+
+        candidates = (groups or self._candidate_groups_by_origin(photo)).get(
+            origin, ()
+        )
+        return self._default_components(candidates, photo)
+
+    def _active_location_origin(
+        self,
+        photo: Photo,
+        groups: dict[str, tuple] | None = None,
+    ) -> str:
+        groups = groups or self._candidate_groups_by_origin(photo)
+        stored = self._location_ui_state(photo).get("origin")
+        if stored in {"manual", "none"} or stored in groups:
+            return str(stored)
+
+        effective = {
+            LocationSource.SOURCE: "provider",
+            LocationSource.GEOCODING: "geocoding",
+            LocationSource.MANUAL: "manual",
+        }.get(photo.location_source)
+        if effective in groups or effective == "manual":
+            return effective
+
+        if "provider" in groups:
+            return "provider"
+        if "geocoding" in groups:
+            return "geocoding"
+        return "manual"
+
+    def _manual_location_text(self, photo: Photo) -> str:
+        state = self._location_ui_state(photo)
+        texts = state.get("texts")
+        if isinstance(texts, dict) and isinstance(texts.get("manual"), str):
+            return str(texts["manual"])
+        manual_data = state.get("manual_data")
+        if isinstance(manual_data, dict) and isinstance(manual_data.get("address"), str):
+            return str(manual_data["address"])
+        if photo.location_source == LocationSource.MANUAL and photo.location_text:
+            return photo.location_text
+        return ""
+
+    def _location_override_data(
+        self,
+        photo: Photo,
+        origin: str,
+        components: tuple[LocationComponent, ...],
+        location_text: str | None,
+    ) -> dict[str, object]:
+        previous = photo.manual_location_data
+        state = self._location_ui_state(photo)
+
+        if "manual_data" not in state and isinstance(previous, dict):
+            legacy_manual = {
+                key: value
+                for key, value in previous.items()
+                if key != self.LOCATION_UI_STATE_KEY
+            }
+            if legacy_manual:
+                state["manual_data"] = legacy_manual
+
+        stored_selections = state.get("selections")
+        selections = (
+            dict(stored_selections)
+            if isinstance(stored_selections, dict)
+            else {}
+        )
+        selections[origin] = self._serialize_components(components)
+        state["selections"] = selections
+
+        stored_texts = state.get("texts")
+        texts = (
+            dict(stored_texts)
+            if isinstance(stored_texts, dict)
+            else {}
+        )
+        texts[origin] = location_text
+        state["texts"] = texts
+        state["origin"] = origin
+
+        if origin == "manual":
+            manual_data = {
+                "place_name": None,
+                "city": next(
+                    (
+                        component.value
+                        for component in components
+                        if component.key.casefold()
+                        in {"city", "town", "village", "municipality"}
+                    ),
+                    None,
+                ),
+                "address": location_text,
+                "components": self._serialize_components(components),
+                "raw": {
+                    "address": {
+                        component.key: component.value
+                        for component in components
+                    }
+                },
+            }
+            state["manual_data"] = manual_data
+            return {
+                **manual_data,
+                self.LOCATION_UI_STATE_KEY: state,
+            }
+
+        return {self.LOCATION_UI_STATE_KEY: state}
+
+    def _persist_location_override(
+        self,
+        photo: Photo,
+        origin: str,
+        components: tuple[LocationComponent, ...],
+        location_text: str | None,
+    ) -> None:
+        components = order_location_components(components)
+        override_data = self._location_override_data(
+            photo, origin, components, location_text
+        )
+        photo.selected_location_components = components
+        photo.location_text = location_text
+        photo.location_selection_edited = True
+        photo.manual_location_data = override_data
+        photo.location_source = {
+            "provider": LocationSource.SOURCE,
+            "geocoding": LocationSource.GEOCODING,
+            "manual": LocationSource.MANUAL,
+        }.get(origin, LocationSource.UNKNOWN)
+
+        if self._save_location_override is not None:
+            self._save_location_override(
+                photo,
+                components,
+                location_text,
+                override_data,
+            )
+
     def _effective_components(
         self,
         photo: Photo,
     ) -> tuple[LocationComponent, ...]:
-        if photo.location_selection_edited:
-            return tuple(
-                photo.selected_location_components
-            )
-
-        result = self._caption_result(photo)
-
-        return tuple(
-            LocationComponent(
-                key=candidate.key,
-                value=candidate.value,
-            )
-            for candidate in result.selected
-            if self._component_is_visible(
-                candidate.key
-            )
-        )
+        groups = self._candidate_groups_by_origin(photo)
+        origin = self._active_location_origin(photo, groups)
+        return self._components_for_origin(photo, origin, groups)
 
     def _components_text(
         self,
@@ -1979,38 +2311,16 @@ class PhotoPlacesWidget(QWidget):
 
         return text or None
 
-    def _has_custom_location(
-        self,
-        photo: Photo,
-    ) -> bool:
-        if not photo.location_selection_edited:
-            return False
-
-        component_text = self._components_text(
-            photo.selected_location_components
-        )
-
-        actual = (
-            photo.location_text.strip()
-            if photo.location_text
-            else None
-        )
-
-        return actual != component_text
-
     def _effective_location(
         self,
         photo: Photo,
     ) -> str:
-        if photo.location_selection_edited:
-            if photo.location_text:
-                text = photo.location_text.strip()
-                if text:
-                    return text
+        origin = self._active_location_origin(photo)
+        if origin == "none":
             return "—"
-
-        result = self._caption_result(photo)
-        return result.caption or "—"
+        if origin == "manual":
+            return self._manual_location_text(photo).strip() or "—"
+        return self._components_text(self._effective_components(photo)) or "—"
 
     def _component_is_visible(
         self,
@@ -2052,26 +2362,13 @@ class PhotoPlacesWidget(QWidget):
         outer.setContentsMargins(6, 3, 6, 3)
         outer.setSpacing(2)
 
-        path_key = str(photo.path)
-        result = self._caption_result(photo)
-
-        visible_candidates = tuple(
-            candidate
-            for candidate in result.candidates
-            if self._component_is_visible(
-                candidate.key
-            )
-            and candidate.value.strip()
-        )
-
-        has_geographic_data = bool(
-            visible_candidates
-        )
-
-        custom_mode = (
-            not has_geographic_data
-            or self._has_custom_location(photo)
-        )
+        path_key = photo.identity
+        candidate_groups = self._location_candidate_groups(photo)
+        groups_by_origin = {
+            origin: candidates
+            for origin, _label, candidates in candidate_groups
+        }
+        active_origin = self._active_location_origin(photo, groups_by_origin)
 
         # ----------------------------------------------------
         # Location row
@@ -2091,39 +2388,28 @@ class PhotoPlacesWidget(QWidget):
         )
         location_row_layout.setSpacing(5)
 
-        if has_geographic_data:
-            mode_box = QComboBox()
+        mode_box = QComboBox()
+        for origin, label, _candidates in candidate_groups:
             mode_box.addItem(
-                self._translator.tr(
-                    "photos.places.location_auto"
-                ),
-                False,
+                label,
+                origin,
             )
-            mode_box.addItem(
-                self._translator.tr(
-                    "photos.places.location_custom"
-                ),
-                True,
-            )
+        mode_box.addItem(
+            self._translator.tr("photos.places.location_source.custom"),
+            "manual",
+        )
+        mode_box.addItem(
+            self._translator.tr("photos.places.location_source.none"),
+            "none",
+        )
+        active_index = mode_box.findData(active_origin)
+        mode_box.setCurrentIndex(max(0, active_index))
+        mode_box.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents
+        )
 
-            mode_box.setCurrentIndex(
-                1 if custom_mode else 0
-            )
-            mode_box.setSizeAdjustPolicy(
-                QComboBox.SizeAdjustPolicy.AdjustToContents
-            )
-
-            self._location_mode_boxes[
-                path_key
-            ] = mode_box
-
-            location_label_widget = mode_box
-        else:
-            location_label_widget = QLabel(
-                self._translator.tr(
-                    "photos.places.location_custom"
-                )
-            )
+        self._location_mode_boxes[path_key] = mode_box
+        location_label_widget = mode_box
 
         # Fixed label-column width is established below after
         # constructing the caption label.
@@ -2160,70 +2446,12 @@ class PhotoPlacesWidget(QWidget):
             v_spacing=2,
         )
 
-        selected = {
-            (
-                component.key,
-                component.value,
-            )
-            for component
-            in self._effective_components(photo)
-        }
-
-        for candidate in visible_candidates:
-            checkbox = QCheckBox(
-                candidate.value
-            )
-            checkbox.setAutoFillBackground(
-                False
-            )
-            checkbox.setChecked(
-                (
-                    candidate.key,
-                    candidate.value,
-                )
-                in selected
-            )
-            checkbox.setToolTip(
-                candidate.key
-            )
-            checkbox.setProperty(
-                "location_key",
-                candidate.key,
-            )
-            checkbox.setProperty(
-                "location_value",
-                candidate.value,
-            )
-            checkbox.setProperty(
-                "group_edit_pending",
-                False,
-            )
-
-            checkbox.pressed.connect(
-                lambda cb=checkbox,
-                p=photo:
-                    self._location_checkbox_pressed(
-                        p,
-                        cb,
-                    )
-            )
-
-            checkbox.toggled.connect(
-                lambda checked,
-                p=photo,
-                row_widget=automatic_widget,
-                cb=checkbox:
-                    self._location_checkbox_toggled(
-                        p,
-                        row_widget,
-                        cb,
-                        checked,
-                    )
-            )
-
-            location_flow.addWidget(
-                checkbox
-            )
+        self._populate_location_flow(
+            photo,
+            automatic_widget,
+            location_flow,
+            active_origin,
+        )
 
         # ----------------------------------------------------
         # Custom location content
@@ -2243,17 +2471,7 @@ class PhotoPlacesWidget(QWidget):
         )
         custom_layout.setSpacing(0)
 
-        if self._has_custom_location(photo):
-            location_text = (
-                photo.location_text or ""
-            )
-        else:
-            location_text = (
-                self._components_text(
-                    self._effective_components(photo)
-                )
-                or ""
-            )
+        location_text = self._manual_location_text(photo)
 
         location_editor = QLineEdit(
             location_text
@@ -2309,11 +2527,10 @@ class PhotoPlacesWidget(QWidget):
         )
 
         automatic_widget.setVisible(
-            has_geographic_data
-            and not custom_mode
+            active_origin in groups_by_origin
         )
         custom_widget.setVisible(
-            custom_mode
+            active_origin == "manual"
         )
 
         location_row_layout.addWidget(
@@ -2329,10 +2546,23 @@ class PhotoPlacesWidget(QWidget):
             custom_widget,
             location_editor,
         )
+        self._location_flows[path_key] = location_flow
 
         outer.addWidget(
             location_row
         )
+
+        if photo.imported_caption:
+            provider_caption = QLabel(
+                self._translator.tr(
+                    "photos.places.provider_caption",
+                    provider=self._provider_for(photo),
+                    caption=photo.imported_caption.strip(),
+                )
+            )
+            provider_caption.setWordWrap(True)
+            provider_caption.setProperty("caption_origin", "provider")
+            outer.addWidget(provider_caption)
 
         # ----------------------------------------------------
         # Caption row
@@ -2357,27 +2587,17 @@ class PhotoPlacesWidget(QWidget):
         # It must not depend on whether this particular photo has
         # geographic data, otherwise mixed GPS/non-GPS rows drift
         # horizontally.
-        automatic_probe = QComboBox()
-        automatic_probe.addItem(
-            self._translator.tr(
-                "photos.places.location_auto"
-            )
-        )
-        automatic_probe.addItem(
-            self._translator.tr(
-                "photos.places.location_custom"
-            )
-        )
-
-        custom_probe = QLabel(
-            self._translator.tr(
-                "photos.places.location_custom"
-            )
-        )
-
+        source_probe = QComboBox()
+        for label in (
+            *self._source_labels.values(),
+            self._provider_for(photo),
+            self._translator.tr("photos.policy.nominatim"),
+            self._translator.tr("photos.places.location_source.custom"),
+            self._translator.tr("photos.places.location_source.none"),
+        ):
+            source_probe.addItem(label)
         label_width = max(
-            automatic_probe.sizeHint().width(),
-            custom_probe.sizeHint().width(),
+            source_probe.sizeHint().width(),
             caption_label.sizeHint().width(),
         )
 
@@ -2407,6 +2627,17 @@ class PhotoPlacesWidget(QWidget):
         editor = QLineEdit(
             photo.caption or ""
         )
+        if photo.imported_caption:
+            editor.setPlaceholderText(
+                photo.imported_caption.strip()
+            )
+            editor.setToolTip(
+                self._translator.tr(
+                    "photos.places.provider_caption",
+                    provider=self._provider_for(photo),
+                    caption=photo.imported_caption.strip(),
+                )
+            )
         editor.setClearButtonEnabled(True)
         editor.setFixedHeight(22)
 
@@ -2438,19 +2669,18 @@ class PhotoPlacesWidget(QWidget):
             caption_container
         )
 
-        if has_geographic_data:
-            mode_box.currentIndexChanged.connect(
-                lambda _index,
-                p=photo,
-                box=mode_box:
-                    self._location_mode_changed(
-                        p,
-                        box,
-                    )
-            )
+        mode_box.currentIndexChanged.connect(
+            lambda _index,
+            p=photo,
+            box=mode_box:
+                self._location_mode_changed(
+                    p,
+                    box,
+                )
+        )
 
-        container.geometry_changed.connect(lambda: self._update_item_height(item))
-        container.setProperty("photo_path", str(photo.path))
+        self._connect_item_geometry(container, photo.identity)
+        container.setProperty("photo_identity", photo.identity)
         container.installEventFilter(self)
         self._tree.setItemWidget(
             item,
@@ -2466,6 +2696,76 @@ class PhotoPlacesWidget(QWidget):
 
         self._update_item_height(item)
 
+    def _populate_location_flow(
+        self,
+        photo: Photo,
+        automatic_widget: QWidget,
+        location_flow: FlowLayout,
+        origin: str,
+    ) -> None:
+        while location_flow.count():
+            item = location_flow.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+        groups = self._candidate_groups_by_origin(photo)
+        candidates = groups.get(origin, ())
+        selected = {
+            (component.key, component.value)
+            for component in self._components_for_origin(photo, origin, groups)
+        }
+        seen: set[tuple[str, str]] = set()
+        for candidate in candidates:
+            identity = (candidate.key, candidate.value)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            checkbox = QCheckBox(candidate.value)
+            checkbox.setAutoFillBackground(False)
+            checkbox.setChecked(identity in selected)
+            checkbox.setToolTip(candidate.key)
+            checkbox.setProperty("location_key", candidate.key)
+            checkbox.setProperty("location_value", candidate.value)
+            checkbox.setProperty("location_origin", origin)
+            checkbox.setProperty("group_edit_pending", False)
+            checkbox.pressed.connect(
+                lambda cb=checkbox, p=photo:
+                    self._location_checkbox_pressed(p, cb)
+            )
+            checkbox.toggled.connect(
+                lambda checked,
+                p=photo,
+                row_widget=automatic_widget,
+                cb=checkbox:
+                    self._location_checkbox_toggled(
+                        p, row_widget, cb, checked
+                    )
+            )
+            location_flow.addWidget(checkbox)
+
+        automatic_widget.setProperty("location_origin", origin)
+        automatic_widget.updateGeometry()
+
+    def _connect_item_geometry(self, container: _PhotoCell, photo_identity: str) -> None:
+        generation = self._tree_generation
+        container.geometry_changed.connect(
+            lambda identity=photo_identity, current_generation=generation:
+                self._update_photo_item_height(identity, current_generation)
+        )
+
+    def _update_photo_item_height(
+        self,
+        photo_identity: str,
+        generation: int,
+    ) -> None:
+        if generation != self._tree_generation:
+            return
+        item = self._photo_items.get(photo_identity)
+        if item is not None:
+            self._update_item_height(item)
+
     def _update_all_editor_heights(self) -> None:
         # Only already materialized rows participate; never expand closed months.
         if getattr(self, "_updating_row_heights", False):
@@ -2478,6 +2778,10 @@ class PhotoPlacesWidget(QWidget):
             self._updating_row_heights = False
 
     def _update_item_height(self, item: QTreeWidgetItem) -> None:
+        # QTreeWidgetItem is not a QObject, so queued Python callbacks are not
+        # automatically disconnected when its C++ owner destroys it.
+        if not isValid(item):
+            return
         required = 0
         for column in range(self._tree.columnCount()):
             cell = self._tree.itemWidget(item, column)
@@ -2507,7 +2811,7 @@ class PhotoPlacesWidget(QWidget):
         photo: Photo,
         mode_box: QComboBox,
     ) -> None:
-        path_key = str(photo.path)
+        path_key = photo.identity
         widgets = self._location_mode_widgets.get(
             path_key
         )
@@ -2521,63 +2825,48 @@ class PhotoPlacesWidget(QWidget):
             location_editor,
         ) = widgets
 
-        custom_mode = bool(
-            mode_box.currentData()
-        )
+        origin = str(mode_box.currentData())
+        groups = self._candidate_groups_by_origin(photo)
 
-        if custom_mode:
-            # Entering custom mode is UI-only until the user actually
-            # edits the field.
-            if not self._has_custom_location(photo):
-                text = (
-                    self._components_text(
-                        self._effective_components(photo)
-                    )
-                    or ""
-                )
-                location_editor.setText(
-                    text
-                )
-                location_editor.setProperty(
-                    "initial_location_text",
-                    text,
-                )
-
+        if origin in groups:
+            components = self._components_for_origin(photo, origin, groups)
+            location_text = self._components_text(components)
+            flow = self._location_flows[path_key]
+            self._populate_location_flow(
+                photo, automatic_widget, flow, origin
+            )
+            custom_widget.hide()
+            automatic_widget.show()
+        elif origin == "manual":
+            previous_components = self._effective_components(photo)
+            previous_text = self._effective_location(photo)
+            components = self._components_for_origin(photo, origin, groups)
+            location_text = self._manual_location_text(photo)
+            if not location_text:
+                if previous_components:
+                    components = previous_components
+                location_text = (
+                    None if previous_text == "—" else previous_text
+                ) or self._components_text(components) or ""
+            location_editor.setText(location_text)
+            location_editor.setProperty("initial_location_text", location_text)
             automatic_widget.hide()
             custom_widget.show()
+        else:
+            origin = "none"
+            components = ()
+            location_text = None
+            automatic_widget.hide()
+            custom_widget.hide()
 
-            self._update_item_height(self._photo_items[path_key])
-            return
-
-        # Return to the preserved structured composition.
-        components = tuple(
-            photo.selected_location_components
+        self._persist_location_override(
+            photo,
+            origin,
+            tuple(components),
+            location_text or None,
         )
-
-        if not photo.location_selection_edited:
-            components = self._effective_components(
-                photo
-            )
-
-        photo.selected_location_components = (
-            components
-        )
-        photo.location_text = self._components_text(
-            components
-        )
-        photo.location_selection_edited = True
-
-        custom_widget.hide()
-        automatic_widget.show()
-
-        if self._save_location is not None:
-            self._save_location(
-                photo,
-                components,
-                photo.location_text,
-            )
-
         self._after_editorial_change(photo)
+        self._update_item_height(self._photo_items[path_key])
 
     def _inline_location_finished(
         self,
@@ -2595,27 +2884,13 @@ class PhotoPlacesWidget(QWidget):
         if text == initial:
             return
 
-        if photo.location_selection_edited:
-            components = tuple(
-                photo.selected_location_components
-            )
-        else:
-            components = self._effective_components(
-                photo
-            )
-
-        photo.selected_location_components = (
-            components
+        components = self._components_for_origin(photo, "manual")
+        self._persist_location_override(
+            photo,
+            "manual",
+            components,
+            text or None,
         )
-        photo.location_text = text or None
-        photo.location_selection_edited = True
-
-        if self._save_location is not None:
-            self._save_location(
-                photo,
-                components,
-                photo.location_text,
-            )
 
         editor.setProperty(
             "initial_location_text",
@@ -2681,11 +2956,20 @@ class PhotoPlacesWidget(QWidget):
         self,
         photo: Photo,
     ) -> dict[str, str]:
-        result = self._caption_result(photo)
+        groups = self._location_candidate_groups(photo)
+        active_origin = self._active_location_origin(photo)
+        candidates = next(
+            (
+                list(values)
+                for origin, _label, values in groups
+                if origin == active_origin
+            ),
+            [],
+        )
 
         values: dict[str, str] = {}
 
-        for candidate in result.candidates:
+        for candidate in candidates:
             key = candidate.key.casefold()
             value = candidate.value.strip()
 
@@ -4009,25 +4293,23 @@ class PhotoPlacesWidget(QWidget):
                     )
                 )
 
-            # Preserve the geographic ordering used by the builder.
-            current.sort(
-                key=lambda component:
-                    self._location_priority(
-                        component.key
-                    )
-                    or 100
-            )
-
-            selected = tuple(current)
+            selected = order_location_components(current)
             location_text = (
                 self._components_text(
                     selected
                 )
             )
 
-            photo.selected_location_components = (
-                selected
-            )
+            if self._save_location_override is not None:
+                self._persist_location_override(
+                    photo,
+                    self._active_location_origin(photo),
+                    selected,
+                    location_text,
+                )
+                continue
+
+            photo.selected_location_components = selected
             photo.location_text = location_text
             photo.location_selection_edited = True
 
@@ -4039,24 +4321,8 @@ class PhotoPlacesWidget(QWidget):
                 )
             )
 
-        if pending_saves:
-            if self._save_locations is not None:
-                self._save_locations(
-                    pending_saves
-                )
-            elif self._save_location is not None:
-                # Compatibility fallback for callers that only
-                # provide the historical per-photo callback.
-                for (
-                    photo,
-                    selected,
-                    location_text,
-                ) in pending_saves:
-                    self._save_location(
-                        photo,
-                        selected,
-                        location_text,
-                    )
+        if pending_saves and self._save_locations is not None:
+            self._save_locations(pending_saves)
 
         # One widget refresh after the complete grouped operation.
         self._rebuild_tree()
@@ -4094,23 +4360,20 @@ class PhotoPlacesWidget(QWidget):
                     )
                 )
 
-        selected = tuple(components)
+        selected = order_location_components(components)
         location_text = self._components_text(
             selected
         )
-
-        photo.selected_location_components = (
-            selected
+        origin = str(
+            location_widget.property("location_origin")
+            or "provider"
         )
-        photo.location_text = location_text
-        photo.location_selection_edited = True
-
-        if self._save_location is not None:
-            self._save_location(
-                photo,
-                selected,
-                location_text,
-            )
+        self._persist_location_override(
+            photo,
+            origin,
+            selected,
+            location_text,
+        )
 
         self._after_editorial_change(
             photo
@@ -4154,7 +4417,7 @@ class PhotoPlacesWidget(QWidget):
                 i
                 for i, candidate
                 in enumerate(visible)
-                if candidate.path == photo.path
+                if candidate.identity == photo.identity
             )
         except StopIteration:
             return
@@ -4166,7 +4429,7 @@ class PhotoPlacesWidget(QWidget):
         )
 
         editor = self._caption_editors.get(
-            str(photo.path)
+            photo.identity
         )
 
         if editor is not None:
@@ -4179,14 +4442,14 @@ class PhotoPlacesWidget(QWidget):
             return
 
         next_editor = self._caption_editors.get(
-            str(next_photo.path)
+            next_photo.identity
         )
 
         if next_editor is not None:
             next_editor.setFocus()
 
             item = self._photo_items.get(
-                str(next_photo.path)
+                next_photo.identity
             )
             if item is not None:
                 self._tree.scrollToItem(
@@ -4227,7 +4490,7 @@ class PhotoPlacesWidget(QWidget):
             self._rebuild_tree()
             return
 
-        path_key = str(photo.path)
+        path_key = photo.identity
 
         truth = self._truth_labels.get(
             path_key

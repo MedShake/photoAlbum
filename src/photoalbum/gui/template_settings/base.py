@@ -195,6 +195,11 @@ class PageTemplateSettingsWidget(QWidget):
 
         self._preview_page = page
         self.set_temporal_context(materialized_periods(page, album_pages))
+        self._album_context_changed()
+
+    def _album_context_changed(self) -> None:
+        """Hook for editors whose preview depends on the concrete occurrence."""
+        return
 
     def set_temporal_context(self, context) -> None:
         """Receive materialized temporal levels; templates choose their presentation."""

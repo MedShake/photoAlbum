@@ -5,7 +5,7 @@ from datetime import datetime
 import random
 from typing import Callable, Iterable
 
-from photoalbum.models import Photo
+from photoalbum.models import Photo, displayed_photo_dimensions
 
 from photoalbum.album.composition import NormalizedRect
 
@@ -97,22 +97,7 @@ def cover_period_title(
 def _display_dimensions(
     photo: Photo,
 ) -> tuple[int, int]:
-    width = photo.width or 4
-    height = photo.height or 3
-
-    # EXIF orientations 5–8 swap displayed dimensions.
-    if photo.orientation in (
-        5,
-        6,
-        7,
-        8,
-    ):
-        width, height = (
-            height,
-            width,
-        )
-
-    return width, height
+    return displayed_photo_dimensions(photo) or (4, 3)
 
 
 def _photo_rect(

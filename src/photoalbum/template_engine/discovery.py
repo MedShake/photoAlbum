@@ -10,6 +10,7 @@ from photoalbum.album.models import (
     CoverPosition,
 )
 from photoalbum.album.templates import (
+    AutomaticPhotoPageModeDefinition,
     TemplateDefinition,
     TemplateKind,
     TemplateRegistry,
@@ -52,6 +53,7 @@ class TemplatePack:
     authors: tuple[str, ...]
     templates: tuple[TemplateDefinition, ...]
     modules: tuple[str, ...]  # Absolute import names declared by the manifest.
+    automatic_photo_page_modes: tuple[AutomaticPhotoPageModeDefinition, ...] = ()
     documentation_paths: dict[str, Path] | None = None
     translation_catalogs: dict[str, dict[str, str]] | None = None
     settings_editor: str | None = None
@@ -190,6 +192,52 @@ def _template_from_data(
     return definition, module
 
 
+def _automatic_photo_page_mode_from_data(
+    *,
+    pack_id: str,
+    pack_name: str,
+    value: object,
+) -> tuple[AutomaticPhotoPageModeDefinition, str]:
+    if not isinstance(value, dict):
+        raise ValueError("Automatic photo-page mode entry must be an object.")
+    mode_id = str(value.get("id", "")).strip()
+    name = str(value.get("name", "")).strip()
+    module = str(value.get("module", "")).strip()
+    template_ids = value.get("templates", [])
+    settings_template_id = str(value.get("settings_template", "")).strip()
+    selector_reference = str(value.get("selector", "")).strip() or None
+    localized_names = value.get("localized_names", {})
+    if not mode_id or not name or not module:
+        raise ValueError("Automatic photo-page mode needs id, name and module.")
+    if not isinstance(template_ids, list) or not all(
+        isinstance(item, str) and item for item in template_ids
+    ):
+        raise ValueError(f"Automatic mode {mode_id!r} templates must be a string list.")
+    if not isinstance(localized_names, dict):
+        raise ValueError(f"Automatic mode {mode_id!r} localized_names must be an object.")
+    if selector_reference is None:
+        raise ValueError(f"Automatic mode {mode_id!r} needs a selector reference.")
+    selector_module, separator, selector_attribute = selector_reference.partition(":")
+    if not (
+        separator
+        and selector_attribute.isidentifier()
+        and all(part.isidentifier() for part in selector_module.split("."))
+    ):
+        raise ValueError(
+            f"Automatic mode {mode_id!r} selector must be a 'module:callable' reference."
+        )
+    return AutomaticPhotoPageModeDefinition(
+        mode_id=mode_id,
+        name=name,
+        pack_id=pack_id,
+        pack_name=pack_name,
+        template_ids=tuple(template_ids),
+        settings_template_id=settings_template_id,
+        selector_reference=selector_reference,
+        localized_names={str(key): str(item) for key, item in localized_names.items()},
+    ), module
+
+
 def _documentation_paths(
     pack_path: Path,
     value: object,
@@ -202,15 +250,12 @@ def _documentation_paths(
     if value is None:
         return {}
 
-    if isinstance(value, str):
-        entries = {"en": value}
-    elif isinstance(value, dict):
-        entries = value
-    else:
+    if not isinstance(value, dict):
         raise ValueError(
-            "Template pack documentation must be a path "
-            "or a language/path mapping"
+            "Template pack documentation must be a language/path mapping"
         )
+
+    entries = value
 
     pack_root = pack_path.resolve()
     result: dict[str, Path] = {}
@@ -297,6 +342,19 @@ def load_template_pack(
         definitions.append(definition)
         modules.append(module)
 
+    raw_modes = data.get("automatic_photo_page_modes", [])
+    if not isinstance(raw_modes, list):
+        raise ValueError(f"automatic_photo_page_modes must be a list in {manifest_path}")
+    modes = []
+    for raw_mode in raw_modes:
+        mode, module = _automatic_photo_page_mode_from_data(
+            pack_id=pack_id,
+            pack_name=name,
+            value=raw_mode,
+        )
+        modes.append(mode)
+        modules.append(module)
+
     raw_authors = data.get("authors", [])
     authors = []
 
@@ -324,6 +382,7 @@ def load_template_pack(
         ),
         authors=tuple(authors),
         templates=tuple(definitions),
+        automatic_photo_page_modes=tuple(modes),
         modules=tuple(dict.fromkeys(modules)),
         documentation_paths=_documentation_paths(
             manifest_path.parent,
@@ -331,16 +390,19 @@ def load_template_pack(
         ),
         translation_catalogs=load_pack_catalogs(manifest_path.parent),
         settings_editor=_settings_editor_reference(data.get("settings_editor")),
-        default_templates=_default_templates(data.get("default_templates", {}), definitions),
+        default_templates=_default_templates(
+            data.get("default_templates", {}), definitions, modes
+        ),
     )
 
 
-def _default_templates(value, definitions) -> dict[str, str]:
+def _default_templates(value, definitions, modes=()) -> dict[str, str]:
     from photoalbum.template_engine.defaults import AlbumTemplateDefaults
 
     if not isinstance(value, dict):
         raise ValueError("default_templates must be an object.")
     definitions = {template.template_id: template for template in definitions}
+    modes = {mode.mode_id: mode for mode in modes}
     roles = {
         "front_cover": (TemplateKind.COVER, CoverPosition.FRONT),
         "inside_front_cover": (TemplateKind.COVER, CoverPosition.INSIDE_FRONT),
@@ -354,6 +416,8 @@ def _default_templates(value, definitions) -> dict[str, str]:
     for role, template_id in value.items():
         if role not in AlbumTemplateDefaults.__dataclass_fields__:
             raise ValueError(f"Unknown default template role: {role}")
+        if role == "photo_page" and isinstance(template_id, str) and template_id in modes:
+            continue
         if not isinstance(template_id, str) or template_id not in definitions:
             raise ValueError(f"Default {role} must reference a template in its own pack.")
         kind, position = roles[role]
@@ -411,6 +475,8 @@ def discover_templates(
         registry.pack_defaults[pack.pack_id] = dict(pack.default_templates)
         for template in pack.templates:
             registry.register(template)
+        for mode in pack.automatic_photo_page_modes:
+            registry.register_automatic_photo_page_mode(mode)
 
     return DiscoveredTemplates(
         registry=registry,

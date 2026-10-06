@@ -1,5 +1,8 @@
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
+
+from PySide6.QtWidgets import QApplication, QCheckBox
 
 from photoalbum.templates.msb.photo_page.composition import build_photo_caption
 from photoalbum.album.settings import (
@@ -9,7 +12,8 @@ from photoalbum.database import (
     PhotoRepository,
     ProjectDatabase,
 )
-from photoalbum.models import Photo
+from photoalbum.models import MetadataCandidates, Photo
+from photoalbum.gui.widgets.photo_places_widget import PhotoPlacesWidget
 
 
 def test_repository_persists_editorial_caption(
@@ -125,3 +129,81 @@ def test_caption_without_datetime_still_uses_first_line():
 
     assert content.line_count == 2
 
+
+def test_imported_caption_is_a_searchable_editor_suggestion():
+    app = QApplication.instance() or QApplication([])
+    widget = PhotoPlacesWidget()
+    photo = Photo(
+        path=Path("remote.jpg"),
+        filename="remote.jpg",
+        capture_datetime=datetime(2025, 7, 14),
+        imported_caption="Provider description",
+    )
+    widget._caption_result = lambda _photo: SimpleNamespace(
+        candidates=(), selected=(), caption=None,
+    )
+    widget.set_photos([photo])
+    year = widget._tree.topLevelItem(0)
+    year.setExpanded(True)
+    month = year.child(0)
+    month.setExpanded(True)
+    for _ in range(5):
+        app.processEvents()
+
+    editor = widget._caption_editors[photo.identity]
+    assert editor.text() == ""
+    assert editor.placeholderText() == "Provider description"
+    assert photo.caption is None
+
+    widget._filter_text = "provider"
+    assert widget._matches_filter(photo) is True
+    widget.close()
+
+
+def test_places_exposes_provider_location_components_and_caption_identity():
+    app = QApplication.instance() or QApplication([])
+    widget = PhotoPlacesWidget()
+    widget.set_provider_context("Synology Photos")
+    photo = Photo(
+        path=Path("remote.jpg"),
+        filename="remote.jpg",
+        capture_datetime=datetime(2025, 7, 14),
+        imported_caption="Provider description",
+        metadata_candidates=MetadataCandidates(
+            location={
+                "provider": {
+                    "components": [
+                        {"key": "city", "value": "Paris"},
+                        {"key": "country", "value": "France"},
+                    ]
+                },
+                "geocoding": {
+                    "raw": {"address": {"city": "Nantes", "country": "France"}}
+                },
+            },
+            caption={"provider": "Provider description"},
+        ),
+    )
+    widget.set_photos([photo])
+    year = widget._tree.topLevelItem(0)
+    year.setExpanded(True)
+    month = year.child(0)
+    month.setExpanded(True)
+    for _ in range(5):
+        app.processEvents()
+
+    combo = widget._location_mode_boxes[photo.identity]
+    choices = [combo.itemText(index) for index in range(combo.count())]
+    assert choices[:2] == ["Synology Photos", "Nominatim"]
+    assert combo.currentText() == "Synology Photos"
+    values = [
+        checkbox.text()
+        for checkbox in widget._location_mode_widgets[photo.identity][0]
+        .findChildren(QCheckBox)
+    ]
+    assert values == ["Paris", "France"]
+    assert "Nantes" not in values
+    editor = widget._caption_editors[photo.identity]
+    assert "Synology Photos" in editor.toolTip()
+    assert "Provider description" in editor.toolTip()
+    widget.close()

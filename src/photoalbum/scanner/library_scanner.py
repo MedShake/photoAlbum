@@ -6,7 +6,7 @@ from pathlib import Path
 
 from photoalbum.database import PhotoRepository
 from photoalbum.metadata import PhotoAnalyzer
-from photoalbum.models import LocationSource, Photo
+from photoalbum.models import DateSource, GpsSource, LocationSource, Photo
 
 from .folder_scanner import FolderScanner
 from .photo_processor import (
@@ -48,9 +48,11 @@ class LibraryScanner:
         photo_analyzer: PhotoAnalyzer | None = None,
         photo_repository: PhotoRepository | None = None,
         photo_processor: PhotoProcessor | None = None,
+        source_id: str = "local",
     ) -> None:
         self._folder_scanner = folder_scanner or FolderScanner()
         self._photo_repository = photo_repository
+        self._source_id = source_id
 
         self._photo_processor = (
             photo_processor
@@ -154,7 +156,8 @@ class LibraryScanner:
         }
 
         known_photos = (
-            self._photo_repository.list_all(
+            self._photo_repository.list_by_source(
+                self._source_id,
                 include_missing=True
             )
         )
@@ -167,7 +170,7 @@ class LibraryScanner:
                 # that has returned unchanged and was therefore
                 # reused from the cache.
                 self._photo_repository.set_missing(
-                    photo.path,
+                    photo.identity,
                     False,
                 )
                 continue
@@ -176,12 +179,12 @@ class LibraryScanner:
             # list_all(include_missing=True) returns both states,
             # so inspect the database state before changing it.
             if self._photo_repository.is_missing(
-                photo.path
+                photo.identity
             ):
                 continue
 
             self._photo_repository.set_missing(
-                photo.path,
+                photo.identity,
                 True,
             )
 
@@ -197,23 +200,16 @@ class LibraryScanner:
         on_event: EventCallback | None,
         statistics: ScanStatistics,
     ) -> Photo:
+        previous_photo = (
+            self._photo_repository.find_by_identity(f"{self._source_id}:{path}")
+            if self._photo_repository is not None
+            else None
+        )
+
         cached_photo = self._find_current_cached_photo(path)
 
         if cached_photo is not None:
             statistics.reused += 1
-
-            if self._needs_location_enrichment(cached_photo):
-                changed = self._photo_processor.enrich_location(
-                    cached_photo,
-                    language=language,
-                    on_event=on_event,
-                )
-
-                if changed:
-                    statistics.geocoded += 1
-
-                    if self._photo_repository is not None:
-                        self._photo_repository.save(cached_photo)
 
             return cached_photo
 
@@ -222,11 +218,16 @@ class LibraryScanner:
             language=language,
             on_event=on_event,
         )
+        photo.source_id = self._source_id
+        photo.asset_id = str(path)
 
         statistics.analyzed += 1
 
-        if photo.location_source == LocationSource.GEOCODING:
-            statistics.geocoded += 1
+        if previous_photo is not None:
+            self._preserve_user_state(
+                photo,
+                previous_photo,
+            )
 
         if self._photo_repository is not None:
             self._photo_repository.save(photo)
@@ -240,7 +241,7 @@ class LibraryScanner:
         if self._photo_repository is None:
             return None
 
-        cached_photo = self._photo_repository.find_by_path(path)
+        cached_photo = self._photo_repository.find_by_identity(f"{self._source_id}:{path}")
 
         if cached_photo is None:
             return None
@@ -257,11 +258,74 @@ class LibraryScanner:
         return None
 
     @staticmethod
-    def _needs_location_enrichment(
+    def needs_location_enrichment(
         photo: Photo,
     ) -> bool:
-        return (
-            photo.has_gps
-            and photo.location_source
-            == LocationSource.UNKNOWN
+        if not photo.has_gps:
+            return False
+
+        candidate = photo.geocoded_location_data
+
+        if not isinstance(candidate, dict):
+            return True
+
+        latitude = candidate.get("latitude")
+        longitude = candidate.get("longitude")
+
+        if not isinstance(latitude, (int, float)):
+            return True
+        if not isinstance(longitude, (int, float)):
+            return True
+
+        tolerance = 1e-7
+
+        return not (
+            abs(photo.latitude - float(latitude)) <= tolerance
+            and abs(photo.longitude - float(longitude)) <= tolerance
         )
+
+    @staticmethod
+    def _preserve_user_state(
+        photo: Photo,
+        previous: Photo,
+    ) -> None:
+        """Keep user-authored state while refreshing source metadata."""
+        photo.usage = previous.usage
+
+        if previous.date_source == DateSource.MANUAL:
+            photo.capture_datetime = previous.capture_datetime
+            photo.date_source = DateSource.MANUAL
+        photo.manual_capture_datetime = previous.manual_capture_datetime
+
+        if previous.gps_source == GpsSource.MANUAL:
+            photo.latitude = previous.latitude
+            photo.longitude = previous.longitude
+            photo.gps_source = GpsSource.MANUAL
+        photo.manual_latitude = previous.manual_latitude
+        photo.manual_longitude = previous.manual_longitude
+
+        if previous.location_source == LocationSource.MANUAL:
+            photo.place_name = previous.place_name
+            photo.city = previous.city
+            photo.address = previous.address
+            photo.raw_location_data = previous.raw_location_data
+            photo.location_source = LocationSource.MANUAL
+        photo.manual_location_data = previous.manual_location_data
+
+        # Editorial choices are independent from source analysis.
+        photo.selected_location_components = (
+            previous.selected_location_components
+        )
+        photo.location_text = previous.location_text
+        photo.location_selection_edited = (
+            previous.location_selection_edited
+        )
+        photo.caption = previous.caption
+
+        # A prior Nominatim result remains a candidate even if a changed
+        # file now carries different GPS coordinates. The policy resolver
+        # will reject it as stale until enrichment refreshes it.
+        if photo.geocoded_location_data is None:
+            photo.geocoded_location_data = (
+                previous.geocoded_location_data
+            )
