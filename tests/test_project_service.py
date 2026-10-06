@@ -496,3 +496,60 @@ def test_apply_photo_metadata_policy_recomputes_effective_values(tmp_path: Path)
     assert loaded.city == "Paris"
 
     service.close()
+
+
+def test_project_name_defaults_to_filename_and_is_persisted(tmp_path: Path):
+    project_path = tmp_path / "family-trip.photoalbum"
+
+    service = ProjectService()
+    service.create(project_path)
+    assert service.get_project_name() == "family-trip"
+
+    service.set_project_name("Family trip 2026")
+    service.close()
+
+    reopened = ProjectService()
+    reopened.open(project_path)
+    assert reopened.get_project_name() == "Family trip 2026"
+    reopened.close()
+
+
+def test_legacy_project_name_falls_back_to_filename(tmp_path: Path):
+    project_path = tmp_path / "legacy-name.photoalbum"
+    service = ProjectService()
+    service.create(project_path)
+    service._database.connection.execute(
+        "DELETE FROM project_metadata WHERE key = ?",
+        (service.PROJECT_NAME_KEY,),
+    )
+    service._database.connection.commit()
+
+    assert service.get_project_name() == "legacy-name"
+    service.close()
+
+
+def test_pdf_export_settings_are_persisted(tmp_path: Path):
+    from photoalbum.project_metadata import PdfExportSettings, ProjectPdfMetadata
+
+    project_path = tmp_path / "pdf-settings.photoalbum"
+    expected = PdfExportSettings(
+        metadata=ProjectPdfMetadata(
+            title="Nantes 2026",
+            author="Bertrand",
+            subject="Album",
+            keywords="Nantes, Loire",
+        ),
+        dpi=600,
+        content="body",
+    )
+
+    service = ProjectService()
+    service.create(project_path)
+    assert service.get_pdf_export_settings() is None
+    service.set_pdf_export_settings(expected)
+    service.close()
+
+    reopened = ProjectService()
+    reopened.open(project_path)
+    assert reopened.get_pdf_export_settings() == expected
+    reopened.close()

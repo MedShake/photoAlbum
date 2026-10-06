@@ -186,3 +186,12 @@ def test_rebuilding_materialized_rows_ignores_stale_qt_geometry_events(
 
     assert errors == []
     assert_fits(widget, photos[0])
+
+
+def test_tab_content_keeps_standard_outer_margins(view):
+    widget, _, _, _ = view
+    margins = widget.layout().contentsMargins()
+    assert margins.left() > 0
+    assert margins.top() > 0
+    assert margins.right() > 0
+    assert margins.bottom() > 0

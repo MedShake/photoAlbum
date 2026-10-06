@@ -90,6 +90,7 @@ def test_open_project_clears_image_cache_before_loading_new_preview():
     window = SimpleNamespace(
         _preview_render_service=Mock(),
         _hover_photo_preview=Mock(),
+        _pdf_widget=Mock(),
         _project_service=Mock(),
         _album_preview_widget=Mock(),
         _load_project_settings=lambda: events.append("settings"),
@@ -115,6 +116,7 @@ def test_failed_project_open_does_not_discard_current_image_cache():
     window = SimpleNamespace(
         _preview_render_service=Mock(),
         _hover_photo_preview=Mock(),
+        _pdf_widget=Mock(),
         _project_service=Mock(),
         _album_preview_widget=Mock(),
         _show_error=Mock(),

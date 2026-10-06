@@ -10,6 +10,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QDateTimeEdit, QLineEdit, QPushButton, QMessageBox
 
 from photoalbum.app import ProjectService
+from photoalbum.export import PdfExportContent
 from photoalbum.gui.main_window import MainWindow
 from photoalbum.gui.photo_editor import PhotoEditor
 from photoalbum.gui.scan_controller import ScanController
@@ -495,14 +496,41 @@ def test_open_remote_project_exposes_snapshot_before_background_refresh(
     assert window._photos_widget._sources == [source]
 
 
+def test_pdf_document_summary_uses_effective_dimensions_without_orientation(window):
+    from dataclasses import replace
+    from photoalbum.album import PageOrientation
+
+    widget = window._pdf_widget
+    base = window._album_settings_widget.settings()
+
+    window._album_settings_widget.set_settings(replace(
+        base, page_format="a4", orientation=PageOrientation.PORTRAIT,
+    ))
+    widget.update_summary()
+    assert widget._pdf_format_label.text() == "A4 — 210 × 297 mm"
+    assert not hasattr(widget, "_pdf_orientation_label")
+
+    window._album_settings_widget.set_settings(replace(
+        window._album_settings_widget.settings(),
+        page_format="a4", orientation=PageOrientation.LANDSCAPE,
+    ))
+    widget.update_summary()
+    assert widget._pdf_format_label.text() == "A4 — 297 × 210 mm"
+
+    window._album_settings_widget.set_settings(replace(
+        window._album_settings_widget.settings(),
+        page_format="custom", custom_width_mm=180.0, custom_height_mm=180.0,
+    ))
+    widget.update_summary()
+    assert widget._pdf_format_label.text() == "Custom — 180 × 180 mm"
+
+
 @pytest.mark.parametrize('failure', [False, True])
 @pytest.mark.parametrize('orientation', ['portrait', 'landscape', 'custom'])
 def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_path, monkeypatch, failure, orientation):
     from dataclasses import replace
     from photoalbum.album import PageOrientation
     from photoalbum.gui.widgets import pdf_export_widget as module
-    from photoalbum.export import PdfExportContent
-
     received = []
 
     class ExportService:
@@ -857,3 +885,53 @@ def test_photo_sources_widget_displays_source_sync_progress(app):
     assert not view.nominatim_progress_bar.isVisible()
 
     view.close()
+
+
+def test_project_header_shows_name_edit_action_and_filename(window, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog
+
+    project = tmp_path / "technical-name.photoalbum"
+    window._project_service.create(project)
+    window._load_project_settings()
+    window._update_project_state()
+
+    assert window._project_label.text() == "technical-name"
+    assert window._project_filename_label.text() == "technical-name.photoalbum"
+    assert window._project_filename_label.isVisibleTo(window)
+    assert window._project_rename_button.isVisibleTo(window)
+
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *args, **kwargs: ("Nantes 2026", True),
+    )
+    window._rename_project()
+
+    assert window._project_label.text() == "Nantes 2026"
+    assert window._project_filename_label.text() == "technical-name.photoalbum"
+    assert window._project_service.get_project_name() == "Nantes 2026"
+
+
+def test_pdf_preferences_load_persist_and_keep_project_title_independent(window, tmp_path):
+    project = tmp_path / "nantes.photoalbum"
+    window._project_service.create(project)
+    window._load_project_settings()
+
+    pdf = window._pdf_widget
+    assert pdf._pdf_title_edit.text() == "nantes"
+    assert pdf._pdf_dpi_combo.currentData() == 300
+    assert pdf._pdf_content_complete_radio.isChecked()
+
+    pdf._pdf_title_edit.setText("Nantes — album photo")
+    pdf._pdf_title_edit.editingFinished.emit()
+    pdf._pdf_dpi_combo.setCurrentIndex(pdf._pdf_dpi_combo.findData(600))
+    pdf._pdf_content_body_radio.setChecked(True)
+
+    stored = window._project_service.get_pdf_export_settings()
+    assert stored.metadata.title == "Nantes — album photo"
+    assert stored.dpi == 600
+    assert stored.content == "body"
+
+    window._project_service.set_project_name("Voyage à Nantes")
+    window._load_project_settings()
+    assert pdf._pdf_title_edit.text() == "Nantes — album photo"

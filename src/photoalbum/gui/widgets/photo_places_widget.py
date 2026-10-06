@@ -491,7 +491,8 @@ class PhotoPlacesWidget(QWidget):
 
     def _create_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 8, 0, 0)
+        # Keep the tab content aligned with the other workflow tabs.
+        # QVBoxLayout's standard widget margins are intentional here.
         layout.setSpacing(8)
 
         description = QLabel(

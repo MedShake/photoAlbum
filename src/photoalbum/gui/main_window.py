@@ -3,13 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QPalette
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QLabel,
     QMainWindow,
+    QToolButton,
+    QInputDialog,
+    QHBoxLayout,
     QMessageBox,
     QStatusBar,
     QVBoxLayout,
@@ -20,6 +23,7 @@ from PySide6.QtWidgets import (
 from photoalbum.app_info import APPLICATION_NAME, VERSION
 from photoalbum.app import ProjectService
 from photoalbum.gui.help_dialog import HelpDialog
+from photoalbum.gui.icon_resources import resource_icon
 from photoalbum.gui.template_pack_help_dialog import (
     TemplatePackHelpDialog,
 )
@@ -52,6 +56,7 @@ from photoalbum.gui.synology_source_dialog import SynologySourceDialog
 from photoalbum.gui.widgets.pdf_export_widget import PdfExportWidget
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
 from photoalbum.models import Photo
+from photoalbum.project_metadata import PdfExportSettings, ProjectPdfMetadata
 
 
 class MainWindow(QMainWindow):
@@ -140,6 +145,7 @@ class MainWindow(QMainWindow):
             "main_window/geometry",
             self.saveGeometry(),
         )
+        self._pdf_widget.save_project_settings()
         self._hover_photo_preview.clear()
         self._project_service.close()
         super().closeEvent(event)
@@ -255,10 +261,35 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
 
+        project_header = QHBoxLayout()
+        project_header.setContentsMargins(0, 0, 0, 0)
+        project_header.setSpacing(6)
+
         self._project_label = QLabel()
         self._project_label.setStyleSheet('font-size: 20px; font-weight: bold;')
+        project_header.addWidget(self._project_label)
 
-        layout.addWidget(self._project_label)
+        self._project_rename_button = QToolButton()
+        self._project_rename_button.setIcon(resource_icon("plan-edit.svg"))
+        self._project_rename_button.setAutoRaise(True)
+        self._project_rename_button.setToolTip(
+            self._translator.tr("main.rename_project")
+        )
+        self._project_rename_button.clicked.connect(self._rename_project)
+        project_header.addWidget(self._project_rename_button)
+
+        self._project_filename_label = QLabel()
+        filename_palette = self._project_filename_label.palette()
+        filename_palette.setColor(
+            QPalette.ColorRole.WindowText,
+            filename_palette.color(QPalette.ColorRole.PlaceholderText),
+        )
+        self._project_filename_label.setPalette(filename_palette)
+        self._project_filename_label.setStyleSheet('font-size: 13px;')
+        project_header.addWidget(self._project_filename_label)
+        project_header.addStretch(1)
+
+        layout.addLayout(project_header)
 
         # ----------------------------------------------------
         # Main project workflow
@@ -432,8 +463,9 @@ class MainWindow(QMainWindow):
         if project_path.suffix != ".photoalbum":
             project_path = project_path.with_suffix('.photoalbum')
 
-        # Creating a project replaces the current one. Invalidate in-flight
-        # hover decodes before ProjectService closes the existing database.
+        # Creating a project replaces the current one. Persist PDF preferences
+        # before ProjectService closes the existing database.
+        self._pdf_widget.save_project_settings()
         self._hover_photo_preview.clear()
 
         try:
@@ -488,6 +520,7 @@ class MainWindow(QMainWindow):
         self._preview_render_service.clear()
         # ProjectService.open() closes the current project even when opening
         # the replacement subsequently fails.
+        self._pdf_widget.save_project_settings()
         self._hover_photo_preview.clear()
 
         try:
@@ -509,6 +542,7 @@ class MainWindow(QMainWindow):
 
     def _close_project(self) -> None:
         self._preview_render_service.clear()
+        self._pdf_widget.save_project_settings()
         self._hover_photo_preview.clear()
         self._album_build_result = None
         self._project_service.close()
@@ -696,6 +730,15 @@ class MainWindow(QMainWindow):
         else:
             self._album_settings_widget.set_settings(album_settings)
 
+        project_name = self._project_service.get_project_name()
+        pdf_settings = self._project_service.get_pdf_export_settings()
+        if pdf_settings is None:
+            pdf_settings = PdfExportSettings(
+                metadata=ProjectPdfMetadata(title=project_name)
+            )
+            self._project_service.set_pdf_export_settings(pdf_settings)
+        self._pdf_widget.set_project_settings(pdf_settings)
+
     def _set_scan_running(self, running: bool) -> None:
         self._new_project_action.setEnabled(not running)
 
@@ -751,6 +794,27 @@ class MainWindow(QMainWindow):
                 self._translator.tr('sources.analyze')
             )
 
+    def _rename_project(self) -> None:
+        if not self._project_service.is_open:
+            return
+
+        current_name = self._project_service.get_project_name()
+        name, accepted = QInputDialog.getText(
+            self,
+            self._translator.tr("main.rename_project"),
+            self._translator.tr("main.project_name"),
+            text=current_name,
+        )
+        if not accepted:
+            return
+
+        name = name.strip()
+        if not name or name == current_name:
+            return
+
+        self._project_service.set_project_name(name)
+        self._update_project_state()
+
     def _update_project_state(self) -> None:
         is_open = self._project_service.is_open
         has_source = self._photos_widget.has_active_sources
@@ -761,14 +825,17 @@ class MainWindow(QMainWindow):
 
         if is_open:
             project_path = self._project_service.project_path
-
-            self._project_label.setText(
-                self._translator.tr('main.project', name=project_path.name)
-            )
-
+            self._project_label.setText(self._project_service.get_project_name())
+            self._project_filename_label.setText(project_path.name)
+            self._project_filename_label.setVisible(True)
+            self._project_rename_button.setVisible(True)
             self.statusBar().showMessage(str(project_path))
         else:
             self._project_label.setText(self._translator.tr('main.no_project'))
+            self._project_filename_label.clear()
+            self._project_filename_label.setVisible(False)
+            self._project_rename_button.setVisible(False)
+            self._pdf_widget.set_project_settings(None)
             self.statusBar().showMessage(self._translator.tr("main.ready"))
 
         # Re-evaluate tab availability as part of every

@@ -15,8 +15,13 @@ from photoalbum.album import (
     AlbumStructureSettings,
 )
 from photoalbum.app import ProjectService
-from photoalbum.export import PdfExportContent, PdfExportService, PdfMetadata
+from photoalbum.export import (
+    PdfExportContent,
+    PdfExportService,
+    PdfMetadata,
+)
 from photoalbum.gui.workers import PdfExportWorker
+from photoalbum.project_metadata import PdfExportSettings, ProjectPdfMetadata
 from photoalbum.i18n import Translator
 
 
@@ -39,6 +44,7 @@ class PdfExportWidget(QWidget):
         self._result_provider = result_provider
         self._before_export = before_export
         self._pdf_thread: QThread | None = None
+        self._loading_project_settings = False
         self._pdf_worker: PdfExportWorker | None = None
         self._create_content()
         self.update_summary()
@@ -49,31 +55,6 @@ class PdfExportWidget(QWidget):
 
     def _create_content(self) -> None:
         render_layout = QVBoxLayout(self)
-
-        render_title = QLabel(self._translator.tr('render.title'))
-        render_title.setStyleSheet('font-size: 18px; font-weight: bold;')
-        render_layout.addWidget(render_title)
-
-        render_description = QLabel(self._translator.tr('render.description'))
-        render_description.setWordWrap(True)
-        render_layout.addWidget(render_description)
-
-        # Output file.
-        output_group = QGroupBox(self._translator.tr('render.output_group'))
-        output_layout = QHBoxLayout(output_group)
-
-        self._pdf_output_edit = QLineEdit()
-        self._pdf_output_edit.setPlaceholderText(
-            self._translator.tr('render.output_placeholder')
-        )
-
-        self._pdf_output_button = QPushButton(self._translator.tr('render.browse'))
-        self._pdf_output_button.clicked.connect(self._choose_pdf_output)
-
-        output_layout.addWidget(self._pdf_output_edit, 1)
-        output_layout.addWidget(self._pdf_output_button)
-
-        render_layout.addWidget(output_group)
 
         # Export content.
         content_group = QGroupBox(self._translator.tr('render.content_group'))
@@ -95,6 +76,7 @@ class PdfExportWidget(QWidget):
             self._pdf_content_body_radio,
         ):
             radio.toggled.connect(self.update_summary)
+            radio.toggled.connect(self._save_project_settings)
             content_layout.addWidget(radio)
 
         render_layout.addWidget(content_group)
@@ -112,6 +94,7 @@ class PdfExportWidget(QWidget):
 
         self._pdf_dpi_combo.setCurrentIndex(2)
         self._pdf_dpi_combo.currentIndexChanged.connect(self.update_summary)
+        self._pdf_dpi_combo.currentIndexChanged.connect(self._save_project_settings)
 
         quality_layout.addRow(self._translator.tr('render.resolution'), self._pdf_dpi_combo)
 
@@ -151,6 +134,14 @@ class PdfExportWidget(QWidget):
             self._pdf_keywords_edit,
         )
 
+        for editor in (
+            self._pdf_title_edit,
+            self._pdf_author_edit,
+            self._pdf_subject_edit,
+            self._pdf_keywords_edit,
+        ):
+            editor.editingFinished.connect(self._save_project_settings)
+
         render_layout.addWidget(metadata_group)
 
         # Document summary.
@@ -158,17 +149,12 @@ class PdfExportWidget(QWidget):
         document_layout = QFormLayout(document_group)
 
         self._pdf_format_label = QLabel()
-        self._pdf_orientation_label = QLabel()
         self._pdf_pages_label = QLabel()
         self._pdf_photos_label = QLabel()
 
         document_layout.addRow(
             self._translator.tr('render.document_format'),
             self._pdf_format_label,
-        )
-        document_layout.addRow(
-            self._translator.tr('render.document_orientation'),
-            self._pdf_orientation_label,
         )
         document_layout.addRow(
             self._translator.tr('render.document_pages'),
@@ -180,6 +166,23 @@ class PdfExportWidget(QWidget):
         )
 
         render_layout.addWidget(document_group)
+
+        # Output file: keep the destination next to the final generate action.
+        output_group = QGroupBox(self._translator.tr('render.output_group'))
+        output_layout = QHBoxLayout(output_group)
+
+        self._pdf_output_edit = QLineEdit()
+        self._pdf_output_edit.setPlaceholderText(
+            self._translator.tr('render.output_placeholder')
+        )
+
+        self._pdf_output_button = QPushButton(self._translator.tr('render.browse'))
+        self._pdf_output_button.clicked.connect(self._choose_pdf_output)
+
+        output_layout.addWidget(self._pdf_output_edit, 1)
+        output_layout.addWidget(self._pdf_output_button)
+
+        render_layout.addWidget(output_group)
 
         self._pdf_progress_bar = QProgressBar()
         self._pdf_progress_bar.setRange(0, 1)
@@ -210,6 +213,63 @@ class PdfExportWidget(QWidget):
         action_layout.addWidget(self.generate_button)
 
         render_layout.addLayout(action_layout)
+
+
+    def set_project_settings(self, settings: PdfExportSettings | None) -> None:
+        """Load persisted PDF preferences without writing them back."""
+        if settings is None:
+            settings = PdfExportSettings()
+
+        self._loading_project_settings = True
+        try:
+            index = self._pdf_dpi_combo.findData(settings.dpi)
+            self._pdf_dpi_combo.setCurrentIndex(index if index >= 0 else 2)
+
+            self._pdf_content_complete_radio.setChecked(
+                settings.content == PdfExportContent.COMPLETE.value
+            )
+            self._pdf_content_covers_radio.setChecked(
+                settings.content == PdfExportContent.COVERS.value
+            )
+            self._pdf_content_body_radio.setChecked(
+                settings.content == PdfExportContent.BODY.value
+            )
+
+            self._pdf_title_edit.setText(settings.metadata.title)
+            self._pdf_author_edit.setText(settings.metadata.author)
+            self._pdf_subject_edit.setText(settings.metadata.subject)
+            self._pdf_keywords_edit.setText(settings.metadata.keywords)
+        finally:
+            self._loading_project_settings = False
+
+        self.update_summary()
+
+    def project_settings(self) -> PdfExportSettings:
+        if self._pdf_content_covers_radio.isChecked():
+            content = PdfExportContent.COVERS.value
+        elif self._pdf_content_body_radio.isChecked():
+            content = PdfExportContent.BODY.value
+        else:
+            content = PdfExportContent.COMPLETE.value
+
+        return PdfExportSettings(
+            metadata=ProjectPdfMetadata(
+                title=self._pdf_title_edit.text().strip(),
+                author=self._pdf_author_edit.text().strip(),
+                subject=self._pdf_subject_edit.text().strip(),
+                keywords=self._pdf_keywords_edit.text().strip(),
+            ),
+            dpi=int(self._pdf_dpi_combo.currentData()),
+            content=content,
+        )
+
+    def save_project_settings(self) -> None:
+        if self._loading_project_settings or not self._project_service.is_open:
+            return
+        self._project_service.set_pdf_export_settings(self.project_settings())
+
+    def _save_project_settings(self, *args) -> None:
+        self.save_project_settings()
 
     def _choose_pdf_output(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
@@ -242,21 +302,12 @@ class PdfExportWidget(QWidget):
         width_mm = page_format.width_mm
         height_mm = page_format.height_mm
 
-        orientation = "landscape" if width_mm > height_mm else "portrait"
-
         dpi = int(self._pdf_dpi_combo.currentData())
 
         width_px = round(width_mm / 25.4 * dpi)
         height_px = round(height_mm / 25.4 * dpi)
 
         self._pdf_format_label.setText(f'{format_name} — {width_mm:g} × {height_mm:g} mm')
-
-        if orientation == "landscape":
-            orientation_text = self._translator.tr('render.landscape')
-        else:
-            orientation_text = self._translator.tr('render.portrait')
-
-        self._pdf_orientation_label.setText(orientation_text)
 
         self._pdf_pixel_size_label.setText(
             self._translator.tr(
@@ -316,23 +367,18 @@ class PdfExportWidget(QWidget):
             width_mm = page_format.width_mm
             height_mm = page_format.height_mm
 
-            dpi = int(self._pdf_dpi_combo.currentData())
+            pdf_settings = self.project_settings()
+            dpi = pdf_settings.dpi
 
             photos = self._project_service.list_album_photos()
-
-            if self._pdf_content_covers_radio.isChecked():
-                export_content = PdfExportContent.COVERS
-            elif self._pdf_content_body_radio.isChecked():
-                export_content = PdfExportContent.BODY
-            else:
-                export_content = PdfExportContent.COMPLETE
-
+            export_content = PdfExportContent(pdf_settings.content)
             metadata = PdfMetadata(
-                title=self._pdf_title_edit.text().strip(),
-                author=self._pdf_author_edit.text().strip(),
-                subject=self._pdf_subject_edit.text().strip(),
-                keywords=self._pdf_keywords_edit.text().strip(),
+                title=pdf_settings.metadata.title,
+                author=pdf_settings.metadata.author,
+                subject=pdf_settings.metadata.subject,
+                keywords=pdf_settings.metadata.keywords,
             )
+            self._project_service.set_pdf_export_settings(pdf_settings)
 
         except Exception as exc:
             self.error.emit(self._translator.tr('render.generate_error', error=exc))

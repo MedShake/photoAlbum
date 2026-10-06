@@ -10,6 +10,11 @@ from photoalbum.database.source_repository import SourceRepository
 from photoalbum.database import PhotoRepository, ProjectDatabase
 from photoalbum.models import Location, Photo
 from photoalbum.geocoding import NominatimGeocoder, create_nominatim_location_resolver
+from photoalbum.project_metadata import (
+    PdfExportSettings,
+    pdf_export_settings_from_json,
+    pdf_export_settings_to_json,
+)
 from photoalbum.sources import (
     PhotoMetadataPolicy,
     PhotoSource,
@@ -30,6 +35,8 @@ from photoalbum.album import (
 
 class ProjectService:
     ALBUM_STRUCTURE_SETTINGS_KEY = "album_structure_settings"
+    PROJECT_NAME_KEY = "project_name"
+    PDF_EXPORT_SETTINGS_KEY = "pdf_export_settings"
 
     def __init__(self) -> None:
         self._database: ProjectDatabase | None = None
@@ -56,6 +63,7 @@ class ProjectService:
 
         self._database = ProjectDatabase(path)
         self._database.initialize()
+        self.set_project_name(path.stem)
 
     def open(self, path: Path) -> None:
         self.close()
@@ -424,6 +432,37 @@ class ProjectService:
     def get_recursive_scan(self, source_id: str | None = None) -> bool:
         source = self.get_photo_source(source_id)
         return bool(source and source.config.get("recursive", False))
+
+
+    def get_project_name(self) -> str:
+        database = self._require_database()
+        value = database.get_project_metadata(self.PROJECT_NAME_KEY)
+        if value is not None and value.strip():
+            return value.strip()
+        project_path = self.project_path
+        return project_path.stem if project_path is not None else ""
+
+    def set_project_name(self, name: str) -> None:
+        normalized = name.strip()
+        if not normalized:
+            raise ValueError("Project name cannot be empty.")
+        self._require_database().set_project_metadata(
+            self.PROJECT_NAME_KEY, normalized
+        )
+
+    def set_pdf_export_settings(self, settings: PdfExportSettings) -> None:
+        self._require_database().set_project_metadata(
+            self.PDF_EXPORT_SETTINGS_KEY,
+            pdf_export_settings_to_json(settings),
+        )
+
+    def get_pdf_export_settings(self) -> PdfExportSettings | None:
+        value = self._require_database().get_project_metadata(
+            self.PDF_EXPORT_SETTINGS_KEY
+        )
+        if value is None:
+            return None
+        return pdf_export_settings_from_json(value)
 
     def set_album_structure_settings(
         self,

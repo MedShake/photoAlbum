@@ -535,7 +535,8 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "main.no_project": "No project open",
         "main.ready": "Ready",
-        "main.project": "Project: {name}",
+        "main.rename_project": "Rename project",
+        "main.project_name": "Project name",
 
         "main.open_project_title": "Open Photo Album Project",
         "main.project_file_filter": "Photo Album Project (*.photoalbum)",
@@ -1273,7 +1274,8 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "main.no_project": "Aucun projet ouvert",
         "main.ready": "Prêt",
-        "main.project": "Projet : {name}",
+        "main.rename_project": "Renommer le projet",
+        "main.project_name": "Nom du projet",
 
         "main.open_project_title": "Ouvrir un projet Photo Album",
         "main.project_file_filter": "Projet Photo Album (*.photoalbum)",
