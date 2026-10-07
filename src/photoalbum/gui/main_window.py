@@ -1145,8 +1145,8 @@ class MainWindow(QMainWindow):
 
     def _scan_photos_ready(self, photos: list[Photo]) -> None:
         # Source refreshes can recreate cached image files at the same paths.
-        # Expensive previews (notably the year photo scatter) key their raster
-        # cache from photo metadata, so a blank raster produced while assets
+        # Expensive previews can key their raster cache from photo metadata,
+        # so a blank raster produced while assets
         # were missing would otherwise survive the refresh.
         self._preview_render_service.clear()
         self._load_project_photos()
