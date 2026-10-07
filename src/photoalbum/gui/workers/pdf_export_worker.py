@@ -9,6 +9,7 @@ from PySide6.QtCore import (
 )
 
 from photoalbum.export import PdfExportService
+from photoalbum.cache_manager import CacheManager
 from photoalbum.i18n import Translator
 from photoalbum.sources import SourceReconnectRequiredError
 
@@ -66,13 +67,20 @@ class PdfExportWorker(QObject):
     @Slot()
     def run(self) -> None:
         try:
-            if self._prepare_assets is not None:
-                self._prepare_assets(list(self._arguments["result"].template_photos))
-            self._service.export(
-                output_path=self._output_path,
-                progress_callback=self._progress,
-                **self._arguments,
-            )
+            with CacheManager().protect():
+                photos = list(self._arguments["result"].template_photos)
+                previous_paths = [photo.path for photo in photos]
+                try:
+                    if self._prepare_assets is not None:
+                        self._prepare_assets(photos)
+                    self._service.export(
+                        output_path=self._output_path,
+                        progress_callback=self._progress,
+                        **self._arguments,
+                    )
+                finally:
+                    for photo, path in zip(photos, previous_paths):
+                        photo.path = path
         except SourceReconnectRequiredError as exc:
             key = (
                 "source.export.reconnect_required"

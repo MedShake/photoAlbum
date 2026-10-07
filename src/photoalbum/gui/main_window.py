@@ -163,6 +163,9 @@ class MainWindow(QMainWindow):
         self._quit_action = QAction(self._translator.tr('main.quit'), self)
         self._quit_action.triggered.connect(self.close)
 
+        self._cache_action = QAction(self._translator.tr("cache.title"), self)
+        self._cache_action.triggered.connect(self._show_cache_dialog)
+
         self._help_action = QAction(self._translator.tr('main.quick_help'), self)
         self._help_action.triggered.connect(self._show_help_dialog)
 
@@ -186,11 +189,22 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self._quit_action)
 
+        settings_menu = self.menuBar().addMenu(self._translator.tr("main.settings"))
+        settings_menu.addAction(self._cache_action)
+
         help_menu = self.menuBar().addMenu(self._translator.tr('main.help'))
         help_menu.addAction(self._help_action)
         help_menu.addAction(self._template_help_action)
         help_menu.addSeparator()
         help_menu.addAction(self._about_action)
+
+    def _show_cache_dialog(self) -> None:
+        from photoalbum.gui.cache_dialog import CacheDialog
+        dialog = CacheDialog(
+            self._translator, self,
+            project_is_open=lambda: self._project_service.is_open,
+        )
+        dialog.exec()
 
     def _show_help_dialog(self) -> None:
         """Display the localized quick help dialog."""

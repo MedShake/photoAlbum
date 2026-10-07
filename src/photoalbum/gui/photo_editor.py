@@ -411,6 +411,7 @@ class PhotoEditor(QObject):
         source = self._project_service.get_photo_source(photo.source_id)
         if source is not None and source.kind != "local":
             try:
+                self._project_service.retain_cached_originals()
                 self._project_service.materialize_originals([photo])
             except Exception as exc:
                 self.error.emit(self._translator.tr("photos.open_image.prepare_error"))

@@ -43,6 +43,25 @@ class ProjectService:
         # Authenticated providers are session-only. In particular, passwords
         # and session tokens are never serialized into the project database.
         self._source_sessions: dict[str, PhotoSource] = {}
+        self._asset_cache = None
+        self._cache_lease = None
+        self._external_asset_lease = None
+
+    def _open_cache(self) -> None:
+        self._asset_cache = SourceAssetCache(
+            self._database.path, project_id=self._database.get_project_metadata("cache_project_id")
+        )
+        self._cache_lease = self._asset_cache.manager.protect(
+            self._asset_cache.project_id, light_only=True
+        )
+        self._cache_lease.__enter__()
+        self._asset_cache.manager.enforce_quota()
+
+    def retain_cached_originals(self) -> None:
+        """An external viewer has no completion callback: retain until project close."""
+        if self._external_asset_lease is None:
+            self._external_asset_lease = self._asset_cache.manager.protect(self._asset_cache.project_id)
+            self._external_asset_lease.__enter__()
 
     @property
     def is_open(self) -> bool:
@@ -64,6 +83,7 @@ class ProjectService:
         self._database = ProjectDatabase(path)
         self._database.initialize()
         self.set_project_name(path.stem)
+        self._open_cache()
 
     def open(self, path: Path) -> None:
         self.close()
@@ -83,13 +103,21 @@ class ProjectService:
         self._database = ProjectDatabase(path)
         self._database.initialize()
 
+        self._open_cache()
+
     def list_photos(self) -> list[Photo]:
         database = self._require_database()
 
         repository = PhotoRepository(database)
 
-        active = {source.id for source in self.list_sources() if source.enabled}
-        return [photo for photo in repository.list_all() if photo.source_id in active]
+        active = {source.id: source for source in self.list_sources() if source.enabled}
+        photos = [photo for photo in repository.list_all() if photo.source_id in active]
+        for photo in photos:
+            if active[photo.source_id].kind != "local":
+                # Persisted paths may refer to an old adjacent cache or another OS.
+                photo.path = (self._asset_cache.cached_path(photo, "thumbnail")
+                              or self._asset_cache.path_for(photo, "thumbnail"))
+        return photos
 
     def find_photo(self, photo_path: Path) -> Photo | None:
         repository = PhotoRepository(self._require_database())
@@ -233,6 +261,12 @@ class ProjectService:
         if self._database is not None:
             self._database.close()
             self._database = None
+        for name in ("_external_asset_lease", "_cache_lease"):
+            lease = getattr(self, name)
+            if lease is not None:
+                setattr(self, name, None)
+                lease.__exit__(None, None, None)
+        self._asset_cache = None
 
     def list_sources(self) -> list[ProjectSource]:
         return SourceRepository(self._require_database()).list_all()
@@ -268,6 +302,7 @@ class ProjectService:
 
     def delete_source(self, source_id: str) -> None:
         SourceRepository(self._require_database()).delete(source_id)
+        self._asset_cache.manager.purge(self._asset_cache.project_id, source_id)
         provider = self._source_sessions.pop(source_id, None)
         if provider is not None:
             provider.close()
@@ -411,9 +446,8 @@ class ProjectService:
                 continue
             provider = self._source_sessions.get(photo.source_id)
             if provider is None:
-                path = cache.path_for(photo, "original")
-                marker = path.with_suffix(path.suffix + ".original")
-                if marker.is_file():
+                path = cache.cached_path(photo, "original")
+                if path is not None:
                     photo.path = path
                     continue
                 raise SourceReconnectRequiredError(

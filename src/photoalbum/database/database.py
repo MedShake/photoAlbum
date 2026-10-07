@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from uuid import uuid4
 
 
 class ProjectDatabase:
@@ -35,6 +36,10 @@ class ProjectDatabase:
     def _initialize_schema(self) -> None:
         self._create_schema_version_table()
         self._create_project_metadata_table()
+        self.connection.execute(
+            "INSERT OR IGNORE INTO project_metadata (key, value) VALUES (?, ?)",
+            ("cache_project_id", uuid4().hex),
+        )
         self._create_geocoding_cache_table()
         version = self._schema_version()
 

@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
+from sqlite3 import OperationalError
 
+from photoalbum.cache_manager import CacheManager
+from photoalbum.database import ProjectDatabase
 from photoalbum.models import Photo
 
 from .base import PhotoSource, SourceAsset
@@ -13,19 +16,36 @@ from .errors import SourceReconnectRequiredError
 class SourceAssetCache:
     """Project-scoped cache for provider thumbnails and original files."""
 
-    def __init__(self, project_path: Path) -> None:
-        project_path = project_path.expanduser().resolve()
-        self.root = project_path.parent / f".{project_path.name}.cache" / "assets"
+    def __init__(self, project_path: Path, *, project_id: str | None = None) -> None:
+        if project_id is None:
+            database = ProjectDatabase(project_path.expanduser().resolve())
+            try:
+                try:
+                    project_id = database.get_project_metadata("cache_project_id")
+                except OperationalError:
+                    project_id = None
+                if project_id is None:
+                    database.initialize()
+                    project_id = database.get_project_metadata("cache_project_id")
+            finally:
+                database.close()
+        self.project_id = project_id
+        self.manager = CacheManager()
+        self.root = self.manager.project_directory(self.project_id)
 
     def path_for(self, photo: Photo, quality: str) -> Path:
         if quality not in {"thumbnail", "original"}:
             raise ValueError(f"Unsupported asset quality: {quality}")
-        digest = sha256(photo.identity.encode("utf-8")).hexdigest()
+        digest = sha256((photo.identity + "\0" + (photo.content_hash or "")).encode("utf-8")).hexdigest()
         suffix = Path(photo.filename).suffix.lower() or ".jpg"
-        # A stable canonical path keeps existing renderer contracts intact.
-        # The thumbnail initially occupies it; requesting the original upgrades
-        # that cache entry atomically without changing Photo.path.
-        return self.root / digest[:2] / digest / f"asset{suffix}"
+        return self.manager.source_directory(self.project_id, photo.source_id) / quality / digest / f"asset{suffix}"
+
+    def cached_path(self, photo: Photo, quality: str) -> Path | None:
+        path = self.path_for(photo, quality)
+        if path.is_file() and path.stat().st_size > 0:
+            self.manager.touch(path)
+            return path
+        return None
 
     def materialize(
         self,
@@ -35,22 +55,6 @@ class SourceAssetCache:
         quality: str,
     ) -> Path:
         destination = self.path_for(photo, quality)
-        original_marker = destination.with_suffix(destination.suffix + ".original")
-        revision_file = destination.with_suffix(destination.suffix + ".revision")
-        expected_revision = photo.content_hash or ""
-        try:
-            cached_revision = revision_file.read_text(encoding="utf-8")
-        except OSError:
-            cached_revision = None
-        if (
-            destination.is_file()
-            and destination.stat().st_size > 0
-            and cached_revision == expected_revision
-            and (quality == "thumbnail" or original_marker.is_file())
-        ):
-            return destination
-        if cached_revision != expected_revision:
-            original_marker.unlink(missing_ok=True)
         asset = SourceAsset(
             id=photo.asset_id or photo.identity,
             filename=photo.filename,
@@ -67,14 +71,26 @@ class SourceAssetCache:
             metadata=photo.source_metadata or {},
             candidates=photo.metadata_candidates,
         )
-        if quality == "thumbnail":
-            path = provider.fetch_thumbnail(asset, destination)
-            revision_file.write_text(expected_revision, encoding="utf-8")
-            return path
-        path = provider.fetch_original(asset, destination)
-        revision_file.write_text(expected_revision, encoding="utf-8")
-        original_marker.touch()
-        return path
+        with self.manager.protect(trim=False):
+            cached = self.cached_path(photo, quality)
+            if cached is not None:
+                return cached
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            # Publish only complete files; a failed download must not look cached.
+            from uuid import uuid4
+            temporary = destination.with_name(f".{uuid4().hex}{destination.suffix}")
+            try:
+                fetch = provider.fetch_thumbnail if quality == "thumbnail" else provider.fetch_original
+                fetched = Path(fetch(asset, temporary))
+                if fetched != temporary:
+                    # Local providers may return their original instead of copying.
+                    from shutil import copyfile
+                    copyfile(fetched, temporary)
+                temporary.replace(destination)
+            finally:
+                temporary.unlink(missing_ok=True)
+        self.manager.enforce_quota(exclude=(destination,))
+        return destination
 
     def renderer_photos(
         self,
@@ -94,8 +110,8 @@ class SourceAssetCache:
                 continue
             provider = providers.get(photo.source_id)
             if provider is None:
-                path = self.path_for(photo, quality)
-                if not path.is_file():
+                path = self.cached_path(photo, quality)
+                if path is None:
                     raise SourceReconnectRequiredError(
                         filename=photo.filename,
                         source_id=photo.source_id,

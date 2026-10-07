@@ -296,7 +296,8 @@ def test_original_is_fetched_only_when_materialized(tmp_path):
     assert thumbnail.read_bytes() == b"thumbnail:42"
     assert provider.original_fetches == []
     original = cache.materialize(photo, provider, quality="original")
-    assert original == thumbnail
+    assert original != thumbnail
+    assert thumbnail.read_bytes() == b"thumbnail:42"
     assert original.read_bytes() == b"original:42"
     assert provider.original_fetches == ["42"]
 

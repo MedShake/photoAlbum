@@ -745,17 +745,19 @@ def run_pdf(
         print()
         print("Generating PDF...")
 
-        service.materialize_originals(list(result.template_photos))
-        exporter.export(
-            output_path=output_path,
-            result=result,
-            settings=settings,
-            photos=photos,
-            page_width_mm=width_mm,
-            page_height_mm=height_mm,
-            dpi=args.dpi,
-            metadata=metadata,
-        )
+        from photoalbum.cache_manager import CacheManager
+        with CacheManager().protect():
+            service.materialize_originals(list(result.template_photos))
+            exporter.export(
+                output_path=output_path,
+                result=result,
+                settings=settings,
+                photos=photos,
+                page_width_mm=width_mm,
+                page_height_mm=height_mm,
+                dpi=args.dpi,
+                metadata=metadata,
+            )
 
         print()
         print("PDF generated successfully:")

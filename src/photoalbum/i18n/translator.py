@@ -3,6 +3,26 @@ from __future__ import annotations
 
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
+        "main.settings": "Settings",
+        "cache.title": "Cache management…",
+        "cache.used": "Cache space used",
+        "cache.free": "Available disk space",
+        "cache.maximum": "Maximum cache size",
+        "cache.unit": " GB",
+        "cache.size": "{value} GB",
+        "cache.unlimited": "Unlimited",
+        "cache.clear": "Clear cache",
+        "cache.save": "Save",
+        "cache.close": "Close",
+        "cache.close_project": "Close the current project to change or clear the cache.",
+        "cache.explanation": (
+            "The limit applies to all projects and does not reserve disk space. "
+            "Clearing the cache does not delete projects, their metadata or original "
+            "source files. Cached remote copies will need to be downloaded again."
+        ),
+        "cache.space_warning": "The selected limit exceeds the available disk space. You can still save it.",
+        "cache.confirm": "Clear the Photo Album cache for all projects? Remote copies will need to be downloaded again.",
+        "cache.error": "Cannot change or clear the cache. It may be in use by another Photo Album window, or inaccessible.",
         "sources.add": "Project sources",
         "sources.add_button": "Add…",
         "sources.list": "Album sources",
@@ -785,6 +805,26 @@ CATALOGS: dict[str, dict[str, str]] = {
     },
 
     "fr": {
+        "main.settings": "Paramètres",
+        "cache.title": "Gestion du cache…",
+        "cache.used": "Taille du cache utilisé",
+        "cache.free": "Espace disque disponible",
+        "cache.maximum": "Taille maximale du cache",
+        "cache.unit": " Go",
+        "cache.size": "{value} Go",
+        "cache.unlimited": "Sans limite",
+        "cache.clear": "Vider le cache",
+        "cache.save": "Enregistrer",
+        "cache.close": "Fermer",
+        "cache.close_project": "Fermez le projet en cours pour modifier ou vider le cache.",
+        "cache.explanation": (
+            "La limite concerne tous les projets et ne réserve pas d’espace disque. "
+            "Vider le cache ne supprime ni les projets, ni leurs métadonnées, ni les "
+            "fichiers originaux des sources. Les copies distantes en cache devront être téléchargées à nouveau."
+        ),
+        "cache.space_warning": "La limite choisie dépasse l’espace disque disponible. Vous pouvez néanmoins l’enregistrer.",
+        "cache.confirm": "Vider le cache Photo Album de tous les projets ? Les copies distantes devront être téléchargées à nouveau.",
+        "cache.error": "Impossible de modifier ou vider le cache. Il peut être utilisé par une autre fenêtre Photo Album, ou inaccessible.",
         "sources.add": "Sources du projet",
         "sources.add_button": "Ajouter…",
         "sources.list": "Source(s) de l’album",
