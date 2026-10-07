@@ -1,5 +1,5 @@
 import pytest
-from PySide6.QtWidgets import QApplication, QDialogButtonBox, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialogButtonBox, QGroupBox, QMessageBox
 
 from photoalbum.cache_manager import CacheManager, GB
 from photoalbum.gui.cache_dialog import CacheDialog
@@ -17,6 +17,11 @@ def test_dialog_free_quota_unlimited_warning_and_persistence(app, monkeypatch):
     monkeypatch.setattr(manager, "available_bytes", lambda: GB)
     dialog = CacheDialog(Translator("fr"), manager=manager)
     assert dialog.quota_spin.value() == 20
+    assert dialog.minimumWidth() >= 700
+    assert dialog.minimumHeight() >= 360
+    assert dialog.quota_spin.minimumWidth() >= 180
+    groups = {group.title() for group in dialog.findChildren(QGroupBox)}
+    assert {"Gestion de la taille du cache", "Nettoyage du cache"} <= groups
     assert dialog.quota_spin.isEnabled() and dialog.purge_button.isEnabled()
     assert dialog.warning_label.text()
     dialog.quota_spin.setValue(12.37)
@@ -39,18 +44,37 @@ def test_dialog_free_quota_unlimited_warning_and_persistence(app, monkeypatch):
 def test_purge_needs_confirmation_and_rechecks_project_state(app, monkeypatch):
     manager = CacheManager()
     calls = []
-    monkeypatch.setattr(manager, "purge", lambda: calls.append(True))
+    legacy = manager.root.parent / ".legacy.photoalbum.cache"
+    legacy.mkdir()
+    (legacy / "image.jpg").write_bytes(b"legacy")
+    legacy_searches = []
+    monkeypatch.setattr(
+        manager, "legacy_cache_directories",
+        lambda: legacy_searches.append(True) or [legacy],
+    )
+    monkeypatch.setattr(manager, "purge", lambda: calls.append("current"))
+    monkeypatch.setattr(manager, "purge_legacy_caches", lambda paths: calls.append(tuple(paths)) or [])
     active = [False]
     dialog = CacheDialog(Translator("fr"), project_is_open=lambda: active[0], manager=manager)
     monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+    assert not dialog.legacy_cleanup_checkbox.isChecked()
     dialog.purge_button.click()
     assert calls == []
-    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    assert legacy_searches == []
+    asked = []
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        lambda *args: asked.append(args[2]) or QMessageBox.StandardButton.Yes,
+    )
+    dialog.legacy_cleanup_checkbox.setChecked(True)
     dialog.purge_button.click()
-    assert calls == [True]
+    assert calls == ["current", (legacy,)]
+    assert legacy_searches == [True]
+    assert "1" in asked[0]
+    assert "ancien" in asked[0].lower()
     active[0] = True
     dialog._purge()
-    assert calls == [True]
+    assert calls == ["current", (legacy,)]
     dialog.deleteLater()
 
 
@@ -66,6 +90,7 @@ def test_menu_opens_readonly_dialog_with_project_and_editable_without(app, tmp_p
         assert dialog.quota_spin.isEnabled() == (not active)
         assert dialog.unlimited_checkbox.isEnabled() == (not active)
         assert dialog.purge_button.isEnabled() == (not active)
+        assert dialog.legacy_cleanup_checkbox.isEnabled() == (not active)
         assert dialog.save_button.isEnabled() == (not active)
         assert dialog.project_label.isHidden() == (not active)
         assert dialog.project_label.text() == tr("cache.close_project")

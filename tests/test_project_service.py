@@ -326,8 +326,8 @@ def test_photo_metadata_policy_defaults_for_local_source(tmp_path: Path):
     assert policy == PhotoMetadataPolicy(
         date_preference="exif",
         gps_preference="exif",
-        location_preference="geocoding",
-        nominatim_enabled=True,
+        location_preference="none",
+        nominatim_enabled=False,
     )
 
     service.close()

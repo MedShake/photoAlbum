@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 
 class FolderScanner:
@@ -25,21 +26,22 @@ class FolderScanner:
                 f"Path is not a directory: {directory}"
             )
 
-        iterator = (
-            directory.rglob("*")
-            if recursive
-            else directory.glob("*")
-        )
+        # pathlib glob can silently skip unreadable directories. Abort before
+        # changing the snapshot if any directory in the requested scan fails.
+        images = []
 
-        images = [
-            path
-            for path in iterator
-            if path.is_file()
-            and path.suffix.lower() in self.SUPPORTED_EXTENSIONS
-        ]
+        def visit(folder):
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    path = Path(entry.path)
+                    if entry.is_file() and path.suffix.lower() in self.SUPPORTED_EXTENSIONS:
+                        images.append(path)
+                    elif recursive and entry.is_dir(follow_symlinks=False):
+                        visit(path)
+
+        visit(directory)
 
         return sorted(
             images,
             key=lambda path: str(path).lower(),
         )
-

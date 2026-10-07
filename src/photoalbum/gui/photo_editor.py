@@ -16,6 +16,8 @@ from photoalbum.gui.workers import GpsGeocodingWorker
 from photoalbum.i18n import Translator
 from photoalbum.i18n.date_formatter import datetime_edit_format, format_datetime
 from photoalbum.models import Photo
+from photoalbum.sources import SourceReconnectRequiredError
+from photoalbum.sources.base import SourceError
 
 
 class PhotoEditor(QObject):
@@ -413,6 +415,14 @@ class PhotoEditor(QObject):
             try:
                 self._project_service.retain_cached_originals()
                 self._project_service.materialize_originals([photo])
+            except SourceReconnectRequiredError as exc:
+                self.error.emit(self._translator.tr(
+                    "source.asset.reconnect_required", filename=exc.filename,
+                ))
+                return
+            except SourceError as exc:
+                self.error.emit(self._translator.tr("source.asset.access_failed", error=str(exc)))
+                return
             except Exception as exc:
                 self.error.emit(self._translator.tr("photos.open_image.prepare_error"))
                 return

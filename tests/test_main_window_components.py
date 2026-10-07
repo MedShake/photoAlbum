@@ -797,7 +797,7 @@ def test_policy_choices_use_actual_candidates_and_provider_label(app):
 def test_remote_source_card_exposes_reconnect_action_without_heartbeat(app):
     view = PhotoSourcesWidget(Translator("en"))
     disconnected = _source_card(view, session_available=False)
-    assert disconnected.connection_status_label.text() == "Reconnection required"
+    assert disconnected.connection_status_label.text() == "No active session"
     assert disconnected.edit_button.text() == "Reconnect…"
     assert not disconnected.sync_button.isEnabled()
 
@@ -1102,6 +1102,10 @@ def test_enabling_nominatim_selects_it_for_location_after_success(
     assert policy.location_preference == "geocoding"
     assert source_id not in window._pending_nominatim_location_sources
 
+    service.close()
+    service.open(tmp_path / "nominatim-default.photoalbum")
+    assert service.get_photo_metadata_policy(source_id) == policy
+
 
 def test_failed_first_nominatim_refresh_keeps_location_policy(
     window, tmp_path, monkeypatch,
@@ -1145,3 +1149,75 @@ def test_source_refresh_completion_does_not_log_global_metadata_count(app, tmp_p
     assert "Metadata updated" not in view.log_view.toPlainText()
     view.close()
     service.close()
+
+
+def test_reconnecting_unchanged_synology_source_synchronizes_it(window, tmp_path, monkeypatch):
+    from photoalbum.gui import main_window as main_window_module
+
+    service = window._project_service
+    service.create(tmp_path / "reconnect-sync.photoalbum")
+    source = ProjectSource(
+        id="synology-reconnect",
+        kind="synology-photos",
+        name="Synology Photos",
+        collection_id="album-1",
+        collection_name="Album",
+        config={"base_url": "https://nas.example"},
+        provider_label="Synology Photos",
+    )
+    service.set_photo_source(source)
+
+    provider = SimpleNamespace(close=lambda: None)
+
+    class FakeDialog:
+        def __init__(self, *args, **kwargs):
+            self.source = source
+            self.provider = provider
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(main_window_module, "SynologySourceDialog", FakeDialog)
+    synchronized = []
+    monkeypatch.setattr(
+        window._scan_controller, "sync_source", synchronized.append
+    )
+
+    window._choose_synology_source(source.id)
+
+    assert service.get_photo_source_session(source.id) is provider
+    assert synchronized == [source.id]
+
+
+def test_scan_photos_ready_invalidates_expensive_preview_cache(window, monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        window._preview_render_service, "clear", lambda: events.append("clear")
+    )
+    monkeypatch.setattr(
+        window, "_load_project_photos", lambda: events.append("reload")
+    )
+
+    window._scan_photos_ready([])
+
+    assert events == ["clear", "reload"]
+
+
+@pytest.mark.parametrize("kind,connected", [("local", False), ("synology-photos", True), ("synology-photos", False)])
+def test_reactivation_refreshes_available_source_or_explains_snapshot(window, tmp_path, monkeypatch, kind, connected):
+    service = window._project_service
+    service.create(tmp_path / "reactivate.photoalbum")
+    source = ProjectSource(
+        id="reactivated", kind=kind, name="Source", collection_id="album",
+        collection_name="Album", enabled=False, config={"directory": str(tmp_path)},
+    )
+    service.set_photo_source(source)
+    if connected:
+        service.attach_source_session(source.id, SimpleNamespace(close=lambda: None))
+    calls = []
+    monkeypatch.setattr(window._scan_controller, "sync_source", calls.append)
+    window._source_enabled_changed(source.id, True)
+    assert service.get_photo_source(source.id).enabled
+    assert calls == ([source.id] if kind == "local" or connected else [])
+    if kind != "local" and not connected:
+        assert "snapshot" in window._photos_widget.log_view.toPlainText().lower()

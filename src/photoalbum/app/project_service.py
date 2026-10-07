@@ -26,6 +26,8 @@ from photoalbum.sources import (
     SourceCapabilities,
     SourceReconnectRequiredError,
 )
+from photoalbum.sources.base import SourceError
+from photoalbum.sources.operation import SourceOperationResult
 
 from photoalbum.album import (
     AlbumStructureSettings,
@@ -43,6 +45,7 @@ class ProjectService:
         # Authenticated providers are session-only. In particular, passwords
         # and session tokens are never serialized into the project database.
         self._source_sessions: dict[str, PhotoSource] = {}
+        self._source_results: dict[str, SourceOperationResult] = {}
         self._asset_cache = None
         self._cache_lease = None
         self._external_asset_lease = None
@@ -258,6 +261,7 @@ class ProjectService:
             except Exception:
                 pass
         self._source_sessions.clear()
+        self._source_results.clear()
         if self._database is not None:
             self._database.close()
             self._database = None
@@ -394,7 +398,40 @@ class ProjectService:
     ) -> PhotoSource | None:
         """Return the in-memory provider session for a configured source."""
         self._require_database()
-        return self._source_sessions.get(source_id)
+        provider = self._source_sessions.get(source_id)
+        if getattr(provider, "session_invalid", False) is True:
+            return None
+        result = self._source_results.get(source_id)
+        if result is not None and result.issue == "authentication":
+            return None
+        return provider
+
+    def record_source_result(self, result: SourceOperationResult) -> None:
+        self._source_results[result.source_id] = result
+
+    def source_status(self, source: ProjectSource) -> str | None:
+        result = self._source_results.get(source.id)
+        if source.kind == "local":
+            import os
+            try:
+                with os.scandir(str(source.config["directory"])):
+                    pass
+            except OSError:
+                return "unavailable"
+        else:
+            provider = self._source_sessions.get(source.id)
+            if (getattr(provider, "session_invalid", False) is True
+                    or (result is not None and result.issue == "authentication")):
+                return "invalid_session"
+            if provider is None:
+                return "no_session"
+        if result is not None and result.status != "success":
+            if result.issue == "geocoding":
+                return "geocoding"
+            if result.issue == "access":
+                return "unavailable"
+            return result.status
+        return None
 
     def attach_source_session(self, source_id: str, provider: PhotoSource) -> None:
         self._require_database()
@@ -402,6 +439,7 @@ class ProjectService:
         if old is not None and old is not provider:
             old.close()
         self._source_sessions[source_id] = provider
+        self._source_results.pop(source_id, None)
 
     def activate_source_session(self, source_id: str, provider: PhotoSource) -> None:
         self.attach_source_session(source_id, provider)
@@ -444,7 +482,7 @@ class ProjectService:
             if source is not None and source.kind == "local":
                 photo.require_path()
                 continue
-            provider = self._source_sessions.get(photo.source_id)
+            provider = self.get_photo_source_session(photo.source_id)
             if provider is None:
                 path = cache.cached_path(photo, "original")
                 if path is not None:
@@ -455,7 +493,18 @@ class ProjectService:
                     source_id=photo.source_id,
                     operation="export",
                 )
-            photo.path = cache.materialize(photo, provider, quality="original")
+            try:
+                photo.path = cache.materialize(photo, provider, quality="original")
+            except SourceReconnectRequiredError:
+                self.record_source_result(SourceOperationResult(
+                    photo.source_id, "failed", "authentication",
+                ))
+                raise
+            except SourceError as exc:
+                self.record_source_result(SourceOperationResult(
+                    photo.source_id, "failed", "access", str(exc),
+                ))
+                raise
 
     def set_recursive_scan(self, recursive: bool, source_id: str | None = None) -> None:
         source = self.get_photo_source(source_id)

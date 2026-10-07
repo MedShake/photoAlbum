@@ -3,8 +3,22 @@ from __future__ import annotations
 
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
+        "source.asset.access_failed": "Cannot access the photo source: {error}",
+        "sources.state.no_session": "No active session",
+        "sources.state.invalid_session": "Session invalid — reconnect",
+        "sources.state.unavailable": "Source unavailable",
+        "sources.state.failed": "Last operation failed",
+        "sources.state.partial": "Partial result",
+        "sources.state.cancelled": "Operation cancelled",
+        "sources.state.geocoding": "Geocoding incomplete",
+        "sources.state.cached_hint": "Cached photos remain usable. Reconnect to synchronize or retrieve files absent from the cache. See the activity log for operation details.",
+        "sources.state.snapshot_hint": "The stored snapshot is preserved. See the activity log for operation details.",
+        "sources.operation.partial": "Operation partially completed. See the activity log.",
+        "sources.reactivated_snapshot": "{source}: stored snapshot reactivated. Reconnect to synchronize it.",
         "main.settings": "Settings",
         "cache.title": "Cache management…",
+        "cache.size_management": "Cache size management",
+        "cache.cleanup": "Cache cleanup",
         "cache.used": "Cache space used",
         "cache.free": "Available disk space",
         "cache.maximum": "Maximum cache size",
@@ -12,16 +26,40 @@ CATALOGS: dict[str, dict[str, str]] = {
         "cache.size": "{value} GB",
         "cache.unlimited": "Unlimited",
         "cache.clear": "Clear cache",
+        "cache.legacy_cleanup_option": "Also find and remove caches created by earlier versions (may take some time)",
+        "cache.legacy_cleanup_note": (
+            "Automatic search is limited to your user folder. For exhaustive removal of "
+            "legacy caches across the whole system, manually look for folders matching "
+            "`.*.photoalbum.cache`."
+        ),
         "cache.save": "Save",
         "cache.close": "Close",
-        "cache.close_project": "Close the current project to change or clear the cache.",
-        "cache.explanation": (
-            "The limit applies to all projects and does not reserve disk space. "
-            "Clearing the cache does not delete projects, their metadata or original "
-            "source files. Cached remote copies will need to be downloaded again."
+        "cache.close_project": "Project open — close it to change settings or clear the cache.",
+        "cache.size_explanation": (
+            "The cache is shared by all projects. The limit set here does not reserve "
+            "disk space; it only defines the maximum size Photo Album will try not to exceed."
+        ),
+        "cache.cleanup_explanation": (
+            "Clearing the cache removes only temporary Photo Album files. Projects, their "
+            "metadata and original source files are not deleted. Cached previews will be "
+            "regenerated as needed, and cached remote copies will need to be downloaded again."
         ),
         "cache.space_warning": "The selected limit exceeds the available disk space. You can still save it.",
-        "cache.confirm": "Clear the Photo Album cache for all projects? Remote copies will need to be downloaded again.",
+        "cache.confirm": (
+            "Clear the Photo Album cache for all projects? Cached previews will be "
+            "regenerated as needed, and remote copies will need to be downloaded again."
+        ),
+        "cache.legacy_found_one": (
+            "1 legacy project cache ({value} GB) was also found in your user folder "
+            "and will be removed."
+        ),
+        "cache.legacy_found_many": (
+            "{count} legacy project caches ({value} GB) were also found in your user folder "
+            "and will be removed."
+        ),
+        "cache.legacy_cleanup_error": (
+            "The current cache was cleared, but {count} legacy cache folder(s) could not be removed."
+        ),
         "cache.error": "Cannot change or clear the cache. It may be in use by another Photo Album window, or inaccessible.",
         "sources.add": "Project sources",
         "sources.add_button": "Add…",
@@ -805,8 +843,22 @@ CATALOGS: dict[str, dict[str, str]] = {
     },
 
     "fr": {
+        "source.asset.access_failed": "Impossible d’accéder à la source photo : {error}",
+        "sources.state.no_session": "Sans session active",
+        "sources.state.invalid_session": "Session invalide — reconnecter",
+        "sources.state.unavailable": "Source indisponible",
+        "sources.state.failed": "Dernière opération en échec",
+        "sources.state.partial": "Résultat partiel",
+        "sources.state.cancelled": "Opération annulée",
+        "sources.state.geocoding": "Géocodage incomplet",
+        "sources.state.cached_hint": "Les photos en cache restent utilisables. Reconnectez-vous pour synchroniser ou récupérer les fichiers absents du cache. Consultez le journal pour le détail des opérations.",
+        "sources.state.snapshot_hint": "L’instantané mémorisé est conservé. Consultez le journal pour le détail des opérations.",
+        "sources.operation.partial": "Opération partiellement terminée. Consultez le journal d’activité.",
+        "sources.reactivated_snapshot": "{source} : instantané mémorisé réactivé. Reconnectez-vous pour le synchroniser.",
         "main.settings": "Paramètres",
         "cache.title": "Gestion du cache…",
+        "cache.size_management": "Gestion de la taille du cache",
+        "cache.cleanup": "Nettoyage du cache",
         "cache.used": "Taille du cache utilisé",
         "cache.free": "Espace disque disponible",
         "cache.maximum": "Taille maximale du cache",
@@ -814,16 +866,42 @@ CATALOGS: dict[str, dict[str, str]] = {
         "cache.size": "{value} Go",
         "cache.unlimited": "Sans limite",
         "cache.clear": "Vider le cache",
+        "cache.legacy_cleanup_option": "Rechercher et supprimer aussi les caches créés par d’anciennes versions (peut prendre du temps)",
+        "cache.legacy_cleanup_note": (
+            "La recherche automatique est limitée au dossier utilisateur. Pour une suppression "
+            "exhaustive des anciens caches sur l’ensemble du système, recherchez manuellement "
+            "les dossiers `.*.photoalbum.cache`."
+        ),
         "cache.save": "Enregistrer",
         "cache.close": "Fermer",
-        "cache.close_project": "Fermez le projet en cours pour modifier ou vider le cache.",
-        "cache.explanation": (
-            "La limite concerne tous les projets et ne réserve pas d’espace disque. "
-            "Vider le cache ne supprime ni les projets, ni leurs métadonnées, ni les "
-            "fichiers originaux des sources. Les copies distantes en cache devront être téléchargées à nouveau."
+        "cache.close_project": "Projet ouvert — fermez-le pour modifier les réglages ou vider le cache.",
+        "cache.size_explanation": (
+            "Le cache est partagé entre tous les projets. La limite définie ici ne réserve "
+            "pas d’espace disque ; elle fixe simplement la taille maximale que Photo Album "
+            "cherchera à ne pas dépasser."
+        ),
+        "cache.cleanup_explanation": (
+            "Vider le cache supprime uniquement les fichiers temporaires de Photo Album. "
+            "Les projets, leurs métadonnées et les fichiers originaux des sources ne sont "
+            "pas supprimés. Les aperçus seront recréés si nécessaire et les copies distantes "
+            "devront être téléchargées à nouveau."
         ),
         "cache.space_warning": "La limite choisie dépasse l’espace disque disponible. Vous pouvez néanmoins l’enregistrer.",
-        "cache.confirm": "Vider le cache Photo Album de tous les projets ? Les copies distantes devront être téléchargées à nouveau.",
+        "cache.confirm": (
+            "Vider le cache Photo Album de tous les projets ? Les aperçus en cache seront "
+            "recréés si nécessaire et les copies distantes devront être téléchargées à nouveau."
+        ),
+        "cache.legacy_found_one": (
+            "1 ancien cache de projet ({value} Go) a également été trouvé dans votre dossier utilisateur "
+            "et sera supprimé."
+        ),
+        "cache.legacy_found_many": (
+            "{count} anciens caches de projet ({value} Go) ont également été trouvés dans votre dossier utilisateur "
+            "et seront supprimés."
+        ),
+        "cache.legacy_cleanup_error": (
+            "Le cache actuel a été vidé, mais {count} ancien(s) dossier(s) de cache n’ont pas pu être supprimé(s)."
+        ),
         "cache.error": "Impossible de modifier ou vider le cache. Il peut être utilisé par une autre fenêtre Photo Album, ou inaccessible.",
         "sources.add": "Sources du projet",
         "sources.add_button": "Ajouter…",

@@ -94,6 +94,58 @@ def test_global_purge_removes_only_cache(tmp_path):
     assert original.read_bytes() == b"original"
 
 
+def test_legacy_cache_search_and_cleanup_is_limited_and_safe(tmp_path):
+    manager = CacheManager()
+    home = tmp_path / "home"
+    home.mkdir()
+    first = home / "Albums" / ".summer.photoalbum.cache"
+    second = home / "Archive" / ".family.photoalbum.cache"
+    normal = home / "Albums" / "project.photoalbum.cache"
+    for directory in (first, second):
+        assets = directory / "assets"
+        assets.mkdir(parents=True, exist_ok=True)
+        (assets / "asset.jpg").write_bytes(b"x" * 7)
+    normal.mkdir(parents=True, exist_ok=True)
+    (normal / "assets").mkdir()
+    (normal / "assets" / "asset.jpg").write_bytes(b"x" * 7)
+
+    # A link that merely looks like a legacy cache must never be traversed/deleted.
+    linked_target = tmp_path / "linked-target"
+    linked_target.mkdir()
+    linked = home / ".linked.photoalbum.cache"
+    try:
+        linked.symlink_to(linked_target, target_is_directory=True)
+    except OSError:
+        linked = None
+
+    found = manager.legacy_cache_directories(home)
+    assert set(found) == {first, second}
+    assert manager.paths_size(found) == 14
+    assert manager.purge_legacy_caches(found, search_root=home) == []
+    assert not first.exists() and not second.exists()
+    assert normal.exists()
+    assert linked_target.exists()
+    if linked is not None:
+        assert linked.exists()
+
+    outside = tmp_path / ".outside.photoalbum.cache"
+    (outside / "assets").mkdir(parents=True)
+    assert manager.purge_legacy_caches([outside], search_root=home) == [outside]
+    assert outside.exists()
+
+
+def test_legacy_cache_search_does_not_descend_into_current_global_cache(tmp_path):
+    home = tmp_path / "home"
+    root = home / "current-cache"
+    manager = CacheManager(root=root)
+    fake_legacy = root / ".inside.photoalbum.cache"
+    (fake_legacy / "assets").mkdir(parents=True)
+    outside = home / ".outside.photoalbum.cache"
+    (outside / "assets").mkdir(parents=True)
+
+    assert manager.legacy_cache_directories(home) == [outside]
+
+
 @pytest.mark.parametrize("kind", ["local", "synology-photos"])
 def test_source_cache_deleted_only_after_logical_success(tmp_path, monkeypatch, kind):
     service = ProjectService()

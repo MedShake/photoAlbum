@@ -9,6 +9,29 @@ from photoalbum.gui.widgets.photo_places_widget import PhotoPlacesWidget
 from photoalbum.models import Photo
 
 
+def test_reloading_same_identity_replaces_changed_thumbnail(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    widget = PhotoPlacesWidget()
+    path = tmp_path / "photo.png"
+    image = QImage(40, 30, QImage.Format.Format_RGB32)
+    photo = Photo(path=path, filename=path.name, asset_id="same")
+    image.fill(0xFFFF0000)
+    assert image.save(str(path))
+    widget.set_photos([photo])
+    label = widget._create_thumbnail_label(photo)
+    for _ in range(5):
+        app.processEvents()
+    assert label.pixmap().toImage().pixelColor(10, 10).name() == "#ff0000"
+    image.fill(0xFF0000FF)
+    assert image.save(str(path))
+    widget.set_photos([photo])
+    label = widget._create_thumbnail_label(photo)
+    for _ in range(5):
+        app.processEvents()
+    assert label.pixmap().toImage().pixelColor(10, 10).name() == "#0000ff"
+    widget.close()
+
+
 @pytest.mark.parametrize("preload", [False, True])
 def test_batch_dialog_loads_missing_thumbnails_and_reuses_cache(tmp_path, monkeypatch, preload):
     app = QApplication.instance() or QApplication([])

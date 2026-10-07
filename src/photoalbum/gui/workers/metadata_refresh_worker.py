@@ -24,6 +24,7 @@ class MetadataRefreshWorker(QObject):
     cancelled = Signal(object)
     failed = Signal(str)
     geocoding_status = Signal(bool)
+    event_received = Signal(object)
 
     def __init__(
         self,
@@ -87,6 +88,7 @@ class MetadataRefreshWorker(QObject):
                     nonlocal geocoding_ok
                     if event.type == ProcessingEventType.GEOCODING_ERROR:
                         geocoding_ok = False
+                    self.event_received.emit(event)
 
                 for index, photo in enumerate(eligible, start=1):
                     if self._cancel_requested:

@@ -25,6 +25,7 @@ class SourceCard(QGroupBox):
         parent=None,
         *,
         session_available: bool | None = None,
+        status: str | None = None,
     ):
         super().__init__(parent)
         self.source = source
@@ -72,15 +73,16 @@ class SourceCard(QGroupBox):
 
         is_remote = source.kind != "local"
         reconnect_required = is_remote and session_available is False
+        status = status or ("no_session" if reconnect_required else None)
         self.connection_status_icon = QLabel()
         self.connection_status_icon.setFixedSize(16, 16)
-        self.connection_status_icon.setVisible(reconnect_required)
+        self.connection_status_icon.setVisible(status is not None)
         self.connection_status_label = QLabel(
-            tr("sources.connection.reconnect_required") if reconnect_required else ""
+            tr("sources.state." + status) if status else ""
         )
-        self.connection_status_label.setVisible(reconnect_required)
-        if reconnect_required:
-            reconnect_tooltip = tr("sources.reconnect_required")
+        self.connection_status_label.setVisible(status is not None)
+        if status:
+            reconnect_tooltip = tr("sources.state.cached_hint") if is_remote else tr("sources.state.snapshot_hint")
             self.connection_status_icon.setPixmap(
                 resource_icon("plan-warning-orange.svg").pixmap(QSize(14, 14))
             )

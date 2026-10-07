@@ -9,7 +9,7 @@ from photoalbum.cache_manager import CacheManager
 from photoalbum.database import ProjectDatabase
 from photoalbum.models import Photo
 
-from .base import PhotoSource, SourceAsset
+from .base import PhotoSource, SourceAsset, AuthenticationError
 from .errors import SourceReconnectRequiredError
 
 
@@ -87,6 +87,12 @@ class SourceAssetCache:
                     from shutil import copyfile
                     copyfile(fetched, temporary)
                 temporary.replace(destination)
+            except AuthenticationError as exc:
+                if quality != "original":
+                    raise
+                raise SourceReconnectRequiredError(
+                    filename=photo.filename, source_id=photo.source_id,
+                ) from exc
             finally:
                 temporary.unlink(missing_ok=True)
         self.manager.enforce_quota(exclude=(destination,))

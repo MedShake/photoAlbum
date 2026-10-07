@@ -15,6 +15,7 @@ from photoalbum.gui.workers import (
 )
 from photoalbum.i18n import Translator
 from photoalbum.scanner import LibraryScanResult, ProcessingEvent, ProcessingEventType
+from photoalbum.sources.operation import SourceOperationResult
 
 
 class ScanController(QObject):
@@ -43,6 +44,7 @@ class ScanController(QObject):
         self._source_sync_name: str | None = None
         self._pending_source = None
         self._pending_provider = None
+        self._source_results = {}
         self.reset()
 
     @property
@@ -125,6 +127,7 @@ class ScanController(QObject):
         if not sources:
             return
         self._operation_kind = "sources"
+        self._source_results = {}
         self.running_changed.emit(True)
         # Local scans and metadata refreshes are cooperatively cancellable.
         # A remote provider synchronization remains snapshot-atomic.
@@ -144,6 +147,7 @@ class ScanController(QObject):
         worker.source_progress.connect(self._source_sync_progress)
         worker.event_received.connect(self._handle_processing_event)
         worker.log_message.connect(self._view.log_view.appendPlainText)
+        worker.source_result.connect(self._source_result_received)
         worker.completed.connect(self._metadata_refresh_completed)
         worker.failed.connect(self._scan_failed)
         worker.completed.connect(thread.quit)
@@ -193,6 +197,7 @@ class ScanController(QObject):
             or source.kind.replace("-", " ").title()
         )
         self._operation_kind = "source_import" if publish_source else "source_sync"
+        self._source_results = {}
         self._pending_source = source if publish_source else None
         self._pending_provider = provider if publish_source else None
 
@@ -218,11 +223,16 @@ class ScanController(QObject):
                 else source.effective_metadata_policy
             ),
             publish_source=publish_source,
+            language=self._language,
+            user_agent=user_agent(),
         )
 
         worker.moveToThread(thread)
 
         thread.started.connect(worker.run)
+        worker.source_result.connect(self._source_result_received)
+        worker.phase_progress.connect(self._scan_phase_progress)
+        worker.event_received.connect(self._handle_processing_event)
         worker.progress.connect(
             self._source_sync_progress
         )
@@ -257,13 +267,15 @@ class ScanController(QObject):
         )
 
     def _source_sync_completed(self, result) -> None:
-        self.analysis_completed = True
+        self.analysis_completed = all(item.status == "success" for item in self._source_results.values())
 
         if self._pending_source is not None and self._pending_provider is not None:
             self._project_service.activate_source_session(
                 self._pending_source.id,
                 self._pending_provider,
             )
+            for outcome in self._source_results.values():
+                self._project_service.record_source_result(outcome)
             self.source_changed.emit()
 
         photos = list(result.photos)
@@ -286,6 +298,40 @@ class ScanController(QObject):
                 missing=result.missing,
             )
         )
+        self._show_operation_result()
+        if not self.analysis_completed:
+            self._view.log_view.appendPlainText(self._translator.tr("sources.operation.partial"))
+            for outcome in self._source_results.values():
+                if outcome.detail:
+                    self._view.log_view.appendPlainText(outcome.detail)
+
+    def _source_result_received(self, result) -> None:
+        if (self._operation_kind == "source_import" and result.status == "failed"
+                and result.issue == "authentication"
+                and self._project_service.get_photo_source_session(result.source_id) is not None):
+            # A failed candidate import did not replace the existing source or
+            # its working session. Only the attempted modification failed.
+            from dataclasses import replace
+            result = replace(result, issue=None)
+        self._source_results[result.source_id] = result
+        self._project_service.record_source_result(result)
+
+    def _show_operation_result(self) -> None:
+        outcomes = list(self._source_results.values())
+        if not outcomes:
+            return
+        self.analysis_completed = all(item.status == "success" for item in outcomes)
+        if any(item.status == "cancelled" for item in outcomes):
+            key = "main.analysis_cancelled"
+        elif all(item.status == "failed" for item in outcomes):
+            key = "main.analysis_failed"
+        elif not self.analysis_completed:
+            key = "sources.operation.partial"
+        else:
+            key = "main.analysis_completed"
+        message = self._translator.tr(key)
+        self._view.summary_label.setText(message)
+        self.status_message.emit(message)
 
     def _source_sync_failed(
         self,
@@ -300,6 +346,7 @@ class ScanController(QObject):
         self._view.summary_label.setText(
             self._translator.tr("source.sync.failed")
         )
+        self._view.log_view.appendPlainText(message)
         self.error.emit(self._translator.tr("source.sync.failed"))
 
     def refresh_metadata(self, source_id: str | None = None) -> None:
@@ -332,6 +379,7 @@ class ScanController(QObject):
         thread.started.connect(worker.run)
         worker.phase_progress.connect(self._scan_phase_progress)
         worker.geocoding_status.connect(self._metadata_geocoding_status)
+        worker.event_received.connect(self._handle_processing_event)
         worker.completed.connect(self._metadata_refresh_completed)
         worker.cancelled.connect(self._metadata_refresh_cancelled)
         worker.failed.connect(self._scan_failed)
@@ -349,6 +397,10 @@ class ScanController(QObject):
 
     def _metadata_refresh_cancelled(self, photos) -> None:
         self.analysis_completed = False
+        if self._metadata_refresh_source_id is not None:
+            self._project_service.record_source_result(SourceOperationResult(
+                self._metadata_refresh_source_id, "cancelled",
+            ))
         self.photos_ready.emit(list(photos))
         self._view.summary_label.setText(
             self._translator.tr("main.analysis_cancelled")
@@ -369,12 +421,21 @@ class ScanController(QObject):
             # global "metadata updated" counter as the operation result.
             visible_photos = self._project_service.list_photos()
             self.photos_ready.emit(list(visible_photos))
+            self._show_operation_result()
             return
 
+        self.analysis_completed = self._metadata_geocoding_succeeded
+        if self._operation_kind == "metadata" and self._metadata_refresh_source_id is not None:
+            self._project_service.record_source_result(SourceOperationResult(
+                self._metadata_refresh_source_id,
+                "success" if self.analysis_completed else "partial",
+                None if self.analysis_completed else "geocoding",
+            ))
         visible_photos = list(photos)
         self.photos_ready.emit(visible_photos)
         message = self._translator.tr(
-            "source.metadata.completed", count=len(visible_photos)
+            "source.metadata.completed" if self.analysis_completed else "sources.operation.partial",
+            count=len(visible_photos)
         )
         self._view.summary_label.setText(message)
         self._view.log_view.appendPlainText(message)
@@ -563,6 +624,13 @@ class ScanController(QObject):
             self.status_message.emit(self._translator.tr('main.analysis_completed'))
 
     def _scan_failed(self, message: str) -> None:
+        self.analysis_completed = False
+        self._view.log_view.appendPlainText(message)
+        if self._operation_kind == "metadata" and self._metadata_refresh_source_id is not None:
+            self._project_service.record_source_result(SourceOperationResult(
+                self._metadata_refresh_source_id, "failed", "metadata", message,
+            ))
+        self.photos_ready.emit(self._project_service.list_photos())
         self._view.summary_label.setText(self._translator.tr('main.analysis_failed'))
 
         key = (
@@ -595,4 +663,3 @@ class ScanController(QObject):
 
         self._view.finish_processing_progress()
         self.running_changed.emit(False)
-

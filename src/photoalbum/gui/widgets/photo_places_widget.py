@@ -430,6 +430,9 @@ class PhotoPlacesWidget(QWidget):
     ) -> None:
         self._cancel_photo_preview()
         self._hover_preview.invalidate_changed_sources()
+        # A refreshed snapshot may reuse photo identities and materialized
+        # paths even though their pixels changed or have just become available.
+        self._thumbnail_cache.clear()
         self._photos = sorted(
             photos,
             key=lambda photo: (

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 import json
+from photoalbum.models.coordinates import usable_coordinates
 
 from photoalbum.models import (
     DateSource,
@@ -98,8 +99,8 @@ class PhotoMetadataPolicy:
             return cls(
                 date_preference="exif",
                 gps_preference="exif",
-                location_preference="geocoding",
-                nominatim_enabled=True,
+                location_preference="none",
+                nominatim_enabled=False,
             )
 
         return cls(
@@ -199,7 +200,7 @@ def _resolve_gps(
         manual_longitude = photo.longitude
         if manual_latitude is None and manual_longitude is None:
             return
-    if manual_latitude is not None and manual_longitude is not None:
+    if usable_coordinates(manual_latitude, manual_longitude):
         photo.latitude = manual_latitude
         photo.longitude = manual_longitude
         photo.gps_source = GpsSource.MANUAL
@@ -232,7 +233,7 @@ def _resolve_gps(
 
     for name in fallback_order:
         latitude, longitude, provenance = candidates[name]
-        if latitude is not None and longitude is not None:
+        if usable_coordinates(latitude, longitude):
             photo.latitude = latitude
             photo.longitude = longitude
             photo.gps_source = provenance

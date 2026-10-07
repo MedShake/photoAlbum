@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .location_component import LocationComponent
 from .metadata_candidates import MetadataCandidates
+from .coordinates import usable_coordinates
 
 
 class DateSource(str, Enum):
@@ -135,7 +136,7 @@ class Photo:
 
     @property
     def has_gps(self) -> bool:
-        return self.latitude is not None and self.longitude is not None
+        return usable_coordinates(self.latitude, self.longitude)
 
     @property
     def is_date_anomaly(self) -> bool:

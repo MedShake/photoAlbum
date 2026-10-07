@@ -637,6 +637,10 @@ class MainWindow(QMainWindow):
                 self._refresh_source_cards()
                 self.statusBar().showMessage(
                     self._translator.tr("source.synology.session_attached"), 5000)
+                # Reconnection restores the provider session, but a purged
+                # cache still has to be repopulated. Synchronize this source
+                # immediately so its snapshot/thumbnails become usable again.
+                self._scan_controller.sync_source(dialog.source.id)
                 return
             self._scan_controller.import_remote_source(dialog.source, dialog.provider)
         except Exception as exc:
@@ -662,13 +666,22 @@ class MainWindow(QMainWindow):
             for source in sources
             if source.kind != "local"
         }
-        self._photos_widget.set_sources(sources, available, labels, sessions)
+        statuses = {source.id: self._project_service.source_status(source) for source in sources}
+        self._photos_widget.set_sources(sources, available, labels, sessions, statuses)
         self._photos_places_widget.set_source_labels(labels)
 
     def _source_enabled_changed(self, source_id, enabled) -> None:
         self._project_service.set_source_enabled(source_id, enabled)
         self._load_project_photos()
         self._update_project_state()
+        if enabled:
+            source = self._project_service.get_photo_source(source_id)
+            if source.kind == "local" or self._project_service.get_photo_source_session(source_id) is not None:
+                self._scan_controller.sync_source(source_id)
+            else:
+                self._photos_widget.log_view.appendPlainText(
+                    self._translator.tr("sources.reactivated_snapshot", source=source.collection_name)
+                )
 
 
     def _source_recursive_changed(self, source_id, recursive) -> None:
@@ -1089,6 +1102,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message, 5000)
 
     def _show_error(self, message: str) -> None:
+        # A real asset request may have proved a provider session invalid.
+        self._refresh_source_cards()
         QMessageBox.critical(self, APPLICATION_NAME, message)
 
     def _load_project_photos(self) -> None:
@@ -1129,4 +1144,9 @@ class MainWindow(QMainWindow):
         self._update_pdf_summary()
 
     def _scan_photos_ready(self, photos: list[Photo]) -> None:
+        # Source refreshes can recreate cached image files at the same paths.
+        # Expensive previews (notably the year photo scatter) key their raster
+        # cache from photo metadata, so a blank raster produced while assets
+        # were missing would otherwise survive the refresh.
+        self._preview_render_service.clear()
         self._load_project_photos()

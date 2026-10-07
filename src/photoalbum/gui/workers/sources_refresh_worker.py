@@ -6,6 +6,9 @@ from photoalbum.app.project_scan_service import ProjectScanService
 from photoalbum.database import ProjectDatabase, PhotoRepository
 from photoalbum.sources import SourceImporter, SourceAssetCache
 from photoalbum.i18n import Translator
+from photoalbum.sources.base import AuthenticationError, SourceError
+from photoalbum.sources.operation import SourceOperationResult
+from photoalbum.scanner import ProcessingEventType
 from .metadata_refresh_worker import MetadataRefreshWorker
 
 
@@ -18,6 +21,7 @@ class SourcesRefreshWorker(QObject):
     phase_progress = Signal(object)
     event_received = Signal(object)
     source_progress = Signal(int, int)
+    source_result = Signal(object)
 
     def __init__(self, *, project_path, sources, providers, synchronize,
                  language, user_agent):
@@ -41,6 +45,7 @@ class SourcesRefreshWorker(QObject):
         translator = Translator(self._language)
         for source in self._sources:
             if self._cancelled:
+                self.source_result.emit(SourceOperationResult(source.id, "cancelled"))
                 break
             provider_name = (
                 translator.tr("sources.local_folder")
@@ -54,6 +59,13 @@ class SourcesRefreshWorker(QObject):
             )
             try:
                 if source.kind == "local":
+                    geocoding_errors = []
+
+                    def record_event(event):
+                        if event.type == ProcessingEventType.GEOCODING_ERROR:
+                            geocoding_errors.append(event.message)
+                        self.event_received.emit(event)
+
                     result = ProjectScanService().scan(
                         project_path=self._path, source_id=source.id,
                         source_directory=Path(str(source.config["directory"])),
@@ -61,7 +73,7 @@ class SourcesRefreshWorker(QObject):
                         metadata_policy=source.effective_metadata_policy,
                         language=self._language, user_agent=self._user_agent,
                         should_cancel=lambda: self._cancelled,
-                        on_event=self.event_received.emit,
+                        on_event=record_event,
                         on_phase_progress=self.phase_progress.emit,
                     )
                     for error in result.errors:
@@ -83,10 +95,18 @@ class SourcesRefreshWorker(QObject):
                         )
                     )
                     if result.cancelled or self._cancelled:
+                        self.source_result.emit(SourceOperationResult(source.id, "cancelled"))
                         self.log_message.emit(
                             translator.tr("sources.processing_cancelled", source=source_name)
                         )
                         break
+                    if result.errors or geocoding_errors:
+                        issue = "metadata" if result.errors else "geocoding"
+                        self.source_result.emit(SourceOperationResult(source.id, "partial", issue))
+                        key = "sources.operation.partial" if result.errors else "sources.geocoding_incomplete"
+                        self.log_message.emit("⚠ " + translator.tr(key, source=source_name))
+                        continue
+                    self.source_result.emit(SourceOperationResult(source.id, "success"))
                     self.log_message.emit(
                         translator.tr(f"{operation_prefix}.completed", source=source_name)
                     )
@@ -121,6 +141,7 @@ class SourcesRefreshWorker(QObject):
                     language=self._language, user_agent=self._user_agent,
                 )
                 self._current.phase_progress.connect(self.phase_progress.emit)
+                self._current.event_received.connect(self.event_received.emit)
                 metadata_errors = []
                 metadata_cancelled = []
                 geocoding_statuses = []
@@ -130,11 +151,15 @@ class SourcesRefreshWorker(QObject):
                 self._current.run()
                 self._current = None
                 if metadata_cancelled:
+                    self.source_result.emit(SourceOperationResult(source.id, "cancelled"))
                     self.log_message.emit(
                         translator.tr("sources.processing_cancelled", source=source_name)
                     )
                     break
                 if metadata_errors:
+                    self.source_result.emit(SourceOperationResult(
+                        source.id, "partial" if self._synchronize else "failed", "metadata", metadata_errors[-1]
+                    ))
                     self.log_message.emit(
                         "⚠ " + translator.tr(
                             f"{operation_prefix}.failed",
@@ -144,14 +169,19 @@ class SourcesRefreshWorker(QObject):
                     )
                     continue
                 if False in geocoding_statuses:
+                    self.source_result.emit(SourceOperationResult(source.id, "partial", "geocoding"))
                     self.log_message.emit(
                         "⚠ " + translator.tr("sources.geocoding_incomplete", source=source_name)
                     )
                     continue
+                self.source_result.emit(SourceOperationResult(source.id, "success"))
                 self.log_message.emit(
                     translator.tr(f"{operation_prefix}.completed", source=source_name)
                 )
             except Exception as exc:
+                issue = ("authentication" if isinstance(exc, AuthenticationError)
+                         else "access" if isinstance(exc, (OSError, SourceError)) else "metadata")
+                self.source_result.emit(SourceOperationResult(source.id, "failed", issue, str(exc)))
                 self.log_message.emit(
                     "⚠ " + translator.tr(
                         f"{operation_prefix}.failed",

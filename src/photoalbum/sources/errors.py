@@ -14,4 +14,4 @@ class SourceReconnectRequiredError(RuntimeError):
         self.filename = filename
         self.source_id = source_id
         self.operation = operation
-        super().__init__(filename)
+        super().__init__(f"Reconnect the photo source to retrieve {filename!r}; the asset is absent from the cache.")

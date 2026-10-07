@@ -279,7 +279,7 @@ class PhotoSourcesWidget(QWidget):
         sources_layout.addWidget(QLabel(self._translator.tr('main.photos')))
         sources_layout.addWidget(splitter, 1)
 
-    def set_sources(self, sources, available, labels, sessions=None) -> None:
+    def set_sources(self, sources, available, labels, sessions=None, statuses=None) -> None:
         from .source_card import SourceCard
         sessions = sessions or {}
         previous_expanded = self._expanded_source_id
@@ -296,6 +296,7 @@ class PhotoSourcesWidget(QWidget):
                 source,
                 available.get(source.id, {}),
                 self._translator,
+                status=(statuses or {}).get(source.id),
                 session_available=(
                     sessions.get(source.id)
                     if source.kind != "local"

@@ -78,6 +78,109 @@ class CacheManager:
     def available_bytes(self):
         return shutil.disk_usage(self.root).free
 
+    @staticmethod
+    def _is_link_like(path):
+        if path.is_symlink():
+            return True
+        is_junction = getattr(path, "is_junction", None)
+        return bool(is_junction and is_junction())
+
+    @staticmethod
+    def _is_legacy_cache_name(name):
+        return (
+            name.startswith(".")
+            and name.endswith(".photoalbum.cache")
+            and len(name) > len("..photoalbum.cache")
+        )
+
+    @classmethod
+    def _looks_like_legacy_cache(cls, path):
+        return (
+            cls._is_legacy_cache_name(path.name)
+            and not cls._is_link_like(path)
+            and (path / "assets").is_dir()
+        )
+
+    @staticmethod
+    def _legacy_search_root(search_root=None):
+        if search_root is not None:
+            return Path(search_root).expanduser()
+        home = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.HomeLocation)
+        return Path(home) if home else Path.home()
+
+    def legacy_cache_directories(self, search_root=None):
+        """Find adjacent-cache directories created by pre-global-cache versions.
+
+        The search is deliberately limited to the user's home directory by
+        default. Symlinks/junctions are never followed and the current global
+        cache is excluded.
+        """
+        search_root = self._legacy_search_root(search_root)
+        if not search_root.is_dir() or self._is_link_like(search_root):
+            return []
+
+        cache_root = self.root.expanduser().resolve(strict=False)
+        matches = []
+
+        def ignore_error(_error):
+            return None
+
+        for current, dirs, _names in os.walk(
+            search_root, topdown=True, followlinks=False, onerror=ignore_error,
+        ):
+            current_path = Path(current)
+            kept = []
+            for name in dirs:
+                candidate = current_path / name
+                try:
+                    if self._is_link_like(candidate):
+                        continue
+                    if candidate.resolve(strict=False) == cache_root:
+                        continue
+                except OSError:
+                    continue
+                if self._looks_like_legacy_cache(candidate):
+                    matches.append(candidate)
+                    continue
+                kept.append(name)
+            dirs[:] = kept
+        return matches
+
+    def paths_size(self, paths):
+        total = 0
+        for directory in paths:
+            for path in self._files(Path(directory)):
+                try:
+                    total += path.stat().st_size
+                except (FileNotFoundError, OSError):
+                    pass
+        return total
+
+    def purge_legacy_caches(self, paths, *, search_root=None):
+        """Remove explicitly discovered legacy caches and return failures.
+
+        Callers should pass paths returned by :meth:`legacy_cache_directories`.
+        Names, link-like paths and containment in the searched user directory
+        are checked again immediately before removal.
+        """
+        allowed_root = self._legacy_search_root(search_root).resolve(strict=False)
+        failures = []
+        for value in paths:
+            path = Path(value)
+            try:
+                resolved = path.resolve(strict=False)
+                if (
+                    not resolved.is_relative_to(allowed_root)
+                    or not self._looks_like_legacy_cache(path)
+                ):
+                    failures.append(path)
+                    continue
+                if path.exists():
+                    shutil.rmtree(path)
+            except OSError:
+                failures.append(path)
+        return failures
+
     @contextmanager
     def _guard(self):
         lock = QLockFile(str(self.root / ".maintenance.lock"))

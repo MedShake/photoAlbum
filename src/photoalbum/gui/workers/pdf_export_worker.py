@@ -12,6 +12,7 @@ from photoalbum.export import PdfExportService
 from photoalbum.cache_manager import CacheManager
 from photoalbum.i18n import Translator
 from photoalbum.sources import SourceReconnectRequiredError
+from photoalbum.sources.base import SourceError
 
 
 class PdfExportWorker(QObject):
@@ -93,6 +94,9 @@ class PdfExportWorker(QObject):
                     filename=exc.filename,
                 )
             )
+            return
+        except SourceError as exc:
+            self.failed.emit(self._translator.tr("source.asset.access_failed", error=str(exc)))
             return
         except Exception:
             self.failed.emit(

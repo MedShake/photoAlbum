@@ -85,6 +85,7 @@ class SynologyPhotosSource:
         )
 
         self._connected = False
+        self.session_invalid = False
         self.identity: str | None = None
         self._albums: dict[str, dict[str, Any]] = {}
 
@@ -131,8 +132,9 @@ class SynologyPhotosSource:
                     "method": "me",
                 }
             )
-        except SourceError as exc:
-            raise AuthenticationError(str(exc)) from exc
+        except AuthenticationError:
+            self.session_invalid = True
+            raise
 
         identity = (
             data.get("name")
@@ -142,6 +144,7 @@ class SynologyPhotosSource:
         )
         self.identity = str(identity) if identity is not None else None
         self._connected = True
+        self.session_invalid = False
 
     def list_collections(self) -> list[SourceCollection]:
         self._ensure_connected()
@@ -159,6 +162,8 @@ class SynologyPhotosSource:
                 version=1,
                 parameters={"category": "shared"},
             )
+        except AuthenticationError:
+            raise
         except SourceError:
             shared_rows = []
         # Some DSM builds ignore the shared-category filter and return albums
@@ -487,6 +492,8 @@ class SynologyPhotosSource:
         )
 
     def _ensure_connected(self) -> None:
+        if self.session_invalid:
+            raise AuthenticationError("The Synology session is invalid. Reconnect the source.")
         if not self._connected:
             self.connect()
 
@@ -517,6 +524,9 @@ class SynologyPhotosSource:
         try:
             return self._opener.open(request, timeout=30)
         except (HTTPError, URLError, TimeoutError, OSError) as exc:
+            if isinstance(exc, HTTPError) and exc.code == 401:
+                self.session_invalid = True
+                raise AuthenticationError("The Synology session is invalid.") from exc
             raise SourceError(f"Synology Photos request failed: {exc}") from exc
 
     @classmethod
@@ -539,17 +549,29 @@ class SynologyPhotosSource:
                 payload = json.load(response)
             except (ValueError, UnicodeDecodeError) as exc:
                 raise SourceError("Synology Photos returned invalid JSON.") from exc
+        self._check_response(payload, auth=auth)
+        return dict(payload.get("data") or {})
+
+    def _check_response(self, payload, *, auth=True):
         if not payload.get("success"):
             error = payload.get("error") or {}
             code = error.get("code", "unknown") if isinstance(error, dict) else error
+            # DSM's common session errors; permission errors (105) and
+            # transport failures do not prove that the session expired.
+            if str(code) in {"106", "107", "119"} or not auth:
+                self.session_invalid = True
+                raise AuthenticationError(f"Synology Photos authentication error {code}.")
             raise SourceError(f"Synology Photos API error {code}.")
-        return dict(payload.get("data") or {})
 
     def _download(
         self, parameters: dict[str, object], destination: Path
     ) -> Path:
         self._ensure_connected()
         with self._open(parameters) as response:
+            content_type = getattr(response, "headers", {}).get("Content-Type", "")
+            if "json" in content_type.lower():
+                self._check_response(json.load(response))
+                raise SourceError("Synology Photos returned JSON instead of an image.")
             return copy_stream(response, destination)
 
 

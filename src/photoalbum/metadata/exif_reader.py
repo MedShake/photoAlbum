@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from math import isfinite
 
 from PIL import ExifTags, Image
+from photoalbum.models.coordinates import usable_coordinates
 
 
 @dataclass
@@ -97,7 +99,7 @@ class ExifReader:
 
         try:
             gps_data = exif.get_ifd(gps_tag)
-        except (AttributeError, KeyError, TypeError):
+        except (AttributeError, KeyError, TypeError, ValueError, OSError):
             return None, None
 
         latitude = self._convert_gps_coordinate(
@@ -109,7 +111,7 @@ class ExifReader:
             gps_data.get(3),
         )
 
-        return latitude, longitude
+        return (latitude, longitude) if usable_coordinates(latitude, longitude) else (None, None)
 
     @staticmethod
     def _parse_exif_datetime(value: Any) -> datetime | None:
@@ -136,12 +138,21 @@ class ExifReader:
             degrees = float(coordinate[0])
             minutes = float(coordinate[1])
             seconds = float(coordinate[2])
-        except (TypeError, ValueError, IndexError):
+        except (TypeError, ValueError, IndexError, KeyError, ZeroDivisionError, OverflowError):
             return None
 
+        if not all(isfinite(value) for value in (degrees, minutes, seconds)):
+            return None
+        if degrees < 0 or not 0 <= minutes < 60 or not 0 <= seconds < 60:
+            return None
         decimal = degrees + minutes / 60 + seconds / 3600
 
         reference_text = str(reference).upper()
+        if reference_text not in {"N", "S", "E", "W"}:
+            return None
+        limit = 90 if reference_text in {"N", "S"} else 180
+        if decimal > limit:
+            return None
 
         if reference_text in {"S", "W"}:
             decimal = -decimal
