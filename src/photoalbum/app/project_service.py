@@ -49,7 +49,6 @@ class ProjectService:
         self._asset_cache = None
         self._cache_lease = None
         self._external_asset_lease = None
-        self._legacy_cache_cleanup_result: tuple[str, str | None] | None = None
 
     def _open_cache(self) -> None:
         self._asset_cache = SourceAssetCache(
@@ -78,11 +77,6 @@ class ProjectService:
             lease.__exit__(None, None, None)
 
     @property
-    def legacy_cache_cleanup_result(self) -> tuple[str, str | None] | None:
-        """Result of the automatic cleanup attempted for the last opened project."""
-        return self._legacy_cache_cleanup_result
-
-    @property
     def is_open(self) -> bool:
         return self._database is not None
 
@@ -95,7 +89,6 @@ class ProjectService:
 
     def create(self, path: Path) -> None:
         self.close()
-        self._legacy_cache_cleanup_result = None
 
         path = path.expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -124,13 +117,6 @@ class ProjectService:
         self._database.initialize()
 
         self._open_cache()
-        self._legacy_cache_cleanup_result = None
-        try:
-            if self._asset_cache.manager.purge_legacy_cache_for_project(path):
-                self._legacy_cache_cleanup_result = ("removed", None)
-        except OSError as exc:
-            # A stale cache must never prevent the project itself from opening.
-            self._legacy_cache_cleanup_result = ("failed", str(exc))
 
     def list_photos(self) -> list[Photo]:
         database = self._require_database()
@@ -451,7 +437,10 @@ class ProjectService:
                 photos = PhotoRepository(self._require_database()).list_by_source(source.id)
                 for photo in photos:
                     thumbnail = self._asset_cache.path_for(photo, "thumbnail")
-                    if not thumbnail.is_file() or thumbnail.stat().st_size <= 0:
+                    try:
+                        if not thumbnail.is_file() or thumbnail.stat().st_size <= 0:
+                            return "disconnected_missing_images"
+                    except OSError:
                         return "disconnected_missing_images"
                 return "disconnected"
         if result is not None and result.status != "success":

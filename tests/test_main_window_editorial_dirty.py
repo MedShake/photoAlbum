@@ -82,16 +82,20 @@ def test_staying_on_places_tab_does_not_flush():
     window._update_pdf_summary.assert_not_called()
 
 
-def test_open_project_clears_image_cache_before_loading_new_preview():
+def test_open_project_clears_image_cache_before_loading_new_preview(monkeypatch):
     from pathlib import Path
     from types import SimpleNamespace
 
     events = []
+    pool = Mock()
+    monkeypatch.setattr("photoalbum.gui.main_window.QThreadPool.globalInstance", lambda: pool)
     window = SimpleNamespace(
         _preview_render_service=Mock(),
         _hover_photo_preview=Mock(),
         _pdf_widget=Mock(),
         _project_service=Mock(),
+        _legacy_cache_workers={},
+        _legacy_cache_cleanup_finished=Mock(),
         _album_preview_widget=Mock(),
         _load_project_settings=lambda: events.append("settings"),
         _load_project_photos=lambda: events.append("photos"),
@@ -102,11 +106,15 @@ def test_open_project_clears_image_cache_before_loading_new_preview():
         _translator=Translator("en"),
     )
     window._album_preview_widget.clear.side_effect = lambda: events.append("clear")
+    window._project_service.project_path = Path("other.photoalbum")
     window._photos_widget.source_edit.text.return_value = ""
     MainWindow._open_project_path(window, Path("other.photoalbum"))
     assert events == ["clear", "settings", "photos"]
     window._hover_photo_preview.clear.assert_called_once_with()
     window._show_error.assert_not_called()
+    pool.start.assert_called_once_with(
+        window._legacy_cache_workers[window._project_service.project_path]
+    )
 
 
 def test_failed_project_open_does_not_discard_current_image_cache():

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QSettings, Qt, QThreadPool, Slot
 from PySide6.QtGui import QAction, QPalette
 from PySide6.QtWidgets import (
     QDialog,
@@ -52,6 +52,7 @@ from photoalbum.template_engine import (
 from photoalbum.i18n import Translator
 from photoalbum.gui.scan_controller import ScanController
 from photoalbum.gui.photo_editor import PhotoEditor
+from photoalbum.gui.workers.legacy_cache_cleanup_worker import LegacyCacheCleanupWorker
 from photoalbum.gui.synology_source_dialog import SynologySourceDialog
 from photoalbum.gui.widgets.pdf_export_widget import PdfExportWidget
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
@@ -67,6 +68,7 @@ class MainWindow(QMainWindow):
 
         self._language = language
         self._project_service = ProjectService()
+        self._legacy_cache_workers = {}
         self._translator = Translator(self._language)
 
         self._preview_render_service = PreviewRenderService(self._translator, self)
@@ -558,27 +560,29 @@ class MainWindow(QMainWindow):
         self._load_project_photos()
         self._update_project_state()
 
-        cleanup = getattr(
-            self._project_service, "legacy_cache_cleanup_result", None
-        )
-        if isinstance(cleanup, tuple) and len(cleanup) == 2:
-            state, detail = cleanup
-            if state == "removed":
-                self._photos_widget.log_view.appendPlainText(
-                    self._translator.tr("cache.legacy_project_removed")
-                )
-            elif state == "failed":
-                self._photos_widget.log_view.appendPlainText(
-                    self._translator.tr(
-                        "cache.legacy_project_cleanup_failed", error=detail or ""
-                    )
-                )
+        project_path = self._project_service.project_path
+        if project_path not in self._legacy_cache_workers:
+            worker = LegacyCacheCleanupWorker(project_path)
+            self._legacy_cache_workers[project_path] = worker
+            worker.signals.finished.connect(self._legacy_cache_cleanup_finished)
+            QThreadPool.globalInstance().start(worker)
 
         # The persisted snapshot is already visible. Necessary local analysis
         # or remote metadata resolution now continues in the background;
         # provider synchronization remains an explicit user action.
         if self._photos_widget.has_active_sources:
             self._scan_controller.start()
+
+    @Slot(object, object)
+    def _legacy_cache_cleanup_finished(self, project_path, result) -> None:
+        self._legacy_cache_workers.pop(project_path, None)
+        if result is None or project_path != self._project_service.project_path:
+            return
+        state, detail = result
+        key = "cache.legacy_project_removed" if state == "removed" else "cache.legacy_project_cleanup_failed"
+        self._photos_widget.log_view.appendPlainText(
+            self._translator.tr(key, error=detail or "")
+        )
 
     def _close_project(self) -> None:
         self._preview_render_service.clear()

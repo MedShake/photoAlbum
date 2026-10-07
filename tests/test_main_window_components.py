@@ -1239,3 +1239,57 @@ def test_reactivation_refreshes_available_source_or_explains_snapshot(window, tm
     assert calls == ([source.id] if kind == "local" or connected else [])
     if kind != "local" and not connected:
         assert "snapshot" in window._photos_widget.log_view.toPlainText().lower()
+
+
+@pytest.mark.parametrize("outcome", ["removed", "failed", "switched"])
+def test_legacy_cleanup_runs_in_background_and_logs_only_for_current_project(
+    window, app, tmp_path, monkeypatch, outcome,
+):
+    from threading import Event, get_ident
+    from photoalbum.cache_manager import CacheManager
+
+    project = tmp_path / "legacy.photoalbum"
+    window._project_service.create(project)
+    window._project_service.close()
+    legacy = tmp_path / ".legacy.photoalbum.cache"
+    (legacy / "assets").mkdir(parents=True)
+    (legacy / "assets" / "photo.jpg").write_bytes(b"old cache")
+    started, release, finished = Event(), Event(), Event()
+    threads = []
+    gui_thread = get_ident()
+    original = CacheManager.purge_legacy_cache_for_project
+
+    def slow_cleanup(manager, path):
+        if path == project:
+            threads.append(get_ident())
+            started.set()
+            release.wait(5)
+            finished.set()
+            if outcome == "failed":
+                raise PermissionError("cache locked")
+        return original(manager, path)
+
+    monkeypatch.setattr(CacheManager, "purge_legacy_cache_for_project", slow_cleanup)
+    try:
+        window._open_project_path(project)
+        wait_until(app, started.is_set)
+        assert not finished.is_set()  # Opening returned while deletion is blocked.
+        assert threads == [threads[0]] and threads[0] != gui_thread
+        if outcome == "switched":
+            other = tmp_path / "other.photoalbum"
+            service = ProjectService()
+            service.create(other)
+            service.close()
+            window._open_project_path(other)
+    finally:
+        release.set()
+        wait_until(app, lambda: not window._legacy_cache_workers)
+
+    log = window._photos_widget.log_view.toPlainText()
+    if outcome == "failed":
+        assert "cache locked" in log
+        assert legacy.exists()
+    else:
+        assert not legacy.exists()
+        message = window._translator.tr("cache.legacy_project_removed")
+        assert (message in log) == (outcome == "removed")

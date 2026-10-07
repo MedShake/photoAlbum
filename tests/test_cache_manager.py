@@ -134,7 +134,7 @@ def test_legacy_cache_search_and_cleanup_is_limited_and_safe(tmp_path):
     assert outside.exists()
 
 
-def test_open_project_removes_only_its_exact_adjacent_legacy_cache(tmp_path):
+def test_legacy_cleanup_removes_only_the_exact_adjacent_cache(tmp_path):
     project = tmp_path / "album.photoalbum"
     service = ProjectService()
     service.create(project)
@@ -149,7 +149,8 @@ def test_open_project_removes_only_its_exact_adjacent_legacy_cache(tmp_path):
 
     service.open(project)
     try:
-        assert service.legacy_cache_cleanup_result == ("removed", None)
+        assert legacy.exists()  # Opening itself must not run the slow cleanup.
+        assert CacheManager().purge_legacy_cache_for_project(project)
         assert not legacy.exists()
         assert unrelated.exists()
     finally:
@@ -168,7 +169,7 @@ def test_open_project_ignores_non_legacy_adjacent_directory(tmp_path):
 
     service.open(project)
     try:
-        assert service.legacy_cache_cleanup_result is None
+        assert not CacheManager().purge_legacy_cache_for_project(project)
         assert lookalike.exists()
     finally:
         service.close()

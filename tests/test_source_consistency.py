@@ -406,7 +406,8 @@ def test_failed_album_edit_does_not_invalidate_previous_session(tmp_path):
     service.close()
 
 
-def test_disconnected_remote_source_distinguishes_missing_cached_images(tmp_path):
+@pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
+def test_disconnected_remote_source_distinguishes_missing_cached_images(tmp_path, monkeypatch, error):
     service = ProjectService()
     service.create(tmp_path / "remote-cache-state.photoalbum")
     source = ProjectSource(
@@ -431,4 +432,10 @@ def test_disconnected_remote_source_distinguishes_missing_cached_images(tmp_path
     thumbnail.write_bytes(b"thumbnail")
 
     assert service.source_status(source) == "disconnected"
+    # Simulate a file becoming unavailable after the initial is_file() check.
+    candidate = Mock()
+    candidate.is_file.return_value = True
+    candidate.stat.side_effect = error("cache unavailable")
+    monkeypatch.setattr(service._asset_cache, "path_for", lambda *args: candidate)
+    assert service.source_status(source) == "disconnected_missing_images"
     service.close()
