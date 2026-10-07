@@ -77,8 +77,12 @@ class SourceAssetCache:
                 return cached
             destination.parent.mkdir(parents=True, exist_ok=True)
             # Publish only complete files; a failed download must not look cached.
+            # Keep the staging file one directory above the content digest. This
+            # leaves enough path-length headroom on Windows for providers such
+            # as Synology that perform their own atomic ``.part`` write.
             from uuid import uuid4
-            temporary = destination.with_name(f".{uuid4().hex}{destination.suffix}")
+            staging_directory = destination.parent.parent
+            temporary = staging_directory / f".{uuid4().hex}{destination.suffix}"
             try:
                 fetch = provider.fetch_thumbnail if quality == "thumbnail" else provider.fetch_original
                 fetched = Path(fetch(asset, temporary))

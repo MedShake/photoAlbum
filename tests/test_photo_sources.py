@@ -302,6 +302,30 @@ def test_original_is_fetched_only_when_materialized(tmp_path):
     assert provider.original_fetches == ["42"]
 
 
+
+def test_materialize_stages_outside_digest_directory(tmp_path):
+    project_path = tmp_path / "album.photoalbum"
+    cache = SourceAssetCache(project_path)
+    photo = Photo(
+        path=None, filename="remote.jpg", source_id="remote-1", asset_id="42"
+    )
+
+    destinations = []
+
+    class CapturingRemoteSource(FakeRemoteSource):
+        def fetch_thumbnail(self, asset, destination):
+            destinations.append(destination)
+            return super().fetch_thumbnail(asset, destination)
+
+    provider = CapturingRemoteSource([])
+    cached = cache.materialize(photo, provider, quality="thumbnail")
+
+    assert cached == cache.path_for(photo, "thumbnail")
+    assert destinations[0].parent == cached.parent.parent
+    assert destinations[0].parent.name == "thumbnail"
+    assert destinations[0].parent != cached.parent
+    assert cached.read_bytes() == b"thumbnail:42"
+
 def test_project_source_serialization_excludes_credentials():
     source = ProjectSource(
         id="synology-1", kind="synology-photos", name="NAS",
