@@ -29,6 +29,14 @@ PrivilegesRequired=admin
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
+; Remove stale Python package metadata left behind by an in-place upgrade.
+; PyInstaller can place collected metadata either at the bundle root or under
+; _internal depending on its version/layout. Keeping an older dist-info next
+; to the current one can make importlib.metadata resolve the wrong app version.
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\photo_album-*.dist-info"
+Type: filesandordirs; Name: "{app}\_internal\photo_album-*.dist-info"
+
 [Files]
 Source: "..\pyinstaller\dist\photo-album\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
