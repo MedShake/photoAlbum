@@ -139,3 +139,27 @@ def test_operation_error_messages_are_translated_in_french():
         source="Vacances",
         filename="photo.jpg",
     ) == "Source Vacances : impossible d’analyser photo.jpg."
+
+
+def test_source_refresh_and_reconnect_labels_are_user_facing():
+    en = Translator("en")
+    fr = Translator("fr")
+
+    assert en.tr("sources.analyze") == "Refresh photos"
+    assert en.tr("sources.synchronize") == "Synchronize remote sources"
+    assert en.tr("sources.reconnect") == "Reconnect…"
+    assert en.tr("sources.connection.reconnect_required") == "Reconnection required"
+
+    assert fr.tr("sources.analyze") == "Actualiser les photos"
+    assert fr.tr("sources.synchronize") == "Synchroniser les sources distantes"
+    assert fr.tr("sources.reconnect") == "Reconnecter…"
+    assert fr.tr("sources.connection.reconnect_required") == "Reconnexion requise"
+
+
+def test_source_card_sync_and_journal_labels_are_localized():
+    en = Translator("en")
+    fr = Translator("fr")
+    assert en.tr("sources.synchronize_one") == "Synchronize"
+    assert fr.tr("sources.synchronize_one") == "Synchroniser"
+    assert "Album" in en.tr("sources.sync.started", source="Album")
+    assert "Album" in fr.tr("sources.sync.completed", source="Album")

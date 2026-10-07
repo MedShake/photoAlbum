@@ -517,7 +517,11 @@ class PdfExportWidget(QWidget):
         self._pdf_log_view.appendPlainText('────────────────────────────────────────')
         self._pdf_log_view.appendPlainText(self._translator.tr('render.log_error', error=error))
 
-        self.error.emit(self._translator.tr('render.generate_error', error=error))
+        # The worker already turns known failures (notably a missing remote
+        # source session) into a user-facing localized message. Surface that
+        # message directly instead of hiding the actionable cause behind the
+        # generic “Could not generate the PDF” popup.
+        self.error.emit(error)
 
     def _pdf_export_thread_finished(self) -> None:
         thread = self._pdf_thread

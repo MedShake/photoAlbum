@@ -76,11 +76,6 @@ class ScanController(QObject):
 
         request_cancel()
 
-        self._view.analyze_button.setEnabled(False)
-        self._view.analyze_button.setText(
-            self._translator.tr('main.analysis_stopping_button')
-        )
-
         self._view.summary_label.setText(self._translator.tr('main.analysis_stopping'))
 
         self.status_message.emit(self._translator.tr('main.analysis_stopping'))
@@ -88,10 +83,16 @@ class ScanController(QObject):
     def start(self) -> None:
         self._start_sources_operation(synchronize=False)
 
-    def sync_source(self) -> None:
-        self._start_sources_operation(synchronize=True)
+    def sync_source(self, source_id: str | None = None) -> None:
+        """Synchronize one source from its card, or all remote sources internally."""
+        self._start_sources_operation(synchronize=True, source_id=source_id)
 
-    def _start_sources_operation(self, *, synchronize: bool) -> None:
+    def _start_sources_operation(
+        self,
+        *,
+        synchronize: bool,
+        source_id: str | None = None,
+    ) -> None:
         from photoalbum.gui.workers.sources_refresh_worker import SourcesRefreshWorker
         if self.is_running:
             return
@@ -99,6 +100,23 @@ class ScanController(QObject):
             self.error.emit(self._translator.tr('main.no_project_error'))
             return
         sources = [source for source in self._project_service.list_sources() if source.enabled]
+        if source_id is not None:
+            # Source-card synchronization deliberately targets exactly one
+            # source. Local folders are rescanned; remote collections are
+            # synchronized through their provider.
+            sources = [source for source in sources if source.id == source_id]
+        elif synchronize:
+            # Preserve the historical global synchronization entry point for
+            # internal callers: it still targets remote sources only.
+            sources = [source for source in sources if source.kind != "local"]
+
+        remote_sources = [source for source in sources if source.kind != "local"]
+        if synchronize and any(
+            self._project_service.get_photo_source_session(source.id) is None
+            for source in remote_sources
+        ):
+            self.error.emit(self._translator.tr("sources.reconnect_required"))
+            return
         if not sources:
             return
         self._operation_kind = "sources"
@@ -177,10 +195,6 @@ class ScanController(QObject):
 
         # A source synchronization is currently not cancellable midway:
         # the provider/importer contract is snapshot-atomic.
-        self._view.analyze_button.setEnabled(False)
-        self._view.analyze_button.setText(
-            self._translator.tr("source.sync.running_button")
-        )
 
         thread = QThread(self)
         worker = SourceSyncWorker(
@@ -315,11 +329,17 @@ class ScanController(QObject):
 
     def _metadata_refresh_completed(self, photos) -> None:
         self.analysis_completed = True
-        self.photos_ready.emit(list(photos))
+        visible_photos = (
+            self._project_service.list_photos()
+            if self._operation_kind == "sources"
+            else list(photos)
+        )
+        self.photos_ready.emit(list(visible_photos))
         message = self._translator.tr(
-            "source.metadata.completed", count=len(photos)
+            "source.metadata.completed", count=len(visible_photos)
         )
         self._view.summary_label.setText(message)
+        self._view.log_view.appendPlainText(message)
         self.status_message.emit(message)
 
     def _scan_phase_progress(self, progress) -> None:
@@ -527,7 +547,3 @@ class ScanController(QObject):
         self._view.finish_processing_progress()
         self.running_changed.emit(False)
 
-        if self._project_service.is_open and self._view.has_active_sources:
-            self._view.analyze_button.setText(
-                self._translator.tr('sources.analyze')
-            )

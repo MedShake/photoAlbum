@@ -323,8 +323,10 @@ class MainWindow(QMainWindow):
         self._photos_widget.synology_source_requested.connect(
             self._choose_synology_source
         )
-        self._photos_widget.scan_requested.connect(self._scan_controller.toggle)
-        self._photos_widget.sync_requested.connect(
+        # Global refresh/synchronization entry points remain available in the
+        # controller for automatic/internal workflows, but the Photos UI now
+        # exposes synchronization directly on each source card.
+        self._photos_widget.source_sync_requested.connect(
             self._scan_controller.sync_source
         )
         self._photos_widget.edit_datetime_requested.connect(self._photo_editor.edit_datetime)
@@ -636,7 +638,12 @@ class MainWindow(QMainWindow):
         sources = self._project_service.list_sources() if self._project_service.is_open else []
         labels = self._project_service.source_labels() if sources else {}
         available = {source.id: self._project_service.available_metadata_candidates(source.id) for source in sources}
-        self._photos_widget.set_sources(sources, available, labels)
+        sessions = {
+            source.id: self._project_service.get_photo_source_session(source.id) is not None
+            for source in sources
+            if source.kind != "local"
+        }
+        self._photos_widget.set_sources(sources, available, labels, sessions)
         self._photos_places_widget.set_source_labels(labels)
 
     def _source_enabled_changed(self, source_id, enabled) -> None:
@@ -753,19 +760,7 @@ class MainWindow(QMainWindow):
             not running and self._project_service.is_open
         )
 
-        self._photos_widget.analyze_button.setEnabled(
-            (
-                running
-                or (
-                    self._project_service.is_open
-                    and self._photos_widget.has_active_sources
-                )
-            )
-        )
-        self._photos_widget.sources_group.setEnabled(not running)
-        self._photos_widget.sync_button.setEnabled(
-            not running and self._project_service.is_open and self._photos_widget.has_active_sources
-        )
+        self._photos_widget.set_source_controls_enabled(not running)
 
         # Photos remains the project entry point. Every other
         # workflow tab is available as soon as the project contains
@@ -786,16 +781,7 @@ class MainWindow(QMainWindow):
             self._tabs.setTabEnabled(index, photos_available)
 
         if running:
-            self._photos_widget.analyze_button.setText(
-                self._translator.tr('main.stop_analysis')
-            )
-
             self.statusBar().showMessage(self._translator.tr('main.analysis_in_progress'))
-
-        else:
-            self._photos_widget.analyze_button.setText(
-                self._translator.tr('sources.analyze')
-            )
 
     def _rename_project(self) -> None:
         if not self._project_service.is_open:
@@ -820,11 +806,8 @@ class MainWindow(QMainWindow):
 
     def _update_project_state(self) -> None:
         is_open = self._project_service.is_open
-        has_source = self._photos_widget.has_active_sources
-
         self._close_project_action.setEnabled(is_open)
         self._photos_widget.modify_source_button.setEnabled(is_open)
-        self._photos_widget.analyze_button.setEnabled(is_open and has_source)
 
         if is_open:
             project_path = self._project_service.project_path

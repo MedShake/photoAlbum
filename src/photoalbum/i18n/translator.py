@@ -7,9 +7,26 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.add_button": "Add…",
         "sources.list": "Album sources",
         "sources.refresh": "Refresh photos",
-        "sources.analyze": "Analyze sources",
-        "sources.synchronize": "Synchronize sources",
-        "sources.reconnect_required": "Reconnect this source before synchronization (Modify…).",
+        "sources.analyze": "Refresh photos",
+        "sources.synchronize": "Synchronize remote sources",
+        "sources.synchronize_one": "Synchronize",
+        "sources.sync.started": "Synchronizing source ‘{source}’…",
+        "sources.sync.completed": "Synchronization of ‘{source}’ completed.",
+        "sources.refresh_one.started": "Refreshing source ‘{source}’…",
+        "sources.refresh_one.completed": "Refresh of ‘{source}’ completed.",
+        "sources.refresh_one.failed": "Refresh of ‘{source}’ failed: {error}",
+        "sources.sync.local_summary": (
+            "Source ‘{source}’: {discovered} photos found; {analyzed} analyzed, "
+            "{reused} reused, {missing} missing."
+        ),
+        "sources.sync.remote_summary": (
+            "Source ‘{source}’: {count} photos; {added} added, {updated} updated, "
+            "{missing} no longer in the collection."
+        ),
+        "sources.sync.failed": "Synchronization of ‘{source}’ failed: {error}",
+        "sources.reconnect_required": "Reconnect this source before synchronization. Use “Reconnect…” in Album sources.",
+        "sources.reconnect": "Reconnect…",
+        "sources.connection.reconnect_required": "Reconnection required",
         "source.export.reconnect_required": (
             "Reconnect the source containing ‘{filename}’ before generating the PDF."
         ),
@@ -61,7 +78,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.sync.running": "Synchronizing photo source…",
         "source.sync.running_button": "Synchronizing…",
         "source.sync.failed": "Photo source synchronization failed.",
-        "source.sync.reconnect_required": "Reconnect the photo source before synchronizing.",
+        "source.sync.reconnect_required": "Reconnect the photo source before synchronizing. Use “Reconnect…” in Album sources.",
         "source.sync.completed": "Source snapshot updated: {count} photos.",
         "source.sync.log": (
             "Source {source}: {count} photos; {added} added, {updated} "
@@ -766,9 +783,26 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.add_button": "Ajouter…",
         "sources.list": "Source(s) de l’album",
         "sources.refresh": "Actualisation des photos",
-        "sources.analyze": "Analyser les sources",
-        "sources.synchronize": "Synchroniser les sources",
-        "sources.reconnect_required": "Reconnectez cette source avant de la synchroniser (Modifier…).",
+        "sources.analyze": "Actualiser les photos",
+        "sources.synchronize": "Synchroniser les sources distantes",
+        "sources.synchronize_one": "Synchroniser",
+        "sources.sync.started": "Synchronisation de la source « {source} »…",
+        "sources.sync.completed": "Synchronisation de « {source} » terminée.",
+        "sources.refresh_one.started": "Actualisation de la source « {source} »…",
+        "sources.refresh_one.completed": "Actualisation de « {source} » terminée.",
+        "sources.refresh_one.failed": "Échec de l’actualisation de « {source} » : {error}",
+        "sources.sync.local_summary": (
+            "Source « {source} » : {discovered} photos trouvées ; {analyzed} analysées, "
+            "{reused} réutilisées, {missing} absentes."
+        ),
+        "sources.sync.remote_summary": (
+            "Source « {source} » : {count} photos ; {added} ajoutées, {updated} actualisées, "
+            "{missing} absentes de la collection."
+        ),
+        "sources.sync.failed": "Échec de la synchronisation de « {source} » : {error}",
+        "sources.reconnect_required": "Reconnectez cette source avant de la synchroniser. Utilisez « Reconnecter… » dans les sources de l’album.",
+        "sources.reconnect": "Reconnecter…",
+        "sources.connection.reconnect_required": "Reconnexion requise",
         "source.export.reconnect_required": (
             "Reconnectez la source contenant « {filename} » avant de générer le PDF."
         ),
@@ -820,7 +854,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "source.sync.running": "Synchronisation de la source des photos…",
         "source.sync.running_button": "Synchronisation…",
         "source.sync.failed": "Échec de la synchronisation de la source des photos.",
-        "source.sync.reconnect_required": "Reconnectez la source des photos avant de la synchroniser.",
+        "source.sync.reconnect_required": "Reconnectez la source des photos avant de la synchroniser. Utilisez « Reconnecter… » dans les sources de l’album.",
         "source.sync.completed": "Instantané mis à jour : {count} photos.",
         "source.sync.log": (
             "Source {source} : {count} photos ; {added} ajoutées, {updated} "

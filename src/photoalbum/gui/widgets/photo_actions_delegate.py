@@ -25,6 +25,24 @@ from photoalbum.models import Photo, PhotoUsage
 
 
 
+def _neutral_item_option(option: QStyleOptionViewItem) -> QStyleOptionViewItem:
+    """Return an item option without row selection/hover/focus visuals."""
+    neutral = QStyleOptionViewItem(option)
+    neutral.state &= ~(
+        QStyle.StateFlag.State_Selected
+        | QStyle.StateFlag.State_MouseOver
+        | QStyle.StateFlag.State_HasFocus
+    )
+    return neutral
+
+
+class PhotoCellDelegate(QStyledItemDelegate):
+    """Default Photos-table delegate with neutral interactive row states."""
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
+        super().paint(painter, _neutral_item_option(option), index)
+
+
 class _PhotoIconPainter:
     """Paint cached outline SVG icons used by the Photos table."""
 
@@ -93,10 +111,10 @@ class PhotoFilenameDelegate(QStyledItemDelegate):
     ) -> None:
         photo = index.data(Qt.ItemDataRole.UserRole)
         if not isinstance(photo, Photo):
-            super().paint(painter, option, index)
+            super().paint(painter, _neutral_item_option(option), index)
             return
 
-        base_option = QStyleOptionViewItem(option)
+        base_option = _neutral_item_option(option)
         base_option.text = ""
         QApplication.style().drawControl(
             QStyle.ControlElement.CE_ItemViewItem,
@@ -119,15 +137,8 @@ class PhotoFilenameDelegate(QStyledItemDelegate):
             max(0, text_rect.width()),
         )
 
-        selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        palette_role = (
-            option.palette.ColorRole.HighlightedText
-            if selected
-            else option.palette.ColorRole.Text
-        )
-
         painter.save()
-        painter.setPen(option.palette.color(palette_role))
+        painter.setPen(option.palette.color(option.palette.ColorRole.Text))
         painter.setFont(option.font)
         painter.drawText(
             text_rect,
@@ -206,7 +217,7 @@ class PhotoActionsDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index,
     ) -> None:
-        base_option = QStyleOptionViewItem(option)
+        base_option = _neutral_item_option(option)
         base_option.text = ""
         QApplication.style().drawControl(
             QStyle.ControlElement.CE_ItemViewItem,

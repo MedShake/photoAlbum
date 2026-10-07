@@ -42,7 +42,16 @@ class SourcesRefreshWorker(QObject):
         for source in self._sources:
             if self._cancelled:
                 break
-            self.log_message.emit(f"{source.provider_label or source.kind} — {source.collection_name}")
+            provider_name = (
+                translator.tr("sources.local_folder")
+                if source.kind == "local"
+                else (source.provider_label or source.kind.replace("-", " ").title())
+            )
+            source_name = f"{provider_name} — {source.collection_name}"
+            operation_prefix = "sources.sync" if self._synchronize else "sources.refresh_one"
+            self.log_message.emit(
+                translator.tr(f"{operation_prefix}.started", source=source_name)
+            )
             try:
                 if source.kind == "local":
                     result = ProjectScanService().scan(
@@ -59,10 +68,23 @@ class SourcesRefreshWorker(QObject):
                         self.log_message.emit(
                             translator.tr(
                                 "sources.refresh.file_failed",
-                                source=source.name,
+                                source=source.collection_name,
                                 filename=error.path.name,
                             )
                         )
+                    self.log_message.emit(
+                        translator.tr(
+                            "sources.sync.local_summary",
+                            source=source_name,
+                            discovered=result.statistics.discovered,
+                            analyzed=result.statistics.analyzed,
+                            reused=result.statistics.reused,
+                            missing=len(result.missing_photos),
+                        )
+                    )
+                    self.log_message.emit(
+                        translator.tr(f"{operation_prefix}.completed", source=source_name)
+                    )
                     continue
                 if self._synchronize:
                     provider = self._providers.get(source.id)
@@ -71,10 +93,23 @@ class SourcesRefreshWorker(QObject):
                     database = ProjectDatabase(self._path)
                     try:
                         database.initialize()
-                        SourceImporter(PhotoRepository(database), SourceAssetCache(self._path)).import_collection(
-                            source, provider, on_progress=self.source_progress.emit)
+                        import_result = SourceImporter(
+                            PhotoRepository(database), SourceAssetCache(self._path)
+                        ).import_collection(
+                            source, provider, on_progress=self.source_progress.emit
+                        )
                     finally:
                         database.close()
+                    self.log_message.emit(
+                        translator.tr(
+                            "sources.sync.remote_summary",
+                            source=source_name,
+                            count=len(import_result.photos),
+                            added=import_result.added,
+                            updated=import_result.updated,
+                            missing=import_result.missing,
+                        )
+                    )
                 self._current = MetadataRefreshWorker(
                     project_path=self._path, source_id=source.id,
                     policy=source.effective_metadata_policy,
@@ -88,11 +123,15 @@ class SourcesRefreshWorker(QObject):
                 )
                 self._current.run()
                 self._current = None
-            except Exception:
+                self.log_message.emit(
+                    translator.tr(f"{operation_prefix}.completed", source=source_name)
+                )
+            except Exception as exc:
                 self.log_message.emit(
                     "⚠ " + translator.tr(
-                        "sources.refresh.source_failed",
-                        source=source.name,
+                        f"{operation_prefix}.failed",
+                        source=source_name,
+                        error=str(exc),
                     )
                 )
         database = ProjectDatabase(self._path)

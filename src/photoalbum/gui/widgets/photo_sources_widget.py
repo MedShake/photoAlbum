@@ -4,7 +4,7 @@ from PySide6.QtCore import QEvent, QPoint, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QHBoxLayout, QHeaderView,
     QLabel, QMenu, QPlainTextEdit, QProgressBar, QPushButton,
-    QSplitter, QTableView, QVBoxLayout, QWidget, QGroupBox, QScrollArea,
+    QSplitter, QTableView, QVBoxLayout, QWidget, QGroupBox,
 )
 
 from photoalbum.gui.models import PhotoTableModel
@@ -12,6 +12,7 @@ from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
 from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.gui.widgets.photo_actions_delegate import (
     PhotoActionsDelegate,
+    PhotoCellDelegate,
     PhotoFilenameDelegate,
 )
 from photoalbum.i18n import Translator
@@ -25,6 +26,7 @@ class PhotoSourcesWidget(QWidget):
     synology_source_requested = Signal()
     scan_requested = Signal()
     sync_requested = Signal()
+    source_sync_requested = Signal(str)
     edit_datetime_requested = Signal(object)
     edit_gps_requested = Signal(object)
     open_photo_requested = Signal(object)
@@ -47,6 +49,7 @@ class PhotoSourcesWidget(QWidget):
         self._hover_preview = hover_preview or HoverPhotoPreview(
             PreviewImageCache(self), self
         )
+        self._source_controls_enabled = True
         self._create_content()
         self.model.modelAboutToBeReset.connect(self._cancel_source_photo_preview)
         self.proxy_model.layoutAboutToBeChanged.connect(self._cancel_source_photo_preview)
@@ -71,31 +74,15 @@ class PhotoSourcesWidget(QWidget):
         add_layout.addStretch()
         sources_layout.addWidget(add_group)
 
-        self.sources_group = QGroupBox(self._translator.tr("sources.list"))
+        # Each source is a self-contained card. Avoid a nested scroll area here:
+        # the cards should simply grow with the page so their actions and state
+        # remain immediately visible.
         source_container = QWidget()
         self._source_cards = QVBoxLayout(source_container)
         self._source_cards.setContentsMargins(0, 0, 0, 0)
-        self._sources_scroll = QScrollArea()
-        self._sources_scroll.setWidgetResizable(True)
-        self._sources_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        self._sources_scroll.setWidget(source_container)
-        self._sources_scroll.setMaximumHeight(240)
-        QVBoxLayout(self.sources_group).addWidget(self._sources_scroll)
-        sources_layout.addWidget(self.sources_group)
+        self._source_cards.setSpacing(8)
+        sources_layout.addWidget(source_container)
         self._sources = []
-
-        refresh_group = QGroupBox(self._translator.tr("sources.refresh"))
-        refresh_layout = QVBoxLayout(refresh_group)
-        action_layout = QHBoxLayout()
-        self.analyze_button = QPushButton(self._translator.tr("sources.analyze"))
-        self.analyze_button.clicked.connect(self.scan_requested.emit)
-        self.sync_button = QPushButton(self._translator.tr("sources.synchronize"))
-        self.sync_button.clicked.connect(self.sync_requested.emit)
-        action_layout.addWidget(self.analyze_button)
-        action_layout.addWidget(self.sync_button)
-        action_layout.addStretch()
-        refresh_layout.addLayout(action_layout)
-        sources_layout.addWidget(refresh_group)
 
         # Processing progress.
         self.source_progress_label = QLabel(
@@ -162,10 +149,11 @@ class PhotoSourcesWidget(QWidget):
             self.nominatim_progress_layout
         )
 
-        # Analysis summary.
+        # Kept as an internal status sink for existing controller workflows,
+        # but operation results belong in the journal rather than as a persistent
+        # line between the source cards and the photo table.
         self.summary_label = QLabel(self._translator.tr('main.no_analysis'))
-
-        sources_layout.addWidget(self.summary_label)
+        self.summary_label.setVisible(False)
 
         self.model = PhotoTableModel(translator=self._translator, parent=self)
         self._provider_label = self._translator.tr("photos.policy.provider")
@@ -207,11 +195,17 @@ class PhotoSourcesWidget(QWidget):
             self.edit_usage_requested.emit
         )
 
+        # Keep the Photos table visually passive across platform styles:
+        # alternate rows remain visible, but row selection/hover/focus painting
+        # is deliberately neutralized. Mouse tracking stays enabled because
+        # filename hover previews and delegate tooltips depend on it.
+        self._photo_cell_delegate = PhotoCellDelegate(self.table)
+        self.table.setItemDelegate(self._photo_cell_delegate)
         self.table.setItemDelegateForColumn(0, self._photo_filename_delegate)
         self.table.setItemDelegateForColumn(1, self._photo_actions_delegate)
 
-        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setAlternatingRowColors(True)
         self.table.setSortingEnabled(True)
 
@@ -265,28 +259,58 @@ class PhotoSourcesWidget(QWidget):
         sources_layout.addWidget(QLabel(self._translator.tr('main.photos')))
         sources_layout.addWidget(splitter, 1)
 
-    def set_sources(self, sources, available, labels) -> None:
+    def set_sources(self, sources, available, labels, sessions=None) -> None:
         from .source_card import SourceCard
+        sessions = sessions or {}
         while self._source_cards.count():
             item = self._source_cards.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         for source in sources:
-            card = SourceCard(source, available.get(source.id, {}), self._translator)
+            card = SourceCard(
+                source,
+                available.get(source.id, {}),
+                self._translator,
+                session_available=(
+                    sessions.get(source.id)
+                    if source.kind != "local"
+                    else None
+                ),
+            )
             card.enabled_changed.connect(self.source_enabled_changed.emit)
+            card.sync_requested.connect(self.source_sync_requested.emit)
             card.edit_requested.connect(self.edit_source_requested.emit)
             card.delete_requested.connect(self.delete_source_requested.emit)
             card.policy_changed.connect(self.source_policy_changed.emit)
             card.recursive_changed.connect(self.source_recursive_changed.emit)
+            card.setEnabled(self._source_controls_enabled)
             self._source_cards.addWidget(card)
         self.model.set_sources(labels, {source.id: source.collection_name for source in sources})
         self._sources = list(sources)
-        self._sources_scroll.setFixedHeight(min(240, max(40, len(self._sources) * 78)))
-        self.sync_button.setVisible(True)
+
+    def set_source_controls_enabled(self, enabled: bool) -> None:
+        """Enable or disable every per-source card action.
+
+        The cards replaced the former sources QGroupBox, so scan-state handling
+        must target the cards themselves rather than a removed container.
+        Remember the state as cards may be rebuilt while an operation is active.
+        """
+        self._source_controls_enabled = bool(enabled)
+        for index in range(self._source_cards.count()):
+            widget = self._source_cards.itemAt(index).widget()
+            if widget is not None:
+                widget.setEnabled(self._source_controls_enabled)
 
     @property
     def has_active_sources(self) -> bool:
         return any(source.enabled for source in self._sources)
+
+    @property
+    def has_active_remote_sources(self) -> bool:
+        return any(
+            source.enabled and source.kind != "local"
+            for source in self._sources
+        )
 
     def prepare_source_progress(self, provider_label: str | None = None) -> None:
         """Show source synchronization and hide scan-only phases."""
@@ -498,9 +522,11 @@ class PhotoSourcesWidget(QWidget):
                 if not proxy_index.isValid():
                     return
 
-                self.table.selectRow(proxy_index.row())
+                # Keep programmatic navigation without creating a visual
+                # selection. The current index is still useful to callers and
+                # tests, while NoSelection/NoFocus keep the table passive.
+                self.table.setCurrentIndex(proxy_index)
                 self.table.scrollTo(proxy_index, QAbstractItemView.ScrollHint.PositionAtCenter)
-                self.table.setFocus()
                 return
 
     def eventFilter(self, watched, event) -> bool:

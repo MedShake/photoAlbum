@@ -1,34 +1,52 @@
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QComboBox, QPushButton
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+    QVBoxLayout,
+)
 
 from photoalbum.sources import PhotoMetadataPolicy
 
 
-class SourceCard(QWidget):
+class SourceCard(QGroupBox):
     enabled_changed = Signal(str, bool)
+    sync_requested = Signal(str)
     edit_requested = Signal(str)
     delete_requested = Signal(str)
     policy_changed = Signal(str, object)
     recursive_changed = Signal(str, bool)
 
-    def __init__(self, source, available, translator, parent=None):
-        super().__init__(parent)
+    def __init__(
+        self,
+        source,
+        available,
+        translator,
+        parent=None,
+        *,
+        session_available: bool | None = None,
+    ):
+        provider_name = (
+            translator.tr("sources.local_folder")
+            if source.kind == "local"
+            else (source.provider_label or source.kind)
+        )
+        super().__init__(f"{provider_name} — {source.collection_name}", parent)
         self.source = source
         tr = translator.tr
+        self.setToolTip(
+            str(source.config.get("directory") or source.config.get("base_url") or source.name)
+        )
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 10)
+        layout.setSpacing(7)
         heading = QHBoxLayout()
+        heading.setSpacing(8)
         enabled = QCheckBox(tr("sources.active"))
         enabled.setChecked(source.enabled)
         enabled.toggled.connect(lambda value: self.enabled_changed.emit(source.id, value))
         heading.addWidget(enabled)
-        provider_name = (
-            tr("sources.local_folder")
-            if source.kind == "local"
-            else (source.provider_label or source.kind)
-        )
-        label = QLabel(f"{provider_name} — {source.collection_name}")
-        label.setToolTip(str(source.config.get("directory") or source.config.get("base_url") or source.name))
-        heading.addWidget(label)
+        is_remote = source.kind != "local"
+        reconnect_required = is_remote and session_available is False
+
         if source.kind == "local":
             heading.addSpacing(24)
             recursive = QCheckBox(tr("main.include_subdirectories"))
@@ -37,15 +55,61 @@ class SourceCard(QWidget):
                 lambda value: self.recursive_changed.emit(source.id, value)
             )
             heading.addWidget(recursive)
+
+        self.connection_status_label = QLabel(
+            tr("sources.connection.reconnect_required") if reconnect_required else ""
+        )
+        self.connection_status_label.setVisible(reconnect_required)
+        if reconnect_required:
+            self.connection_status_label.setToolTip(
+                tr("sources.reconnect_required")
+            )
+            heading.addWidget(self.connection_status_label)
+
         heading.addStretch(1)
-        for key, signal in (("sources.modify", self.edit_requested), ("sources.delete", self.delete_requested)):
-            button = QPushButton(tr(key))
-            button.clicked.connect(lambda _checked=False, s=signal: s.emit(source.id))
-            heading.addWidget(button)
+
+        actions = QVBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(4)
+        actions.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+
+        action_width = 118
+
+        self.sync_button = QPushButton(tr("sources.synchronize_one"))
+        self.sync_button.setFixedWidth(action_width)
+        self.sync_button.setEnabled(source.enabled and not reconnect_required)
+        self.sync_button.clicked.connect(
+            lambda _checked=False: self.sync_requested.emit(source.id)
+        )
+        actions.addWidget(self.sync_button, 0, Qt.AlignmentFlag.AlignRight)
+
+        secondary_actions = QHBoxLayout()
+        secondary_actions.setContentsMargins(0, 0, 0, 0)
+        secondary_actions.setSpacing(4)
+
+        self.edit_button = QPushButton(
+            tr("sources.reconnect") if reconnect_required else tr("sources.modify")
+        )
+        self.edit_button.setFixedWidth(action_width)
+        self.edit_button.clicked.connect(
+            lambda _checked=False: self.edit_requested.emit(source.id)
+        )
+        secondary_actions.addWidget(self.edit_button)
+
+        delete_button = QPushButton(tr("sources.delete"))
+        delete_button.setFixedWidth(action_width)
+        delete_button.clicked.connect(
+            lambda _checked=False: self.delete_requested.emit(source.id)
+        )
+        secondary_actions.addWidget(delete_button)
+        actions.addLayout(secondary_actions)
+
+        heading.addLayout(actions)
         layout.addLayout(heading)
         policy = source.effective_metadata_policy
         self._combos = {}
         row = QHBoxLayout()
+        row.setSpacing(6)
         labels = {"provider": source.provider_label or source.kind,
                   "exif": "EXIF", "filename": tr("photos.policy.filename"),
                   "geocoding": "Nominatim", "none": tr("photos.policy.none")}

@@ -7,7 +7,9 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QDateTimeEdit, QLineEdit, QPushButton, QMessageBox
+from PySide6.QtWidgets import (
+    QAbstractItemView, QApplication, QDialog, QDateTimeEdit, QLineEdit, QPushButton, QMessageBox,
+)
 
 from photoalbum.app import ProjectService
 from photoalbum.export import PdfExportContent
@@ -155,15 +157,12 @@ def test_format_and_orientation_persist_and_rebuild_once(window, tmp_path, monke
 
 def test_photo_controls_forward_signals_and_selection_respects_sort(app, tmp_path):
     view = PhotoSourcesWidget(Translator('en'))
-    source, scan, recursive = Mock(), Mock(), Mock()
+    source, recursive = Mock(), Mock()
     view.source_requested.connect(source)
-    view.scan_requested.connect(scan)
     view.source_enabled_changed.connect(recursive)
     view.source_requested.emit()
-    view.analyze_button.click()
     view.source_enabled_changed.emit("source-a", True)
     source.assert_called_once_with()
-    scan.assert_called_once_with()
     recursive.assert_called_once_with("source-a", True)
     first = Photo(path=tmp_path / 'a.jpg', filename='a.jpg')
     second = Photo(path=tmp_path / 'z.jpg', filename='z.jpg')
@@ -172,6 +171,23 @@ def test_photo_controls_forward_signals_and_selection_respects_sort(app, tmp_pat
     view.select_photo(first)
     selected = view.proxy_model.mapToSource(view.table.currentIndex())
     assert view.model.photo_at(selected.row()).path == first.path
+    view.close()
+
+
+def test_photo_table_keeps_hover_features_without_visual_selection(app, tmp_path):
+    view = PhotoSourcesWidget(Translator('en'))
+    first = Photo(path=tmp_path / 'a.jpg', filename='a.jpg')
+    second = Photo(path=tmp_path / 'b.jpg', filename='b.jpg')
+    view.model.set_photos([first, second])
+
+    assert view.table.selectionMode() == QAbstractItemView.SelectionMode.NoSelection
+    assert view.table.focusPolicy() == Qt.FocusPolicy.NoFocus
+    assert view.table.alternatingRowColors()
+    assert view.table.hasMouseTracking()
+
+    view.select_photo(second)
+    assert view.table.currentIndex().data(Qt.ItemDataRole.UserRole).identity == second.identity
+    assert not view.table.selectionModel().selectedIndexes()
     view.close()
 
 
@@ -453,10 +469,35 @@ def test_remote_import_and_sync_are_async_and_analysis_does_not_sync_provider(
     wait_until(app, lambda: not controller.is_running)
     assert provider.list_calls == 1
 
-    controller.sync_source()
+    controller.sync_source("future-1")
     assert controller.is_running
     wait_until(app, lambda: not controller.is_running)
     assert provider.list_calls == 2
+    service.close()
+    view.close()
+
+
+def test_remote_sync_requires_an_attached_session_before_starting(app, tmp_path):
+    service = ProjectService()
+    service.create(tmp_path / "remote-disconnected.photoalbum")
+    source = ProjectSource(
+        id="remote-1",
+        kind="future-provider",
+        name="remote",
+        collection_id="album",
+        collection_name="Album",
+        provider_label="Future Photos",
+    )
+    service.set_photo_source(source)
+    view = PhotoSourcesWidget(Translator("en"))
+    controller = ScanController(service, view, Translator("en"), language="en")
+    errors = []
+    controller.error.connect(errors.append)
+
+    controller.sync_source()
+
+    assert not controller.is_running
+    assert errors == [Translator("en").tr("sources.reconnect_required")]
     service.close()
     view.close()
 
@@ -598,7 +639,6 @@ def test_scan_cancellation_keeps_partial_results(app, tmp_path):
     controller._scan_worker = worker
     controller.cancel()
     worker.request_cancel.assert_called_once_with()
-    assert not view.analyze_button.isEnabled()
     received = []
     controller.photos_ready.connect(received.append)
     photo = Photo(path=tmp_path / 'partial.jpg', filename='partial.jpg')
@@ -706,7 +746,7 @@ def test_photo_sources_widget_hides_nominatim_when_disabled(app):
 
 
 def _source_card(view, *, label="Synology Photos", kind="synology-photos",
-                 available=None, policy=None):
+                 available=None, policy=None, session_available=False):
     source = ProjectSource(
         id="source-a", kind=kind, name="NAS", collection_id="album",
         collection_name="Album", provider_label=label, metadata_policy=policy,
@@ -714,7 +754,7 @@ def _source_card(view, *, label="Synology Photos", kind="synology-photos",
     view.set_sources([source], {source.id: available or {
         "date": {"provider", "exif", "filename"}, "gps": {"provider", "exif"},
         "location": {"provider", "geocoding"}, "caption": {"provider"},
-    }}, {source.id: label})
+    }}, {source.id: label}, {source.id: session_available})
     return view._source_cards.itemAt(0).widget()
 
 
@@ -750,10 +790,37 @@ def test_policy_choices_use_actual_candidates_and_provider_label(app):
     assert [date.itemText(i) for i in range(date.count())] == ["Synology Photos", "Filename"]
     assert date.findData("exif") == -1
     assert [gps.itemText(i) for i in range(gps.count())] == ["Synology Photos"]
-    assert not view.sync_button.isVisible()
-    view.show()
-    app.processEvents()
-    assert view.sync_button.isVisible()
+    assert card.sync_button.text() == "Synchronize"
+    view.close()
+
+
+def test_remote_source_card_exposes_reconnect_action_without_heartbeat(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    disconnected = _source_card(view, session_available=False)
+    assert disconnected.connection_status_label.text() == "Reconnection required"
+    assert disconnected.edit_button.text() == "Reconnect…"
+    assert not disconnected.sync_button.isEnabled()
+
+    connected = _source_card(view, session_available=True)
+    assert not connected.connection_status_label.isVisible()
+    assert connected.edit_button.text() == "Modify…"
+    assert connected.sync_button.isEnabled()
+    view.close()
+
+
+def test_each_source_card_exposes_its_own_sync_action(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    local = _source_card(view, label="Local folder", kind="local")
+    received = []
+    view.source_sync_requested.connect(received.append)
+
+    assert local.sync_button.text() == "Synchronize"
+    assert local.sync_button.isEnabled()
+    assert local.sync_button.width() == local.edit_button.width()
+    local.sync_button.click()
+    assert received == ["source-a"]
+    assert not hasattr(view, "analyze_button")
+    assert not hasattr(view, "sync_button")
     view.close()
 
 
@@ -838,7 +905,12 @@ def test_photo_sources_widget_uses_user_facing_source_and_policy_labels(app):
     view = PhotoSourcesWidget(Translator("fr"))
     card = _source_card(view)
     titles = {group.title() for group in view.findChildren(QGroupBox)}
-    assert {"Ajouter une source", "Source(s) de l’album", "Actualisation des photos"} <= titles
+    assert "Ajouter une source" in titles
+    assert "Source(s) de l’album" not in titles
+    assert "Actualisation des photos" not in titles
+    assert card.title() == "Synology Photos — Album"
+    assert not hasattr(view, "_sources_scroll")
+    assert not view.summary_label.isVisible()
     assert view.modify_source_button.text() == "Ajouter…"
     assert "OpenStreetMap" in card._nominatim.toolTip()
     assert "Internet" in card._nominatim.toolTip()
@@ -910,6 +982,17 @@ def test_project_header_shows_name_edit_action_and_filename(window, tmp_path, mo
     assert window._project_label.text() == "Nantes 2026"
     assert window._project_filename_label.text() == "technical-name.photoalbum"
     assert window._project_service.get_project_name() == "Nantes 2026"
+
+
+def test_pdf_failure_popup_surfaces_actionable_worker_message(window):
+    errors = []
+    window._pdf_widget.error.connect(errors.append)
+    message = "Reconnect the source containing ‘photo.jpg’ before generating the PDF."
+
+    window._pdf_widget._pdf_export_failed(message)
+
+    assert errors[-1] == message
+    assert message in window._pdf_widget._pdf_log_view.toPlainText()
 
 
 def test_pdf_preferences_load_persist_and_keep_project_title_independent(window, tmp_path):
