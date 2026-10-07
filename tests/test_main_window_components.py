@@ -746,7 +746,7 @@ def test_photo_sources_widget_hides_nominatim_when_disabled(app):
 
 
 def _source_card(view, *, label="Synology Photos", kind="synology-photos",
-                 available=None, policy=None, session_available=False):
+                 available=None, policy=None, session_available=False, status=None):
     source = ProjectSource(
         id="source-a", kind=kind, name="NAS", collection_id="album",
         collection_name="Album", provider_label=label, metadata_policy=policy,
@@ -754,7 +754,8 @@ def _source_card(view, *, label="Synology Photos", kind="synology-photos",
     view.set_sources([source], {source.id: available or {
         "date": {"provider", "exif", "filename"}, "gps": {"provider", "exif"},
         "location": {"provider", "geocoding"}, "caption": {"provider"},
-    }}, {source.id: label}, {source.id: session_available})
+    }}, {source.id: label}, {source.id: session_available},
+       {source.id: status} if status is not None else None)
     return view._source_cards.itemAt(0).widget()
 
 
@@ -796,8 +797,10 @@ def test_policy_choices_use_actual_candidates_and_provider_label(app):
 
 def test_remote_source_card_exposes_reconnect_action_without_heartbeat(app):
     view = PhotoSourcesWidget(Translator("en"))
-    disconnected = _source_card(view, session_available=False)
-    assert disconnected.connection_status_label.text() == "No active session"
+    disconnected = _source_card(
+        view, session_available=False, status="disconnected"
+    )
+    assert disconnected.connection_status_label.text() == "Source disconnected"
     assert disconnected.edit_button.text() == "Reconnect…"
     assert not disconnected.sync_button.isEnabled()
 
@@ -1060,11 +1063,26 @@ def test_pdf_preferences_load_persist_and_keep_project_title_independent(window,
     assert pdf._pdf_title_edit.text() == "Nantes — album photo"
 
 
-def test_reconnect_required_uses_the_shared_orange_warning_icon(app):
+def test_disconnected_source_uses_orange_warning_icon_and_text(app):
     view = PhotoSourcesWidget(Translator("en"))
-    card = _source_card(view, session_available=False)
+    card = _source_card(
+        view, session_available=False, status="disconnected"
+    )
     assert not card.connection_status_icon.isHidden()
     assert not card.connection_status_icon.pixmap().isNull()
+    assert "#ef6c00" in card.connection_status_label.styleSheet()
+    view.close()
+
+
+def test_disconnected_source_with_missing_images_uses_red_warning(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    card = _source_card(
+        view, session_available=False, status="disconnected_missing_images"
+    )
+    assert card.connection_status_label.text() == "Source disconnected — images missing"
+    assert not card.connection_status_icon.pixmap().isNull()
+    assert "#c62828" in card.connection_status_label.styleSheet()
+    assert "no longer available" in card.connection_status_label.toolTip()
     view.close()
 
 

@@ -134,6 +134,46 @@ def test_legacy_cache_search_and_cleanup_is_limited_and_safe(tmp_path):
     assert outside.exists()
 
 
+def test_open_project_removes_only_its_exact_adjacent_legacy_cache(tmp_path):
+    project = tmp_path / "album.photoalbum"
+    service = ProjectService()
+    service.create(project)
+    service.close()
+
+    legacy = tmp_path / ".album.photoalbum.cache"
+    (legacy / "assets").mkdir(parents=True)
+    (legacy / "assets" / "asset.jpg").write_bytes(b"legacy")
+    unrelated = tmp_path / ".other.photoalbum.cache"
+    (unrelated / "assets").mkdir(parents=True)
+    (unrelated / "assets" / "asset.jpg").write_bytes(b"keep")
+
+    service.open(project)
+    try:
+        assert service.legacy_cache_cleanup_result == ("removed", None)
+        assert not legacy.exists()
+        assert unrelated.exists()
+    finally:
+        service.close()
+
+
+def test_open_project_ignores_non_legacy_adjacent_directory(tmp_path):
+    project = tmp_path / "album.photoalbum"
+    service = ProjectService()
+    service.create(project)
+    service.close()
+
+    lookalike = tmp_path / ".album.photoalbum.cache"
+    lookalike.mkdir()
+    (lookalike / "keep.txt").write_text("not a legacy asset cache")
+
+    service.open(project)
+    try:
+        assert service.legacy_cache_cleanup_result is None
+        assert lookalike.exists()
+    finally:
+        service.close()
+
+
 def test_legacy_cache_search_does_not_descend_into_current_global_cache(tmp_path):
     home = tmp_path / "home"
     root = home / "current-cache"

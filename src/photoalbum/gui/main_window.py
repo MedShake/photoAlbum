@@ -558,6 +558,22 @@ class MainWindow(QMainWindow):
         self._load_project_photos()
         self._update_project_state()
 
+        cleanup = getattr(
+            self._project_service, "legacy_cache_cleanup_result", None
+        )
+        if isinstance(cleanup, tuple) and len(cleanup) == 2:
+            state, detail = cleanup
+            if state == "removed":
+                self._photos_widget.log_view.appendPlainText(
+                    self._translator.tr("cache.legacy_project_removed")
+                )
+            elif state == "failed":
+                self._photos_widget.log_view.appendPlainText(
+                    self._translator.tr(
+                        "cache.legacy_project_cleanup_failed", error=detail or ""
+                    )
+                )
+
         # The persisted snapshot is already visible. Necessary local analysis
         # or remote metadata resolution now continues in the background;
         # provider synchronization remains an explicit user action.

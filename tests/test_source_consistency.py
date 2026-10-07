@@ -404,3 +404,31 @@ def test_failed_album_edit_does_not_invalidate_previous_session(tmp_path):
     assert service.source_status(source) == "failed"
     view.close()
     service.close()
+
+
+def test_disconnected_remote_source_distinguishes_missing_cached_images(tmp_path):
+    service = ProjectService()
+    service.create(tmp_path / "remote-cache-state.photoalbum")
+    source = ProjectSource(
+        id="remote-cache", kind="synology-photos", name="Remote",
+        collection_id="album", collection_name="Album",
+    )
+    service.set_photo_source(source)
+    photo = Photo(
+        path=None, filename="photo.jpg", source_id=source.id,
+        asset_id="asset-1", content_hash="revision-1",
+    )
+    database = ProjectDatabase(service.project_path)
+    PhotoRepository(database).save(photo)
+    database.close()
+
+    assert service.get_photo_source_session(source.id) is None
+    assert service.source_status(source) == "disconnected_missing_images"
+
+    cache = SourceAssetCache(service.project_path)
+    thumbnail = cache.path_for(photo, "thumbnail")
+    thumbnail.parent.mkdir(parents=True, exist_ok=True)
+    thumbnail.write_bytes(b"thumbnail")
+
+    assert service.source_status(source) == "disconnected"
+    service.close()

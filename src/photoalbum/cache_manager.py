@@ -156,6 +156,24 @@ class CacheManager:
                     pass
         return total
 
+    def legacy_cache_for_project(self, project_path):
+        """Return the exact adjacent cache used by older versions, if present."""
+        project_path = Path(project_path).expanduser().resolve(strict=False)
+        candidate = project_path.parent / f".{project_path.name}.cache"
+        return candidate if self._looks_like_legacy_cache(candidate) else None
+
+    def purge_legacy_cache_for_project(self, project_path):
+        """Remove only the legacy cache adjacent to *project_path*.
+
+        This deliberately performs no directory scan: it targets the one cache
+        name that older Photo Album versions derived from this project path.
+        """
+        candidate = self.legacy_cache_for_project(project_path)
+        if candidate is None:
+            return False
+        shutil.rmtree(candidate)
+        return True
+
     def purge_legacy_caches(self, paths, *, search_root=None):
         """Remove explicitly discovered legacy caches and return failures.
 

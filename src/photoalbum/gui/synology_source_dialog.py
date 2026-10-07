@@ -115,6 +115,12 @@ class SynologySourceDialog(QDialog):
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
 
+        preferred_size = self.sizeHint()
+        self.resize(
+            round(preferred_size.width() * 1.15),
+            round(preferred_size.height() * 1.15),
+        )
+
     def _connect(self) -> None:
         if self.provider is not None:
             try:

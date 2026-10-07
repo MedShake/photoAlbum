@@ -82,9 +82,19 @@ class SourceCard(QGroupBox):
         )
         self.connection_status_label.setVisible(status is not None)
         if status:
-            reconnect_tooltip = tr("sources.state.cached_hint") if is_remote else tr("sources.state.snapshot_hint")
+            reconnect_tooltip = (
+                tr("sources.state.missing_images_hint")
+                if status == "disconnected_missing_images"
+                else (tr("sources.state.cached_hint") if is_remote else tr("sources.state.snapshot_hint"))
+            )
+            severe = status == "disconnected_missing_images"
             self.connection_status_icon.setPixmap(
-                resource_icon("plan-warning-orange.svg").pixmap(QSize(14, 14))
+                resource_icon(
+                    "plan-warning-red.svg" if severe else "plan-warning-orange.svg"
+                ).pixmap(QSize(14, 14))
+            )
+            self.connection_status_label.setStyleSheet(
+                "color: #c62828;" if severe else "color: #ef6c00;"
             )
             self.connection_status_icon.setToolTip(reconnect_tooltip)
             self.connection_status_label.setToolTip(reconnect_tooltip)

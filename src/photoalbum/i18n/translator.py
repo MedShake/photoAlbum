@@ -5,6 +5,8 @@ CATALOGS: dict[str, dict[str, str]] = {
     "en": {
         "source.asset.access_failed": "Cannot access the photo source: {error}",
         "sources.state.no_session": "No active session",
+        "sources.state.disconnected": "Source disconnected",
+        "sources.state.disconnected_missing_images": "Source disconnected — images missing",
         "sources.state.invalid_session": "Session invalid — reconnect",
         "sources.state.unavailable": "Source unavailable",
         "sources.state.failed": "Last operation failed",
@@ -12,6 +14,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.state.cancelled": "Operation cancelled",
         "sources.state.geocoding": "Geocoding incomplete",
         "sources.state.cached_hint": "Cached photos remain usable. Reconnect to synchronize or retrieve files absent from the cache. See the activity log for operation details.",
+        "sources.state.missing_images_hint": "Some images from this source are no longer available in the local cache. Reconnect to retrieve them and restore previews.",
         "sources.state.snapshot_hint": "The stored snapshot is preserved. See the activity log for operation details.",
         "sources.operation.partial": "Operation partially completed. See the activity log.",
         "sources.reactivated_snapshot": "{source}: stored snapshot reactivated. Reconnect to synchronize it.",
@@ -60,6 +63,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "cache.legacy_cleanup_error": (
             "The current cache was cleared, but {count} legacy cache folder(s) could not be removed."
         ),
+        "cache.legacy_project_removed": "Legacy cache for this project removed.",
+        "cache.legacy_project_cleanup_failed": "⚠ Could not remove the legacy cache for this project: {error}",
         "cache.error": "Cannot change or clear the cache. It may be in use by another Photo Album window, or inaccessible.",
         "sources.add": "Project sources",
         "sources.add_button": "Add…",
@@ -845,6 +850,8 @@ CATALOGS: dict[str, dict[str, str]] = {
     "fr": {
         "source.asset.access_failed": "Impossible d’accéder à la source photo : {error}",
         "sources.state.no_session": "Sans session active",
+        "sources.state.disconnected": "Source déconnectée",
+        "sources.state.disconnected_missing_images": "Source déconnectée — images manquantes",
         "sources.state.invalid_session": "Session invalide — reconnecter",
         "sources.state.unavailable": "Source indisponible",
         "sources.state.failed": "Dernière opération en échec",
@@ -852,6 +859,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.state.cancelled": "Opération annulée",
         "sources.state.geocoding": "Géocodage incomplet",
         "sources.state.cached_hint": "Les photos en cache restent utilisables. Reconnectez-vous pour synchroniser ou récupérer les fichiers absents du cache. Consultez le journal pour le détail des opérations.",
+        "sources.state.missing_images_hint": "Certaines images de cette source ne sont plus disponibles dans le cache local. Reconnectez la source pour les récupérer et restaurer les aperçus.",
         "sources.state.snapshot_hint": "L’instantané mémorisé est conservé. Consultez le journal pour le détail des opérations.",
         "sources.operation.partial": "Opération partiellement terminée. Consultez le journal d’activité.",
         "sources.reactivated_snapshot": "{source} : instantané mémorisé réactivé. Reconnectez-vous pour le synchroniser.",
@@ -902,6 +910,8 @@ CATALOGS: dict[str, dict[str, str]] = {
         "cache.legacy_cleanup_error": (
             "Le cache actuel a été vidé, mais {count} ancien(s) dossier(s) de cache n’ont pas pu être supprimé(s)."
         ),
+        "cache.legacy_project_removed": "Ancien cache du projet supprimé.",
+        "cache.legacy_project_cleanup_failed": "⚠ Impossible de supprimer l’ancien cache du projet : {error}",
         "cache.error": "Impossible de modifier ou vider le cache. Il peut être utilisé par une autre fenêtre Photo Album, ou inaccessible.",
         "sources.add": "Sources du projet",
         "sources.add_button": "Ajouter…",
