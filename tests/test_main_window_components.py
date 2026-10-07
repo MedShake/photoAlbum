@@ -1018,3 +1018,76 @@ def test_pdf_preferences_load_persist_and_keep_project_title_independent(window,
     window._project_service.set_project_name("Voyage à Nantes")
     window._load_project_settings()
     assert pdf._pdf_title_edit.text() == "Nantes — album photo"
+
+
+def test_reconnect_required_uses_the_shared_orange_warning_icon(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    card = _source_card(view, session_available=False)
+    assert not card.connection_status_icon.isHidden()
+    assert not card.connection_status_icon.pixmap().isNull()
+    view.close()
+
+
+def test_enabling_nominatim_selects_it_for_location_after_success(
+    window, tmp_path, monkeypatch,
+):
+    from photoalbum.sources import PhotoMetadataPolicy
+
+    service = window._project_service
+    service.create(tmp_path / "nominatim-default.photoalbum")
+    service.set_source_directory(tmp_path / "photos")
+    window._load_project_settings()
+    source_id = service.get_photo_source().id
+
+    service.set_photo_metadata_policy(PhotoMetadataPolicy(
+        date_preference="exif",
+        gps_preference="exif",
+        location_preference="none",
+        nominatim_enabled=False,
+    ), source_id)
+    monkeypatch.setattr(window._scan_controller, "refresh_metadata", lambda _source_id: None)
+    window._source_policy_changed(source_id, PhotoMetadataPolicy(
+        date_preference="exif",
+        gps_preference="exif",
+        location_preference="none",
+        nominatim_enabled=True,
+    ))
+    assert source_id in window._pending_nominatim_location_sources
+    assert service.get_photo_metadata_policy(source_id).location_preference == "none"
+
+    window._metadata_refresh_finished(source_id, True)
+
+    policy = service.get_photo_metadata_policy(source_id)
+    assert policy.nominatim_enabled
+    assert policy.location_preference == "geocoding"
+    assert source_id not in window._pending_nominatim_location_sources
+
+
+def test_failed_first_nominatim_refresh_keeps_location_policy(
+    window, tmp_path, monkeypatch,
+):
+    from photoalbum.sources import PhotoMetadataPolicy
+
+    service = window._project_service
+    service.create(tmp_path / "nominatim-failed.photoalbum")
+    service.set_source_directory(tmp_path / "photos")
+    window._load_project_settings()
+    source_id = service.get_photo_source().id
+
+    service.set_photo_metadata_policy(PhotoMetadataPolicy(
+        date_preference="exif",
+        gps_preference="exif",
+        location_preference="none",
+        nominatim_enabled=False,
+    ), source_id)
+    monkeypatch.setattr(window._scan_controller, "refresh_metadata", lambda _source_id: None)
+    window._source_policy_changed(source_id, PhotoMetadataPolicy(
+        date_preference="exif",
+        gps_preference="exif",
+        location_preference="none",
+        nominatim_enabled=True,
+    ))
+    window._metadata_refresh_finished(source_id, False)
+
+    assert service.get_photo_metadata_policy(source_id).location_preference == "none"
+    assert source_id not in window._pending_nominatim_location_sources

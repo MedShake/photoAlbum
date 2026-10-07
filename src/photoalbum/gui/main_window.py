@@ -311,8 +311,12 @@ class MainWindow(QMainWindow):
             self._project_service, self._photos_widget, self._translator,
             language=self._language, parent=self,
         )
+        self._pending_nominatim_location_sources: set[str] = set()
         self._scan_controller.error.connect(self._show_error)
-        self._scan_controller.status_message.connect(self.statusBar().showMessage)
+        self._scan_controller.status_message.connect(self._show_transient_status)
+        self._scan_controller.metadata_refresh_finished.connect(
+            self._metadata_refresh_finished
+        )
         self._scan_controller.running_changed.connect(self._set_scan_running)
         self._scan_controller.photos_ready.connect(self._scan_photos_ready)
         self._scan_controller.source_unavailable.connect(lambda: self._tabs.setCurrentIndex(0))
@@ -577,7 +581,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._project_service.add_local_source(Path(directory))
+            source = self._project_service.add_local_source(Path(directory))
         except Exception as exc:
             self._show_error(self._translator.tr("main.add_local_source_error"))
             return
@@ -588,9 +592,9 @@ class MainWindow(QMainWindow):
 
         self._update_project_state()
 
-        # Choosing a source folder defines the photo library:
-        # analysis therefore starts immediately.
-        self._scan_controller.start()
+        # A newly added local folder only needs to refresh itself. Do not
+        # re-run unrelated local or remote sources as a side effect.
+        self._scan_controller.start(source.id)
 
     def _choose_synology_source(self, source_id: str | None = None) -> None:
         if not self._project_service.is_open:
@@ -669,14 +673,48 @@ class MainWindow(QMainWindow):
         self._refresh_source_cards()
         self._scan_controller.reset()
         self._update_project_state()
-        self._scan_controller.start()
+        self._scan_controller.start(source_id)
 
     def _source_policy_changed(self, source_id, policy) -> None:
+        previous_policy = self._project_service.get_photo_metadata_policy(source_id)
+        if (
+            not previous_policy.nominatim_enabled
+            and policy.nominatim_enabled
+        ):
+            # Once the first successful Nominatim refresh has populated the
+            # geocoded locations, make Nominatim the default location source.
+            # Wait for success so a failed/cancelled refresh never changes the
+            # user's effective location policy.
+            self._pending_nominatim_location_sources.add(source_id)
+        elif not policy.nominatim_enabled:
+            self._pending_nominatim_location_sources.discard(source_id)
+
         self._project_service.set_photo_metadata_policy(policy, source_id)
         self._project_service.apply_photo_metadata_policy(source_id=source_id)
         self._load_project_photos()
         if not self._scan_controller.is_running:
             self._scan_controller.refresh_metadata(source_id)
+
+    def _metadata_refresh_finished(self, source_id, succeeded: bool) -> None:
+        if source_id not in self._pending_nominatim_location_sources:
+            return
+        self._pending_nominatim_location_sources.discard(source_id)
+        if not succeeded:
+            return
+
+        from dataclasses import replace
+
+        policy = self._project_service.get_photo_metadata_policy(source_id)
+        if not policy.nominatim_enabled:
+            return
+        if policy.location_preference != "geocoding":
+            policy = replace(policy, location_preference="geocoding")
+            self._project_service.set_photo_metadata_policy(policy, source_id)
+            self._project_service.apply_photo_metadata_policy(source_id=source_id)
+
+        # Rebuild the cards so the Lieu combo immediately reflects Nominatim,
+        # and reload effective photo values without launching a second scan.
+        self._load_project_photos()
 
     def _delete_source(self, source_id) -> None:
         source = self._project_service.get_photo_source(source_id)
@@ -713,13 +751,17 @@ class MainWindow(QMainWindow):
             directory = Path(path.text()).expanduser().resolve()
             config = dict(source.config)
             config["directory"] = str(directory)
-            self._project_service.set_photo_source(replace(
+            updated_source = replace(
                 source,
                 name=directory.name,
                 collection_name=directory.name,
                 config=config,
-            ))
+            )
+            self._project_service.set_photo_source(updated_source)
             self._refresh_source_cards()
+            self._scan_controller.reset()
+            self._update_project_state()
+            self._scan_controller.start(source_id)
 
     def _edit_photo_usage(self, photo) -> None:
         from photoalbum.gui.photo_usage_dialog import PhotoUsageDialog
@@ -782,6 +824,17 @@ class MainWindow(QMainWindow):
 
         if running:
             self.statusBar().showMessage(self._translator.tr('main.analysis_in_progress'))
+        else:
+            # Do not let the persistent "analysis in progress" status survive
+            # the end of a scan. Preserve any completion/error message emitted
+            # just before running_changed(False), because those are transient and
+            # should remain visible for their configured timeout.
+            stale_statuses = {
+                self._translator.tr('main.analysis_in_progress'),
+                self._translator.tr('main.analysis_stopping'),
+            }
+            if self.statusBar().currentMessage() in stale_statuses:
+                self.statusBar().clearMessage()
 
     def _rename_project(self) -> None:
         if not self._project_service.is_open:
@@ -815,14 +868,14 @@ class MainWindow(QMainWindow):
             self._project_filename_label.setText(project_path.name)
             self._project_filename_label.setVisible(True)
             self._project_rename_button.setVisible(True)
-            self.statusBar().showMessage(str(project_path))
+            self.statusBar().clearMessage()
         else:
             self._project_label.setText(self._translator.tr('main.no_project'))
             self._project_filename_label.clear()
             self._project_filename_label.setVisible(False)
             self._project_rename_button.setVisible(False)
             self._pdf_widget.set_project_settings(None)
-            self.statusBar().showMessage(self._translator.tr("main.ready"))
+            self.statusBar().clearMessage()
 
         # Re-evaluate tab availability as part of every
         # project-state refresh.
@@ -941,7 +994,8 @@ class MainWindow(QMainWindow):
             self._album_preview_widget.clear()
 
             self.statusBar().showMessage(
-                self._translator.tr('main.build_plan_error', error=exc)
+                self._translator.tr('main.build_plan_error', error=exc),
+                7000,
             )
 
     def _save_album_settings(self) -> None:
@@ -1014,6 +1068,10 @@ class MainWindow(QMainWindow):
             self._mark_editorial_album_dirty()
         except Exception as exc:
             self._show_error(self._translator.tr("main.save_photo_location_error"))
+
+    def _show_transient_status(self, message: str) -> None:
+        """Show scan results briefly; persistent details belong in the journal."""
+        self.statusBar().showMessage(message, 5000)
 
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(self, APPLICATION_NAME, message)

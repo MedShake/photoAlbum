@@ -26,6 +26,7 @@ class ScanController(QObject):
     photos_ready = Signal(object)
     source_unavailable = Signal()
     source_changed = Signal()
+    metadata_refresh_finished = Signal(object, bool)
 
     def __init__(self, project_service: ProjectService, view: PhotoSourcesWidget,
                  translator: Translator, *, language: str, parent=None) -> None:
@@ -37,6 +38,7 @@ class ScanController(QObject):
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | SourceSyncWorker | MetadataRefreshWorker | None = None
         self._operation_kind: str | None = None
+        self._metadata_refresh_source_id: str | None = None
         self._source_sync_name: str | None = None
         self._pending_source = None
         self._pending_provider = None
@@ -80,8 +82,9 @@ class ScanController(QObject):
 
         self.status_message.emit(self._translator.tr('main.analysis_stopping'))
 
-    def start(self) -> None:
-        self._start_sources_operation(synchronize=False)
+    def start(self, source_id: str | None = None) -> None:
+        """Refresh active sources, optionally limiting the operation to one source."""
+        self._start_sources_operation(synchronize=False, source_id=source_id)
 
     def sync_source(self, source_id: str | None = None) -> None:
         """Synchronize one source from its card, or all remote sources internally."""
@@ -299,6 +302,7 @@ class ScanController(QObject):
             return
         policy = self._project_service.get_photo_metadata_policy(source_id)
         self._operation_kind = "metadata"
+        self._metadata_refresh_source_id = source_id
         self._view.prepare_scan_progress(
             nominatim_enabled=policy.nominatim_enabled
         )
@@ -341,6 +345,10 @@ class ScanController(QObject):
         self._view.summary_label.setText(message)
         self._view.log_view.appendPlainText(message)
         self.status_message.emit(message)
+        if self._operation_kind == "metadata":
+            self.metadata_refresh_finished.emit(
+                self._metadata_refresh_source_id, True
+            )
 
     def _scan_phase_progress(self, progress) -> None:
         """Display progress for one logical scan phase."""
@@ -527,6 +535,10 @@ class ScanController(QObject):
             if self._operation_kind == "metadata"
             else "source.scan.failed"
         )
+        if self._operation_kind == "metadata":
+            self.metadata_refresh_finished.emit(
+                self._metadata_refresh_source_id, False
+            )
         self.error.emit(self._translator.tr(key))
 
     def _scan_thread_finished(self) -> None:
@@ -537,6 +549,7 @@ class ScanController(QObject):
         self._scan_worker = None
         self._scan_thread = None
         self._operation_kind = None
+        self._metadata_refresh_source_id = None
         self._source_sync_name = None
         self._pending_source = None
         self._pending_provider = None

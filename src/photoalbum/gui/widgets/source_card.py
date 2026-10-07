@@ -1,9 +1,10 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout,
 )
 
+from photoalbum.gui.icon_resources import resource_icon
 from photoalbum.sources import PhotoMetadataPolicy
 
 
@@ -36,10 +37,10 @@ class SourceCard(QGroupBox):
             str(source.config.get("directory") or source.config.get("base_url") or source.name)
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 10)
-        layout.setSpacing(7)
+        layout.setContentsMargins(10, 6, 10, 7)
+        layout.setSpacing(2)
         heading = QHBoxLayout()
-        heading.setSpacing(8)
+        heading.setSpacing(6)
         enabled = QCheckBox(tr("sources.active"))
         enabled.setChecked(source.enabled)
         enabled.toggled.connect(lambda value: self.enabled_changed.emit(source.id, value))
@@ -56,14 +57,21 @@ class SourceCard(QGroupBox):
             )
             heading.addWidget(recursive)
 
+        self.connection_status_icon = QLabel()
+        self.connection_status_icon.setFixedSize(16, 16)
+        self.connection_status_icon.setVisible(reconnect_required)
         self.connection_status_label = QLabel(
             tr("sources.connection.reconnect_required") if reconnect_required else ""
         )
         self.connection_status_label.setVisible(reconnect_required)
         if reconnect_required:
-            self.connection_status_label.setToolTip(
-                tr("sources.reconnect_required")
+            reconnect_tooltip = tr("sources.reconnect_required")
+            self.connection_status_icon.setPixmap(
+                resource_icon("plan-warning-orange.svg").pixmap(QSize(14, 14))
             )
+            self.connection_status_icon.setToolTip(reconnect_tooltip)
+            self.connection_status_label.setToolTip(reconnect_tooltip)
+            heading.addWidget(self.connection_status_icon)
             heading.addWidget(self.connection_status_label)
 
         heading.addStretch(1)
@@ -109,7 +117,7 @@ class SourceCard(QGroupBox):
         policy = source.effective_metadata_policy
         self._combos = {}
         row = QHBoxLayout()
-        row.setSpacing(6)
+        row.setSpacing(5)
         labels = {"provider": source.provider_label or source.kind,
                   "exif": "EXIF", "filename": tr("photos.policy.filename"),
                   "geocoding": "Nominatim", "none": tr("photos.policy.none")}
