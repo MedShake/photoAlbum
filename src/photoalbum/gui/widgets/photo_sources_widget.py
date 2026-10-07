@@ -261,10 +261,17 @@ class PhotoSourcesWidget(QWidget):
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
 
+        log_container = QWidget()
+        log_layout = QVBoxLayout(log_container)
+        log_layout.setContentsMargins(0, 0, 0, 0)
+        log_layout.setSpacing(4)
+        log_layout.addWidget(QLabel(self._translator.tr("main.activity_log")))
+        log_layout.addWidget(self.log_view, 1)
+
         splitter = QSplitter(Qt.Orientation.Vertical)
 
         splitter.addWidget(self.table)
-        splitter.addWidget(self.log_view)
+        splitter.addWidget(log_container)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)

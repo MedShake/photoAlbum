@@ -944,7 +944,7 @@ def test_photo_sources_widget_uses_user_facing_source_and_policy_labels(app):
     view = PhotoSourcesWidget(Translator("fr"))
     card = _source_card(view)
     titles = {group.title() for group in view.findChildren(QGroupBox)}
-    assert "Ajouter une source" in titles
+    assert "Sources du projet" in titles
     assert "Source(s) de l’album" not in titles
     assert "Actualisation des photos" not in titles
     assert card.title() == ""

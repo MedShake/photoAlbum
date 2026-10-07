@@ -3,7 +3,7 @@ from __future__ import annotations
 
 CATALOGS: dict[str, dict[str, str]] = {
     "en": {
-        "sources.add": "Add a source",
+        "sources.add": "Project sources",
         "sources.add_button": "Add…",
         "sources.list": "Album sources",
         "sources.refresh": "Refresh photos",
@@ -520,7 +520,8 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "main.choose_source": "Choose Source Folder...",
         "main.include_subdirectories": "Include subdirectories",
-        "main.photos": "Photos:",
+        "main.photos": "Project photos",
+        "main.activity_log": "Activity log",
 
         "main.no_analysis": "No analysis performed.",
         "main.analysis_running": "Analysis in progress...",
@@ -561,7 +562,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Do you want to generate the PDF anyway?"
         ),
 
-        "main.no_project": "No project open",
+        "main.no_project": "No project open — use the File menu to open or create a project.",
         "main.ready": "Ready",
         "main.rename_project": "Rename project",
         "main.project_name": "Project name",
@@ -784,7 +785,7 @@ CATALOGS: dict[str, dict[str, str]] = {
     },
 
     "fr": {
-        "sources.add": "Ajouter une source",
+        "sources.add": "Sources du projet",
         "sources.add_button": "Ajouter…",
         "sources.list": "Source(s) de l’album",
         "sources.refresh": "Actualisation des photos",
@@ -1315,7 +1316,8 @@ CATALOGS: dict[str, dict[str, str]] = {
 
         "main.choose_source": "Choisir le dossier source...",
         "main.include_subdirectories": "Inclure les sous-dossiers",
-        "main.photos": "Photos :",
+        "main.photos": "Photos du projet",
+        "main.activity_log": "Journal d’activité",
 
         "main.no_analysis": "Aucune analyse effectuée.",
         "main.analysis_running": "Analyse en cours...",
@@ -1356,7 +1358,7 @@ CATALOGS: dict[str, dict[str, str]] = {
             "Voulez-vous tout de même générer le PDF ?"
         ),
 
-        "main.no_project": "Aucun projet ouvert",
+        "main.no_project": "Aucun projet ouvert — utilisez le menu Fichier pour ouvrir ou créer un projet.",
         "main.ready": "Prêt",
         "main.rename_project": "Renommer le projet",
         "main.project_name": "Nom du projet",
