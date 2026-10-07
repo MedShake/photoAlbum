@@ -60,11 +60,21 @@ class ProjectService:
         self._cache_lease.__enter__()
         self._asset_cache.manager.enforce_quota()
 
-    def retain_cached_originals(self) -> None:
-        """An external viewer has no completion callback: retain until project close."""
+    def retain_cached_originals(self) -> bool:
+        """Retain until project close; return whether this call acquired the lease."""
         if self._external_asset_lease is None:
-            self._external_asset_lease = self._asset_cache.manager.protect(self._asset_cache.project_id)
-            self._external_asset_lease.__enter__()
+            lease = self._asset_cache.manager.protect(self._asset_cache.project_id)
+            lease.__enter__()
+            self._external_asset_lease = lease
+            return True
+        return False
+
+    def release_cached_originals(self) -> None:
+        """Release a newly acquired lease when opening an external viewer fails."""
+        lease = self._external_asset_lease
+        if lease is not None:
+            self._external_asset_lease = None
+            lease.__exit__(None, None, None)
 
     @property
     def is_open(self) -> bool:

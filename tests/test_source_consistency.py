@@ -316,6 +316,75 @@ def test_open_original_without_session_has_actionable_message(tmp_path):
     editor.error.connect(errors.append)
     editor.open_in_os(photo)
     assert errors == [Translator("en").tr("source.asset.reconnect_required", filename=photo.filename)]
+    assert service._external_asset_lease is None
+    service.close()
+
+
+@pytest.mark.parametrize("previous_open", [False, True])
+@pytest.mark.parametrize("failure", ["materialize", "missing_file", "open"])
+def test_failed_photo_open_releases_only_its_new_lease(tmp_path, monkeypatch, previous_open, failure):
+    from PySide6.QtGui import QDesktopServices
+    from photoalbum.gui.photo_editor import PhotoEditor
+
+    app = QApplication.instance() or QApplication([])
+    service = ProjectService()
+    service.create(tmp_path / "opening.photoalbum")
+    source = ProjectSource(id="remote", kind="synology-photos", name="Remote", collection_id="album", collection_name="Album")
+    service.set_photo_source(source)
+    photo = Photo(path=None, filename="cached.jpg", source_id=source.id, asset_id="1")
+    cache = SourceAssetCache(service.project_path)
+    path = cache.path_for(photo, "original")
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"original")
+    editor = PhotoEditor(service, Translator("en"), language="en")
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: True)
+    if previous_open:
+        editor.open_in_os(photo)
+        assert service._external_asset_lease is not None
+    previous_lease = service._external_asset_lease
+    previous_scopes = cache.manager._leases()
+
+    if failure == "materialize":
+        monkeypatch.setattr(service, "materialize_originals", Mock(side_effect=SourceError("offline")))
+    elif failure == "missing_file":
+        monkeypatch.setattr(service, "materialize_originals", lambda photos: setattr(photos[0], "path", tmp_path / "missing.jpg"))
+    opener = Mock(return_value=False)
+    monkeypatch.setattr(QDesktopServices, "openUrl", opener)
+    errors = []
+    editor.error.connect(errors.append)
+
+    editor.open_in_os(photo)
+
+    assert len(errors) == 1
+    assert opener.call_count == (1 if failure == "open" else 0)
+    assert service._external_asset_lease is previous_lease
+    assert cache.manager._leases() == previous_scopes
+    service.close()
+    assert not cache.manager._leases()
+
+
+@pytest.mark.parametrize("status", ["success", "partial", "failed"])
+def test_source_sync_completion_never_announces_success_before_a_problem(tmp_path, monkeypatch, status):
+    from photoalbum.sources import SourceImportResult
+
+    app = QApplication.instance() or QApplication([])
+    service = ProjectService()
+    service.create(tmp_path / "sync-message.photoalbum")
+    translator = Translator("en")
+    view = PhotoSourcesWidget(translator)
+    controller = ScanController(service, view, translator, language="en")
+    controller._source_result_received(SourceOperationResult("remote", status))
+    messages = []
+    monkeypatch.setattr(view.summary_label, "setText", messages.append)
+
+    controller._source_sync_completed(SourceImportResult((), added=0, updated=0, missing=0))
+
+    snapshot_message = translator.tr("source.sync.completed", count=0)
+    assert (snapshot_message in messages) == (status == "success")
+    expected = {"success": "main.analysis_completed", "partial": "sources.operation.partial", "failed": "main.analysis_failed"}
+    assert messages[-1] == translator.tr(expected[status])
+    assert translator.tr("source.sync.log", source="", count=0, added=0, updated=0, missing=0) in view.log_view.toPlainText()
+    view.close()
     service.close()
 
 

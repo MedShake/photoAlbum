@@ -411,28 +411,36 @@ class PhotoEditor(QObject):
 
     def open_in_os(self, photo: Photo) -> None:
         source = self._project_service.get_photo_source(photo.source_id)
-        if source is not None and source.kind != "local":
-            try:
-                self._project_service.retain_cached_originals()
-                self._project_service.materialize_originals([photo])
-            except SourceReconnectRequiredError as exc:
-                self.error.emit(self._translator.tr(
-                    "source.asset.reconnect_required", filename=exc.filename,
-                ))
-                return
-            except SourceError as exc:
-                self.error.emit(self._translator.tr("source.asset.access_failed", error=str(exc)))
-                return
-            except Exception as exc:
-                self.error.emit(self._translator.tr("photos.open_image.prepare_error"))
-                return
-        path = Path(photo.path)
+        acquired_lease = False
+        opened = False
+        try:
+            if source is not None and source.kind != "local":
+                try:
+                    acquired_lease = self._project_service.retain_cached_originals()
+                    self._project_service.materialize_originals([photo])
+                except SourceReconnectRequiredError as exc:
+                    self.error.emit(self._translator.tr(
+                        "source.asset.reconnect_required", filename=exc.filename,
+                    ))
+                    return
+                except SourceError as exc:
+                    self.error.emit(self._translator.tr("source.asset.access_failed", error=str(exc)))
+                    return
+                except Exception as exc:
+                    self.error.emit(self._translator.tr("photos.open_image.prepare_error"))
+                    return
+            path = Path(photo.path)
 
-        if not path.exists():
-            self.error.emit(self._translator.tr('photos.open_image.not_found', path=path))
-            return
+            if not path.exists():
+                self.error.emit(self._translator.tr('photos.open_image.not_found', path=path))
+                return
 
-        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+            opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
-        if not opened:
-            self.error.emit(self._translator.tr('photos.open_image.error', path=path))
+            if not opened:
+                self.error.emit(self._translator.tr('photos.open_image.error', path=path))
+        finally:
+            # Keep leases from earlier successful opens: their viewers may
+            # still need the files. Only roll back this failed attempt's lease.
+            if acquired_lease and not opened:
+                self._project_service.release_cached_originals()

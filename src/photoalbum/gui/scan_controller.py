@@ -281,12 +281,13 @@ class ScanController(QObject):
         photos = list(result.photos)
         self.photos_ready.emit(photos)
 
-        self._view.summary_label.setText(
-            self._translator.tr(
-                "source.sync.completed",
-                count=len(photos),
+        if self.analysis_completed:
+            self._view.summary_label.setText(
+                self._translator.tr(
+                    "source.sync.completed",
+                    count=len(photos),
+                )
             )
-        )
 
         self._view.log_view.appendPlainText(
             self._translator.tr(
