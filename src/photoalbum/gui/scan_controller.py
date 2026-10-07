@@ -39,6 +39,7 @@ class ScanController(QObject):
         self._scan_worker: ScanWorker | SourceSyncWorker | MetadataRefreshWorker | None = None
         self._operation_kind: str | None = None
         self._metadata_refresh_source_id: str | None = None
+        self._metadata_geocoding_succeeded = True
         self._source_sync_name: str | None = None
         self._pending_source = None
         self._pending_provider = None
@@ -77,6 +78,7 @@ class ScanController(QObject):
             return
 
         request_cancel()
+        self._view.set_processing_stopping()
 
         self._view.summary_label.setText(self._translator.tr('main.analysis_stopping'))
 
@@ -124,6 +126,11 @@ class ScanController(QObject):
             return
         self._operation_kind = "sources"
         self.running_changed.emit(True)
+        # Local scans and metadata refreshes are cooperatively cancellable.
+        # A remote provider synchronization remains snapshot-atomic.
+        self._view.set_processing_cancellable(
+            not (synchronize and bool(remote_sources))
+        )
         self._view.prepare_scan_progress(nominatim_enabled=any(
             source.effective_metadata_policy.nominatim_enabled for source in sources))
         thread = QThread(self)
@@ -195,6 +202,7 @@ class ScanController(QObject):
         )
 
         self.running_changed.emit(True)
+        self._view.set_processing_cancellable(False)
 
         # A source synchronization is currently not cancellable midway:
         # the provider/importer contract is snapshot-atomic.
@@ -303,6 +311,8 @@ class ScanController(QObject):
         policy = self._project_service.get_photo_metadata_policy(source_id)
         self._operation_kind = "metadata"
         self._metadata_refresh_source_id = source_id
+        self._metadata_geocoding_succeeded = True
+        self._view.set_processing_cancellable(True)
         self._view.prepare_scan_progress(
             nominatim_enabled=policy.nominatim_enabled
         )
@@ -321,9 +331,12 @@ class ScanController(QObject):
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.phase_progress.connect(self._scan_phase_progress)
+        worker.geocoding_status.connect(self._metadata_geocoding_status)
         worker.completed.connect(self._metadata_refresh_completed)
+        worker.cancelled.connect(self._metadata_refresh_cancelled)
         worker.failed.connect(self._scan_failed)
         worker.completed.connect(thread.quit)
+        worker.cancelled.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(self._scan_thread_finished)
@@ -331,14 +344,35 @@ class ScanController(QObject):
         self._scan_worker = worker
         thread.start()
 
+    def _metadata_geocoding_status(self, succeeded: bool) -> None:
+        self._metadata_geocoding_succeeded = bool(succeeded)
+
+    def _metadata_refresh_cancelled(self, photos) -> None:
+        self.analysis_completed = False
+        self.photos_ready.emit(list(photos))
+        self._view.summary_label.setText(
+            self._translator.tr("main.analysis_cancelled")
+        )
+        self.status_message.emit(
+            self._translator.tr("main.analysis_cancelled")
+        )
+        if self._operation_kind == "metadata":
+            self.metadata_refresh_finished.emit(
+                self._metadata_refresh_source_id, False
+            )
+
     def _metadata_refresh_completed(self, photos) -> None:
         self.analysis_completed = True
-        visible_photos = (
-            self._project_service.list_photos()
-            if self._operation_kind == "sources"
-            else list(photos)
-        )
-        self.photos_ready.emit(list(visible_photos))
+        if self._operation_kind == "sources":
+            # Source workers already log a source-scoped summary. Reload the
+            # complete project for the table, but do not publish a misleading
+            # global "metadata updated" counter as the operation result.
+            visible_photos = self._project_service.list_photos()
+            self.photos_ready.emit(list(visible_photos))
+            return
+
+        visible_photos = list(photos)
+        self.photos_ready.emit(visible_photos)
         message = self._translator.tr(
             "source.metadata.completed", count=len(visible_photos)
         )
@@ -347,7 +381,8 @@ class ScanController(QObject):
         self.status_message.emit(message)
         if self._operation_kind == "metadata":
             self.metadata_refresh_finished.emit(
-                self._metadata_refresh_source_id, True
+                self._metadata_refresh_source_id,
+                self._metadata_geocoding_succeeded,
             )
 
     def _scan_phase_progress(self, progress) -> None:
@@ -550,6 +585,7 @@ class ScanController(QObject):
         self._scan_thread = None
         self._operation_kind = None
         self._metadata_refresh_source_id = None
+        self._metadata_geocoding_succeeded = True
         self._source_sync_name = None
         self._pending_source = None
         self._pending_provider = None

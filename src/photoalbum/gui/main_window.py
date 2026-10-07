@@ -333,6 +333,7 @@ class MainWindow(QMainWindow):
         self._photos_widget.source_sync_requested.connect(
             self._scan_controller.sync_source
         )
+        self._photos_widget.scan_requested.connect(self._scan_controller.cancel)
         self._photos_widget.edit_datetime_requested.connect(self._photo_editor.edit_datetime)
         self._photos_widget.edit_gps_requested.connect(self._photo_editor.edit_gps)
         self._photos_widget.edit_usage_requested.connect(self._edit_photo_usage)

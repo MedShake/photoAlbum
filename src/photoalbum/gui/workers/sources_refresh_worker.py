@@ -82,6 +82,11 @@ class SourcesRefreshWorker(QObject):
                             missing=len(result.missing_photos),
                         )
                     )
+                    if result.cancelled or self._cancelled:
+                        self.log_message.emit(
+                            translator.tr("sources.processing_cancelled", source=source_name)
+                        )
+                        break
                     self.log_message.emit(
                         translator.tr(f"{operation_prefix}.completed", source=source_name)
                     )
@@ -116,13 +121,33 @@ class SourcesRefreshWorker(QObject):
                     language=self._language, user_agent=self._user_agent,
                 )
                 self._current.phase_progress.connect(self.phase_progress.emit)
-                self._current.failed.connect(
-                    lambda _message, source_name=source.name: self.log_message.emit(
-                        translator.tr("sources.refresh.source_failed", source=source_name)
-                    )
-                )
+                metadata_errors = []
+                metadata_cancelled = []
+                geocoding_statuses = []
+                self._current.failed.connect(metadata_errors.append)
+                self._current.cancelled.connect(metadata_cancelled.append)
+                self._current.geocoding_status.connect(geocoding_statuses.append)
                 self._current.run()
                 self._current = None
+                if metadata_cancelled:
+                    self.log_message.emit(
+                        translator.tr("sources.processing_cancelled", source=source_name)
+                    )
+                    break
+                if metadata_errors:
+                    self.log_message.emit(
+                        "⚠ " + translator.tr(
+                            f"{operation_prefix}.failed",
+                            source=source_name,
+                            error=metadata_errors[-1],
+                        )
+                    )
+                    continue
+                if False in geocoding_statuses:
+                    self.log_message.emit(
+                        "⚠ " + translator.tr("sources.geocoding_incomplete", source=source_name)
+                    )
+                    continue
                 self.log_message.emit(
                     translator.tr(f"{operation_prefix}.completed", source=source_name)
                 )

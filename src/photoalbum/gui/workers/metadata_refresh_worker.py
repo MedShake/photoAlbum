@@ -9,6 +9,7 @@ from photoalbum.geocoding import create_nominatim_location_resolver
 from photoalbum.scanner import (
     LibraryScanner,
     PhotoProcessor,
+    ProcessingEventType,
     ScanProgress,
     ScanProgressPhase,
 )
@@ -20,7 +21,9 @@ class MetadataRefreshWorker(QObject):
 
     phase_progress = Signal(object)
     completed = Signal(object)
+    cancelled = Signal(object)
     failed = Signal(str)
+    geocoding_status = Signal(bool)
 
     def __init__(
         self,
@@ -63,6 +66,7 @@ class MetadataRefreshWorker(QObject):
                     )
 
             photos = (repository.list_by_source(self._source_id) if self._source_id else repository.list_all())
+            geocoding_ok = True
             if self._policy.nominatim_enabled and not self._cancel_requested:
                 resolver = create_nominatim_location_resolver(
                     database,
@@ -78,15 +82,37 @@ class MetadataRefreshWorker(QObject):
                 self.phase_progress.emit(
                     ScanProgress(ScanProgressPhase.NOMINATIM, 0, total)
                 )
+
+                def record_event(event):
+                    nonlocal geocoding_ok
+                    if event.type == ProcessingEventType.GEOCODING_ERROR:
+                        geocoding_ok = False
+
                 for index, photo in enumerate(eligible, start=1):
                     if self._cancel_requested:
                         break
-                    processor.enrich_location(photo, language=self._language)
+                    processor.enrich_location(
+                        photo,
+                        language=self._language,
+                        on_event=record_event,
+                    )
                     repository.save(resolve_photo_metadata(photo, self._policy))
                     self.phase_progress.emit(
                         ScanProgress(ScanProgressPhase.NOMINATIM, index, total)
                     )
-            self.completed.emit((repository.list_by_source(self._source_id) if self._source_id else repository.list_all()))
+            current_photos = (
+                repository.list_by_source(self._source_id)
+                if self._source_id
+                else repository.list_all()
+            )
+            if self._policy.nominatim_enabled:
+                self.geocoding_status.emit(
+                    geocoding_ok and not self._cancel_requested
+                )
+            if self._cancel_requested:
+                self.cancelled.emit(current_photos)
+            else:
+                self.completed.emit(current_photos)
         except Exception as exc:
             self.failed.emit(str(exc))
         finally:

@@ -50,6 +50,7 @@ class PhotoSourcesWidget(QWidget):
             PreviewImageCache(self), self
         )
         self._source_controls_enabled = True
+        self._expanded_source_id = None
         self._create_content()
         self.model.modelAboutToBeReset.connect(self._cancel_source_photo_preview)
         self.proxy_model.layoutAboutToBeChanged.connect(self._cancel_source_photo_preview)
@@ -83,6 +84,18 @@ class PhotoSourcesWidget(QWidget):
         self._source_cards.setSpacing(8)
         sources_layout.addWidget(source_container)
         self._sources = []
+
+        # Explicit cancellation remains available even though the former global
+        # analysis block was removed from the UI.
+        self.cancel_scan_button = QPushButton(
+            self._translator.tr("main.analysis_cancel_button")
+        )
+        self.cancel_scan_button.setVisible(False)
+        self.cancel_scan_button.clicked.connect(self.scan_requested.emit)
+        cancel_layout = QHBoxLayout()
+        cancel_layout.addStretch(1)
+        cancel_layout.addWidget(self.cancel_scan_button)
+        sources_layout.addLayout(cancel_layout)
 
         # Processing progress.
         self.source_progress_label = QLabel(
@@ -262,10 +275,15 @@ class PhotoSourcesWidget(QWidget):
     def set_sources(self, sources, available, labels, sessions=None) -> None:
         from .source_card import SourceCard
         sessions = sessions or {}
+        previous_expanded = self._expanded_source_id
         while self._source_cards.count():
             item = self._source_cards.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        source_ids = {source.id for source in sources}
+        if previous_expanded not in source_ids:
+            previous_expanded = sources[0].id if sources else None
+        self._expanded_source_id = previous_expanded
         for source in sources:
             card = SourceCard(
                 source,
@@ -283,10 +301,34 @@ class PhotoSourcesWidget(QWidget):
             card.delete_requested.connect(self.delete_source_requested.emit)
             card.policy_changed.connect(self.source_policy_changed.emit)
             card.recursive_changed.connect(self.source_recursive_changed.emit)
+            card.expansion_requested.connect(self._source_expansion_requested)
+            card.set_expanded(source.id == self._expanded_source_id)
             card.setEnabled(self._source_controls_enabled)
             self._source_cards.addWidget(card)
         self.model.set_sources(labels, {source.id: source.collection_name for source in sources})
         self._sources = list(sources)
+
+
+    def _source_expansion_requested(self, source_id: str, expanded: bool) -> None:
+        """Keep at most one source details row expanded at a time."""
+        self._expanded_source_id = source_id if expanded else None
+        for index in range(self._source_cards.count()):
+            card = self._source_cards.itemAt(index).widget()
+            if card is not None and hasattr(card, "set_expanded"):
+                card.set_expanded(expanded and card.source.id == source_id)
+
+    def set_processing_cancellable(self, cancellable: bool) -> None:
+        self.cancel_scan_button.setText(
+            self._translator.tr("main.analysis_cancel_button")
+        )
+        self.cancel_scan_button.setVisible(bool(cancellable))
+        self.cancel_scan_button.setEnabled(bool(cancellable))
+
+    def set_processing_stopping(self) -> None:
+        self.cancel_scan_button.setText(
+            self._translator.tr("main.analysis_stopping_button")
+        )
+        self.cancel_scan_button.setEnabled(False)
 
     def set_source_controls_enabled(self, enabled: bool) -> None:
         """Enable or disable every per-source card action.
@@ -367,6 +409,7 @@ class PhotoSourcesWidget(QWidget):
 
     def finish_processing_progress(self) -> None:
         """Hide transient processing indicators after an operation."""
+        self.set_processing_cancellable(False)
         for widget in (
             self.source_progress_label,
             self.source_progress_bar,

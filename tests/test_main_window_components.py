@@ -824,6 +824,45 @@ def test_each_source_card_exposes_its_own_sync_action(app):
     view.close()
 
 
+def test_source_cards_use_single_open_accordion(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    first = ProjectSource(
+        id="first", kind="local", name="First", collection_id="first",
+        collection_name="First", provider_label="Local folder",
+    )
+    second = ProjectSource(
+        id="second", kind="local", name="Second", collection_id="second",
+        collection_name="Second", provider_label="Local folder",
+    )
+    available = {
+        source.id: {"date": {"exif", "filename"}, "gps": {"exif"},
+                    "location": {"geocoding"}, "caption": set()}
+        for source in (first, second)
+    }
+    view.set_sources([first, second], available, {}, {})
+    first_card = view._source_cards.itemAt(0).widget()
+    second_card = view._source_cards.itemAt(1).widget()
+    assert not first_card.details_widget.isHidden()
+    assert second_card.details_widget.isHidden()
+    second_card.expansion_requested.emit("second", True)
+    assert first_card.details_widget.isHidden()
+    assert not second_card.details_widget.isHidden()
+    view.close()
+
+
+def test_photo_sources_widget_exposes_scan_cancel_action(app):
+    view = PhotoSourcesWidget(Translator("en"))
+    received = []
+    view.scan_requested.connect(lambda: received.append(True))
+    view.set_processing_cancellable(True)
+    assert not view.cancel_scan_button.isHidden()
+    view.cancel_scan_button.click()
+    assert received == [True]
+    view.set_processing_cancellable(False)
+    assert view.cancel_scan_button.isHidden()
+    view.close()
+
+
 def test_provider_label_mechanism_accepts_immich_without_special_ui_code(app):
     view = PhotoSourcesWidget(Translator("en"))
     card = _source_card(view, label="Immich", kind="immich")
@@ -908,7 +947,8 @@ def test_photo_sources_widget_uses_user_facing_source_and_policy_labels(app):
     assert "Ajouter une source" in titles
     assert "Source(s) de l’album" not in titles
     assert "Actualisation des photos" not in titles
-    assert card.title() == "Synology Photos — Album"
+    assert card.title() == ""
+    assert card.title_label.text() == "Synology Photos — Album"
     assert not hasattr(view, "_sources_scroll")
     assert not view.summary_label.isVisible()
     assert view.modify_source_button.text() == "Ajouter…"
@@ -1091,3 +1131,17 @@ def test_failed_first_nominatim_refresh_keeps_location_policy(
 
     assert service.get_photo_metadata_policy(source_id).location_preference == "none"
     assert source_id not in window._pending_nominatim_location_sources
+
+
+def test_source_refresh_completion_does_not_log_global_metadata_count(app, tmp_path):
+    service = ProjectService()
+    service.create(tmp_path / "source-log.photoalbum")
+    view = PhotoSourcesWidget(Translator("en"))
+    controller = ScanController(service, view, Translator("en"), language="en")
+    controller._operation_kind = "sources"
+
+    controller._metadata_refresh_completed([])
+
+    assert "Metadata updated" not in view.log_view.toPlainText()
+    view.close()
+    service.close()

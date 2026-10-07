@@ -15,6 +15,10 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.refresh_one.started": "Refreshing source ‘{source}’…",
         "sources.refresh_one.completed": "Refresh of ‘{source}’ completed.",
         "sources.refresh_one.failed": "Refresh of ‘{source}’ failed: {error}",
+        "sources.processing_cancelled": "Processing of ‘{source}’ stopped.",
+        "sources.geocoding_incomplete": (
+            "Source ‘{source}’: metadata refresh incomplete; Nominatim lookups failed."
+        ),
         "sources.sync.local_summary": (
             "Source ‘{source}’: {discovered} photos found; {analyzed} analyzed, "
             "{reused} reused, {missing} missing."
@@ -525,6 +529,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_in_progress": "Photo analysis in progress…",
         "main.stop_analysis": "Stop",
         "main.analysis_stopping": "Stopping analysis...",
+        "main.analysis_cancel_button": "Stop",
         "main.analysis_stopping_button": "Stopping...",
         "main.analysis_cancelled": "Photo analysis stopped.",
 
@@ -791,6 +796,11 @@ CATALOGS: dict[str, dict[str, str]] = {
         "sources.refresh_one.started": "Actualisation de la source « {source} »…",
         "sources.refresh_one.completed": "Actualisation de « {source} » terminée.",
         "sources.refresh_one.failed": "Échec de l’actualisation de « {source} » : {error}",
+        "sources.processing_cancelled": "Traitement de « {source} » arrêté.",
+        "sources.geocoding_incomplete": (
+            "Source « {source} » : actualisation des métadonnées incomplète ; "
+            "des recherches Nominatim ont échoué."
+        ),
         "sources.sync.local_summary": (
             "Source « {source} » : {discovered} photos trouvées ; {analyzed} analysées, "
             "{reused} réutilisées, {missing} absentes."
@@ -1314,6 +1324,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "main.analysis_in_progress": "Analyse des photos en cours…",
         "main.stop_analysis": "Arrêter",
         "main.analysis_stopping": "Arrêt de l’analyse en cours...",
+        "main.analysis_cancel_button": "Arrêter",
         "main.analysis_stopping_button": "Arrêt en cours...",
         "main.analysis_cancelled": "Analyse des photos arrêtée.",
 

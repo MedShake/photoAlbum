@@ -129,3 +129,51 @@ def test_nominatim_progress_counts_only_eligible_photos(tmp_path: Path, monkeypa
 
     nominatim = [item for item in phases if item.phase.value == "nominatim"]
     assert [(item.current, item.total) for item in nominatim] == [(0, 1), (1, 1)]
+
+
+def test_nominatim_network_error_reports_unsuccessful_geocoding(tmp_path: Path, monkeypatch):
+    from photoalbum.geocoding import GeocodingError
+
+    project_path = tmp_path / "geocoding-error.photoalbum"
+    database = ProjectDatabase(project_path)
+    database.initialize()
+    PhotoRepository(database).save(
+        Photo(
+            path=tmp_path / "photo.jpg",
+            filename="photo.jpg",
+            latitude=47.2184,
+            longitude=-1.5536,
+            exif_latitude=47.2184,
+            exif_longitude=-1.5536,
+        )
+    )
+    database.close()
+
+    class Resolver:
+        def resolve_with_source(self, *args, **kwargs):
+            raise GeocodingError("offline")
+
+    monkeypatch.setattr(
+        "photoalbum.gui.workers.metadata_refresh_worker.create_nominatim_location_resolver",
+        lambda *args, **kwargs: Resolver(),
+    )
+    worker = MetadataRefreshWorker(
+        project_path=project_path,
+        policy=PhotoMetadataPolicy(
+            date_preference="exif",
+            gps_preference="exif",
+            location_preference="none",
+            nominatim_enabled=True,
+        ),
+        language="en",
+        user_agent="tests",
+    )
+    statuses = []
+    completed = []
+    worker.geocoding_status.connect(statuses.append)
+    worker.completed.connect(completed.append)
+
+    worker.run()
+
+    assert statuses == [False]
+    assert len(completed) == 1
