@@ -53,7 +53,9 @@ def _wait_for_preview_layout(widget: AlbumPreviewWidget) -> None:
         viewport_height = widget._scroll.viewport().height()
         scroll = widget._scroll.verticalScrollBar()
         if (
-            content_height == widget._pages_grid.sizeHint().height()
+            content_height == max(
+                page.geometry().bottom() + 1 for page in widget._page_widgets
+            ) + widget._pages_grid.contentsMargins().bottom()
             and scroll.maximum() == content_height - viewport_height
             and scroll.maximum() > 0
             and all(
@@ -388,6 +390,48 @@ def test_left_and_right_pages_share_a_spread():
         right.widget(),
         AlbumPagePreview,
     )
+
+
+def test_large_portrait_album_preserves_gaps_between_spreads():
+    result = make_result()
+    base = result.pagination.pages[0]
+    result.pagination.pages[:] = [
+        replace(base, number=number,
+                side=PageSide.RIGHT if number % 2 else PageSide.LEFT)
+        for number in range(1, 1401)
+    ]
+    widget = create_widget()
+    try:
+        widget.resize(1650, 700)
+        widget.show()
+        widget.set_result(result, make_settings())
+        _wait_for_preview_layout(widget)
+
+        def assert_gaps():
+            for column in (0, 1):
+                pages = [widget._pages_grid.itemAtPosition(row, column).widget()
+                         for row in range(2, 701)]
+                assert all(
+                    lower.y() - upper.geometry().bottom() - 1
+                    == widget.SPREAD_VERTICAL_GAP
+                    for upper, lower in zip(pages, pages[1:])
+                )
+            left = widget._pages_grid.itemAtPosition(2, 0).widget()
+            right = widget._pages_grid.itemAtPosition(2, 1).widget()
+            assert right.x() - left.geometry().right() - 1 == widget.SPREAD_HORIZONTAL_GAP
+
+        assert_gaps()
+        large_height = widget._content.height()
+        widget.resize(950, 700)
+        _wait_for_preview_layout(widget)
+        assert widget._content.height() < large_height
+        assert_gaps()
+
+        widget.set_result(make_result(), make_settings())
+        _wait_for_preview_layout(widget)
+        assert widget._content.height() < 5000
+    finally:
+        widget.close()
 
 
 def test_inside_back_is_on_the_right():

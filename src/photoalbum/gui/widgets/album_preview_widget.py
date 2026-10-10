@@ -567,7 +567,9 @@ class AlbumPreviewWidget(QWidget):
         self._navigation_first_indices: list[int] = []
 
         self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
+        self._scroll.setAlignment(
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
+        )
         self._image_request_timer = QTimer(self)
         self._image_request_timer.setSingleShot(True)
         self._image_request_timer.timeout.connect(self._request_page_images)
@@ -587,11 +589,6 @@ class AlbumPreviewWidget(QWidget):
 
         self._pages_grid = QGridLayout(
             self._content
-        )
-
-        self._pages_grid.setAlignment(
-            Qt.AlignmentFlag.AlignHCenter
-            | Qt.AlignmentFlag.AlignTop
         )
 
         self._pages_grid.setHorizontalSpacing(
@@ -636,6 +633,7 @@ class AlbumPreviewWidget(QWidget):
                 widget.deleteLater()
 
         self._page_widgets.clear()
+        self._content.resize(0, 0)
         self._navigation_widgets.clear()
         self._navigation_tops.clear()
         self._navigation_first_indices.clear()
@@ -957,6 +955,21 @@ class AlbumPreviewWidget(QWidget):
             if widget.width() == page_width:
                 continue
             widget.set_page_width(page_width)
+
+        # Qt caps layout size hints around 524287 pixels. Letting the scroll
+        # area or an aligned grid use that hint compresses tall albums' gaps.
+        # Size the content from actual rows; the scroll area owns centering.
+        row_heights: dict[int, int] = {}
+        for index in range(self._pages_grid.count()):
+            row = self._pages_grid.getItemPosition(index)[0]
+            page = self._pages_grid.itemAt(index).widget()
+            row_heights[row] = max(row_heights.get(row, 0), page.height())
+        self._content.resize(
+            2 * page_width + self.SPREAD_HORIZONTAL_GAP + margins.left() + margins.right(),
+            sum(row_heights.values())
+            + (len(row_heights) - 1) * self.SPREAD_VERTICAL_GAP
+            + margins.top() + margins.bottom(),
+        )
         QTimer.singleShot(0, self._refresh_navigation_positions)
 
     def eventFilter(
