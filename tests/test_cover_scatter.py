@@ -334,3 +334,55 @@ def test_scatter_physical_sizes_follow_page_format():
             letter_rect.height * 279.4
         )
     )
+
+
+def test_frozen_scatter_keeps_geometry_after_photo_collection_changes():
+    from photoalbum.album import PageInstance
+    from photoalbum.templates.msb.year_photo_scatter.composition import (
+        freeze_cover_scatter, stored_cover_scatter, visible_cover_scatter_items,
+    )
+
+    original = [photo(f"freeze-{n}.jpg", 2025, 3, n + 1) for n in range(12)]
+    initial = compose_cover_scatter(original, seed=91, month_name=month_name)
+    snapshot = freeze_cover_scatter(initial)
+    page = PageInstance(
+        template_id="year-photo-scatter",
+        settings={"scatter": {
+            "seeds": [91], "selected_seed_index": 0, "proposals": [snapshot],
+        }},
+    )
+    restored = stored_cover_scatter(
+        page, original + [photo("extra.jpg", 2025, 4, 2)],
+        month_name=month_name, page_width_mm=210, page_height_mm=297,
+    )
+    assert restored.title == snapshot["title"]
+    assert [item.photo.identity for item in restored.items] == [
+        entry["photo_id"] for entry in snapshot["items"]
+    ]
+    assert len(restored.items) <= len(initial.items)
+    assert all(item.rect == expected.rect for item, expected in zip(
+        restored.items,
+        visible_cover_scatter_items(initial.items),
+    ))
+
+
+def test_frozen_scatter_keeps_missing_slot_instead_of_recomposing():
+    from photoalbum.album import PageInstance
+    from photoalbum.templates.msb.year_photo_scatter.composition import (
+        freeze_cover_scatter, stored_cover_scatter, visible_cover_scatter_items,
+    )
+    original = [photo(f"lost-{n}.jpg", 2025, 3, n + 1) for n in range(12)]
+    snapshot = freeze_cover_scatter(compose_cover_scatter(
+        original, seed=25, month_name=month_name,
+    ))
+    assert snapshot["items"]
+    missing_id = snapshot["items"][0]["photo_id"]
+    page = PageInstance(template_id="year-photo-scatter", settings={
+        "scatter": {"seeds": [25], "proposals": [snapshot]}
+    })
+    restored = stored_cover_scatter(
+        page, [p for p in original if p.identity != missing_id],
+        month_name=month_name, page_width_mm=210, page_height_mm=297,
+    )
+    assert restored.items[0].photo is None
+    assert len(restored.items) == len(snapshot["items"])

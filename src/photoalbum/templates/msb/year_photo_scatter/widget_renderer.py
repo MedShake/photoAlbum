@@ -13,7 +13,7 @@ from PySide6.QtGui import (
 
 from photoalbum.album import PageInstance
 
-from .composition import compose_cover_scatter
+from .composition import stored_cover_scatter, visible_cover_scatter_items
 from .title_style import (
     title_font_family,
     title_font_size,
@@ -295,13 +295,9 @@ class YearPhotoScatterWidgetRenderer:
                 )
             )
 
-        composition = compose_cover_scatter(
-            list(
-                effective_photos
-            ),
-            seed=self._seed(
-                instance
-            ),
+        composition = stored_cover_scatter(
+            instance,
+            list(effective_photos),
             month_name=(
                 translator.month_name
             ),
@@ -317,7 +313,7 @@ class YearPhotoScatterWidgetRenderer:
 
             YearPhotoScatterRenderer().paint(
                 painter=painter,
-                composition=composition,
+                composition=type(composition)(composition.title, visible_cover_scatter_items(composition.items)),
                 target_rect=target_rect,
                 image_cache=thumbnail_cache,
             )

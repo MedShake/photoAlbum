@@ -62,9 +62,15 @@ class CoverRenderWorker(QRunnable):
             )
 
             for item in self.items:
-                path = Path(
-                    item.photo.path
-                )
+                rect = item.rect
+                x, y = round(rect.x * self.width), round(rect.y * self.height)
+                w = max(1, round(rect.width * self.width))
+                h = max(1, round(rect.height * self.height))
+                if item.photo is None or item.photo.path is None:
+                    from PIL import ImageDraw
+                    ImageDraw.Draw(canvas).rectangle((x, y, x + w - 1, y + h - 1), fill="black")
+                    continue
+                path = Path(item.photo.path)
 
                 try:
                     with Image.open(path) as source:
@@ -128,8 +134,8 @@ class CoverRenderWorker(QRunnable):
                         )
 
                 except Exception:
-                    # One broken image must not kill a
-                    # complete cover preview.
+                    from PIL import ImageDraw
+                    ImageDraw.Draw(canvas).rectangle((x, y, x + w - 1, y + h - 1), fill="black")
                     continue
 
             buffer = BytesIO()

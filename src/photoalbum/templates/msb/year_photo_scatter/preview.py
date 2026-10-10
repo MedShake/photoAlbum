@@ -13,7 +13,7 @@ from photoalbum.template_engine.preview_backend import (
 )
 
 from .composition import (
-    compose_cover_scatter,
+    stored_cover_scatter,
     visible_cover_scatter_items,
 )
 
@@ -93,10 +93,15 @@ class YearPhotoScatterPreviewBackend(
         # The expensive raster contains the photo scatter only.
         # Title font, size and color are painted later by the
         # lightweight widget renderer and must not invalidate it.
-        return (
-            "seed",
-            self._seed(instance),
-        )
+        scatter = instance.settings.get("scatter", {})
+        proposals = scatter.get("proposals") if isinstance(scatter, dict) else None
+        index = int(scatter.get("selected_seed_index", 0)) if isinstance(scatter, dict) else 0
+        if isinstance(proposals, list) and 0 <= index < len(proposals):
+            import hashlib
+            import json
+            data = json.dumps(proposals[index], sort_keys=True).encode("utf-8")
+            return ("frozen", hashlib.sha256(data).hexdigest())
+        return ("seed", self._seed(instance))
 
     def create_job(
         self,
@@ -111,11 +116,9 @@ class YearPhotoScatterPreviewBackend(
         translator: Translator,
         template_pack_settings=None,
     ) -> PreviewJob:
-        composition = compose_cover_scatter(
+        composition = stored_cover_scatter(
+            instance,
             list(photos),
-            seed=self._seed(
-                instance
-            ),
             month_name=(
                 translator.month_name
             ),

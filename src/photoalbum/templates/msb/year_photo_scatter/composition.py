@@ -29,7 +29,7 @@ class CoverPeriod:
 
 @dataclass(frozen=True)
 class CoverScatterItem:
-    photo: Photo
+    photo: Photo | None
     rect: NormalizedRect
 
 
@@ -381,8 +381,8 @@ def _is_opaque_photo(
     """
 
     return (
-        photo.path.suffix.lower()
-        in {".jpg", ".jpeg"}
+        photo is not None
+        and photo.filename.lower().endswith((".jpg", ".jpeg"))
     )
 
 
@@ -451,4 +451,46 @@ def visible_cover_scatter_items(
         reversed(
             visible_reversed
         )
+    )
+
+
+# Persisted compositions are independent of the current source snapshot.
+# The original seed is kept for compatibility, not used for reconstruction.
+def freeze_cover_scatter(composition: CoverScatterComposition) -> dict:
+    return {
+        "title": composition.title,
+        "items": [
+            {"photo_id": item.photo.identity, "rect": [
+                item.rect.x, item.rect.y, item.rect.width, item.rect.height,
+            ]}
+            for item in visible_cover_scatter_items(composition.items)
+        ],
+    }
+
+
+def thaw_cover_scatter(snapshot: dict, photos: Iterable[Photo]) -> CoverScatterComposition:
+    known = {photo.identity: photo for photo in photos}
+    items = []
+    for record in snapshot["items"]:
+        values = record["rect"]
+        rect = NormalizedRect(*map(float, values))
+        items.append(CoverScatterItem(known.get(record["photo_id"]), rect))
+    return CoverScatterComposition(str(snapshot["title"]), tuple(items))
+
+
+def stored_cover_scatter(instance, photos, *, month_name, page_width_mm, page_height_mm):
+    """Use a frozen proposal when available; old projects retain seed fallback."""
+    scatter = instance.settings.get("scatter", {})
+    if not isinstance(scatter, dict):
+        scatter = {}
+    seeds = scatter.get("seeds", [0]) or [0]
+    index = max(0, min(int(scatter.get("selected_seed_index", 0)), len(seeds) - 1))
+    proposals = scatter.get("proposals")
+    if isinstance(proposals, list) and index < len(proposals):
+        snapshot = proposals[index]
+        if isinstance(snapshot, dict) and isinstance(snapshot.get("items"), list):
+            return thaw_cover_scatter(snapshot, photos)
+    return compose_cover_scatter(
+        photos, seed=int(seeds[index]), month_name=month_name,
+        page_width_mm=page_width_mm, page_height_mm=page_height_mm,
     )

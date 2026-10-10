@@ -36,6 +36,8 @@ from photoalbum.album import (
 )
 from photoalbum.templates.msb.year_photo_scatter.composition import (
     cover_period_title,
+    compose_cover_scatter,
+    freeze_cover_scatter,
 )
 
 from photoalbum.templates.msb.settings_base import (
@@ -83,6 +85,7 @@ class YearPhotoScatterSettingsWidget(
 
 
         self._load_state()
+        self._freeze_existing_proposals()
         self._create_content()
         self._update_controls()
         self._request_preview()
@@ -121,6 +124,8 @@ class YearPhotoScatterSettingsWidget(
             ),
             len(self._seeds) - 1,
         )
+
+        self._proposals = list(scatter.get("proposals", [])) if isinstance(scatter.get("proposals"), list) else []
 
         self._title_color = str(
             scatter.get(
@@ -548,6 +553,27 @@ class YearPhotoScatterSettingsWidget(
         self._preview_label = self.create_preview_label(self.PREVIEW_WIDTH)
         self.add_settings_columns(root, left, self._preview_label)
 
+    def _create_frozen_proposal(self, seed: int) -> dict:
+        unique = {}
+        for photo in self._photos:
+            if photo.capture_datetime is not None:
+                unique.setdefault(photo.identity, photo)
+        composition = compose_cover_scatter(
+            unique.values(), seed=seed,
+            month_name=self._translator.month_name,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
+        return freeze_cover_scatter(composition)
+
+    def _freeze_existing_proposals(self) -> None:
+        # Legacy seeds are converted to persistent geometry when edited.
+        while len(self._proposals) < len(self._seeds):
+            seed = self._seeds[len(self._proposals)]
+            self._proposals.append(self._create_frozen_proposal(seed))
+        self._proposals = self._proposals[:len(self._seeds)]
+        self._save_state()
+
     def _save_state(
         self,
     ) -> None:
@@ -561,6 +587,7 @@ class YearPhotoScatterSettingsWidget(
             "seeds": list(
                 self._seeds
             ),
+            "proposals": list(self._proposals),
             "selected_seed_index": (
                 self._index
             ),
@@ -642,6 +669,7 @@ class YearPhotoScatterSettingsWidget(
                 2_147_483_647
             )
         )
+        self._proposals.append(self._create_frozen_proposal(self._seeds[-1]))
 
         self._index = (
             len(self._seeds) - 1
@@ -652,6 +680,7 @@ class YearPhotoScatterSettingsWidget(
             self._seeds = (
                 self._seeds[-20:]
             )
+            self._proposals = self._proposals[-20:]
 
             self._index = (
                 len(self._seeds) - 1

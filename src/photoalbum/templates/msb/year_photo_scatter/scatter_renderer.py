@@ -58,12 +58,17 @@ class YearPhotoScatterRenderer:
                 h,
             )
 
-            pixmap = image_cache.load(
-                item.photo.path,
-                slot.size(),
-            )
-
+            from PySide6.QtGui import QColor
+            if item.photo is None or item.photo.path is None:
+                painter.fillRect(slot, QColor("black"))
+                continue
+            try:
+                pixmap = image_cache.load(item.photo.path, slot.size())
+            except (OSError, ValueError):
+                painter.fillRect(slot, QColor("black"))
+                continue
             if pixmap.isNull():
+                painter.fillRect(slot, QColor("black"))
                 continue
 
             scaled = pixmap.scaled(
