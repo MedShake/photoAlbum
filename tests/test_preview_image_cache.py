@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication
@@ -72,6 +73,67 @@ def test_higher_density_upgrades_and_lower_density_reuses():
     service.prioritize(["a"])
     assert service._pool.start.call_count == 2
     assert len(service._cache) == 1
+
+
+@pytest.mark.parametrize("final_edge", [200, 400, 900])
+def test_resize_waits_for_running_source_and_uses_latest_resolution(final_edge):
+    service = cache()
+    service.set_resolution(400, 400, 1)
+    service.prioritize(["a"])
+    initial_token = next(iter(service._active))
+
+    for edge in (700, 1000, final_edge):
+        service.set_resolution(edge, edge, 1)
+        service.prioritize(["a"])
+    assert service._pool.start.call_count == 1
+
+    finish(service, initial_token)
+    assert not service.load("a", QSize(10, 10)).isNull()
+    if final_edge > 400:
+        assert service._pool.start.call_count == 2
+        worker = service._pool.start.call_args.args[0]
+        assert (worker.path, worker.edge) == ("a", final_edge)
+        finish(service, worker.token)
+    else:
+        assert service._pool.start.call_count == 1
+    assert service._cache["a"][0] == max(400, final_edge)
+    assert not service._active and not service._queue
+
+
+def test_resize_keeps_other_source_running_and_drops_obsolete_upgrade():
+    service = cache()
+    service.set_resolution(400, 400, 1)
+    service.prioritize(["a"])
+    initial_token = next(iter(service._active))
+    service.set_resolution(800, 800, 1)
+    service.prioritize(["a", "b"])
+    assert [call.args[0].path for call in service._pool.start.call_args_list] == ["a", "b"]
+
+    # The resized source leaves the viewport before its first decode finishes.
+    service.prioritize(["b"])
+    finish(service, initial_token)
+    assert service._pool.start.call_count == 2
+    finish(service, next(iter(service._active)))
+    assert not service._active and not service._queue
+
+
+@pytest.mark.parametrize("reset", ["clear", "invalidate_changed_sources"])
+def test_requested_source_waits_for_stale_decode_before_reloading(tmp_path, reset):
+    service = cache()
+    path = tmp_path / "changed.jpg"
+    service.prioritize([path])
+    initial_token = next(iter(service._active))
+    path.write_bytes(b"changed")
+    getattr(service, reset)()
+    service.prioritize([path])
+    assert service._pool.start.call_count == 1
+
+    finish(service, initial_token)
+    assert service.load(path, QSize(10, 10)).isNull()
+    assert service._pool.start.call_count == 2
+    finish(service, next(iter(service._active)))
+    assert not service.load(path, QSize(10, 10)).isNull()
+    assert not service._active and not service._queue
 
 
 def test_real_decode_runs_off_gui_thread_and_applies_exif(tmp_path, monkeypatch):

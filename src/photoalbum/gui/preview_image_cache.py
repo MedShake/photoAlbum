@@ -97,14 +97,17 @@ class PreviewImageCache(QObject):
         for path in list(self._queue):
             if len(self._active) >= 2:
                 break
-            token = self._token(path)
-            if token in self._active:
+            # A resize or invalidation changes the token, but the same source
+            # must still have only one running decoder. Keep its request queued:
+            # _finished() will recheck the cache against the latest target edge.
+            if any(worker.path == path for worker in self._active.values()):
                 continue
             del self._queue[path]
             if not self._needed(path):
                 continue
             if path not in self._signatures:
                 self._signatures[path] = RenderImageCache._source_signature(path)
+            token = self._token(path)
             worker = _Decode(token, path, self._edge)
             worker.signals.finished.connect(self._finished)
             self._active[token] = worker

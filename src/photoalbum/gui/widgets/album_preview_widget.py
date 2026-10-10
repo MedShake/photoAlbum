@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 
+from bisect import bisect_right
+
 from PySide6.QtCore import (
     QEvent,
     QRect,
@@ -14,8 +16,8 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QGridLayout,
+    QHBoxLayout,
     QScrollArea,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -38,6 +40,10 @@ from photoalbum.album.composition import (
 from photoalbum.rendering.fonts import resolve_font_family
 
 from photoalbum.gui.preview_image_cache import PreviewImageCache
+from photoalbum.gui.widgets.preview_navigation_ruler import (
+    NavigationPage,
+    PreviewNavigationRuler,
+)
 
 from photoalbum.gui.preview_render_service import (
     PreviewRenderService,
@@ -54,8 +60,8 @@ from photoalbum.rendering import (
 PREVIEW_PAGE_WIDTH = 300
 PREVIEW_PAGE_MAX_WIDTH = 550
 PREVIEW_LANDSCAPE_PAGE_MAX_WIDTH = 750
-# Keep room in the viewport for a future right-side navigation ruler.
-PREVIEW_NAVIGATION_RESERVE = 32
+# Each lateral ruler consumes this width; both stay outside the QScrollArea.
+PREVIEW_NAVIGATION_RESERVE = PreviewNavigationRuler.WIDTH
 
 
 PreviewThumbnailCache = RenderImageCache
@@ -84,6 +90,13 @@ class _PreviewPageBase(QWidget):
 
         self.set_page_width(
             self.PAGE_WIDTH
+        )
+
+    @property
+    def _maximum_page_width(self) -> int:
+        return (
+            PREVIEW_LANDSCAPE_PAGE_MAX_WIDTH
+            if self._page_ratio < 1.0 else PREVIEW_PAGE_MAX_WIDTH
         )
 
     def set_page_width(
@@ -549,6 +562,9 @@ class AlbumPreviewWidget(QWidget):
         self._composer = PageComposer()
         self._thumbnail_cache = PreviewImageCache(self)
         self._page_widgets: list[_PreviewPageBase] = []
+        self._navigation_widgets: list[_PreviewPageBase] = []
+        self._navigation_tops: list[int] = []
+        self._navigation_first_indices: list[int] = []
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -556,7 +572,7 @@ class AlbumPreviewWidget(QWidget):
         self._image_request_timer.setSingleShot(True)
         self._image_request_timer.timeout.connect(self._request_page_images)
         self._scroll.verticalScrollBar().valueChanged.connect(
-            lambda: self._image_request_timer.start(0)
+            self._scroll_position_changed
         )
         self._thumbnail_cache.ready.connect(self._image_ready)
 
@@ -590,8 +606,20 @@ class AlbumPreviewWidget(QWidget):
             self._content
         )
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(self._scroll)
+        self._date_ruler = PreviewNavigationRuler(
+            self._translator, self, mode="date",
+        )
+        self._page_ruler = PreviewNavigationRuler(
+            self._translator, self, mode="page",
+        )
+        self._date_ruler.page_activated.connect(self._navigate_to_page)
+        self._page_ruler.page_activated.connect(self._navigate_to_page)
+        self._date_ruler.page_explored.connect(self._explore_rulers)
+        self._page_ruler.page_explored.connect(self._explore_rulers)
+        layout = QHBoxLayout(self)
+        layout.addWidget(self._date_ruler)
+        layout.addWidget(self._scroll, 1)
+        layout.addWidget(self._page_ruler)
 
     def clear(self) -> None:
         self._image_request_timer.stop()
@@ -608,6 +636,11 @@ class AlbumPreviewWidget(QWidget):
                 widget.deleteLater()
 
         self._page_widgets.clear()
+        self._navigation_widgets.clear()
+        self._navigation_tops.clear()
+        self._navigation_first_indices.clear()
+        self._date_ruler.set_pages(())
+        self._page_ruler.set_pages(())
 
     def _add_page_widget(
         self,
@@ -726,8 +759,8 @@ class AlbumPreviewWidget(QWidget):
     def prioritize_preview_images(self, preview: AlbumPagePreview) -> None:
         """Prioritize one page in the Preview tab's shared image cache."""
         self._thumbnail_cache.set_resolution(
-            PREVIEW_PAGE_MAX_WIDTH,
-            PREVIEW_PAGE_MAX_WIDTH * preview._page_ratio,
+            preview._maximum_page_width,
+            round(preview._maximum_page_width * preview._page_ratio),
             preview.devicePixelRatioF(),
         )
         self._thumbnail_cache.prioritize(
@@ -758,11 +791,11 @@ class AlbumPreviewWidget(QWidget):
         pages = [p for p in self._page_widgets if isinstance(p, AlbumPagePreview)]
         if not pages:
             return
-        # Request the resolution of the displayed pages, which can be wider
-        # than the historical 550px cap in landscape mode.
+        # Decode once at the largest useful preview size for this page format.
+        # Window resizing only scales the cached image when painting.
         self._thumbnail_cache.set_resolution(
-            max(p.width() for p in pages),
-            max(p.height() for p in pages),
+            max(p._maximum_page_width for p in pages),
+            max(round(p._maximum_page_width * p._page_ratio) for p in pages),
             self.devicePixelRatioF(),
         )
         top = self._scroll.verticalScrollBar().value()
@@ -781,6 +814,119 @@ class AlbumPreviewWidget(QWidget):
             for photo in page._composition.page.photos[:len(page._composition.photo_slots)]
         )
 
+    @staticmethod
+    def _navigation_page(page, translator: Translator) -> NavigationPage:
+        """Use actual dated photos; special pages keep their period metadata."""
+        dates = sorted({
+            photo.capture_datetime.date()
+            for photo in page.photos
+            if photo.capture_datetime is not None
+        })
+        is_special = page.kind in {
+            PlanItemKind.SPECIAL_PAGE, PlanItemKind.BODY_SPECIAL_PAGE,
+        }
+        number = page.number
+        def formatted_date(value) -> str:
+            return f"{value.day:02d} {translator.month_name(value.month)} {value.year}"
+
+        short = "sp." if is_special else str(number)
+        full = (f"{translator.tr('preview.special_page')} — {number}"
+                if is_special else "")
+        if dates:
+            first, last = dates[0], dates[-1]
+            label = formatted_date(first)
+            if first != last:
+                label += " – " + formatted_date(last)
+            return NavigationPage(
+                label, first.year, first.month, first.day,
+                {PlanItemKind.YEAR_DIVIDER: "year",
+                 PlanItemKind.MONTH_DIVIDER: "month",
+                 PlanItemKind.DAY_DIVIDER: "day"}.get(page.kind),
+                tuple((day.year, day.month, day.day) for day in dates),
+                short, full, number,
+            )
+        if page.year is not None:
+            if page.month is not None and page.day is not None:
+                label = f"{page.day:02d} {translator.month_name(page.month)} {page.year}"
+            elif page.month is not None:
+                label = f"{translator.month_name(page.month)} {page.year}"
+            else:
+                label = str(page.year)
+            return NavigationPage(
+                label, page.year, page.month, page.day,
+                {PlanItemKind.YEAR_DIVIDER: "year",
+                 PlanItemKind.MONTH_DIVIDER: "month",
+                 PlanItemKind.DAY_DIVIDER: "day"}.get(page.kind),
+                (), short, full, number,
+            )
+        return NavigationPage("", short_label=short, page_label=full,
+                              page_number=number)
+
+    def _navigation_cover(self, position: CoverPosition) -> NavigationPage:
+        names = {
+            CoverPosition.FRONT: "front",
+            CoverPosition.INSIDE_FRONT: "inside_front",
+            CoverPosition.INSIDE_BACK: "inside_back",
+            CoverPosition.BACK: "back",
+        }
+        name = names[position]
+        return NavigationPage(
+            "", short_label=self._translator.tr(f"preview.navigation.short.{name}"),
+            page_label=self._translator.tr(f"preview.cover.{name}"),
+        )
+
+    def _refresh_navigation_positions(self) -> None:
+        """Index spread offsets once after layout, not on each scroll event."""
+        if not self._navigation_widgets:
+            return
+        self._pages_grid.activate()
+        entries = sorted(
+            (widget.y(), index) for index, widget in enumerate(self._navigation_widgets)
+        )
+        self._navigation_tops = []
+        self._navigation_first_indices = []
+        for top, index in entries:
+            if self._navigation_tops and self._navigation_tops[-1] == top:
+                self._navigation_first_indices[-1] = min(
+                    self._navigation_first_indices[-1], index
+                )
+            else:
+                self._navigation_tops.append(top)
+                self._navigation_first_indices.append(index)
+        self._sync_ruler_to_scroll()
+
+    def _scroll_position_changed(self, _value: int) -> None:
+        self._image_request_timer.start(0)
+        self._sync_ruler_to_scroll()
+
+    def _sync_ruler_to_scroll(self) -> None:
+        if not self._navigation_tops:
+            return
+        top = self._scroll.verticalScrollBar().value()
+        spread = max(0, bisect_right(self._navigation_tops, top + 2) - 1)
+        for ruler in (self._date_ruler, self._page_ruler):
+            # Preview scrolling takes ownership of both positions again.
+            ruler.clear_exploration()
+            ruler.set_current_index(self._navigation_first_indices[spread])
+
+    def _explore_rulers(self, index: int, date_entry: int) -> None:
+        """Keep both rulers together, without moving the scroll area."""
+        if not 0 <= index < len(self._navigation_widgets):
+            return
+        self._date_ruler.set_explored_index(index, date_entry=date_entry)
+        self._page_ruler.set_explored_index(index)
+
+    def _navigate_to_page(self, index: int) -> None:
+        if not 0 <= index < len(self._navigation_widgets):
+            return
+        # Both pages in a spread share the same scroll offset.  The ruler
+        # nevertheless keeps the exact page targeted by the user selected.
+        target = self._navigation_widgets[index]
+        self._scroll.verticalScrollBar().setValue(target.y())
+        for ruler in (self._date_ruler, self._page_ruler):
+            ruler.clear_exploration()
+            ruler.set_current_index(index)
+
     def _resize_page_widgets(
         self,
         viewport_width: int | None = None,
@@ -797,18 +943,13 @@ class AlbumPreviewWidget(QWidget):
             - margins.left()
             - margins.right()
             - self.SPREAD_HORIZONTAL_GAP
-            - PREVIEW_NAVIGATION_RESERVE
             - 8
         )
 
         # The album has one common page format. A landscape spread can use
         # more horizontal room than a portrait spread without changing PDF
         # geometry or requiring horizontal scrolling.
-        landscape = self._page_widgets[0]._page_ratio < 1.0
-        maximum_width = (
-            PREVIEW_LANDSCAPE_PAGE_MAX_WIDTH
-            if landscape else PREVIEW_PAGE_MAX_WIDTH
-        )
+        maximum_width = self._page_widgets[0]._maximum_page_width
         page_width = min(maximum_width, max(1, available_width // 2))
 
         self._image_request_timer.start(0)
@@ -816,6 +957,7 @@ class AlbumPreviewWidget(QWidget):
             if widget.width() == page_width:
                 continue
             widget.set_page_width(page_width)
+        QTimer.singleShot(0, self._refresh_navigation_positions)
 
     def eventFilter(
         self,
@@ -853,27 +995,21 @@ class AlbumPreviewWidget(QWidget):
         if page_format is None:
             page_format = settings.effective_page_format()
 
-        # Row 0: outer front cover, right side.
-        self._add_page_widget(
-            self._cover_widget(
-                settings,
-                CoverPosition.FRONT,
-                page_format,
-            ),
-            0,
-            1,
-        )
+        navigation_pages: list[NavigationPage] = []
 
-        # Row 1: inside front cover on the left.
-        self._add_page_widget(
-            self._cover_widget(
-                settings,
-                CoverPosition.INSIDE_FRONT,
-                page_format,
-            ),
-            1,
-            0,
+        # Covers are physical pages too: they must be reachable via the
+        # lower cyclic list, including both inside covers.
+        front = self._cover_widget(settings, CoverPosition.FRONT, page_format)
+        self._add_page_widget(front, 0, 1)
+        self._navigation_widgets.append(front)
+        navigation_pages.append(self._navigation_cover(CoverPosition.FRONT))
+
+        inside_front = self._cover_widget(
+            settings, CoverPosition.INSIDE_FRONT, page_format,
         )
+        self._add_page_widget(inside_front, 1, 0)
+        self._navigation_widgets.append(inside_front)
+        navigation_pages.append(self._navigation_cover(CoverPosition.INSIDE_FRONT))
 
         pages = result.pagination.pages
 
@@ -904,6 +1040,8 @@ class AlbumPreviewWidget(QWidget):
                 row,
                 column,
             )
+            self._navigation_widgets.append(preview)
+            navigation_pages.append(self._navigation_page(page, self._translator))
 
         if pages:
             last_page = pages[-1]
@@ -919,27 +1057,27 @@ class AlbumPreviewWidget(QWidget):
         else:
             inside_back_row = 1
 
-        # Inside back cover is a right-facing page.
-        self._add_page_widget(
-            self._cover_widget(
-                settings,
-                CoverPosition.INSIDE_BACK,
-                page_format,
-            ),
-            inside_back_row,
-            1,
+        inside_back = self._cover_widget(
+            settings, CoverPosition.INSIDE_BACK, page_format,
         )
+        self._add_page_widget(inside_back, inside_back_row, 1)
+        self._navigation_widgets.append(inside_back)
+        navigation_pages.append(self._navigation_cover(CoverPosition.INSIDE_BACK))
 
-        # Outside back cover is displayed alone on the left.
-        self._add_page_widget(
-            self._cover_widget(
-                settings,
-                CoverPosition.BACK,
-                page_format,
-            ),
-            inside_back_row + 1,
-            0,
+        back = self._cover_widget(settings, CoverPosition.BACK, page_format)
+        self._add_page_widget(back, inside_back_row + 1, 0)
+        self._navigation_widgets.append(back)
+        navigation_pages.append(self._navigation_cover(CoverPosition.BACK))
+
+        dividers = tuple(
+            level for enabled, level in (
+                (settings.year_dividers.enabled, "year"),
+                (settings.month_dividers.enabled, "month"),
+                (settings.day_dividers.enabled, "day"),
+            ) if enabled
         )
+        self._date_ruler.set_pages(navigation_pages, enabled_dividers=dividers)
+        self._page_ruler.set_pages(navigation_pages, enabled_dividers=dividers)
 
         # The viewport can still have its old geometry while the
         # preview tab is being populated. Resize once Qt has
