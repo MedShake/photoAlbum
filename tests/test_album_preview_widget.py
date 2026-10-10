@@ -54,6 +54,87 @@ def test_preview_default_geometry_respects_landscape():
     widget.close()
 
 
+
+def test_landscape_spreads_grow_on_wide_screens_without_enlarging_portrait():
+    from photoalbum.album import PageOrientation
+
+    landscape = create_widget()
+    portrait = create_widget()
+    try:
+        landscape.set_result(
+            make_result(),
+            replace(make_settings(), orientation=PageOrientation.LANDSCAPE),
+        )
+        portrait.set_result(make_result(), make_settings())
+
+        landscape._resize_page_widgets(viewport_width=1650)
+        portrait._resize_page_widgets(viewport_width=1650)
+
+        assert {page.width() for page in landscape._page_widgets} == {750}
+        assert {page.width() for page in portrait._page_widgets} == {550}
+        assert all(
+            abs(page.height() - page.width() * 210 / 297) <= 1
+            for page in landscape._page_widgets
+        )
+    finally:
+        landscape.close()
+        portrait.close()
+
+
+def test_landscape_spreads_shrink_to_fit_and_reserve_future_ruler():
+    from photoalbum.album import PageOrientation
+    from photoalbum.gui.widgets.album_preview_widget import PREVIEW_NAVIGATION_RESERVE
+
+    widget = create_widget()
+    try:
+        widget.set_result(
+            make_result(),
+            replace(make_settings(), orientation=PageOrientation.LANDSCAPE),
+        )
+        widget._resize_page_widgets(viewport_width=950)
+        page_width = widget._page_widgets[0].width()
+        margins = widget._pages_grid.contentsMargins()
+        total_width = (
+            page_width * 2
+            + widget.SPREAD_HORIZONTAL_GAP
+            + margins.left()
+            + margins.right()
+            + PREVIEW_NAVIGATION_RESERVE
+            + 8
+        )
+
+        assert 1 < page_width < 750
+        assert total_width <= 950
+        assert {page.width() for page in widget._page_widgets} == {page_width}
+
+        widget._resize_page_widgets(viewport_width=1650)
+        assert widget._page_widgets[0].width() > page_width
+    finally:
+        widget.close()
+
+
+def test_landscape_image_requests_follow_actual_preview_size(monkeypatch):
+    from photoalbum.album import PageOrientation
+
+    widget = create_widget()
+    try:
+        widget.set_result(
+            make_result(),
+            replace(make_settings(), orientation=PageOrientation.LANDSCAPE),
+        )
+        widget._resize_page_widgets(viewport_width=1650)
+        calls = []
+        monkeypatch.setattr(widget._thumbnail_cache, "set_resolution", lambda *args: calls.append(args))
+        monkeypatch.setattr(widget._thumbnail_cache, "prioritize", lambda paths: None)
+
+        widget._request_page_images()
+
+        assert calls
+        assert calls[-1][0] == 750
+        assert calls[-1][1] == max(page.height() for page in widget._page_widgets)
+    finally:
+        widget.close()
+
 def make_settings() -> AlbumStructureSettings:
     return AlbumStructureSettings(
         covers={
@@ -430,6 +511,7 @@ def test_preview_prioritizes_visible_pages_and_reuses_resize_requests(monkeypatc
         page.move(0, index * (height + page.height() + 10))
     monkeypatch.setattr(widget, "isVisible", lambda: True)
     widget._request_page_images()
+    initial_edge = cache._edge
     assert cache._pool.start.call_args_list[0].args[0].path == "/photo-0.jpg"
     assert "/photo-5.jpg" not in cache._queue
     for width in (310, 400, 550, 320):
@@ -437,7 +519,15 @@ def test_preview_prioritizes_visible_pages_and_reuses_resize_requests(monkeypatc
             page.set_page_width(width)
         widget._request_page_images()
     assert cache._pool.start.call_count <= 2
-    assert {worker.edge for worker in cache._active.values()} == {cache._edge}
+    # Running decoders keep their original resolution: resizing only updates
+    # the target edge for subsequent requests, without restarting workers.
+    from math import ceil
+    expected_edge = ceil(
+        max(max(page.width(), page.height()) for page in pages)
+        * widget.devicePixelRatioF()
+    )
+    assert cache._edge == expected_edge
+    assert {worker.edge for worker in cache._active.values()} == {initial_edge}
     widget.clear()
     widget.close()
 

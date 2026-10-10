@@ -53,6 +53,9 @@ from photoalbum.rendering import (
 
 PREVIEW_PAGE_WIDTH = 300
 PREVIEW_PAGE_MAX_WIDTH = 550
+PREVIEW_LANDSCAPE_PAGE_MAX_WIDTH = 750
+# Keep room in the viewport for a future right-side navigation ruler.
+PREVIEW_NAVIGATION_RESERVE = 32
 
 
 PreviewThumbnailCache = RenderImageCache
@@ -755,9 +758,12 @@ class AlbumPreviewWidget(QWidget):
         pages = [p for p in self._page_widgets if isinstance(p, AlbumPagePreview)]
         if not pages:
             return
-        maximum_height = max(PREVIEW_PAGE_MAX_WIDTH * p._page_ratio for p in pages)
+        # Request the resolution of the displayed pages, which can be wider
+        # than the historical 550px cap in landscape mode.
         self._thumbnail_cache.set_resolution(
-            PREVIEW_PAGE_MAX_WIDTH, maximum_height, self.devicePixelRatioF(),
+            max(p.width() for p in pages),
+            max(p.height() for p in pages),
+            self.devicePixelRatioF(),
         )
         top = self._scroll.verticalScrollBar().value()
         height = self._scroll.viewport().height()
@@ -777,41 +783,39 @@ class AlbumPreviewWidget(QWidget):
 
     def _resize_page_widgets(
         self,
+        viewport_width: int | None = None,
     ) -> None:
         if not self._page_widgets:
             return
 
-        viewport_width = (
-            self._scroll.viewport().width()
-        )
+        if viewport_width is None:
+            viewport_width = self._scroll.viewport().width()
 
-        margins = (
-            self._pages_grid.contentsMargins()
-        )
-
+        margins = self._pages_grid.contentsMargins()
         available_width = (
             viewport_width
             - margins.left()
             - margins.right()
             - self.SPREAD_HORIZONTAL_GAP
+            - PREVIEW_NAVIGATION_RESERVE
             - 8
         )
 
-        page_width = min(
-            PREVIEW_PAGE_MAX_WIDTH,
-            max(
-                PREVIEW_PAGE_WIDTH,
-                available_width // 2,
-            ),
+        # The album has one common page format. A landscape spread can use
+        # more horizontal room than a portrait spread without changing PDF
+        # geometry or requiring horizontal scrolling.
+        landscape = self._page_widgets[0]._page_ratio < 1.0
+        maximum_width = (
+            PREVIEW_LANDSCAPE_PAGE_MAX_WIDTH
+            if landscape else PREVIEW_PAGE_MAX_WIDTH
         )
+        page_width = min(maximum_width, max(1, available_width // 2))
 
         self._image_request_timer.start(0)
         for widget in self._page_widgets:
             if widget.width() == page_width:
                 continue
-            widget.set_page_width(
-                page_width
-            )
+            widget.set_page_width(page_width)
 
     def eventFilter(
         self,
