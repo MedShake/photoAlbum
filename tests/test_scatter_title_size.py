@@ -470,3 +470,53 @@ def test_title_position_is_persisted_and_reloaded(monkeypatch):
 
     editor.close()
     reopened.close()
+
+
+def test_scatter_proposal_counter_shows_capacity_not_count(monkeypatch):
+    monkeypatch.setattr(YearPhotoScatterSettingsWidget, "_request_preview", lambda self: None)
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance("year-photo-scatter"), [], translator=Translator("fr"),
+    )
+    try:
+        assert editor._proposal_label.text() == editor._translator.tr("album.cover_proposal", current=1, total=20)
+        editor._new()
+        assert editor._proposal_label.text() == editor._translator.tr("album.cover_proposal", current=2, total=20)
+    finally:
+        editor.close()
+
+
+def test_scatter_full_history_replaces_only_selected_slot_after_confirmation(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(YearPhotoScatterSettingsWidget, "_request_preview", lambda self: None)
+    editor = YearPhotoScatterSettingsWidget(
+        PageInstance("year-photo-scatter"), [], translator=Translator("fr"),
+    )
+    try:
+        editor._seeds = list(range(20))
+        editor._proposals = [editor._create_frozen_proposal(seed) for seed in editor._seeds]
+        editor._index = 6
+        editor._save_state()
+        editor._update_controls()
+        before = list(editor._proposals)
+        assert editor._proposal_label.text() == editor._translator.tr("album.cover_proposal", current=7, total=20)
+
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: None)
+        editor._new()
+        assert editor._proposals == before
+        assert editor._index == 6
+
+        monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: self.buttons()[0])
+        monkeypatch.setattr(
+            YearPhotoScatterSettingsWidget, "_create_frozen_proposal",
+            lambda self, seed: {"new": seed},
+        )
+        editor._new()
+        assert len(editor._proposals) == 20
+        assert editor._seeds[:6] == list(range(6))
+        assert editor._seeds[7:] == list(range(7, 20))
+        assert editor._proposals[6] != before[6]
+        assert editor._proposals[:6] == before[:6]
+        assert editor._proposals[7:] == before[7:]
+    finally:
+        editor.close()

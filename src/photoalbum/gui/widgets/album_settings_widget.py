@@ -29,6 +29,7 @@ from photoalbum.gui.template_labels import (
 )
 from photoalbum.gui.page_instance_dialog import PageInstanceDialog
 from photoalbum.template_engine.discovery import pack_settings_editor
+from photoalbum.template_engine.extensions import template_extension_registry
 from photoalbum.template_engine.instances import create_template_instance
 from photoalbum.album import (
     PAGE_FORMATS,
@@ -90,9 +91,11 @@ class AlbumSettingsWidget(QWidget):
         self._photo_provider = None
         self._photo_page_overrides = []
         self._body_insertions = []
+        self._last_page_dimensions_mm = None
 
         self._create_content()
         self._apply_defaults()
+        self._last_page_dimensions_mm = self._page_geometry()
         self.set_available_years(set())
 
     def set_photo_provider(
@@ -540,11 +543,43 @@ class AlbumSettingsWidget(QWidget):
         finally:
             self._loading_settings = was_loading
 
-        # During load_settings(), the surrounding load operation owns
-        # notification. For an actual user target change, emit exactly
-        # once after every selector is coherent with the new target.
+        # Allow registered template extensions to react to physical page changes.
         if not was_loading:
+            self._refresh_pages_after_dimensions_change()
             self.settings_changed.emit()
+
+    def _refresh_pages_after_dimensions_change(self) -> None:
+        dimensions = self._page_geometry()
+        previous = self._last_page_dimensions_mm
+        self._last_page_dimensions_mm = dimensions
+        if previous is None or previous == dimensions:
+            return
+        if self._photo_provider is None:
+            return
+
+        photos = tuple(self._photo_provider())
+
+        def rebuild(instance):
+            extension = template_extension_registry.get(instance.template_id)
+            callback = getattr(extension, "on_page_dimensions_changed", None)
+            if callback is None:
+                return instance
+            return callback(
+                instance, photos,
+                month_name=self._translator.month_name,
+                page_width_mm=dimensions[0],
+                page_height_mm=dimensions[1],
+            )
+
+        for position, instance in tuple(self._cover_instances.items()):
+            self._cover_instances[position] = rebuild(instance)
+
+        for list_widget in (self._front_matter_list, self._back_matter_list):
+            for index in range(list_widget.count()):
+                item = list_widget.item(index)
+                instance = item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(instance, PageInstance):
+                    item.setData(Qt.ItemDataRole.UserRole, rebuild(instance))
 
 
     def _create_covers_group(self) -> QGroupBox:
@@ -1816,6 +1851,7 @@ class AlbumSettingsWidget(QWidget):
             self._update_divider_controls()
 
         finally:
+            self._last_page_dimensions_mm = self._page_geometry()
             self._loading_settings = False
 
     def _update_divider_controls(self) -> None:

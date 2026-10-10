@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QMessageBox,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -38,6 +39,9 @@ from photoalbum.templates.msb.year_photo_scatter.composition import (
     cover_period_title,
     compose_cover_scatter,
     freeze_cover_scatter,
+    proposal_matches_dimensions,
+    reset_frozen_scatter_for_dimensions,
+    scatter_dimensions_key,
 )
 
 from photoalbum.templates.msb.settings_base import (
@@ -50,6 +54,7 @@ class YearPhotoScatterSettingsWidget(
 ):
     PREVIEW_WIDTH = 420
     DEFAULT_TITLE_COLOR = "#d0d0d0"
+    MAX_PROPOSALS = 20
 
     def __init__(
         self,
@@ -84,6 +89,12 @@ class YearPhotoScatterSettingsWidget(
         )
 
 
+        self._instance = reset_frozen_scatter_for_dimensions(
+            self._instance, self._photos,
+            month_name=self._translator.month_name,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
         self._load_state()
         self._freeze_existing_proposals()
         self._create_content()
@@ -564,9 +575,23 @@ class YearPhotoScatterSettingsWidget(
             page_width_mm=self._page_format.width_mm,
             page_height_mm=self._page_format.height_mm,
         )
-        return freeze_cover_scatter(composition)
+        return freeze_cover_scatter(
+            composition,
+            page_width_mm=self._page_format.width_mm,
+            page_height_mm=self._page_format.height_mm,
+        )
 
     def _freeze_existing_proposals(self) -> None:
+        # A change in physical dimensions invalidates the complete proposal
+        # history. Recreate a new composition rather than adapting old slots.
+        if self._proposals and any(
+            not isinstance(proposal, dict) or not proposal_matches_dimensions(
+                proposal, self._page_format.width_mm, self._page_format.height_mm,
+            ) for proposal in self._proposals
+        ):
+            self._seeds = [randbelow(2_147_483_647)]
+            self._index = 0
+            self._proposals = []
         # Legacy seeds are converted to persistent geometry when edited.
         while len(self._proposals) < len(self._seeds):
             seed = self._seeds[len(self._proposals)]
@@ -582,8 +607,19 @@ class YearPhotoScatterSettingsWidget(
         )
 
         scatter = settings.get("scatter", {})
+        previous = scatter if isinstance(scatter, dict) else {}
+        histories = previous.get("format_histories")
+        histories = dict(histories) if isinstance(histories, dict) else {}
+        histories[scatter_dimensions_key(
+            self._page_format.width_mm, self._page_format.height_mm,
+        )] = {
+            "seeds": list(self._seeds),
+            "proposals": list(self._proposals),
+            "selected_seed_index": self._index,
+        }
         settings["scatter"] = {
-            **(scatter if isinstance(scatter, dict) else {}),
+            **previous,
+            "format_histories": histories,
             "seeds": list(
                 self._seeds
             ),
@@ -621,7 +657,7 @@ class YearPhotoScatterSettingsWidget(
             self._translator.tr(
                 "album.cover_proposal",
                 current=self._index + 1,
-                total=len(self._seeds),
+                total=self.MAX_PROPOSALS,
             )
         )
 
@@ -661,30 +697,42 @@ class YearPhotoScatterSettingsWidget(
         self._update_controls()
         self._request_preview()
 
-    def _new(
-        self,
-    ) -> None:
-        self._seeds.append(
-            randbelow(
-                2_147_483_647
+    def _new(self) -> None:
+        if len(self._seeds) >= self.MAX_PROPOSALS:
+            confirmation = QMessageBox(self)
+            confirmation.setIcon(QMessageBox.Icon.Question)
+            confirmation.setWindowTitle(
+                self._translator.tr("page_settings.scatter_replace_title")
             )
-        )
-        self._proposals.append(self._create_frozen_proposal(self._seeds[-1]))
-
-        self._index = (
-            len(self._seeds) - 1
-        )
-
-        # Avoid keeping an unlimited history.
-        if len(self._seeds) > 20:
-            self._seeds = (
-                self._seeds[-20:]
+            confirmation.setText(self._translator.tr(
+                "page_settings.scatter_replace_message",
+                current=self._index + 1,
+                limit=self.MAX_PROPOSALS,
+            ))
+            replace_button = confirmation.addButton(
+                self._translator.tr("page_settings.scatter_replace_button"),
+                QMessageBox.ButtonRole.AcceptRole,
             )
-            self._proposals = self._proposals[-20:]
-
-            self._index = (
-                len(self._seeds) - 1
+            cancel_button = confirmation.addButton(
+                self._translator.tr("page_settings.scatter_cancel_button"),
+                QMessageBox.ButtonRole.RejectRole,
             )
+            confirmation.setDefaultButton(cancel_button)
+            confirmation.exec()
+            if confirmation.clickedButton() is not replace_button:
+                return
+            # A full set never evicts its oldest item implicitly. Replace
+            # only the explicitly selected slot after confirmation.
+            seed = randbelow(2_147_483_647)
+            proposal = self._create_frozen_proposal(seed)
+            self._seeds[self._index] = seed
+            self._proposals[self._index] = proposal
+        else:
+            seed = randbelow(2_147_483_647)
+            proposal = self._create_frozen_proposal(seed)
+            self._seeds.append(seed)
+            self._proposals.append(proposal)
+            self._index = len(self._seeds) - 1
 
         self._save_state()
         self._update_controls()
@@ -842,8 +890,19 @@ class YearPhotoScatterSettingsWidget(
 
         settings = dict(self._instance.settings)
         scatter = settings.get("scatter", {})
+        previous = scatter if isinstance(scatter, dict) else {}
+        histories = previous.get("format_histories")
+        histories = dict(histories) if isinstance(histories, dict) else {}
+        histories[scatter_dimensions_key(
+            self._page_format.width_mm, self._page_format.height_mm,
+        )] = {
+            "seeds": list(self._seeds),
+            "proposals": list(self._proposals),
+            "selected_seed_index": self._index,
+        }
         settings["scatter"] = {
-            **(scatter if isinstance(scatter, dict) else {}),
+            **previous,
+            "format_histories": histories,
             "title_font_family": str(family),
         }
         self._instance = replace(
@@ -855,8 +914,19 @@ class YearPhotoScatterSettingsWidget(
     def _change_title_font_size(self, value: float) -> None:
         settings = dict(self._instance.settings)
         scatter = settings.get("scatter", {})
+        previous = scatter if isinstance(scatter, dict) else {}
+        histories = previous.get("format_histories")
+        histories = dict(histories) if isinstance(histories, dict) else {}
+        histories[scatter_dimensions_key(
+            self._page_format.width_mm, self._page_format.height_mm,
+        )] = {
+            "seeds": list(self._seeds),
+            "proposals": list(self._proposals),
+            "selected_seed_index": self._index,
+        }
         settings["scatter"] = {
-            **(scatter if isinstance(scatter, dict) else {}),
+            **previous,
+            "format_histories": histories,
             "title_font_size": value,
         }
         self._instance = replace(self._instance, settings=settings)

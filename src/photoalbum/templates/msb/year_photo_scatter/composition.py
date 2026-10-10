@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 import random
+from math import isclose
+from secrets import randbelow
 from typing import Callable, Iterable
 
 from photoalbum.models import Photo, displayed_photo_dimensions
@@ -454,11 +456,31 @@ def visible_cover_scatter_items(
     )
 
 
-# Persisted compositions are independent of the current source snapshot.
-# The original seed is kept for compatibility, not used for reconstruction.
-def freeze_cover_scatter(composition: CoverScatterComposition) -> dict:
+# Frozen geometry is specific to the physical page dimensions. Portrait and
+# landscape (or two different paper formats) must never share a proposal.
+def proposal_matches_dimensions(
+    snapshot: dict, page_width_mm: float, page_height_mm: float,
+) -> bool:
+    dimensions = snapshot.get("page_dimensions_mm")
+    if not isinstance(dimensions, (list, tuple)) or len(dimensions) != 2:
+        return False
+    try:
+        return (
+            isclose(float(dimensions[0]), page_width_mm, abs_tol=1e-6)
+            and isclose(float(dimensions[1]), page_height_mm, abs_tol=1e-6)
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def freeze_cover_scatter(
+    composition: CoverScatterComposition, *,
+    page_width_mm: float = 210.0, page_height_mm: float = 297.0,
+) -> dict:
+    """Persist the visible geometry and the physical page it belongs to."""
     return {
         "title": composition.title,
+        "page_dimensions_mm": [float(page_width_mm), float(page_height_mm)],
         "items": [
             {"photo_id": item.photo.identity, "rect": [
                 item.rect.x, item.rect.y, item.rect.width, item.rect.height,
@@ -478,8 +500,113 @@ def thaw_cover_scatter(snapshot: dict, photos: Iterable[Photo]) -> CoverScatterC
     return CoverScatterComposition(str(snapshot["title"]), tuple(items))
 
 
+def scatter_dimensions_key(page_width_mm: float, page_height_mm: float) -> str:
+    """Stable, orientation-sensitive identifier for a physical page format."""
+    return f"{page_width_mm:.6f}x{page_height_mm:.6f}"
+
+
+def reset_frozen_scatter_for_dimensions(
+    instance, photos: Iterable[Photo], *,
+    month_name: Callable[[int], str],
+    page_width_mm: float, page_height_mm: float,
+):
+    """Switch to the proposals already made for this page format, if any.
+
+    A single PageInstance owns all of its format histories; nothing is shared
+    with another scatter page. A new format gets its first proposal only when
+    selected, never speculatively. Old seed-only pages remain compatible.
+    """
+    if instance.template_id != "year-photo-scatter":
+        return instance
+    scatter = instance.settings.get("scatter", {})
+    if not isinstance(scatter, dict):
+        return instance
+    proposals = scatter.get("proposals")
+    if not isinstance(proposals, list) or not proposals:
+        return instance
+    if all(
+        isinstance(proposal, dict) and proposal_matches_dimensions(
+            proposal, page_width_mm, page_height_mm,
+        ) for proposal in proposals
+    ):
+        return instance
+
+    histories = scatter.get("format_histories")
+    histories = dict(histories) if isinstance(histories, dict) else {}
+
+    # Save the departing format in the *same* page instance. Never store an
+    # incomplete or mixed-format proposal set as a reusable history.
+    first = proposals[0]
+    old_dimensions = first.get("page_dimensions_mm") if isinstance(first, dict) else None
+    if isinstance(old_dimensions, (tuple, list)) and len(old_dimensions) == 2:
+        try:
+            old_width, old_height = map(float, old_dimensions)
+            if all(
+                isinstance(proposal, dict) and proposal_matches_dimensions(
+                    proposal, old_width, old_height,
+                ) for proposal in proposals
+            ):
+                histories[scatter_dimensions_key(old_width, old_height)] = {
+                    "seeds": list(scatter.get("seeds", [0])),
+                    "proposals": list(proposals),
+                    "selected_seed_index": int(scatter.get("selected_seed_index", 0)),
+                }
+        except (TypeError, ValueError, OverflowError):
+            pass
+
+    target_key = scatter_dimensions_key(page_width_mm, page_height_mm)
+    saved = histories.get(target_key)
+    if isinstance(saved, dict):
+        saved_seeds = saved.get("seeds")
+        saved_proposals = saved.get("proposals")
+        if (
+            isinstance(saved_seeds, list)
+            and isinstance(saved_proposals, list)
+            and bool(saved_proposals)
+            and len(saved_seeds) == len(saved_proposals)
+            and len(saved_seeds) <= 20
+            and all(
+                isinstance(proposal, dict) and proposal_matches_dimensions(
+                    proposal, page_width_mm, page_height_mm,
+                ) for proposal in saved_proposals
+            )
+        ):
+            try:
+                selection = int(saved.get("selected_seed_index", 0))
+            except (TypeError, ValueError, OverflowError):
+                selection = 0
+            selection = min(max(selection, 0), len(saved_seeds) - 1)
+            new_scatter = {
+                **scatter, "format_histories": histories,
+                "seeds": list(saved_seeds), "proposals": list(saved_proposals),
+                "selected_seed_index": selection,
+            }
+            return replace(instance, settings={**instance.settings, "scatter": new_scatter})
+
+    seed = randbelow(2_147_483_647)
+    composition = compose_cover_scatter(
+        photos, seed=seed, month_name=month_name,
+        page_width_mm=page_width_mm, page_height_mm=page_height_mm,
+    )
+    frozen = freeze_cover_scatter(
+        composition, page_width_mm=page_width_mm, page_height_mm=page_height_mm,
+    )
+    histories[target_key] = {
+        "seeds": [seed], "selected_seed_index": 0, "proposals": [frozen],
+    }
+    new_scatter = {
+        **scatter, "format_histories": histories,
+        "seeds": [seed], "selected_seed_index": 0, "proposals": [frozen],
+    }
+    return replace(instance, settings={**instance.settings, "scatter": new_scatter})
+
+
 def stored_cover_scatter(instance, photos, *, month_name, page_width_mm, page_height_mm):
-    """Use a frozen proposal when available; old projects retain seed fallback."""
+    """Use a proposal only for its original page size; never stretch it.
+
+    When loading an older unsized proposal without visiting its settings,
+    keep the original seed fallback instead of painting mismatched rectangles.
+    """
     scatter = instance.settings.get("scatter", {})
     if not isinstance(scatter, dict):
         scatter = {}
@@ -488,7 +615,11 @@ def stored_cover_scatter(instance, photos, *, month_name, page_width_mm, page_he
     proposals = scatter.get("proposals")
     if isinstance(proposals, list) and index < len(proposals):
         snapshot = proposals[index]
-        if isinstance(snapshot, dict) and isinstance(snapshot.get("items"), list):
+        if (
+            isinstance(snapshot, dict)
+            and isinstance(snapshot.get("items"), list)
+            and proposal_matches_dimensions(snapshot, page_width_mm, page_height_mm)
+        ):
             return thaw_cover_scatter(snapshot, photos)
     return compose_cover_scatter(
         photos, seed=int(seeds[index]), month_name=month_name,

@@ -47,6 +47,7 @@ from photoalbum.templates.msb.settings_base import (
 )
 
 
+from .variants import LAYOUT_LARGE_FIRST, LAYOUT_LARGE_LAST
 from .caption_style import (
     caption_color_name,
     caption_font_family,
@@ -115,6 +116,21 @@ class PhotoPageSettingsWidget(
         left_layout.addWidget(
             self.create_page_settings_title()
         )
+
+        self._layout_variant = None
+        if self._instance.template_id == "photo-page-3":
+            variant_group = QGroupBox(
+                self._translator.tr("page_settings.photo_3_layout_group")
+            )
+            variant_form = QFormLayout(variant_group)
+            self._layout_variant = QComboBox()
+            self._populate_layout_variants()
+            variant_form.addRow(
+                self._translator.tr("page_settings.photo_3_layout"),
+                self._layout_variant,
+            )
+            left_layout.addWidget(variant_group)
+            self._layout_variant.currentIndexChanged.connect(self._changed)
 
         caption_group = QGroupBox(
             self._translator.tr("page_settings.caption_group")
@@ -221,8 +237,36 @@ class PhotoPageSettingsWidget(
             self._changed
         )
 
+    def _populate_layout_variants(self) -> None:
+        if self._layout_variant is None:
+            return
+        landscape = self._page_format.width_mm > self._page_format.height_mm
+        self._layout_variant.clear()
+        self._layout_variant.addItem(
+            self._translator.tr(
+                "page_settings.photo_3_large_left" if landscape
+                else "page_settings.photo_3_large_top"
+            ), LAYOUT_LARGE_FIRST,
+        )
+        self._layout_variant.addItem(
+            self._translator.tr(
+                "page_settings.photo_3_large_right" if landscape
+                else "page_settings.photo_3_large_bottom"
+            ), LAYOUT_LARGE_LAST,
+        )
+
     def _load_state(self) -> None:
         settings = self._instance.settings
+        if self._layout_variant is not None:
+            index = self._layout_variant.findData(
+                settings.get("layout_variant", LAYOUT_LARGE_FIRST)
+            )
+            if index < 0:
+                # Removed layouts must not stay in newly saved page settings.
+                settings = {**settings, "layout_variant": LAYOUT_LARGE_FIRST}
+                self._instance = replace(self._instance, settings=settings)
+                index = 0
+            self._layout_variant.setCurrentIndex(index)
 
         self._show_caption.setChecked(
             caption_show_user(settings)
@@ -318,6 +362,8 @@ class PhotoPageSettingsWidget(
             return
 
         settings = dict(self._instance.settings)
+        if self._layout_variant is not None:
+            settings["layout_variant"] = self._layout_variant.currentData()
 
         settings["photo_caption"] = {
             "show_caption": self._show_caption.isChecked(),
@@ -372,4 +418,11 @@ class PhotoPageSettingsWidget(
         )
 
     def _album_context_changed(self) -> None:
+        if self._layout_variant is not None:
+            chosen = self._layout_variant.currentData()
+            self._loading = True
+            self._populate_layout_variants()
+            index = self._layout_variant.findData(chosen)
+            self._layout_variant.setCurrentIndex(max(0, index))
+            self._loading = False
         self._render_preview()

@@ -91,3 +91,19 @@ def test_preview_capacity_and_generic_fallback(monkeypatch):
             )
         finally:
             widget.close()
+
+
+def test_three_photo_layout_group_is_above_captions(monkeypatch):
+    from PySide6.QtWidgets import QGroupBox
+    from photoalbum.templates.msb.photo_page.settings import PhotoPageSettingsWidget
+    monkeypatch.setattr(
+        PhotoPageSettingsWidget, "_render_preview", lambda self: None,
+    )
+    editor = PhotoPageSettingsWidget(
+        PageInstance("photo-page-3"), [], translator=Translator("fr"),
+    )
+    try:
+        group_titles = [group.title() for group in editor.findChildren(QGroupBox)]
+        assert group_titles.index(editor._translator.tr("page_settings.photo_3_layout_group")) < group_titles.index(editor._translator.tr("page_settings.caption_group"))
+    finally:
+        editor.close()

@@ -96,6 +96,10 @@ class PhotoTemplateLayout:
         [float, float],
         tuple[NormalizedRect, ...],
     ]
+    # Optional per-instance geometry for templates with layout variants.
+    settings_cells_factory: Callable[
+        [float, float, dict], tuple[NormalizedRect, ...]
+    ] | None = None
     # Classic built-in layout, inspired by the historical
     # PHP renderer:
     #
@@ -135,9 +139,8 @@ class PhotoTemplateLayout:
         reserved_caption_lines: int | None = None,
     ) -> PageComposition:
         photo_settings = PhotoPageSettings(page=instance)
-        cells = self.cells_factory(
-            page_width_mm,
-            page_height_mm,
+        cells = self._cells(
+            page_width_mm, page_height_mm, instance.settings
         )
 
         page_number = (
@@ -211,6 +214,11 @@ class PhotoTemplateLayout:
             photo_slots=slots,
             page_number=page_number,
         )
+
+    def _cells(self, width_mm, height_mm, settings):
+        if self.settings_cells_factory is not None:
+            return self.settings_cells_factory(width_mm, height_mm, settings)
+        return self.cells_factory(width_mm, height_mm)
 
     def _required_caption_lines(
         self,
@@ -371,7 +379,7 @@ class PhotoTemplateLayout:
 
     def required_caption_lines(self, page, instance, *, page_width_mm, page_height_mm):
         settings = PhotoPageSettings(page=instance)
-        cells = self.cells_factory(page_width_mm, page_height_mm)
+        cells = self._cells(page_width_mm, page_height_mm, instance.settings)
         return max((self._required_caption_lines(
             build_photo_caption(photo, settings), cell,
             settings=settings.page.settings, page_width_mm=page_width_mm,

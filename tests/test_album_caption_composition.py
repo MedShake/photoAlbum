@@ -1,4 +1,5 @@
 from photoalbum.album import PageInstance
+from dataclasses import replace
 import pytest
 
 from datetime import datetime
@@ -1051,3 +1052,48 @@ def test_three_photo_layout_is_horizontal_hierarchy_on_landscape_page():
         - (cells[1].y + cells[1].height)
     ) * 210.0
     assert gap_mm == pytest.approx(4.0, abs=0.01)
+
+
+@pytest.mark.parametrize("page_width,page_height,variant,large_index", [
+    (210.0, 297.0, "large-first", 0),
+    (210.0, 297.0, "large-last", 2),
+    (297.0, 210.0, "large-first", 0),
+    (297.0, 210.0, "large-last", 2),
+])
+def test_three_photo_variant_changes_slot_geometry_without_reordering_photos(
+    page_width, page_height, variant, large_index,
+):
+    photos = tuple(make_photo(f"photo-{i}.jpg") for i in range(3))
+    instance = PageInstance("photo-page-3", settings={"layout_variant": variant})
+    page = make_page(photos, capacity=3)
+    page = replace(page, page_instance=instance)
+    composition = PageComposer().compose(
+        page, page_numbers=PageNumberSettings(enabled=False),
+        page_width_mm=page_width, page_height_mm=page_height,
+    )
+    slots = composition.photo_slots
+    assert len(slots) == 3
+    assert composition.page.photos == photos
+    if page_width > page_height:
+        assert slots[large_index].image_rect.height > slots[(large_index + 1) % 3].image_rect.height
+        assert (slots[large_index].image_rect.x < slots[0 if large_index else 1].image_rect.x) == (variant == "large-first")
+    else:
+        assert slots[large_index].image_rect.width > slots[(large_index + 1) % 3].image_rect.width
+        assert (slots[large_index].image_rect.y < slots[0 if large_index else 1].image_rect.y) == (variant == "large-first")
+
+
+def test_removed_three_portrait_variant_falls_back_to_historical_layout():
+    from photoalbum.templates.msb.photo_page.layout import _photo_page_3_cells
+
+    assert _photo_page_3_cells(297.0, 210.0, "three-portraits") == (
+        _photo_page_3_cells(297.0, 210.0, "large-first")
+    )
+
+
+def test_three_photo_missing_variant_defaults_to_historical_layout():
+    from photoalbum.templates.msb.photo_page.layout import _photo_page_3_cells_for_settings
+
+    for size in ((210.0, 297.0), (297.0, 210.0)):
+        expected = _photo_page_3_cells_for_settings(*size, {})
+        assert expected == _photo_page_3_cells_for_settings(*size, {"layout_variant": "large-first"})
+        assert expected == _photo_page_3_cells_for_settings(*size, {"layout_variant": "unknown"})

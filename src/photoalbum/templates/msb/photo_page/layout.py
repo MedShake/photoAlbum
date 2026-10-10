@@ -6,6 +6,7 @@ from photoalbum.album.composition import (
 )
 
 from .composition import PhotoTemplateLayout
+from .variants import LAYOUT_LARGE_FIRST, LAYOUT_LARGE_LAST
 
 
 def _grid_cells(
@@ -133,9 +134,12 @@ def _photo_page_2_cells(
     )
 
 
+
+
 def _photo_page_3_cells(
     page_width_mm: float,
     page_height_mm: float,
+    variant: str = LAYOUT_LARGE_FIRST,
 ) -> tuple[NormalizedRect, ...]:
     margin_x = 10.0 / page_width_mm
     margin_top = 6.0 / page_height_mm
@@ -169,7 +173,7 @@ def _photo_page_3_cells(
         right_height = available_height / 2
         lower_y = margin_top + right_height + vertical_gap
 
-        return (
+        cells = (
             NormalizedRect(
                 x=margin_x,
                 y=margin_top,
@@ -189,6 +193,17 @@ def _photo_page_3_cells(
                 height=right_height,
             ),
         )
+        if variant == LAYOUT_LARGE_LAST:
+            # The first two chronological photos are stacked on the LEFT;
+            # the final (large) photo occupies the RIGHT.
+            large_x = margin_x + right_width + horizontal_gap
+            return (
+                NormalizedRect(margin_x, margin_top, right_width, right_height),
+                NormalizedRect(margin_x, lower_y, right_width, right_height),
+                NormalizedRect(large_x, margin_top, left_width,
+                               1 - margin_top - margin_bottom),
+            )
+        return cells
 
     available_height = (
         1
@@ -210,7 +225,7 @@ def _photo_page_3_cells(
     )
     bottom_width = available_width / 2
 
-    return (
+    cells = (
         NormalizedRect(
             x=margin_x,
             y=margin_top,
@@ -234,6 +249,29 @@ def _photo_page_3_cells(
             height=bottom_height,
         ),
     )
+    if variant == LAYOUT_LARGE_LAST:
+        # Two small photos first, at the TOP, with a large photo BELOW.
+        large_bottom_y = margin_top + bottom_height + vertical_gap
+        return (
+            NormalizedRect(margin_x, margin_top, bottom_width, bottom_height),
+            NormalizedRect(margin_x + bottom_width + horizontal_gap,
+                           margin_top, bottom_width, bottom_height),
+            NormalizedRect(margin_x, large_bottom_y,
+                           1 - 2 * margin_x, top_height),
+        )
+    return cells
+
+
+def _photo_page_3_cells_for_settings(
+    page_width_mm: float,
+    page_height_mm: float,
+    settings: dict,
+) -> tuple[NormalizedRect, ...]:
+    return _photo_page_3_cells(
+        page_width_mm, page_height_mm,
+        variant=settings.get("layout_variant", LAYOUT_LARGE_FIRST),
+    )
+
 
 def _photo_page_4_cells(
     page_width_mm: float,
@@ -286,6 +324,7 @@ def register_layouts(registry: TemplateLayoutRegistry) -> None:
         "photo-page-3",
         PhotoTemplateLayout(
             cells_factory=_photo_page_3_cells,
+            settings_cells_factory=_photo_page_3_cells_for_settings,
             max_caption_lines=3,
             caption_line_counter=count_caption_lines,
             caption_line_height_counter=physical_line_height_mm,

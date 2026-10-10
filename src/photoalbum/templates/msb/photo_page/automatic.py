@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from photoalbum.models import displayed_photo_dimensions
-from photoalbum.album import AutomaticPhotoPageContext
+from photoalbum.album import AutomaticPhotoPageContext, PageInstance
+
+from .variants import LAYOUT_LARGE_FIRST, LAYOUT_LARGE_LAST
 
 
 MODE_ID = "msb-orientation-1-2"
@@ -50,17 +52,12 @@ def select_orientation_template(context: AutomaticPhotoPageContext) -> str:
 
 def select_orientation_1_2_3_template(
     context: AutomaticPhotoPageContext,
-) -> str:
-    """Prefer MSB's orientation-aware 3-photo layout, then 2, then 1.
+) -> str | PageInstance:
+    """Choose a three-photo layout variant without reordering the photo stream.
 
-    For a portrait page, the 3-photo layout expects landscape / portrait /
-    portrait: one wide photo on top and two portrait photos below.
-
-    For a landscape page, it expects portrait / landscape / landscape: one
-    tall photo on the left and two landscape photos stacked on the right.
-
-    If that exact three-photo pattern is unavailable, the existing 1/2 rule
-    is used unchanged.
+    The returned PageInstance carries the layout selected for this occurrence.
+    The pagination engine merges that variant with the user's shared settings.
+    Other modes and the historical 1/2 fallback remain unchanged.
     """
     page_orientation = _page_orientation(context)
     if page_orientation is None:
@@ -68,12 +65,20 @@ def select_orientation_1_2_3_template(
 
     if len(context.photos) >= 3:
         orientations = tuple(_orientation(photo) for photo in context.photos[:3])
-        expected = (
-            ("portrait", "landscape", "landscape")
-            if page_orientation == "landscape"
-            else ("landscape", "portrait", "portrait")
-        )
-        if orientations == expected:
-            return "photo-page-3"
+        if page_orientation == "portrait":
+            patterns = {
+                ("landscape", "portrait", "portrait"): LAYOUT_LARGE_FIRST,
+                ("portrait", "portrait", "landscape"): LAYOUT_LARGE_LAST,
+            }
+        else:
+            patterns = {
+                ("portrait", "landscape", "landscape"): LAYOUT_LARGE_FIRST,
+                ("landscape", "landscape", "portrait"): LAYOUT_LARGE_LAST,
+            }
+        variant = patterns.get(orientations)
+        if variant is not None:
+            return PageInstance(
+                "photo-page-3", settings={"layout_variant": variant},
+            )
 
     return select_orientation_template(context)

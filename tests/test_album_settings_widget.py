@@ -435,3 +435,75 @@ def test_gui_filters_using_central_physical_compatibility(monkeypatch):
     assert widget._photo_page_combo.findData(template.template_id) == -1
     assert (210.0, 297.0) in calls and (297.0, 210.0) in calls
     widget.close()
+
+
+def test_format_change_rebuilds_frozen_scatter_for_covers_and_special_pages(monkeypatch):
+    from dataclasses import replace
+    from datetime import datetime
+    from pathlib import Path
+    from photoalbum.album import PageInstance
+    from photoalbum.models import Photo
+    from photoalbum.templates.msb.year_photo_scatter import composition as scatter
+    from photoalbum.templates.msb.year_photo_scatter import register as register_scatter
+    from photoalbum.template_engine.extensions import template_extension_registry
+
+    # create_widget() installs template metadata only. The real main window
+    # also registers executable pack extensions before handling format changes.
+    # Isolate the registration so this test does not alter other tests.
+    monkeypatch.setattr(
+        template_extension_registry,
+        "_extensions",
+        dict(template_extension_registry._extensions),
+    )
+    register_scatter()
+
+    photos = [Photo(
+        path=Path(f"/photos/{index}.jpg"), filename=f"{index}.jpg",
+        capture_datetime=datetime(2025, 3, index + 1),
+        width=3000, height=2000,
+    ) for index in range(5)]
+    existing = scatter.freeze_cover_scatter(
+        scatter.compose_cover_scatter(
+            photos, seed=11, month_name=lambda number: str(number),
+            page_width_mm=210.0, page_height_mm=297.0,
+        ), page_width_mm=210.0, page_height_mm=297.0,
+    )
+    instance = PageInstance("year-photo-scatter", settings={"scatter": {
+        "seeds": [11], "selected_seed_index": 0, "proposals": [existing],
+    }})
+    widget = create_widget()
+    widget.set_photo_provider(lambda: photos)
+    settings = widget.settings()
+    settings = replace(
+        settings,
+        covers={**settings.covers, CoverPosition.FRONT: CoverSettings(
+            CoverPosition.FRONT, page=instance,
+        )},
+        front_matter=[instance],
+    )
+    widget.set_settings(settings)
+    monkeypatch.setattr(scatter, "randbelow", lambda limit: 92)
+    widget._orientation_combo.setCurrentIndex(
+        widget._orientation_combo.findData("landscape")
+    )
+    updated = widget.settings()
+    assert updated.covers[CoverPosition.FRONT].page.settings["scatter"]["seeds"] == [92]
+    assert updated.covers[CoverPosition.FRONT].page.settings["scatter"]["proposals"][0][
+        "page_dimensions_mm"
+    ] == [297.0, 210.0]
+    assert updated.front_matter[0].settings["scatter"]["proposals"][0][
+        "page_dimensions_mm"
+    ] == [297.0, 210.0]
+    # Rebuilding for unrelated settings must not create new scatter proposals.
+    assert widget.settings().covers[CoverPosition.FRONT].page == (
+        updated.covers[CoverPosition.FRONT].page
+    )
+    # Revisiting a format restores its original proposal rather than
+    # generating another or stretching the landscape geometry.
+    widget._orientation_combo.setCurrentIndex(
+        widget._orientation_combo.findData("portrait")
+    )
+    restored = widget.settings()
+    assert restored.covers[CoverPosition.FRONT].page.settings["scatter"]["seeds"] == [11]
+    assert restored.front_matter[0].settings["scatter"]["seeds"] == [11]
+    widget.close()

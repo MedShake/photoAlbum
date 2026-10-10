@@ -231,11 +231,15 @@ class PaginationEngine:
             raise ValueError(
                 f"Automatic mode {selection.mode_id!r} has no callable selector."
             )
-        template_id = selector(AutomaticPhotoPageContext(
+        choice = selector(AutomaticPhotoPageContext(
             photos=tuple(admissible_photos),
             page_width_mm=self._page_geometry.width_mm,
             page_height_mm=self._page_geometry.height_mm,
         ))
+        # Backward compatible: existing pack selectors still return a template
+        # ID. A selector may also return a PageInstance to specify a variant
+        # for the selected occurrence without creating another template.
+        template_id = choice.template_id if isinstance(choice, PageInstance) else choice
         if template_id not in definition.template_ids:
             raise ValueError(
                 f"Automatic mode {selection.mode_id!r} returned undeclared template "
@@ -258,7 +262,10 @@ class PaginationEngine:
         return PageInstance(
             template_id=template_id,
             instance_id=selection.instance_id,
-            settings=dict(selection.settings),
+            settings={
+                **selection.settings,
+                **(choice.settings if isinstance(choice, PageInstance) else {}),
+            },
         )
 
     def _append_insertions(self, result, anchor, item, photo=None) -> None:

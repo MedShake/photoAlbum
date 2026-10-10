@@ -33,6 +33,7 @@ class PageTemplateExtension:
     photo_scope: str = "page"
     settings_defaults: Callable[[], dict[str, object]] | None = None
     validate_settings: Callable[[dict[str, object]], None] | None = None
+    on_page_dimensions_changed: Callable[..., object] | None = None
 
     def __post_init__(self) -> None:
         if self.photo_scope not in {"page", "album"}:

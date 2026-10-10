@@ -26,10 +26,13 @@ def register() -> None:
         YearPhotoScatterWidgetRenderer,
     )
 
+    from .composition import reset_frozen_scatter_for_dimensions
+
     register_template_extension(
         PageTemplateExtension(
             template_id="year-photo-scatter",
             photo_scope="album",
+            on_page_dimensions_changed=reset_frozen_scatter_for_dimensions,
             settings_editor_type=(
                 YearPhotoScatterSettingsWidget
             ),

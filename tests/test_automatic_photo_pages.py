@@ -294,3 +294,61 @@ def test_removing_manual_override_reactivates_the_automatic_mode():
     settings.photo_page_overrides = []
     automatic = photo_pages(AlbumBuilder(registry).build(photos, settings))
     assert [page.template_id for page in automatic] == ["photo-page-2"]
+
+
+@pytest.mark.parametrize(
+    ("landscape", "dimensions", "variant"),
+    [
+        (False, [(3, 2), (2, 3), (2, 3)], "large-first"),
+        (False, [(2, 3), (2, 3), (3, 2)], "large-last"),
+        (True, [(2, 3), (3, 2), (3, 2)], "large-first"),
+        (True, [(3, 2), (3, 2), (2, 3)], "large-last"),
+    ],
+)
+def test_three_photo_automatic_variants_preserve_photo_order_and_shared_settings(
+    landscape, dimensions, variant,
+):
+    photos = [photo(str(index), *size, day=index + 1)
+              for index, size in enumerate(dimensions)]
+    settings = automatic_settings(landscape=landscape)
+    shared = {"photo_caption": {"show_datetime": False}}
+    settings.photo_pages = PhotoPageSettings(automatic_mode=AutomaticPhotoPageSettings(
+        MODE_ID_1_2_3, settings=shared,
+    ))
+    pages = photo_pages(AlbumBuilder(create_template_registry()).build(photos, settings))
+    assert len(pages) == 1
+    assert pages[0].template_id == "photo-page-3"
+    assert tuple(p.identity for p in pages[0].photos) == tuple(p.identity for p in photos)
+    assert pages[0].page_instance.settings == {**shared, "layout_variant": variant}
+
+
+def test_three_photo_automatic_new_patterns_do_not_affect_old_1_2_mode():
+    photos = [photo(str(index), 2, 3, day=index + 1) for index in range(3)]
+    pages = photo_pages(AlbumBuilder(create_template_registry()).build(
+        photos, automatic_settings(landscape=True)
+    ))
+    assert [page.template_id for page in pages] == ["photo-page-2", "photo-page-1"]
+
+
+def test_three_photo_layout_setting_roundtrips_with_page_instance():
+    from photoalbum.album import PhotoPageOverride
+
+    photos = [photo(str(index), 2, 3, day=index + 1) for index in range(3)]
+    settings = automatic_settings(landscape=True)
+    settings.photo_page_overrides = [PhotoPageOverride(
+        photos[0].identity,
+        PageInstance("photo-page-3", settings={"layout_variant": "large-last"}),
+    )]
+    restored = album_settings_from_json(album_settings_to_json(settings))
+    pages = photo_pages(AlbumBuilder(create_template_registry()).build(photos, restored))
+    assert pages[0].page_instance.settings["layout_variant"] == "large-last"
+
+
+def test_three_portraits_no_longer_selects_a_three_photo_page():
+    photos = [photo(str(index), 2, 3, day=index + 1) for index in range(3)]
+    settings = automatic_settings(landscape=True)
+    settings.photo_pages = PhotoPageSettings(
+        automatic_mode=AutomaticPhotoPageSettings(MODE_ID_1_2_3)
+    )
+    pages = photo_pages(AlbumBuilder(create_template_registry()).build(photos, settings))
+    assert [page.template_id for page in pages] == ["photo-page-2", "photo-page-1"]
