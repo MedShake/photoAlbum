@@ -2,6 +2,11 @@
 
 [Français](README.fr.md) | **English**
 
+<p align="center">
+  <img src="docs/images/pages.png"
+       alt="Exemple de couverture pêle-mêle">
+</p>
+
 Photo Album is a desktop application for composing chronological photo albums from local folders or Synology Photos albums. It lets you correct dates, locations, and captions, configure pages, and export a PDF. The interface is available in French and English.
 
 **[Full documentation — wiki](https://github.com/MedShake/photoAlbum/wiki)**: installation, usage, templates, and development.
