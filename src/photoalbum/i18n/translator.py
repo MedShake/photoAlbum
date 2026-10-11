@@ -701,6 +701,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
 
         "album.page_format": "Page format",
+        "album.accordion.format": "Format",
         "album.special_page_incompatible": "Incompatible page format (excluded from rendering)",
         "album.custom_format": "Custom",
         "album.custom_width": "Width",
@@ -709,6 +710,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
         "album.orientation_landscape": "Landscape",
+        "album.orientation_square": "Square",
         "album.templates_unavailable_format": (
             "templates unavailable for this format"
         ),
@@ -731,6 +733,14 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.page_numbering": "Page numbering",
         "album.show_page_numbers": "Show page numbers",
         "album.printing": "Printing",
+        "album.numbering_printing": "Page numbering and printing",
+        "album.divider_summary.day": "Day",
+        "album.divider_summary.month": "Month",
+        "album.divider_summary.year": "Year",
+        "album.divider_summary.active": "Active:",
+        "album.divider_summary.inactive": "Inactive:",
+        "album.special_pages_summary_one": "1 page configured",
+        "album.special_pages_summary_many": "{count} pages configured",
         "album.page_multiple_4": "Require page count to be a multiple of 4",
         "album.template": "Template:",
 
@@ -1570,6 +1580,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         ),
 
         "album.page_format": "Format de page",
+        "album.accordion.format": "Format",
         "album.special_page_incompatible": "Format de page incompatible (exclue des rendus)",
         "album.custom_format": "Personnalisé",
         "album.custom_width": "Largeur",
@@ -1578,6 +1589,7 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.orientation": "Orientation",
         "album.orientation_portrait": "Portrait",
         "album.orientation_landscape": "Paysage",
+        "album.orientation_square": "Carré",
         "album.templates_unavailable_format": (
             "templates indisponibles dans ce format"
         ),
@@ -1600,6 +1612,14 @@ CATALOGS: dict[str, dict[str, str]] = {
         "album.page_numbering": "Numérotation",
         "album.show_page_numbers": "Afficher les numéros de page",
         "album.printing": "Impression",
+        "album.numbering_printing": "Numérotation et impression",
+        "album.divider_summary.day": "Jour",
+        "album.divider_summary.month": "Mois",
+        "album.divider_summary.year": "Année",
+        "album.divider_summary.active": "Actifs :",
+        "album.divider_summary.inactive": "Inactifs :",
+        "album.special_pages_summary_one": "1 page configurée",
+        "album.special_pages_summary_many": "{count} pages configurées",
         "album.page_multiple_4": "Imposer un nombre de pages multiple de 4",
         "album.template": "Modèle :",
 

@@ -537,7 +537,7 @@ def test_open_remote_project_exposes_snapshot_before_background_refresh(
     assert window._photos_widget._sources == [source]
 
 
-def test_pdf_document_summary_uses_effective_dimensions_without_orientation(window):
+def test_pdf_output_heading_uses_effective_dimensions_without_orientation(window):
     from dataclasses import replace
     from photoalbum.album import PageOrientation
 
@@ -548,7 +548,7 @@ def test_pdf_document_summary_uses_effective_dimensions_without_orientation(wind
         base, page_format="a4", orientation=PageOrientation.PORTRAIT,
     ))
     widget.update_summary()
-    assert widget._pdf_format_label.text() == "A4 — 210 × 297 mm"
+    assert "A4 — 210 × 297 mm" in widget._pdf_output_group.title()
     assert not hasattr(widget, "_pdf_orientation_label")
 
     window._album_settings_widget.set_settings(replace(
@@ -556,14 +556,14 @@ def test_pdf_document_summary_uses_effective_dimensions_without_orientation(wind
         page_format="a4", orientation=PageOrientation.LANDSCAPE,
     ))
     widget.update_summary()
-    assert widget._pdf_format_label.text() == "A4 — 297 × 210 mm"
+    assert "A4 — 297 × 210 mm" in widget._pdf_output_group.title()
 
     window._album_settings_widget.set_settings(replace(
         window._album_settings_widget.settings(),
         page_format="custom", custom_width_mm=180.0, custom_height_mm=180.0,
     ))
     widget.update_summary()
-    assert widget._pdf_format_label.text() == "Custom — 180 × 180 mm"
+    assert "Custom — 180 × 180 mm" in widget._pdf_output_group.title()
 
 
 @pytest.mark.parametrize('failure', [False, True])
@@ -1011,6 +1011,8 @@ def test_project_header_shows_name_edit_action_and_filename(window, tmp_path, mo
     window._update_project_state()
 
     assert window._project_label.text() == "technical-name"
+    assert window._project_label.toolTip() == "technical-name"
+    assert window.windowTitle().endswith("— technical-name")
     assert window._project_filename_label.text() == "technical-name.photoalbum"
     assert window._project_filename_label.isVisibleTo(window)
     assert window._project_rename_button.isVisibleTo(window)
@@ -1023,8 +1025,35 @@ def test_project_header_shows_name_edit_action_and_filename(window, tmp_path, mo
     window._rename_project()
 
     assert window._project_label.text() == "Nantes 2026"
+    assert window._project_label.toolTip() == "Nantes 2026"
+    assert window.windowTitle().endswith("— Nantes 2026")
     assert window._project_filename_label.text() == "technical-name.photoalbum"
     assert window._project_service.get_project_name() == "Nantes 2026"
+
+
+def test_project_title_stays_visible_at_compact_window_size(window, tmp_path, app):
+    project = tmp_path / "un-album-avec-un-nom-un-peu-long.photoalbum"
+    window._project_service.create(project)
+    window._update_project_state()
+    window.resize(960, 540)
+    window.show()
+    app.processEvents()
+    assert window._project_label.isVisibleTo(window)
+    assert window._project_label.width() >= 130
+    assert window._project_label.text() == project.stem
+    assert project.stem in window.windowTitle()
+
+    # Rename, then switch back to the filename-based title.
+    window._project_service.set_project_name("Souvenirs personnalisés")
+    window._update_project_state()
+    app.processEvents()
+    assert window._project_label.text() == "Souvenirs personnalisés"
+    assert "Souvenirs personnalisés" in window.windowTitle()
+
+    window._project_service.close()
+    window._update_project_state()
+    assert window.windowTitle() == "Photo Album"
+
 
 
 def test_pdf_failure_popup_surfaces_actionable_worker_message(window):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from math import isclose
+
 from photoalbum.album.planning import PlanItemKind
 
 from PySide6.QtCore import Qt, Signal, QSignalBlocker
@@ -9,7 +11,10 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
+    QFrame,
+    QScrollArea,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -18,6 +23,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from photoalbum.gui.widgets.accordion_section import AccordionGroup, AccordionSection
 
 from photoalbum.template_engine.defaults import (
     default_template_choices,
@@ -97,6 +104,7 @@ class AlbumSettingsWidget(QWidget):
         self._apply_defaults()
         self._last_page_dimensions_mm = self._page_geometry()
         self.set_available_years(set())
+        self._update_accordion_summaries()
 
     def set_photo_provider(
         self,
@@ -105,39 +113,146 @@ class AlbumSettingsWidget(QWidget):
         self._photo_provider = provider
 
     def _create_content(self) -> None:
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(
-            self._create_page_format_group()
+        # No group may impose its full expanded height on QTabWidget.  Each
+        # accordion hides its contents, and the scroll area is an emergency
+        # fallback, not a permanently visible scrollbar.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(4, 4, 4, 4)
+        self._settings_scroll = QScrollArea(self)
+        self._settings_scroll.setWidgetResizable(True)
+        self._settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._settings_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        self._settings_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        outer.addWidget(self._settings_scroll)
 
-        layout.addWidget(self._create_covers_group())
-        layout.addWidget(self._create_dividers_group())
-        layout.addWidget(self._create_photo_pages_group())
-        layout.addWidget(self._create_page_numbers_group())
-        layout.addWidget(self._create_print_group())
-
-        special_layout = QHBoxLayout()
-
-        special_layout.addWidget(
-            self._create_special_pages_group(
+        content = QWidget()
+        content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(3)
+        self._accordions = AccordionGroup(exclusive=True)
+        groups = [
+            ("format", self._create_page_format_group()),
+            ("covers", self._create_covers_group()),
+            ("dividers", self._create_dividers_group()),
+            ("photos", self._create_photo_pages_group()),
+            ("numbering_printing", self._create_numbering_printing_group()),
+            ("front", self._create_special_pages_group(
                 title=self._translator.tr("album.front_matter"),
                 list_widget_name="_front_matter_list",
                 combo_name="_front_matter_combo",
-            )
-        )
-
-        special_layout.addWidget(
-            self._create_special_pages_group(
+            )),
+            ("back", self._create_special_pages_group(
                 title=self._translator.tr("album.back_matter"),
                 list_widget_name="_back_matter_list",
                 combo_name="_back_matter_combo",
+            )),
+        ]
+        for key, group in groups:
+            # Store the original title in the accordion, then let the native
+            # QGroupBox draw only its contents.
+            section = AccordionSection(group.title(), group, expanded=False)
+            self._accordions.add(key, section)
+            # Compute the latest summary when the user closes a section,
+            # including edits that do not emit settings_changed directly.
+            section.toggled.connect(self._refresh_summary_on_collapse)
+            layout.addWidget(section)
+        self._accordions.sections["format"].set_expanded(True)
+        layout.addStretch(1)
+        self._settings_scroll.setWidget(content)
+        self._connect_settings_signals()
+
+    def _refresh_summary_on_collapse(self, expanded: bool) -> None:
+        if not expanded and not self._loading_settings:
+            self._update_accordion_summaries()
+
+    def _page_format_summary(self) -> str:
+        """Use the actual selected format (including applied custom dimensions)."""
+        format_id = str(self._page_format_combo.currentData())
+        if format_id == "custom":
+            label = self._translator.tr("album.custom_format")
+            width, height = self._custom_dimensions
+        else:
+            page_format = PAGE_FORMATS[format_id]
+            label = page_format.name
+            width, height = page_format.width_mm, page_format.height_mm
+        if isclose(width, height, rel_tol=0.0, abs_tol=0.005):
+            # There is no meaningful portrait/landscape distinction for a
+            # square, whatever orientation is stored by the underlying model.
+            orientation_key = "album.orientation_square"
+        else:
+            orientation_key = (
+                "album.orientation_landscape"
+                if self._orientation_combo.currentData() == PageOrientation.LANDSCAPE.value
+                else "album.orientation_portrait"
             )
+        return (
+            f"{label} — {width:g} × {height:g} mm · "
+            f"{self._translator.tr(orientation_key)}"
         )
 
-        layout.addLayout(special_layout)
-        self._connect_settings_signals()
-        layout.addStretch()
+    def _update_accordion_summaries(self) -> None:
+        """Show only accurate and current information in collapsed headers."""
+        a = self._accordions.sections
+        a["format"].set_summary(self._page_format_summary())
+
+        # Four model names do not fit small screens. Showing only two would
+        # incorrectly suggest the other covers are not configured.
+        a["covers"].set_summary("")
+
+        # Group separators by their state instead of using competing tick
+        # and cross glyphs. Both states are explicitly labelled and have
+        # the same visual weight, including when all are on or all are off.
+        statuses = (
+            ("album.divider_summary.day", self._day_dividers_checkbox),
+            ("album.divider_summary.month", self._month_dividers_checkbox),
+            ("album.divider_summary.year", self._year_dividers_checkbox),
+        )
+        active = [
+            self._translator.tr(key)
+            for key, checkbox in statuses
+            if checkbox.isChecked()
+        ]
+        inactive = [
+            self._translator.tr(key)
+            for key, checkbox in statuses
+            if not checkbox.isChecked()
+        ]
+        parts = []
+        if active:
+            parts.append(
+                f"{self._translator.tr('album.divider_summary.active')} "
+                f"{', '.join(active)}"
+            )
+        if inactive:
+            parts.append(
+                f"{self._translator.tr('album.divider_summary.inactive')} "
+                f"{', '.join(inactive)}"
+            )
+        a["dividers"].set_summary(" · ".join(parts))
+        a["photos"].set_summary(self._photo_page_combo.currentText())
+        # The combined accordion deliberately has no collapsed summary.
+        a["numbering_printing"].set_summary("")
+
+        for key, page_list in (
+            ("front", self._front_matter_list),
+            ("back", self._back_matter_list),
+        ):
+            count = page_list.count()
+            if not count:
+                summary = ""
+            else:
+                translation_key = (
+                    "album.special_pages_summary_one"
+                    if count == 1
+                    else "album.special_pages_summary_many"
+                )
+                summary = self._translator.tr(translation_key, count=count)
+            a[key].set_summary(summary)
 
     def _connect_settings_signals(self) -> None:
         # Page format and orientation are deliberately excluded here.
@@ -190,14 +305,11 @@ class AlbumSettingsWidget(QWidget):
         if self._loading_settings:
             return
 
+        self._update_accordion_summaries()
         self.settings_changed.emit()
 
     def _create_page_format_group(self) -> QGroupBox:
-        group = QGroupBox(
-            self._translator.tr(
-                "album.page_format"
-            )
-        )
+        group = QGroupBox(self._translator.tr("album.accordion.format"))
         form = QFormLayout(group)
 
         self._page_format_combo = QComboBox()
@@ -543,6 +655,11 @@ class AlbumSettingsWidget(QWidget):
         finally:
             self._loading_settings = was_loading
 
+        # Format/orientation changes bypass _emit_settings_changed; refresh
+        # the collapsed heading after the selectors have been repopulated.
+        if "format" in self._accordions.sections:
+            self._update_accordion_summaries()
+
         # Allow registered template extensions to react to physical page changes.
         if not was_loading:
             self._refresh_pages_after_dimensions_change()
@@ -776,7 +893,7 @@ class AlbumSettingsWidget(QWidget):
         group = QGroupBox(self._translator.tr("album.dividers"))
         layout = QVBoxLayout(group)
 
-        day_layout = QHBoxLayout()
+        day_layout = QGridLayout()
 
         self._day_dividers_checkbox = QCheckBox(
             self._translator.tr("album.day_separators")
@@ -790,13 +907,9 @@ class AlbumSettingsWidget(QWidget):
             self._create_placement_combo()
         )
 
-        day_layout.addWidget(
-            self._day_dividers_checkbox
-        )
-        day_layout.addWidget(
-            self._day_divider_combo,
-            1,
-        )
+        day_layout.addWidget(self._day_dividers_checkbox, 0, 0)
+        day_layout.addWidget(self._day_divider_combo, 0, 1)
+        day_layout.setColumnStretch(1, 1)
 
         self._day_divider_settings_button = QPushButton(
             self._translator.tr(
@@ -811,17 +924,13 @@ class AlbumSettingsWidget(QWidget):
             )
         )
 
-        day_layout.addWidget(
-            self._day_divider_settings_button
-        )
+        day_layout.addWidget(self._day_divider_settings_button, 0, 2)
 
-        day_layout.addWidget(
-            self._day_placement_combo,
-        )
+        day_layout.addWidget(self._day_placement_combo, 1, 1, 1, 2)
 
         layout.addLayout(day_layout)
 
-        month_layout = QHBoxLayout()
+        month_layout = QGridLayout()
 
         self._month_dividers_checkbox = QCheckBox(
             self._translator.tr("album.month_separators")
@@ -835,13 +944,9 @@ class AlbumSettingsWidget(QWidget):
             self._create_placement_combo()
         )
 
-        month_layout.addWidget(
-            self._month_dividers_checkbox
-        )
-        month_layout.addWidget(
-            self._month_divider_combo,
-            1,
-        )
+        month_layout.addWidget(self._month_dividers_checkbox, 0, 0)
+        month_layout.addWidget(self._month_divider_combo, 0, 1)
+        month_layout.setColumnStretch(1, 1)
 
         self._month_divider_settings_button = QPushButton(
             self._translator.tr(
@@ -856,17 +961,13 @@ class AlbumSettingsWidget(QWidget):
             )
         )
 
-        month_layout.addWidget(
-            self._month_divider_settings_button
-        )
+        month_layout.addWidget(self._month_divider_settings_button, 0, 2)
 
-        month_layout.addWidget(
-            self._month_placement_combo,
-        )
+        month_layout.addWidget(self._month_placement_combo, 1, 1, 1, 2)
 
         layout.addLayout(month_layout)
 
-        year_layout = QHBoxLayout()
+        year_layout = QGridLayout()
 
         self._year_dividers_checkbox = QCheckBox(
             self._translator.tr("album.year_separators")
@@ -880,13 +981,9 @@ class AlbumSettingsWidget(QWidget):
             self._create_placement_combo()
         )
 
-        year_layout.addWidget(
-            self._year_dividers_checkbox
-        )
-        year_layout.addWidget(
-            self._year_divider_combo,
-            1,
-        )
+        year_layout.addWidget(self._year_dividers_checkbox, 0, 0)
+        year_layout.addWidget(self._year_divider_combo, 0, 1)
+        year_layout.setColumnStretch(1, 1)
 
         self._year_divider_settings_button = QPushButton(
             self._translator.tr(
@@ -901,13 +998,9 @@ class AlbumSettingsWidget(QWidget):
             )
         )
 
-        year_layout.addWidget(
-            self._year_divider_settings_button
-        )
+        year_layout.addWidget(self._year_divider_settings_button, 0, 2)
 
-        year_layout.addWidget(
-            self._year_placement_combo,
-        )
+        year_layout.addWidget(self._year_placement_combo, 1, 1, 1, 2)
 
         layout.addLayout(year_layout)
 
@@ -1161,37 +1254,19 @@ class AlbumSettingsWidget(QWidget):
 
         self._emit_settings_changed()
 
-    def _create_page_numbers_group(self) -> QGroupBox:
-        group = QGroupBox(
-            self._translator.tr("album.page_numbering")
-        )
+    def _create_numbering_printing_group(self) -> QGroupBox:
+        """Keep both related options in one compact accordion."""
+        group = QGroupBox(self._translator.tr("album.page_numbering"))
         layout = QVBoxLayout(group)
-
         self._page_numbers_checkbox = QCheckBox(
             self._translator.tr("album.show_page_numbers")
         )
-
         layout.addWidget(self._page_numbers_checkbox)
 
-        return group
-
-    def _create_print_group(self) -> QGroupBox:
-        group = QGroupBox(
-            self._translator.tr("album.printing")
-        )
-
-        layout = QVBoxLayout(group)
-
         self._page_multiple_4_checkbox = QCheckBox(
-            self._translator.tr(
-                "album.page_multiple_4"
-            )
+            self._translator.tr("album.page_multiple_4")
         )
-
-        layout.addWidget(
-            self._page_multiple_4_checkbox
-        )
-
+        layout.addWidget(self._page_multiple_4_checkbox)
         return group
 
     def _create_special_pages_group(
@@ -1210,6 +1285,9 @@ class AlbumSettingsWidget(QWidget):
         )
 
         list_widget = QListWidget()
+        # Keep an internal scrollbar for lists of special pages.
+        list_widget.setMinimumHeight(75)
+        list_widget.setMaximumHeight(115)
 
         setattr(
             self,
@@ -1505,6 +1583,7 @@ class AlbumSettingsWidget(QWidget):
             self._day_dividers_checkbox.setChecked(enabled)
         finally:
             self._loading_settings = was_loading
+        self._update_accordion_summaries()
 
     def set_available_years(
         self,
@@ -1561,6 +1640,7 @@ class AlbumSettingsWidget(QWidget):
 
         finally:
             self._loading_settings = False
+            self._update_accordion_summaries()
 
 
     def _divider_instance(
@@ -1853,6 +1933,7 @@ class AlbumSettingsWidget(QWidget):
         finally:
             self._last_page_dimensions_mm = self._page_geometry()
             self._loading_settings = False
+            self._update_accordion_summaries()
 
     def _update_divider_controls(self) -> None:
         day_enabled = (

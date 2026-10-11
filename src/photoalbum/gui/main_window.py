@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QThreadPool, Slot
-from PySide6.QtGui import QAction, QPalette
+from PySide6.QtCore import QSize, QSettings, QTimer, Qt, QThreadPool, Slot
+from PySide6.QtGui import QAction, QPainter, QPalette
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QTabWidget,
+    QSizePolicy,
 )
 
 from photoalbum.app_info import APPLICATION_NAME, VERSION
@@ -58,6 +59,57 @@ from photoalbum.gui.widgets.pdf_export_widget import PdfExportWidget
 from photoalbum.gui.widgets.photo_sources_widget import PhotoSourcesWidget
 from photoalbum.models import Photo
 from photoalbum.project_metadata import PdfExportSettings, ProjectPdfMetadata
+
+
+class ResponsiveTabWidget(QTabWidget):
+    """Do not let the largest tab's form dictate the main window minimum.
+
+    Tabs that need more height must handle it internally (accordions or a
+    dedicated scrollable list), not prevent the OS from resizing the window.
+    """
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(560, 260)
+
+
+class ElidedLabel(QLabel):
+    """Preserve full label text while fitting project details in small windows.
+
+    A regular QLabel's text can impose a large minimum width. Conversely,
+    QSizePolicy.Ignored can cause it to disappear altogether. This label keeps
+    a modest minimum and elides only its rendered text, not its stored value.
+    """
+
+    def __init__(
+        self, *args, minimum_text_width: int = 0, preferred_max_width: int = 420,
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._minimum_text_width = minimum_text_width
+        self._preferred_max_width = preferred_max_width
+
+    def minimumSizeHint(self) -> QSize:
+        size = super().minimumSizeHint()
+        return QSize(self._minimum_text_width, size.height())
+
+    def sizeHint(self) -> QSize:
+        size = super().sizeHint()
+        return QSize(min(size.width(), self._preferred_max_width), size.height())
+
+    def paintEvent(self, event) -> None:
+        if not self.text():
+            return super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        area = self.contentsRect()
+        display = self.fontMetrics().elidedText(
+            self.text(), Qt.TextElideMode.ElideRight, max(0, area.width()),
+        )
+        painter.drawText(
+            area,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            display,
+        )
 
 
 class MainWindow(QMainWindow):
@@ -105,6 +157,9 @@ class MainWindow(QMainWindow):
         self._create_content()
 
         self._update_project_state()
+        # Restored geometry may have been saved at another display scale.
+        self._fit_geometry_to_screen()
+        QTimer.singleShot(0, self._fit_geometry_to_screen)
 
 
     def _restore_or_set_initial_geometry(self) -> None:
@@ -123,6 +178,24 @@ class MainWindow(QMainWindow):
         width = min(available.width(), max(1000, int(available.width() * 0.90)), 1440)
         height = min(available.height(), max(650, int(available.height() * 0.90)), 900)
         self.resize(width, height)
+
+    def _fit_geometry_to_screen(self) -> None:
+        """Keep restored windows inside the available desktop/work area."""
+        if self.isMaximized() or self.isFullScreen():
+            return
+        screen = self.screen()
+        if screen is None:
+            return
+        area = screen.availableGeometry()
+        if not area.isValid():
+            return
+        margin = 12
+        max_width = max(1, area.width() - margin)
+        max_height = max(1, area.height() - margin)
+        if self.width() > max_width or self.height() > max_height:
+            self.resize(min(self.width(), max_width), min(self.height(), max_height))
+        if not area.contains(self.geometry().center()):
+            self.move(area.left() + margin // 2, area.top() + margin // 2)
 
     def closeEvent(self, event) -> None:
         if self._pdf_widget.is_running:
@@ -281,8 +354,13 @@ class MainWindow(QMainWindow):
         project_header.setContentsMargins(0, 0, 0, 0)
         project_header.setSpacing(6)
 
-        self._project_label = QLabel()
+        self._project_label = ElidedLabel(
+            minimum_text_width=130, preferred_max_width=520,
+        )
         self._project_label.setStyleSheet('font-size: 20px; font-weight: bold;')
+        self._project_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
         project_header.addWidget(self._project_label)
 
         self._project_rename_button = QToolButton()
@@ -294,7 +372,9 @@ class MainWindow(QMainWindow):
         self._project_rename_button.clicked.connect(self._rename_project)
         project_header.addWidget(self._project_rename_button)
 
-        self._project_filename_label = QLabel()
+        self._project_filename_label = ElidedLabel(
+            minimum_text_width=0, preferred_max_width=280,
+        )
         filename_palette = self._project_filename_label.palette()
         filename_palette.setColor(
             QPalette.ColorRole.WindowText,
@@ -302,6 +382,9 @@ class MainWindow(QMainWindow):
         )
         self._project_filename_label.setPalette(filename_palette)
         self._project_filename_label.setStyleSheet('font-size: 13px;')
+        self._project_filename_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
         project_header.addWidget(self._project_filename_label)
         project_header.addStretch(1)
 
@@ -311,7 +394,10 @@ class MainWindow(QMainWindow):
         # Main project workflow
         # ----------------------------------------------------
 
-        self._tabs = QTabWidget()
+        self._tabs = ResponsiveTabWidget()
+        self._tabs.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored
+        )
         layout.addWidget(self._tabs, 1)
 
         # ----------------------------------------------------
@@ -912,14 +998,21 @@ class MainWindow(QMainWindow):
 
         if is_open:
             project_path = self._project_service.project_path
-            self._project_label.setText(self._project_service.get_project_name())
+            project_name = self._project_service.get_project_name()
+            self._project_label.setText(project_name)
+            self._project_label.setToolTip(project_name)
+            self.setWindowTitle(f"{APPLICATION_NAME} — {project_name}")
             self._project_filename_label.setText(project_path.name)
+            self._project_filename_label.setToolTip(project_path.name)
             self._project_filename_label.setVisible(True)
             self._project_rename_button.setVisible(True)
             self.statusBar().clearMessage()
         else:
             self._project_label.setText(self._translator.tr('main.no_project'))
+            self._project_label.setToolTip("")
+            self.setWindowTitle(APPLICATION_NAME)
             self._project_filename_label.clear()
+            self._project_filename_label.setToolTip("")
             self._project_filename_label.setVisible(False)
             self._project_rename_button.setVisible(False)
             self._pdf_widget.set_project_settings(None)

@@ -1,7 +1,7 @@
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-    QToolButton, QVBoxLayout, QWidget,
+    QToolButton, QVBoxLayout, QWidget, QGridLayout, QSizePolicy,
 )
 
 from photoalbum.gui.icon_resources import resource_icon
@@ -64,7 +64,12 @@ class SourceCard(QGroupBox):
 
         self.title_label = QLabel(self._display_name)
         self.title_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        heading.addWidget(self.title_label)
+        self.title_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        self.title_label.setMinimumWidth(0)
+        self.title_label.setToolTip(self._display_name)
+        heading.addWidget(self.title_label, 1)
 
         enabled = QCheckBox(tr("sources.active"))
         enabled.setChecked(source.enabled)
@@ -104,12 +109,17 @@ class SourceCard(QGroupBox):
         heading.addStretch(1)
         layout.addLayout(heading)
 
-        # Collapsible content. Keep all controls on one horizontal line:
-        # metadata/options on the left, source actions on the right.
+        # Two rows rather than one oversized row: policies then actions.
+        # This prevents Windows font/DPI metrics from imposing an enormous
+        # minimum width on the main application window.
         self.details_widget = QWidget(self)
-        details = QHBoxLayout(self.details_widget)
+        details = QVBoxLayout(self.details_widget)
         details.setContentsMargins(24, 0, 0, 0)
-        details.setSpacing(6)
+        details.setSpacing(5)
+        options = QGridLayout()
+        options.setContentsMargins(0, 0, 0, 0)
+        options.setHorizontalSpacing(8)
+        options.setVerticalSpacing(3)
 
         if source.kind == "local":
             recursive = QCheckBox(tr("main.include_subdirectories"))
@@ -128,12 +138,12 @@ class SourceCard(QGroupBox):
             "geocoding": "Nominatim",
             "none": tr("photos.policy.none"),
         }
-        for field, preference, order in (
+        for column, (field, preference, order) in enumerate((
             ("date", policy.date_preference, ("provider", "exif", "filename")),
             ("gps", policy.gps_preference, ("provider", "exif")),
             ("location", policy.location_preference, ("provider", "geocoding", "none")),
-        ):
-            details.addWidget(QLabel(tr("photos.policy." + field)))
+        )):
+            options.addWidget(QLabel(tr("photos.policy." + field)), 0, column)
             combo = QComboBox()
             for key in order:
                 if (
@@ -144,42 +154,45 @@ class SourceCard(QGroupBox):
                     combo.addItem(labels[key], "source" if key == "provider" else key)
             combo.setCurrentIndex(max(0, combo.findData(preference)))
             combo.setEnabled(combo.count() > 0)
+            combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             combo.currentIndexChanged.connect(self._emit_policy)
             self._combos[field] = combo
-            details.addWidget(combo)
+            options.addWidget(combo, 1, column)
+            options.setColumnStretch(column, 1)
 
         self._nominatim = QCheckBox("Nominatim")
         self._nominatim.setToolTip(tr("photos.policy.nominatim_tooltip"))
         self._nominatim.setChecked(policy.nominatim_enabled)
         self._nominatim.toggled.connect(self._emit_policy)
-        details.addWidget(self._nominatim)
+        options.addWidget(self._nominatim, 1, 3)
+        details.addLayout(options)
 
-        details.addStretch(1)
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(6)
+        actions.addStretch(1)
 
-        action_width = 112
         self.sync_button = QPushButton(tr("sources.synchronize_one"))
-        self.sync_button.setFixedWidth(action_width)
         self.sync_button.setEnabled(source.enabled and not reconnect_required)
         self.sync_button.clicked.connect(
             lambda _checked=False: self.sync_requested.emit(source.id)
         )
-        details.addWidget(self.sync_button)
+        actions.addWidget(self.sync_button)
 
         self.edit_button = QPushButton(
             tr("sources.reconnect") if reconnect_required else tr("sources.modify")
         )
-        self.edit_button.setFixedWidth(action_width)
         self.edit_button.clicked.connect(
             lambda _checked=False: self.edit_requested.emit(source.id)
         )
-        details.addWidget(self.edit_button)
+        actions.addWidget(self.edit_button)
 
         self.delete_button = QPushButton(tr("sources.delete"))
-        self.delete_button.setFixedWidth(action_width)
         self.delete_button.clicked.connect(
             lambda _checked=False: self.delete_requested.emit(source.id)
         )
-        details.addWidget(self.delete_button)
+        actions.addWidget(self.delete_button)
+        details.addLayout(actions)
 
         layout.addWidget(self.details_widget)
 

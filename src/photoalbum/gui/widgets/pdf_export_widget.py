@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QGroupBox,
     QLineEdit, QPushButton, QRadioButton, QComboBox, QProgressBar,
-    QPlainTextEdit, QFileDialog, QMessageBox,
+    QPlainTextEdit, QFileDialog, QMessageBox, QScrollArea, QFrame, QSizePolicy,
 )
 
 from photoalbum.album import (
@@ -23,6 +23,7 @@ from photoalbum.export import (
 from photoalbum.gui.workers import PdfExportWorker
 from photoalbum.project_metadata import PdfExportSettings, ProjectPdfMetadata
 from photoalbum.i18n import Translator
+from photoalbum.gui.widgets.accordion_section import AccordionGroup, AccordionSection
 
 
 class PdfExportWidget(QWidget):
@@ -55,6 +56,20 @@ class PdfExportWidget(QWidget):
 
     def _create_content(self) -> None:
         render_layout = QVBoxLayout(self)
+        render_layout.setContentsMargins(6, 6, 6, 6)
+        # Configuration as compact accordion; scroll only on very short windows.
+        self._options_scroll = QScrollArea(self)
+        self._options_scroll.setWidgetResizable(True)
+        self._options_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._options_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._options_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._options_container = QWidget()
+        self._options_layout = QVBoxLayout(self._options_container)
+        self._options_layout.setContentsMargins(3, 3, 3, 3)
+        self._options_layout.setSpacing(3)
+        self._pdf_accordions = AccordionGroup(exclusive=True)
+        self._options_scroll.setWidget(self._options_container)
+        render_layout.addWidget(self._options_scroll, 1)
 
         # Export content.
         content_group = QGroupBox(self._translator.tr('render.content_group'))
@@ -79,7 +94,7 @@ class PdfExportWidget(QWidget):
             radio.toggled.connect(self._save_project_settings)
             content_layout.addWidget(radio)
 
-        render_layout.addWidget(content_group)
+        self._add_option_section("content", content_group)
 
         # Quality.
         quality_group = QGroupBox(self._translator.tr('render.quality_group'))
@@ -106,7 +121,7 @@ class PdfExportWidget(QWidget):
             self._pdf_pixel_size_label,
         )
 
-        render_layout.addWidget(quality_group)
+        self._add_option_section("quality", quality_group)
 
         # PDF metadata.
         metadata_group = QGroupBox(self._translator.tr('render.metadata_group'))
@@ -141,35 +156,16 @@ class PdfExportWidget(QWidget):
             self._pdf_keywords_edit,
         ):
             editor.editingFinished.connect(self._save_project_settings)
+            editor.editingFinished.connect(self._update_option_summaries)
 
-        render_layout.addWidget(metadata_group)
+        self._add_option_section("metadata", metadata_group)
 
-        # Document summary.
-        document_group = QGroupBox(self._translator.tr('render.document_group'))
-        document_layout = QFormLayout(document_group)
-
-        self._pdf_format_label = QLabel()
-        self._pdf_pages_label = QLabel()
-        self._pdf_photos_label = QLabel()
-
-        document_layout.addRow(
-            self._translator.tr('render.document_format'),
-            self._pdf_format_label,
-        )
-        document_layout.addRow(
-            self._translator.tr('render.document_pages'),
-            self._pdf_pages_label,
-        )
-        document_layout.addRow(
-            self._translator.tr('render.document_photos'),
-            self._pdf_photos_label,
-        )
-
-        render_layout.addWidget(document_group)
+        self._options_layout.addStretch(1)
+        self._pdf_accordions.sections["content"].set_expanded(True)
 
         # Output file: keep the destination next to the final generate action.
-        output_group = QGroupBox(self._translator.tr('render.output_group'))
-        output_layout = QHBoxLayout(output_group)
+        self._pdf_output_group = QGroupBox(self._translator.tr('render.output_group'))
+        output_layout = QHBoxLayout(self._pdf_output_group)
 
         self._pdf_output_edit = QLineEdit()
         self._pdf_output_edit.setPlaceholderText(
@@ -182,7 +178,7 @@ class PdfExportWidget(QWidget):
         output_layout.addWidget(self._pdf_output_edit, 1)
         output_layout.addWidget(self._pdf_output_button)
 
-        render_layout.addWidget(output_group)
+        render_layout.addWidget(self._pdf_output_group)
 
         self._pdf_progress_bar = QProgressBar()
         self._pdf_progress_bar.setRange(0, 1)
@@ -197,11 +193,9 @@ class PdfExportWidget(QWidget):
         self._pdf_log_view.setMaximumBlockCount(2000)
         self._pdf_log_view.setVisible(False)
 
-        self._pdf_log_view.setMaximumHeight(280)
+        self._pdf_log_view.setMaximumHeight(135)
 
         render_layout.addWidget(self._pdf_log_view)
-
-        render_layout.addStretch(1)
 
         action_layout = QHBoxLayout()
         action_layout.addStretch(1)
@@ -214,6 +208,22 @@ class PdfExportWidget(QWidget):
 
         render_layout.addLayout(action_layout)
 
+    def _add_option_section(self, key: str, group: QGroupBox) -> None:
+        section = AccordionSection(group.title(), group, expanded=False)
+        self._pdf_accordions.add(key, section)
+        self._options_layout.addWidget(section)
+
+    def _update_option_summaries(self) -> None:
+        sections = self._pdf_accordions.sections
+        if self._pdf_content_covers_radio.isChecked():
+            content = self._pdf_content_covers_radio.text()
+        elif self._pdf_content_body_radio.isChecked():
+            content = self._pdf_content_body_radio.text()
+        else:
+            content = self._pdf_content_complete_radio.text()
+        sections["content"].set_summary(content)
+        sections["quality"].set_summary(self._pdf_dpi_combo.currentText())
+        sections["metadata"].set_summary(self._pdf_title_edit.text().strip())
 
     def set_project_settings(self, settings: PdfExportSettings | None) -> None:
         """Load persisted PDF preferences without writing them back."""
@@ -288,7 +298,7 @@ class PdfExportWidget(QWidget):
         self._pdf_output_edit.setText(path)
 
     def update_summary(self) -> None:
-        if not hasattr(self, '_pdf_format_label'):
+        if not hasattr(self, '_pdf_output_group'):
             return
 
         try:
@@ -307,8 +317,6 @@ class PdfExportWidget(QWidget):
         width_px = round(width_mm / 25.4 * dpi)
         height_px = round(height_mm / 25.4 * dpi)
 
-        self._pdf_format_label.setText(f'{format_name} — {width_mm:g} × {height_mm:g} mm')
-
         self._pdf_pixel_size_label.setText(
             self._translator.tr(
                 "render.pixel_dimensions",
@@ -323,14 +331,30 @@ class PdfExportWidget(QWidget):
         if self._project_service.is_open:
             photos = self._project_service.list_album_photos()
 
-        self._pdf_photos_label.setText(str(len(photos)))
+        photo_count = len(photos)
+        photo_text = f"{photo_count} {'photo' if photo_count == 1 else 'photos'}"
 
         result = self._result_provider()
-
         if result is None:
-            self._pdf_pages_label.setText(self._translator.tr('render.page_count_pending'))
+            page_text = (
+                f"{self._translator.tr('render.document_pages')} : "
+                f"{self._translator.tr('render.page_count_pending')}"
+            )
         else:
-            self._pdf_pages_label.setText(str(result.total_page_count))
+            page_count = result.total_page_count
+            page_text = f"{page_count} {'page' if page_count == 1 else 'pages'}"
+
+        # Display document information directly after the output-file heading.
+        # Keep it outside the options accordion so it remains visible.
+        document_info = (
+            f"{format_name} — {width_mm:g} × {height_mm:g} mm"
+            f" / {page_text} / {photo_text}"
+        )
+        self._pdf_output_group.setTitle(
+            f"{self._translator.tr('render.output_group')} : {document_info}"
+        )
+        self._pdf_output_group.setToolTip(document_info)
+        self._update_option_summaries()
 
     def generate(self) -> None:
         if self._pdf_thread is not None:
