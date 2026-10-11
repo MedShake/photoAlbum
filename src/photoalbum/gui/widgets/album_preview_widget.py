@@ -614,9 +614,10 @@ class AlbumPreviewWidget(QWidget):
         self._date_ruler.page_explored.connect(self._explore_rulers)
         self._page_ruler.page_explored.connect(self._explore_rulers)
         layout = QHBoxLayout(self)
-        layout.addWidget(self._date_ruler)
-        layout.addWidget(self._scroll, 1)
+        # Physical page numbers on the left, chronological index on the right.
         layout.addWidget(self._page_ruler)
+        layout.addWidget(self._scroll, 1)
+        layout.addWidget(self._date_ruler)
 
     def clear(self) -> None:
         self._image_request_timer.stop()
@@ -820,16 +821,14 @@ class AlbumPreviewWidget(QWidget):
             for photo in page.photos
             if photo.capture_datetime is not None
         })
-        is_special = page.kind in {
-            PlanItemKind.SPECIAL_PAGE, PlanItemKind.BODY_SPECIAL_PAGE,
-        }
         number = page.number
         def formatted_date(value) -> str:
             return f"{value.day:02d} {translator.month_name(value.month)} {value.year}"
 
-        short = "sp." if is_special else str(number)
-        full = (f"{translator.tr('preview.special_page')} — {number}"
-                if is_special else "")
+        # Special pages occupy physical pages just like every other kind.
+        # Do not single them out in the right-hand page ruler or its tooltip.
+        short = str(number) if number is not None else ""
+        full = ""
         if dates:
             first, last = dates[0], dates[-1]
             label = formatted_date(first)

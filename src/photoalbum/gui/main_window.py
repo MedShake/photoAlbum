@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from photoalbum.app_info import APPLICATION_NAME, VERSION
+from photoalbum.gui.default_paths import project_directory, remember_project_directory
 from photoalbum.app import ProjectService
 from photoalbum.gui.help_dialog import HelpDialog
 from photoalbum.gui.icon_resources import resource_icon
@@ -142,6 +143,7 @@ class MainWindow(QMainWindow):
         # deferred until the user leaves that tab.
         self._editorial_album_dirty = False
         self._previous_tab_index = 0
+        self._pdf_export_running = False
 
         self.setWindowTitle(APPLICATION_NAME)
         self._restore_or_set_initial_geometry()
@@ -520,6 +522,7 @@ class MainWindow(QMainWindow):
         )
         self._pdf_widget.error.connect(self._show_error)
         self._pdf_widget.status_message.connect(self.statusBar().showMessage)
+        self._pdf_widget.running_changed.connect(self._set_pdf_export_running)
         self._tabs.addTab(self._pdf_widget, self._translator.tr("tab.render"))
 
         self._previous_tab_index = self._tabs.currentIndex()
@@ -559,11 +562,13 @@ class MainWindow(QMainWindow):
         self.setStatusBar(status_bar)
 
     def _new_project(self) -> None:
+        if self._pdf_widget.is_running:
+            return
         self._preview_render_service.clear()
         path, _ = QFileDialog.getSaveFileName(
             self,
             self._translator.tr('main.new_project'),
-            "",
+            str(project_directory()),
             self._translator.tr("main.project_file_filter"),
         )
 
@@ -590,11 +595,14 @@ class MainWindow(QMainWindow):
                 project_path.unlink()
 
             self._project_service.create(project_path)
+            remember_project_directory(project_path)
 
         except Exception as exc:
             self._show_error(self._translator.tr("main.create_project_error"))
             return
 
+        # A new project must not inherit the previous album's exportability.
+        self._album_build_result = None
         self._scan_controller.reset()
 
         self._refresh_source_cards()
@@ -615,10 +623,12 @@ class MainWindow(QMainWindow):
         self._update_project_state()
 
     def _open_project(self) -> None:
+        if self._pdf_widget.is_running:
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             self._translator.tr("main.open_project_title"),
-            "",
+            str(project_directory()),
             self._translator.tr("main.project_file_filter"),
         )
 
@@ -629,6 +639,10 @@ class MainWindow(QMainWindow):
 
     def _open_project_path(self, path: Path) -> None:
         """Open an existing project from an explicit path."""
+        # Use MainWindow's explicit lock state, rather than the PDF widget's
+        # is_running attribute: it is also safe for lightweight window stubs.
+        if getattr(self, "_pdf_export_running", False):
+            return
         self._preview_render_service.clear()
         # ProjectService.open() closes the current project even when opening
         # the replacement subsequently fails.
@@ -637,7 +651,11 @@ class MainWindow(QMainWindow):
 
         try:
             self._project_service.open(path)
+            self._album_build_result = None
+            remember_project_directory(path)
         except Exception as exc:
+            # ProjectService.open() may already have closed the old project.
+            self._album_build_result = None
             self._show_error(self._translator.tr("main.open_project_error"))
             return
 
@@ -671,6 +689,8 @@ class MainWindow(QMainWindow):
         )
 
     def _close_project(self) -> None:
+        if self._pdf_widget.is_running:
+            return
         self._preview_render_service.clear()
         self._pdf_widget.save_project_settings()
         self._hover_photo_preview.clear()
@@ -925,18 +945,26 @@ class MainWindow(QMainWindow):
             self._project_service.set_pdf_export_settings(pdf_settings)
         self._pdf_widget.set_project_settings(pdf_settings)
 
+    def _set_pdf_export_running(self, running: bool) -> None:
+        """Keep the PDF tab active and prevent all project mutations on export."""
+        self._pdf_export_running = bool(running)
+        if running:
+            self._tabs.setCurrentWidget(self._pdf_widget)
+        self._set_scan_running(self._scan_controller.is_running)
+
     def _set_scan_running(self, running: bool) -> None:
-        self._new_project_action.setEnabled(not running)
-
-        self._open_project_action.setEnabled(not running)
-
-        self._close_project_action.setEnabled(not running and self._project_service.is_open)
-
+        locked = running or self._pdf_export_running
+        self._new_project_action.setEnabled(not locked)
+        self._open_project_action.setEnabled(not locked)
+        self._close_project_action.setEnabled(not locked and self._project_service.is_open)
+        self._project_rename_button.setEnabled(not locked)
+        # Scanning may still open the cache dialog in read-only mode. PDF
+        # export locks it entirely to avoid changes during rendering.
+        self._cache_action.setEnabled(not self._pdf_export_running)
         self._photos_widget.modify_source_button.setEnabled(
-            not running and self._project_service.is_open
+            not locked and self._project_service.is_open
         )
-
-        self._photos_widget.set_source_controls_enabled(not running)
+        self._photos_widget.set_source_controls_enabled(not locked)
 
         # Photos remains the project entry point. Every other
         # workflow tab is available as soon as the project contains
@@ -946,15 +974,29 @@ class MainWindow(QMainWindow):
             and not running
             and bool(self._project_service.list_album_photos())
         )
+        # A prebuilt album can be exported even if it has no regular photos
+        # (for example, an album containing only configured cover pages).
+        # More importantly, after an export the PDF tab must not disable its
+        # controls merely because the photos list is empty.
+        pdf_available = photos_available or (
+            self._project_service.is_open
+            and not running
+            and self._album_build_result is not None
+        )
 
         # Photos is always available. It is the entry point
         # for creating/opening a project, selecting the source
         # folder and reading the analysis log.
         if self._tabs.count() > 0:
-            self._tabs.setTabEnabled(0, True)
+            self._tabs.setTabEnabled(0, not self._pdf_export_running)
 
         for index in range(1, self._tabs.count()):
-            self._tabs.setTabEnabled(index, photos_available)
+            is_pdf_tab = self._tabs.widget(index) is self._pdf_widget
+            enabled = (
+                is_pdf_tab if self._pdf_export_running
+                else (pdf_available if is_pdf_tab else photos_available)
+            )
+            self._tabs.setTabEnabled(index, enabled)
 
         if running:
             self.statusBar().showMessage(self._translator.tr('main.analysis_in_progress'))
@@ -971,7 +1013,7 @@ class MainWindow(QMainWindow):
                 self.statusBar().clearMessage()
 
     def _rename_project(self) -> None:
-        if not self._project_service.is_open:
+        if self._pdf_widget.is_running or not self._project_service.is_open:
             return
 
         current_name = self._project_service.get_project_name()
@@ -1080,6 +1122,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_album_plan(self) -> None:
         if not self._project_service.is_open:
+            self._album_build_result = None
             self._album_plan_widget.clear()
             self._album_preview_widget.clear()
             return
@@ -1131,6 +1174,7 @@ class MainWindow(QMainWindow):
                 pass
 
         except Exception as exc:
+            self._album_build_result = None
             self._album_plan_widget.clear()
             self._album_preview_widget.clear()
 

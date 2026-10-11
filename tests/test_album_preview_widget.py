@@ -690,8 +690,8 @@ def test_two_lateral_rulers_include_covers_and_observed_dates():
             "2025", "aoû 25", "14", "sep 25", "2026",
         ]
         assert dates.width() == pages.width() == 54
-        assert widget.layout().itemAt(0).widget() is dates
-        assert widget.layout().itemAt(2).widget() is pages
+        assert widget.layout().itemAt(0).widget() is pages
+        assert widget.layout().itemAt(2).widget() is dates
     finally:
         widget.close()
 
@@ -755,7 +755,7 @@ def test_date_ruler_uses_compact_ticks_and_years_on_month_labels():
         assert ruler._item_height(0) > ruler._item_height(1) > ruler._item_height(2)
         assert ruler._item_height(2) == ruler.DAY_HEIGHT
         assert ruler.WIDTH == 54
-        assert ruler.YEAR_FONT_SIZE >= 13
+        assert ruler.YEAR_FONT_SIZE > ruler.MONTH_FONT_SIZE
         assert ruler.MONTH_FONT_SIZE >= 12
         assert ruler.PAGE_FONT_SIZE >= 12
     finally:
@@ -859,6 +859,28 @@ def test_date_ruler_preserves_divider_configuration():
         ruler.close()
 
 
+@pytest.mark.parametrize("mode", ["date", "page"])
+def test_navigation_selection_is_only_a_light_wash_without_blue_edge(mode):
+    from photoalbum.gui.widgets.preview_navigation_ruler import (
+        NavigationPage, PreviewNavigationRuler,
+    )
+    from photoalbum.i18n import Translator
+
+    ruler = PreviewNavigationRuler(Translator("fr"), mode=mode)
+    try:
+        ruler.resize(54, 240)
+        ruler.set_pages([NavigationPage("14 août 2024", 2024, 8, 14, page_number=1)])
+        ruler.show()
+        QApplication.processEvents()
+        y = round(ruler._row_center_for(ruler._cursor()))
+        image = ruler.grab().toImage()
+        # In the previous version a 3px saturated-blue stripe marked the
+        # preview page. Both edges must now have exactly the same pale wash.
+        assert image.pixelColor(2, y) == image.pixelColor(51, y)
+    finally:
+        ruler.close()
+
+
 def test_callouts_point_inwards_and_show_both_page_and_date():
     from PySide6.QtWidgets import QWidget
     from photoalbum.gui.widgets.preview_navigation_ruler import (
@@ -871,8 +893,8 @@ def test_callouts_point_inwards_and_show_both_page_and_date():
     page = PreviewNavigationRuler(Translator("fr"), parent, mode="page")
     try:
         parent.resize(650, 450)
-        date.move(0, 0)
-        page.move(596, 0)
+        page.move(0, 0)
+        date.move(596, 0)
         date.resize(54, 450)
         page.resize(54, 450)
         parent.show()
@@ -885,12 +907,14 @@ def test_callouts_point_inwards_and_show_both_page_and_date():
         assert page._callout is not None and page._callout.isVisible()
         assert page._callout._first_line == "Page 1 / 2"
         assert page._callout._second_line == "14/08/2024"
-        assert page._callout.geometry().right() <= page.geometry().left() + 1
+        assert page._callout._side == "left"
+        assert page._callout.geometry().left() >= page.geometry().right() - 1
         date._hover_at(date._row_center_for(1))
         assert date._callout is not None and date._callout.isVisible()
         assert date._callout._first_line == "Page 1 / 2"
         assert date._callout._second_line == "août 2024"
-        assert date._callout.geometry().left() >= date.geometry().right() - 1
+        assert date._callout._side == "right"
+        assert date._callout.geometry().right() <= date.geometry().left() + 1
         date._hide_callout()
         page._hide_callout()
         assert not date._callout.isVisible() and not page._callout.isVisible()

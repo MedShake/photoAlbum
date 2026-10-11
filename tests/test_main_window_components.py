@@ -604,7 +604,17 @@ def test_pdf_worker_completes_or_fails_and_reenables_controls(window, app, tmp_p
     widget.generate()
     assert widget.is_running
     assert not widget.generate_button.isEnabled()
+    assert window._tabs.currentWidget() is widget
+    assert window._tabs.isTabEnabled(5)
+    assert all(not window._tabs.isTabEnabled(i) for i in range(5))
+    assert not window._new_project_action.isEnabled()
+    assert not widget._options_container.isEnabled()
+    assert widget._pdf_output_edit.isReadOnly()
     wait_until(app, lambda: not widget.is_running)
+    assert window._tabs.isTabEnabled(0)
+    assert window._new_project_action.isEnabled()
+    assert widget._options_container.isEnabled()
+    assert not widget._pdf_output_edit.isReadOnly()
     assert widget.generate_button.isEnabled()
     assert widget._pdf_output_button.isEnabled()
     assert widget._pdf_dpi_combo.isEnabled()

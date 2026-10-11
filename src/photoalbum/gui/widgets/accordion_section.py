@@ -28,20 +28,27 @@ class AccordionSection(QWidget):
         self._heading.setText(title)
         self._heading.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self._heading.setAutoRaise(True)
+        self._heading.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        # Let Qt paint its native checked/pressed/focus state.  The V8 custom
+        # stylesheet introduced an unwanted white focus rectangle on Windows.
+        # Make the native hover/selection surface cover the *whole* row instead
+        # of just the left half of the heading.
         self._heading.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._heading.setAccessibleName(title)
         self._heading.toggled.connect(self._on_toggled)
 
-        self._summary = QLabel(self)
+        # The folded summary is a non-interactive overlay on the right of the
+        # button. Mouse/keyboard events still reach the full-width heading.
+        self._summary = QLabel(self._heading)
+        self._summary.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._summary.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self._summary.setVisible(False)
-
-        header = QHBoxLayout()
-        header.setContentsMargins(3, 0, 3, 0)
-        header.setSpacing(6)
-        header.addWidget(self._heading, 1)
-        header.addWidget(self._summary, 1)
+        heading_layout = QHBoxLayout(self._heading)
+        heading_layout.setContentsMargins(0, 0, 8, 0)
+        heading_layout.setSpacing(0)
+        heading_layout.addStretch(1)
+        heading_layout.addWidget(self._summary)
 
         self.content = content
         self.content.setParent(self)
@@ -56,7 +63,7 @@ class AccordionSection(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
-        layout.addLayout(header)
+        layout.addWidget(self._heading)
         line = QFrame(self)
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
@@ -90,11 +97,10 @@ class AccordionSection(QWidget):
 
 
 class AccordionGroup:
-    """Manage accordion sections, independent by default.
+    """Manage accordion sections, with optional exclusive expansion.
 
-    Set ``exclusive=True`` only for screens that explicitly need to keep a
-    single section expanded. Album settings and PDF options intentionally use
-    the independent mode so users can compare multiple sections side by side.
+    Album settings and PDF options use ``exclusive=True`` so opening one
+    section closes the previous one on small screens.
     """
 
     def __init__(self, *, exclusive: bool = False) -> None:

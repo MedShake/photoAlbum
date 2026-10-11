@@ -15,6 +15,7 @@ from photoalbum.album import (
     AlbumStructureSettings,
 )
 from photoalbum.app import ProjectService
+from photoalbum.gui.default_paths import pdf_destination, remember_pdf_directory
 from photoalbum.export import (
     PdfExportContent,
     PdfExportService,
@@ -31,6 +32,7 @@ class PdfExportWidget(QWidget):
 
     error = Signal(str)
     status_message = Signal(str, int)
+    running_changed = Signal(bool)
 
     def __init__(
         self, *, translator: Translator, project_service: ProjectService,
@@ -47,6 +49,7 @@ class PdfExportWidget(QWidget):
         self._pdf_thread: QThread | None = None
         self._loading_project_settings = False
         self._pdf_worker: PdfExportWorker | None = None
+        self._output_project_path: Path | None = None
         self._create_content()
         self.update_summary()
 
@@ -252,6 +255,18 @@ class PdfExportWidget(QWidget):
         finally:
             self._loading_project_settings = False
 
+        # Update the destination when changing projects, not on every options
+        # refresh (which would erase a manually chosen filename).
+        project = (
+            self._project_service.project_path
+            if self._project_service.is_open else None
+        )
+        if project != self._output_project_path:
+            self._output_project_path = project
+            self._pdf_output_edit.setText(
+                str(pdf_destination(project)) if project is not None else ""
+            )
+
         self.update_summary()
 
     def project_settings(self) -> PdfExportSettings:
@@ -296,6 +311,7 @@ class PdfExportWidget(QWidget):
             path += ".pdf"
 
         self._pdf_output_edit.setText(path)
+        remember_pdf_directory(self._output_project_path, Path(path))
 
     def update_summary(self) -> None:
         if not hasattr(self, '_pdf_output_group'):
@@ -465,52 +481,74 @@ class PdfExportWidget(QWidget):
 
         self.generate_button.setEnabled(False)
         self._pdf_output_button.setEnabled(False)
+        self._pdf_output_edit.setReadOnly(True)
+        self._options_container.setEnabled(False)
         self._pdf_dpi_combo.setEnabled(False)
 
-        service = PdfExportService(self._translator)
+        # Initialisation is part of the export transaction too: if creating
+        # the worker/thread fails, release the UI immediately.
+        thread = None
+        try:
+            service = PdfExportService(self._translator)
 
-        thread = QThread(self)
+            thread = QThread(self)
 
-        worker = PdfExportWorker(
-            service,
-            output_path=output_path,
-            result=result,
-            settings=settings,
-            photos=photos,
-            page_width_mm=width_mm,
-            page_height_mm=height_mm,
-            dpi=dpi,
-            metadata=metadata,
-            content=export_content,
-            prepare_assets=self._project_service.materialize_originals,
-            translator=self._translator,
-        )
+            worker = PdfExportWorker(
+                service,
+                output_path=output_path,
+                result=result,
+                settings=settings,
+                photos=photos,
+                page_width_mm=width_mm,
+                page_height_mm=height_mm,
+                dpi=dpi,
+                metadata=metadata,
+                content=export_content,
+                prepare_assets=self._project_service.materialize_originals,
+                translator=self._translator,
+            )
 
-        worker.moveToThread(thread)
+            worker.moveToThread(thread)
 
-        thread.started.connect(worker.run)
+            thread.started.connect(worker.run)
 
-        worker.progress.connect(self._pdf_export_progress)
+            worker.progress.connect(self._pdf_export_progress)
 
-        worker.finished.connect(self._pdf_export_finished)
+            worker.finished.connect(self._pdf_export_finished)
 
-        worker.failed.connect(self._pdf_export_failed)
+            worker.failed.connect(self._pdf_export_failed)
 
-        worker.finished.connect(thread.quit)
+            worker.finished.connect(thread.quit)
 
-        worker.failed.connect(thread.quit)
+            worker.failed.connect(thread.quit)
 
-        thread.finished.connect(worker.deleteLater)
+            thread.finished.connect(worker.deleteLater)
 
+            thread.finished.connect(self._pdf_export_thread_finished)
 
-        thread.finished.connect(self._pdf_export_thread_finished)
+            self._pdf_thread = thread
+            self._pdf_worker = worker
+            remember_pdf_directory(self._output_project_path, output_path)
 
-        self._pdf_thread = thread
-        self._pdf_worker = worker
+            self._pdf_log_view.appendPlainText(self._translator.tr('render.log_engine_start'))
+            self.running_changed.emit(True)
+            thread.start()
+        except Exception as exc:
+            self._pdf_thread = None
+            self._pdf_worker = None
+            if thread is not None and not thread.isRunning():
+                thread.deleteLater()
+            self._restore_export_controls()
+            self.running_changed.emit(False)
+            self.error.emit(self._translator.tr('render.generate_error', error=exc))
 
-        self._pdf_log_view.appendPlainText(self._translator.tr('render.log_engine_start'))
-
-        thread.start()
+    def _restore_export_controls(self) -> None:
+        """Enable PDF controls again after any completed or aborted export."""
+        self.generate_button.setEnabled(True)
+        self._pdf_output_button.setEnabled(True)
+        self._pdf_output_edit.setReadOnly(False)
+        self._options_container.setEnabled(True)
+        self._pdf_dpi_combo.setEnabled(True)
 
     def _pdf_export_progress(self, current: int, total: int, message: str) -> None:
         self._pdf_progress_bar.setRange(0, total)
@@ -557,6 +595,5 @@ class PdfExportWidget(QWidget):
         if thread is not None:
             thread.deleteLater()
 
-        self.generate_button.setEnabled(True)
-        self._pdf_output_button.setEnabled(True)
-        self._pdf_dpi_combo.setEnabled(True)
+        self._restore_export_controls()
+        self.running_changed.emit(False)

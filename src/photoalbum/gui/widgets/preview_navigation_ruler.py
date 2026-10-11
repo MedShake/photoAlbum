@@ -11,8 +11,8 @@ from __future__ import annotations
 from bisect import bisect_right
 from dataclasses import dataclass
 
-from PySide6.QtCore import QPoint, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
 from photoalbum.i18n import Translator
@@ -43,11 +43,12 @@ class _DateEntry:
 
 
 class _RulerCallout(QWidget):
-    """In-app panel whose triangle points to either the left or right ruler."""
+    """In-app page/date tooltip, drawn as one continuous pointed outline."""
 
     WIDTH = 194
     HEIGHT = 58
     TIP = 12
+    TEXT_TOP = 31
 
     def __init__(self, parent: QWidget, *, side: str) -> None:
         super().__init__(parent)
@@ -60,24 +61,75 @@ class _RulerCallout(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.hide()
 
+    def _body_edges(self) -> tuple[float, float]:
+        if self._side == "left":
+            return float(self.TIP + 1), float(self.WIDTH - 1)
+        return 1.0, float(self.WIDTH - self.TIP - 1)
+
+    def _text_geometry(self) -> tuple[int, int]:
+        left, right = self._body_edges()
+        return int(left + 9), int(right - left - 18)
+
+    def _date_height(self) -> int:
+        """Allow long dates and explicit ranges to occupy multiple lines."""
+        _left, width = self._text_geometry()
+        metrics = QFontMetrics(self.font())
+        return metrics.boundingRect(
+            QRect(0, 0, width, 2048),
+            int(Qt.TextFlag.TextWordWrap),
+            self._second_line,
+        ).height()
+
     def display(self, page_text: str, date_text: str, anchor: QPoint) -> None:
         parent = self.parentWidget()
         if parent is None:
             return
         self._first_line = page_text
         self._second_line = date_text
+        desired_height = max(self.HEIGHT, self.TEXT_TOP + self._date_height() + 10)
+        if self.height() != desired_height:
+            self.setFixedHeight(desired_height)
         if self._side == "left":
             x = anchor.x()  # Panel opens towards the album, to the right.
         else:
             x = anchor.x() - self.WIDTH  # Panel opens to the left.
         x = max(0, min(max(0, parent.width() - self.WIDTH), x))
-        y = max(2, min(max(2, parent.height() - self.HEIGHT - 2),
-                       anchor.y() - self.HEIGHT // 2))
-        self._arrow_y = max(9, min(self.HEIGHT - 9, anchor.y() - y))
+        y = max(2, min(max(2, parent.height() - self.height() - 2),
+                       anchor.y() - self.height() // 2))
+        # Keep the point clear of the rounded corners, including near the
+        # first/last ruler entry.
+        self._arrow_y = max(16, min(self.height() - 16, anchor.y() - y))
         self.move(x, y)
         self.raise_()
         self.show()
         self.update()
+
+    def _outline_path(self) -> QPainterPath:
+        """One closed contour, without the former rectangle/triangle seam."""
+        left, right = self._body_edges()
+        top, bottom, radius = 1.5, self.height() - 1.5, 7.0
+        point = 1.5 if self._side == "left" else self.WIDTH - 1.5
+        mid, half = self._arrow_y, 7.0
+        path = QPainterPath()
+        path.moveTo(left + radius, top)
+        path.lineTo(right - radius, top)
+        path.quadTo(right, top, right, top + radius)
+        if self._side == "right":
+            path.lineTo(right, mid - half)
+            path.lineTo(point, mid)
+            path.lineTo(right, mid + half)
+        path.lineTo(right, bottom - radius)
+        path.quadTo(right, bottom, right - radius, bottom)
+        path.lineTo(left + radius, bottom)
+        path.quadTo(left, bottom, left, bottom - radius)
+        if self._side == "left":
+            path.lineTo(left, mid + half)
+            path.lineTo(point, mid)
+            path.lineTo(left, mid - half)
+        path.lineTo(left, top + radius)
+        path.quadTo(left, top, left + radius, top)
+        path.closeSubpath()
+        return path
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -87,31 +139,11 @@ class _RulerCallout(QWidget):
         text = self.palette().text().color()
         secondary = QColor(text)
         secondary.setAlpha(185)
-        left_tip = self._side == "left"
-        body_left = self.TIP + 1 if left_tip else 1
-        body_right = self.WIDTH - 1 if left_tip else self.WIDTH - self.TIP - 1
-        body = QRectF(body_left, 1, body_right - body_left, self.HEIGHT - 2)
-        x_tip = 1 if left_tip else self.WIDTH - 1
-        x_join = body_left + 1 if left_tip else body_right - 1
-        triangle = QPainterPath()
-        triangle.moveTo(x_join, self._arrow_y - 7)
-        triangle.lineTo(x_tip, self._arrow_y)
-        triangle.lineTo(x_join, self._arrow_y + 7)
-        triangle.closeSubpath()
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(base)
-        painter.drawRoundedRect(body, 7, 7)
-        painter.fillPath(triangle, base)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(border, 1))
-        painter.drawRoundedRect(body, 7, 7)
-        painter.drawLine(round(x_join), round(self._arrow_y - 7), x_tip, round(self._arrow_y))
-        painter.drawLine(x_tip, round(self._arrow_y), round(x_join), round(self._arrow_y + 7))
-        painter.setPen(QPen(base, 3))
-        painter.drawLine(round(x_join), round(self._arrow_y - 5),
-                         round(x_join), round(self._arrow_y + 5))
-        text_left = int(body_left + 9)
-        text_width = int(body_right - body_left - 18)
+        painter.setBrush(base)
+        painter.drawPath(self._outline_path())
+
+        text_left, text_width = self._text_geometry()
         font = QFont(self.font())
         font.setBold(True)
         painter.setFont(font)
@@ -121,13 +153,17 @@ class _RulerCallout(QWidget):
         font.setBold(False)
         painter.setFont(font)
         painter.setPen(secondary)
-        painter.drawText(text_left, 31, text_width, 17,
-                         Qt.AlignmentFlag.AlignVCenter, self._second_line)
+        painter.drawText(
+            QRect(text_left, self.TEXT_TOP, text_width,
+                  self.height() - self.TEXT_TOP - 6),
+            int(Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextWordWrap),
+            self._second_line,
+        )
         painter.end()
 
 
 class PreviewNavigationRuler(QWidget):
-    """A bounded date (left) or physical-page (right) navigation strip.
+    """A bounded physical-page (left) or date (right) navigation strip.
 
     The rulers occupy the full preview height. Both stop at the first and
     last entry; the active entry remains visible without looping around.
@@ -140,7 +176,7 @@ class PreviewNavigationRuler(QWidget):
     YEAR_HEIGHT = 31
     MONTH_HEIGHT = 27
     DAY_HEIGHT = 7
-    YEAR_FONT_SIZE = 13
+    YEAR_FONT_SIZE = 16
     MONTH_FONT_SIZE = 12
     PAGE_FONT_SIZE = 12
 
@@ -169,7 +205,7 @@ class PreviewNavigationRuler(QWidget):
         self._hover: int | None = None
         self._dragging: tuple[float, int, bool] | None = None
         self._requested_date: int | None = None
-        self._callout = (_RulerCallout(parent, side="left" if mode == "date" else "right")
+        self._callout = (_RulerCallout(parent, side="right" if mode == "date" else "left")
                          if parent is not None else None)
         self.setFixedWidth(self.WIDTH)
         self.setMouseTracking(True)
@@ -311,7 +347,8 @@ class PreviewNavigationRuler(QWidget):
         The selected row is centred when there is room on both sides. Near
         either boundary the viewport stays within the content, so no entries
         repeat and the first/last page can sit at the top/bottom respectively.
-        A short list is centred as a group instead of being artificially looped.
+        Short date indexes start at the top of their strip; short page indexes
+        retain their existing centred presentation.
         """
         count = self._count()
         if not count:
@@ -319,7 +356,8 @@ class PreviewNavigationRuler(QWidget):
         viewport_height = self.height()
         total_height = self._row_tops[-1]
         if total_height <= viewport_height:
-            scroll_top = -(viewport_height - total_height) / 2
+            scroll_top = (0.0 if self._mode == "date"
+                          else -(viewport_height - total_height) / 2)
         else:
             current = self._cursor()
             selected_y = (self._row_tops[current] + self._row_tops[current + 1]) / 2
@@ -367,7 +405,12 @@ class PreviewNavigationRuler(QWidget):
         page = self._pages[page_index]
         date = (self._date_entries[index].full_label if self._mode == "date"
                 else page.date_label or "—")
-        x = self.width() if self._mode == "date" else 0
+        if self._mode == "page" and " – " in date:
+            start, end = date.split(" – ", 1)
+            date = self._translator.tr(
+                "preview.navigation.date_range", start=start, end=end,
+            )
+        x = 0 if self._mode == "date" else self.width()
         anchor = self.mapTo(self.parentWidget(), QPoint(x, round(row_y)))
         self._callout.display(self._page_caption(page_index), date, anchor)
 
@@ -496,16 +539,15 @@ class PreviewNavigationRuler(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         base = self.palette().base().color()
         ink = self.palette().text().color()
-        blue = self.palette().link().color()
         accent = self.palette().highlight().color()
         quiet = QColor(ink)
         quiet.setAlpha(160)
         painter.fillRect(self.rect(), base)
-        # Persistent edge marks distinguish the left date ruler from the right
-        # physical-page ruler without reducing the available text width.
+        # Subtle inner edges separate the left page index from the preview
+        # and the right date index from the preview.
         frame_pen = QPen(self.palette().mid().color(), 1)
         painter.setPen(frame_pen)
-        if self._mode == "date":
+        if self._mode == "page":
             painter.drawLine(self.WIDTH - 1, 0, self.WIDTH - 1, self.height())
         else:
             painter.drawLine(0, 0, 0, self.height())
@@ -514,12 +556,10 @@ class PreviewNavigationRuler(QWidget):
             return
         rows = self._visible_rows()
         current = self._cursor()
-        preview_row = self._preview_cursor()
         for index, center, height in sorted(rows, key=lambda row: row[1]):
             if center + height / 2 < 0 or center - height / 2 > self.height():
                 continue
             selected = index == current
-            preview_selected = index == preview_row
             hovered = self._hover == index
             if selected:
                 wash = QColor(accent)
@@ -531,12 +571,6 @@ class PreviewNavigationRuler(QWidget):
                 wash.setAlpha(25)
                 painter.fillRect(1, round(center - height / 2), self.WIDTH - 2,
                                  round(height), wash)
-            if preview_selected:
-                # Keep the actual displayed page identifiable while exploring
-                # another place in the rulers (when it is still in view).
-                painter.fillRect(1 if self._mode == "date" else self.WIDTH - 4,
-                                 round(center - height / 2) + 1, 3,
-                                 max(2, round(height) - 2), accent)
             if self._mode == "date":
                 item = self._date_entries[index]
                 if item.kind == "day":
@@ -551,10 +585,8 @@ class PreviewNavigationRuler(QWidget):
                                       else self.MONTH_FONT_SIZE)
                     font.setBold(item.kind == "year" or selected)
                     painter.setFont(font)
-                    painter.setPen(ink if item.kind == "year" else blue)
-                    if item.kind == "year":
-                        painter.fillRect(2, round(center - height / 2),
-                                         self.WIDTH - 5, 2, QColor(accent))
+                    # Both months and years use the same blue as selected pages.
+                    painter.setPen(accent)
                     painter.drawText(1, round(center - height / 2), self.WIDTH - 3,
                                      round(height), Qt.AlignmentFlag.AlignCenter,
                                      item.short_label)
