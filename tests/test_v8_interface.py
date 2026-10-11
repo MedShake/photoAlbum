@@ -43,6 +43,7 @@ def test_accordion_hover_surface_covers_full_row_with_native_selection(app):
         assert section.layout().itemAt(0).widget() is section._heading
         assert section._heading.width() == section.width()
         assert section._summary.parentWidget() is section._heading
+        assert section._summary.width() >= section._summary.sizeHint().width()
         assert section._summary.testAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents
         )

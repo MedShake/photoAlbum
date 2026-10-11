@@ -27,6 +27,7 @@ class AccordionSection(QWidget):
         self._heading.setCheckable(True)
         self._heading.setText(title)
         self._heading.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._heading.setArrowType(Qt.ArrowType.RightArrow)
         self._heading.setAutoRaise(True)
         self._heading.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         # Let Qt paint its native checked/pressed/focus state.  The V8 custom
@@ -47,8 +48,10 @@ class AccordionSection(QWidget):
         heading_layout = QHBoxLayout(self._heading)
         heading_layout.setContentsMargins(0, 0, 8, 0)
         heading_layout.setSpacing(0)
-        heading_layout.addStretch(1)
-        heading_layout.addWidget(self._summary)
+        # Reserve the title, then give the summary the remaining space even
+        # though its size policy ignores the potentially very long text.
+        heading_layout.addSpacing(self._heading.sizeHint().width() + 8)
+        heading_layout.addWidget(self._summary, 1)
 
         self.content = content
         self.content.setParent(self)

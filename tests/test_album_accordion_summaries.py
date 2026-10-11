@@ -52,6 +52,8 @@ def test_page_format_summary_tracks_custom_format_and_collapse(view, app):
     app.processEvents()
     assert "345.5" not in _summary(view, "format")
     assert "A4" in _summary(view, "format")
+    view._orientation_combo.setCurrentIndex(view._orientation_combo.findData("landscape"))
+    assert _summary(view, "format") == "A4 — 297 × 210 mm · Paysage"
 
 
 def test_format_header_is_short_and_square_summary_never_shows_orientation(view, app):

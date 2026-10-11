@@ -192,12 +192,16 @@ class MainWindow(QMainWindow):
         if not area.isValid():
             return
         margin = 12
-        max_width = max(1, area.width() - margin)
-        max_height = max(1, area.height() - margin)
+        frame = self.frameGeometry()
+        max_width = max(1, area.width() - margin - (frame.width() - self.width()))
+        max_height = max(1, area.height() - margin - (frame.height() - self.height()))
         if self.width() > max_width or self.height() > max_height:
             self.resize(min(self.width(), max_width), min(self.height(), max_height))
-        if not area.contains(self.geometry().center()):
-            self.move(area.left() + margin // 2, area.top() + margin // 2)
+        frame = self.frameGeometry()
+        x = max(area.left(), min(frame.left(), area.right() - frame.width() + 1))
+        y = max(area.top(), min(frame.top(), area.bottom() - frame.height() + 1))
+        if x != frame.left() or y != frame.top():
+            self.move(x, y)
 
     def closeEvent(self, event) -> None:
         if self._pdf_widget.is_running:

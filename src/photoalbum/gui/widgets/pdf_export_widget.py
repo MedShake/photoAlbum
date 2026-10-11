@@ -348,7 +348,10 @@ class PdfExportWidget(QWidget):
             photos = self._project_service.list_album_photos()
 
         photo_count = len(photos)
-        photo_text = f"{photo_count} {'photo' if photo_count == 1 else 'photos'}"
+        photo_text = self._translator.tr(
+            "render.photo_count_one" if photo_count == 1 else "render.photo_count_many",
+            count=photo_count,
+        )
 
         result = self._result_provider()
         if result is None:
@@ -358,7 +361,10 @@ class PdfExportWidget(QWidget):
             )
         else:
             page_count = result.total_page_count
-            page_text = f"{page_count} {'page' if page_count == 1 else 'pages'}"
+            page_text = self._translator.tr(
+                "render.page_count_one" if page_count == 1 else "render.page_count_many",
+                count=page_count,
+            )
 
         # Display document information directly after the output-file heading.
         # Keep it outside the options accordion so it remains visible.

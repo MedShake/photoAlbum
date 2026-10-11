@@ -175,11 +175,10 @@ class AlbumSettingsWidget(QWidget):
         format_id = str(self._page_format_combo.currentData())
         if format_id == "custom":
             label = self._translator.tr("album.custom_format")
-            width, height = self._custom_dimensions
         else:
             page_format = PAGE_FORMATS[format_id]
             label = page_format.name
-            width, height = page_format.width_mm, page_format.height_mm
+        width, height = self._page_geometry()
         if isclose(width, height, rel_tol=0.0, abs_tol=0.005):
             # There is no meaningful portrait/landscape distinction for a
             # square, whatever orientation is stored by the underlying model.

@@ -211,5 +211,18 @@ def test_main_window_tabs_do_not_force_a_tall_minimum(app, tmp_path, monkeypatch
             window.resize(960, 540)
             app.processEvents()
             assert window.height() <= 540
+        window.show()
+        app.processEvents()
+        area = window.screen().availableGeometry()
+        # Put half the frame beyond the screen regardless of its resolution.
+        frame = window.frameGeometry()
+        window.move(
+            area.right() - frame.width() // 2,
+            area.bottom() - frame.height() // 2,
+        )
+        app.processEvents()
+        assert not area.contains(window.frameGeometry())
+        window._fit_geometry_to_screen()
+        assert area.contains(window.frameGeometry())
     finally:
         window.close()
