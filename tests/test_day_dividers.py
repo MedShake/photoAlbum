@@ -109,7 +109,8 @@ def test_day_pagination_reuses_all_placements(widget, placement, first_day_photo
     assert all(p.page_instance is settings.day_dividers.page for p in days)
     if placement == DividerPlacement.NATURAL:
         assert days[1].number == first_day_photos + 2
-        assert not any(p.is_blank for p in pages)
+        assert not any(p.is_blank for p in pages[:-1])
+        assert pages[-1].is_blank == (first_day_photos == 2)
     else:
         assert all(p.side == PageSide.RIGHT for p in days)
         if placement == DividerPlacement.RIGHT_PAGE_WITH_BLANK_FACING:
@@ -123,9 +124,11 @@ def test_day_pagination_reuses_all_placements(widget, placement, first_day_photo
         (2025, 3, 1, "day"),
         (2025, 3, 5, "day"),
     ]
+    assert result.pagination.period_end_capacities[-1].unused_photo_slots == int(pages[-1].is_blank)
     # Day is the finest active separator, so it owns capacity reports.
     natural = PaginationEngine(widget._registry).paginate(result.plan)
-    assert not any(p.is_blank for p in natural.pages)
+    assert not any(p.is_blank for p in natural.pages[:-1])
+    assert natural.pages[-1].is_blank == (first_day_photos == 2)
 
 
 def test_day_capacity_takes_priority_over_month_and_year(widget):

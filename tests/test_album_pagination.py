@@ -2,6 +2,8 @@ from photoalbum.templates.msb.month_divider_classic.layout import month_cities
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from photoalbum.album import AlbumPlan, PageSide, PaginationEngine, PlanItem, PlanItemKind, TemplateDefinition, TemplateKind, TemplateRegistry, AlbumStructureSettings, BlankPageReason, CoverPosition, CoverSettings, DividerPlacement, DividerSettings, PhotoPageSettings
 from photoalbum.template_engine import create_template_registry
 
@@ -70,6 +72,32 @@ def photo_group(
     )
 
 
+@pytest.mark.parametrize("photo_count", [0, 1, 2, 3, 4, 5, 6])
+def test_album_ends_with_a_verso_and_counts_its_available_slots(photo_count):
+    photos = [photo(f"{index}.jpg", index + 1) for index in range(photo_count)]
+    result = PaginationEngine(registry()).paginate(
+        AlbumPlan(items=[photo_group(photos)])
+    )
+
+    photo_page_count = (photo_count + 1) // 2
+    physical_page_count = photo_page_count + photo_page_count % 2
+    assert len(result.pages) == physical_page_count
+    assert [page.number for page in result.pages] == list(range(1, physical_page_count + 1))
+    assert tuple(p for page in result.pages for p in page.photos) == tuple(photos)
+    if not photos:
+        assert result.period_end_capacities == []
+        return
+
+    assert result.pages[-1].side == PageSide.LEFT
+    assert result.pages[-1].is_blank == bool(photo_page_count % 2)
+    if photo_page_count % 2:
+        blank = result.pages[-1]
+        assert blank.blank_reason == BlankPageReason.TECHNICAL
+        assert (blank.year, blank.month, blank.template_id) == (2025, 3, "photo")
+        assert blank.photo_capacity == 2
+    assert result.period_end_capacities[0].unused_photo_slots == physical_page_count * 2 - photo_count
+
+
 def test_first_page_is_right():
     plan = AlbumPlan(
         items=[
@@ -118,6 +146,7 @@ def test_pages_alternate_right_and_left():
         PageSide.RIGHT,
         PageSide.LEFT,
         PageSide.RIGHT,
+        PageSide.LEFT,
     ]
 
 
@@ -140,7 +169,7 @@ def test_two_photo_template_splits_photos():
         registry(capacity=2)
     ).paginate(plan)
 
-    assert len(result.pages) == 3
+    assert len(result.pages) == 4
 
     assert [
         len(page.photos)
@@ -149,6 +178,7 @@ def test_two_photo_template_splits_photos():
         2,
         2,
         1,
+        0,
     ]
 
 
@@ -180,6 +210,7 @@ def test_three_photo_template_splits_photos():
         3,
         3,
         1,
+        0,
     ]
 
 
@@ -279,7 +310,9 @@ def test_special_page_occupies_one_page():
         registry()
     ).paginate(plan)
 
-    assert len(result.pages) == 1
+    assert len(result.pages) == 2
+    assert result.pages[-1].is_blank
+    assert result.pages[-1].photo_capacity == 0
 
     page = result.pages[0]
 
@@ -304,7 +337,9 @@ def test_month_divider_occupies_one_page():
         registry()
     ).paginate(plan)
 
-    assert len(result.pages) == 1
+    assert len(result.pages) == 2
+    assert result.pages[-1].is_blank
+    assert result.pages[-1].photo_capacity == 0
 
     page = result.pages[0]
 
@@ -373,7 +408,7 @@ def test_right_page_month_divider_is_placed_on_right():
         ),
     )
 
-    april = result.pages[-1]
+    april = result.pages[-2]
 
     assert april.kind == PlanItemKind.MONTH_DIVIDER
     assert april.month == 4
@@ -423,7 +458,8 @@ def test_right_page_policy_inserts_technical_blank():
         )
     ]
 
-    assert len(technical_blanks) == 1
+    assert [page.number for page in technical_blanks] == [4, 6]
+    assert technical_blanks[-1].photo_capacity == 0
     assert technical_blanks[0].side == PageSide.LEFT
 
 
@@ -508,8 +544,8 @@ def test_blank_facing_policy_keeps_left_page_empty():
         ),
     )
 
-    april = result.pages[-1]
-    facing = result.pages[-2]
+    april = result.pages[-2]
+    facing = result.pages[-3]
 
     assert april.kind == PlanItemKind.MONTH_DIVIDER
     assert april.month == 4
@@ -604,17 +640,17 @@ def test_blank_facing_may_require_technical_and_editorial_blank():
         ),
     )
 
-    april = result.pages[-1]
+    april = result.pages[-2]
 
     assert april.side == PageSide.RIGHT
 
     assert (
-        result.pages[-2].blank_reason
+        result.pages[-3].blank_reason
         == BlankPageReason.EDITORIAL
     )
 
     assert (
-        result.pages[-3].blank_reason
+        result.pages[-4].blank_reason
         == BlankPageReason.TECHNICAL
     )
 
@@ -672,7 +708,7 @@ def test_last_month_capacity_is_recorded_at_end_of_album():
         )
     )
 
-    assert december.unused_photo_slots == 1
+    assert december.unused_photo_slots == 3
 
 def test_december_capacity_is_recorded_before_year_divider():
     december_photos = (
@@ -838,4 +874,3 @@ def test_month_divider_accepts_month_without_city():
     )
 
     assert month_cities(divider, result.pages) == ()
-

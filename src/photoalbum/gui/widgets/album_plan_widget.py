@@ -1032,6 +1032,11 @@ class AlbumPlanWidget(QWidget):
         body_pages = []
 
         for page in pages:
+            # Keep the final verso after the back matter it completes.
+            if page.is_blank and back_pages:
+                back_pages.append(page)
+                continue
+
             instance_id = None
 
             if page.page_instance is not None:

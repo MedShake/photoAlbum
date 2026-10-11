@@ -41,8 +41,8 @@ def test_overrides_force_start_and_only_apply_to_one_page():
     ]
     result = AlbumBuilder(registry).build(photos, settings)
     assert page_photos(result) == [["A"], ["B"], ["C"], ["D", "E", "F"], ["G"]]
-    assert [page.photo_capacity for page in result.pagination.pages] == [2, 1, 2, 3, 2]
-    assert [page.number for page in result.pagination.pages] == [1, 2, 3, 4, 5]
+    assert [page.photo_capacity for page in result.pagination.pages] == [2, 1, 2, 3, 2, 2]
+    assert [page.number for page in result.pagination.pages] == [1, 2, 3, 4, 5, 6]
 
 
 def test_insertions_force_end_remain_attached_when_previous_capacity_changes():
@@ -114,7 +114,12 @@ def test_semantic_divider_anchor_and_inline_do_not_split_month_diagnostics():
     result = AlbumBuilder(registry).build(photos, settings)
     index = next(i for i, page in enumerate(result.pagination.pages) if page.page_instance == instance)
     assert result.pagination.pages[index - 1].kind == PlanItemKind.MONTH_DIVIDER
-    assert result.pagination.period_end_capacities == baseline.pagination.period_end_capacities
+    # The insertion uses the final spare side, but keeps one monthly diagnostic.
+    assert len(result.pagination.period_end_capacities) == 1
+    assert result.pagination.period_end_capacities[0] == replace(
+        baseline.pagination.period_end_capacities[0], unused_photo_slots=1
+    )
+    assert baseline.pagination.period_end_capacities[0].unused_photo_slots == 3
 
 
 def test_current_schema_roundtrip_and_schema_two_defaults():
@@ -136,7 +141,10 @@ def test_terminal_inline_boundary_cannot_offer_spare_photo_slots():
     settings.body_insertions = [BodyPageInsertion(
         ContentAnchor("photo", photo_identity=photos[-1].identity), PageInstance("inline"))]
     result = AlbumBuilder(registry).build(photos, settings)
-    assert result.pagination.pages[-2].unused_photo_slots == 1
+    assert result.pagination.pages[-3].unused_photo_slots == 1
+    assert result.pagination.pages[-2].kind == PlanItemKind.BODY_SPECIAL_PAGE
+    assert result.pagination.pages[-1].is_blank
+    assert result.pagination.pages[-1].photo_capacity == 0
     assert result.pagination.period_end_capacities[0].unused_photo_slots == 0
 
 

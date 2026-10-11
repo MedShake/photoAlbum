@@ -127,7 +127,10 @@ class PaginationEngine:
                 result,
                 item,
             )
-            
+        # Complete the last physical sheet before recording reusable capacity.
+        if self._side_for_next_page(result) == PageSide.LEFT:
+            self._append_technical_blank(result)
+
         self._record_period_capacities(result, settings)
 
         return result

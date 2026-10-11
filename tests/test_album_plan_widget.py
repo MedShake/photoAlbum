@@ -672,7 +672,8 @@ def test_day_groups_follow_pagination_inside_each_month():
                      if (p.year, p.month, p.day) == (2025, month_number, day_number)]
             assert page_numbers_in_visual_order(day) == [p.number for p in pages]
             assert "Day divider" in day.child(0).text(0)
-            assert all("Photos" in day.child(i).text(0) for i in range(1, day.childCount()))
+            for i, page in enumerate(pages[1:], start=1):
+                assert ("Technical blank" if page.is_blank else "Photos") in day.child(i).text(0)
             assert int(day.text(1)) == len(pages)
             assert int(day.text(2)) == sum(len(p.photos) for p in pages)
             assert day.isExpanded()

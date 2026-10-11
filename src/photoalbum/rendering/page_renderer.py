@@ -56,6 +56,14 @@ class PageRenderer:
         temporal_context=None,
     ) -> None:
         page = composition.page
+        # A technical/editorial blank keeps its number, never the template artwork.
+        if getattr(page, "is_blank", False):
+            self._paint_page_number(
+                painter=painter, composition=composition,
+                font_pixel_size=font_pixel_size, pixel_rect=pixel_rect,
+            )
+            return
+
         instance = page.page_instance
         if instance is None and page.template_id is not None:
             instance = create_template_instance(page.template_id)

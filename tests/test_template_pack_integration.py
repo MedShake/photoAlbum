@@ -152,17 +152,25 @@ def test_directory_pack_composes_edits_settings_and_exports(external_pack, tmp_p
 
     image = QImage(210, 297, QImage.Format.Format_ARGB32)
     geometry = PageRenderGeometry(width=210, height=297, page_width_mm=210, page_height_mm=297)
-    painter = QPainter(image)
-    try:
-        PageRenderer(translator=Translator('en')).paint(
-            painter=painter, composition=composition, target_rect=image.rect(),
-            width=210, height=297, page_width_mm=210, page_height_mm=297,
-            font_pixel_size=geometry.font_pixel_size, pixel_rect=geometry.pixel_rect,
-            thumbnail_cache=None, template_pack_settings=settings.template_pack_settings,
-        )
-    finally:
-        painter.end()
-    assert image.pixelColor(100, 100).name() == '#123456'
+    assert result.interior_page_count == 2
+    verso = result.pagination.pages[-1]
+    assert verso.is_blank
+    assert verso.photo_capacity == 1
+    for rendered_page, expected_color in [(page, '#123456'), (verso, '#ffffff')]:
+        image.fill(0xFFFFFFFF)
+        painter = QPainter(image)
+        try:
+            PageRenderer(translator=Translator('en')).paint(
+                painter=painter,
+                composition=PageComposer().compose(rendered_page, settings.photo_pages),
+                target_rect=image.rect(),
+                width=210, height=297, page_width_mm=210, page_height_mm=297,
+                font_pixel_size=geometry.font_pixel_size, pixel_rect=geometry.pixel_rect,
+                thumbnail_cache=None, template_pack_settings=settings.template_pack_settings,
+            )
+        finally:
+            painter.end()
+        assert image.pixelColor(100, 100).name() == expected_color
 
     output = tmp_path / 'independent.pdf'
     PdfExportService(Translator('en')).export(
