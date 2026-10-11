@@ -53,6 +53,7 @@ from photoalbum.geocoding.location_candidate_selector import (
     LocationCandidateSelector,
 )
 from photoalbum.geocoding import order_location_components
+from photoalbum.gui.dialog_geometry import fit_dialog_to_screen
 from photoalbum.gui.hover_photo_preview import HoverPhotoPreview
 from photoalbum.gui.preview_image_cache import PreviewImageCache
 from photoalbum.i18n import Translator
@@ -3481,8 +3482,6 @@ class PhotoPlacesWidget(QWidget):
                 "photos.places.group.title"
             )
         )
-        dialog.resize(1050, 620)
-
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(
             16, 16, 16, 16
@@ -4131,6 +4130,10 @@ class PhotoPlacesWidget(QWidget):
             0,
             position_header_checkbox,
         )
+
+        # The dialog is fully populated at this point. Size it for the
+        # usable screen, keeping the preview table as the flexible area.
+        fit_dialog_to_screen(dialog, 1050, 620)
 
         try:
             result = dialog.exec()

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from photoalbum.gui.dialog_geometry import fit_dialog_to_screen
 from photoalbum.i18n import Translator
 
 
@@ -26,7 +27,6 @@ class HelpDialog(QDialog):
         self.setWindowTitle(
             self._translator.tr("help.window_title")
         )
-        self.resize(760, 680)
         self.setMinimumSize(600, 450)
 
         layout = QVBoxLayout(self)
@@ -56,3 +56,6 @@ class HelpDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         layout.addWidget(buttons)
+
+        # Respect the desktop work area after all widgets are installed.
+        fit_dialog_to_screen(self, 760, 680)
