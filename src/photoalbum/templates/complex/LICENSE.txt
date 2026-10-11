@@ -1,0 +1,1 @@
+This pack contains original adaptation code for Photo Album and is intended to be distributed under GPL-3.0-or-later, consistent with the host project.

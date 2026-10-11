@@ -89,6 +89,9 @@ class PaginationEngine:
         forced_photo_page_starts: set[str] | None = None,
     ) -> PaginationResult:
         result = PaginationResult()
+        # New state on every pagination: regeneration starts from variant #1.
+        # Manual overrides bypass the selector and never increment this map.
+        self._automatic_variant_counts: dict[tuple[str, str], int] = {}
         self._page_geometry = settings.effective_page_format() if settings else None
         self._overrides = {item.photo_identity: item.page for item in settings.photo_page_overrides} if settings else {}
         self._override_boundaries = set(self._overrides) | set(forced_photo_page_starts or ())
@@ -235,6 +238,7 @@ class PaginationEngine:
             photos=tuple(admissible_photos),
             page_width_mm=self._page_geometry.width_mm,
             page_height_mm=self._page_geometry.height_mm,
+            selection_counts=self._automatic_variant_counts,
         ))
         # Backward compatible: existing pack selectors still return a template
         # ID. A selector may also return a PageInstance to specify a variant

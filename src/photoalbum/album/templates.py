@@ -179,6 +179,9 @@ class AutomaticPhotoPageContext:
     photos: tuple[Photo, ...]
     page_width_mm: float
     page_height_mm: float
+    # Optional state owned by one PaginationEngine.paginate() call.
+    # Selectors that do not use round-robin safely ignore this field.
+    selection_counts: dict[tuple[str, str], int] | None = None
 
 
 class TemplateRegistry:
