@@ -15,7 +15,9 @@ from photoalbum.album import (
     A4,
     PageFormat,
     PageInstance,
+    TemplateDefinition,
 )
+from photoalbum.gui.template_labels import template_display_name
 from photoalbum.gui.template_settings import (
     create_template_settings_editor,
 )
@@ -38,6 +40,7 @@ class PageInstanceDialog(QDialog):
         photos,
         *,
         translator: Translator,
+        template: TemplateDefinition | None = None,
         render_service=None,
         page_format: PageFormat = A4,
         template_pack_settings=None,
@@ -52,6 +55,7 @@ class PageInstanceDialog(QDialog):
         )
 
         self._instance = instance
+        self._template = template
         self._photos = tuple(
             photos
         )
@@ -104,6 +108,9 @@ class PageInstanceDialog(QDialog):
     def _template_name(
         self,
     ) -> str:
+        if self._template is not None:
+            return template_display_name(self._template, self._translator)
+
         key = (
             f"template."
             f"{self._instance.template_id}"

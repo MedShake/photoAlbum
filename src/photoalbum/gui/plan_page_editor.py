@@ -94,6 +94,7 @@ def choose_page(parent, registry, settings, result, translator, *, page=None,
             context_page = replace(context_page, page_instance=instance)
         editor = PageInstanceDialog(
             instance, result.template_photos, translator=translator,
+            template=registry.get(instance.template_id),
             page_format=geometry, template_pack_settings=pack_settings,
             usage=kind.value, preview_page=context_page, album_pages=context_album_pages,
             temporal_context=tuple(key for key in ("year", "month", "day") if context_page is not None and getattr(context_page, key) is not None),

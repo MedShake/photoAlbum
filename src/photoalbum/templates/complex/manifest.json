@@ -5,18 +5,14 @@
   "version": "1.4.0",
   "authors": [
     {
-      "name": "OpenAI adaptation for Photo Album"
+      "name": "Bertrand Boutillier"
     }
   ],
   "description": "Autonomous 1–5 photo pack: 4-photo Reportage unchanged; 29 chronological 5-photo Mosaïque/Sequence layouts; per-signature deterministic automatic rotation (host integration).",
   "templates": [
     {
       "id": "complex-photo-1",
-      "name": "Complex — 1 photo",
-      "localized_names": {
-        "fr": "Complex — 1 photo",
-        "en": "Complex — 1 photo"
-      },
+      "name": "One photo",
       "module": "photoalbum.templates.complex.photo_page",
       "kinds": [
         "photo_page"
@@ -25,11 +21,7 @@
     },
     {
       "id": "complex-photo-2",
-      "name": "Complex — 2 photos",
-      "localized_names": {
-        "fr": "Complex — 2 photos",
-        "en": "Complex — 2 photos"
-      },
+      "name": "Two photos",
       "module": "photoalbum.templates.complex.photo_page",
       "kinds": [
         "photo_page"
@@ -38,11 +30,7 @@
     },
     {
       "id": "complex-photo-3",
-      "name": "Complex — 3 photos",
-      "localized_names": {
-        "fr": "Complex — 3 photos",
-        "en": "Complex — 3 photos"
-      },
+      "name": "Three photos",
       "module": "photoalbum.templates.complex.photo_page",
       "kinds": [
         "photo_page"
@@ -51,11 +39,7 @@
     },
     {
       "id": "complex-photo-4",
-      "name": "Complex — 4 photos",
-      "localized_names": {
-        "fr": "Complex — 4 photos",
-        "en": "Complex — 4 photos"
-      },
+      "name": "Four photos",
       "module": "photoalbum.templates.complex.photo_page",
       "kinds": [
         "photo_page"
@@ -64,11 +48,7 @@
     },
     {
       "id": "complex-photo-5",
-      "name": "Complex — 5 photos",
-      "localized_names": {
-        "fr": "Complex — 5 photos",
-        "en": "Complex — 5 photos"
-      },
+      "name": "Five photos",
       "module": "photoalbum.templates.complex.photo_page",
       "kinds": [
         "photo_page"
@@ -79,11 +59,7 @@
   "automatic_photo_page_modes": [
     {
       "id": "complex-auto-1-5",
-      "name": "Complex automatic (1 to 5 photos)",
-      "localized_names": {
-        "fr": "Complex automatique — 1 à 5 photos",
-        "en": "Complex automatic — 1 to 5 photos"
-      },
+      "name": "Automatic mode — 1 to 5 photos",
       "module": "photoalbum.templates.complex.photo_page",
       "selector": "photoalbum.templates.complex.photo_page.automatic:select_automatic_1_5",
       "templates": [

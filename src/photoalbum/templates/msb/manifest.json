@@ -5,7 +5,7 @@
   "version": "1.0",
   "authors": [
     {
-      "name": "MSB"
+      "name": "Bertrand Boutillier"
     }
   ],
   "description": "Templates historiques fournis avec Photo Album.",
@@ -185,11 +185,7 @@
   "automatic_photo_page_modes": [
     {
       "id": "msb-orientation-1-2",
-      "name": "Automatic: orientation 1/2",
-      "localized_names": {
-        "en": "Automatic: orientation 1/2",
-        "fr": "Automatique : orientation 1/2"
-      },
+      "name": "Automatic mode — 1 to 2 photos",
       "module": "photoalbum.templates.msb.photo_page",
       "selector": "photoalbum.templates.msb.photo_page.automatic:select_orientation_template",
       "templates": [
@@ -200,11 +196,7 @@
     },
     {
       "id": "msb-orientation-1-2-3",
-      "name": "Automatic: orientation 1/2/3",
-      "localized_names": {
-        "en": "Automatic: orientation 1/2/3",
-        "fr": "Automatique : orientation 1/2/3"
-      },
+      "name": "Automatic mode — 1 to 3 photos",
       "module": "photoalbum.templates.msb.photo_page",
       "selector": "photoalbum.templates.msb.photo_page.automatic:select_orientation_1_2_3_template",
       "templates": [

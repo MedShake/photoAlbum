@@ -856,6 +856,7 @@ class AlbumSettingsWidget(QWidget):
             instance,
             photos,
             translator=self._translator,
+            template=self._registry.get(instance.template_id),
             render_service=self._render_service,
             page_format=self._oriented_page_format(),
             template_pack_settings=(
@@ -1063,6 +1064,7 @@ class AlbumSettingsWidget(QWidget):
             instance,
             photos,
             translator=self._translator,
+            template=self._registry.get(instance.template_id),
             render_service=self._render_service,
             page_format=self._oriented_page_format(),
             template_pack_settings=(
@@ -1216,6 +1218,7 @@ class AlbumSettingsWidget(QWidget):
             instance,
             photos,
             translator=self._translator,
+            template=self._registry.get(instance.template_id),
             render_service=self._render_service,
             page_format=self._oriented_page_format(),
             template_pack_settings=(
@@ -2096,6 +2099,7 @@ class AlbumSettingsWidget(QWidget):
             value,
             photos,
             translator=self._translator,
+            template=self._registry.get(value.template_id),
             render_service=self._render_service,
             page_format=self._oriented_page_format(),
             template_pack_settings=(
