@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QDialog, QDateTimeEdit, QLineEdit, QPushButton, QMessageBox,
@@ -1064,6 +1065,30 @@ def test_project_title_stays_visible_at_compact_window_size(window, tmp_path, ap
     window._update_project_state()
     assert window.windowTitle() == "Photo Album"
 
+
+
+@pytest.mark.parametrize("initial_dark", [False, True], ids=["light", "dark"])
+def test_project_title_renders_palette_text_after_theme_changes(window, app, initial_dark):
+    title = window._project_label
+    title.setText("Souvenirs de vacances")
+    window.show()
+    for dark in (initial_dark, not initial_dark):
+        palette = QPalette(window.palette())
+        for group in (QPalette.Active, QPalette.Inactive, QPalette.Disabled):
+            palette.setColor(group, QPalette.Window, QColor("#202020" if dark else "#eeeeee"))
+            palette.setColor(group, QPalette.WindowText, QColor("#ededed" if dark else "#161616"))
+        palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor("#999999"))
+        window.setPalette(palette)
+        for enabled in (True, False):
+            title.setEnabled(enabled)
+            app.processEvents()
+            image = title.grab().toImage()
+            group = title.palette().currentColorGroup()
+            expected = palette.color(group, QPalette.WindowText)
+            assert any(image.pixelColor(x, y) == expected
+                       for y in range(image.height()) for x in range(image.width()))
+            assert title.text() == "Souvenirs de vacances"
+        title.setEnabled(True)
 
 
 def test_pdf_failure_popup_surfaces_actionable_worker_message(window):

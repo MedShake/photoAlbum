@@ -101,15 +101,19 @@ class ElidedLabel(QLabel):
         if not self.text():
             return super().paintEvent(event)
         painter = QPainter(self)
-        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.setFont(self.font())
         area = self.contentsRect()
         display = self.fontMetrics().elidedText(
             self.text(), Qt.TextElideMode.ElideRight, max(0, area.width()),
         )
-        painter.drawText(
+        self.style().drawItemText(
+            painter,
             area,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            self.palette(),
+            self.isEnabled(),
             display,
+            self.foregroundRole(),
         )
 
 
@@ -363,7 +367,10 @@ class MainWindow(QMainWindow):
         self._project_label = ElidedLabel(
             minimum_text_width=130, preferred_max_width=520,
         )
-        self._project_label.setStyleSheet('font-size: 20px; font-weight: bold;')
+        title_font = self._project_label.font()
+        title_font.setPixelSize(20)
+        title_font.setBold(True)
+        self._project_label.setFont(title_font)
         self._project_label.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )

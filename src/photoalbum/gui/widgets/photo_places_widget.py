@@ -14,10 +14,9 @@ from PySide6.QtCore import (
     Qt,
 )
 from PySide6.QtGui import (
-    QBrush,
-    QColor,
     QImageReader,
     QPixmap,
+    QPalette,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -733,14 +732,27 @@ class PhotoPlacesWidget(QWidget):
 
         # Recalculate wrapping when the available tree width changes.
         self._tree.viewport().installEventFilter(self)
+        self._tree.installEventFilter(self)
+
+    def _set_photo_row_palette(self, widget: QWidget, role: QPalette.ColorRole) -> None:
+        # Keep native control roles (Button, Base, Highlight, etc.) intact.
+        # Labels and checkbox labels use WindowText over the row's Window.
+        source = self._tree.palette()
+        palette = QPalette(source)
+        for group in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive,
+                      QPalette.ColorGroup.Disabled):
+            palette.setBrush(group, QPalette.ColorRole.Window, source.brush(group, role))
+            palette.setBrush(group, QPalette.ColorRole.WindowText,
+                             source.brush(group, QPalette.ColorRole.Text))
+        widget.setPalette(palette)
+        widget.setAutoFillBackground(True)
+        # QSS on the tree can otherwise prevent palette inheritance by its
+        # embedded widgets. Keep their native painting, with explicit roles.
+        for child in widget.findChildren(QWidget):
+            child.setPalette(palette)
 
     def _apply_photo_row_backgrounds(self) -> None:
-        """
-        Alternate photo backgrounds inside each month.
-
-        Every month restarts with alternateBase:
-        grey, white, grey, white...
-        """
+        """Alternate palette backgrounds inside each month, starting at AlternateBase."""
         month_positions: dict[
             tuple[int, int],
             int,
@@ -773,13 +785,9 @@ class PhotoPlacesWidget(QWidget):
                 position + 1
             )
 
-            brush = QBrush(
-                QColor(
-                    "#f3f5f6"
-                    if position % 2 == 0
-                    else "#ffffff"
-                )
-            )
+            role = (QPalette.ColorRole.AlternateBase if position % 2 == 0
+                    else QPalette.ColorRole.Base)
+            brush = self._tree.palette().brush(role)
 
             for column in range(
                 self._tree.columnCount()
@@ -797,33 +805,14 @@ class PhotoPlacesWidget(QWidget):
                 if widget is None:
                     continue
 
-                widget.setAutoFillBackground(True)
+                self._set_photo_row_palette(widget, role)
 
-                palette = widget.palette()
-                palette.setColor(
-                    widget.backgroundRole(),
-                    brush.color(),
-                )
-                widget.setPalette(palette)
-
-                # Non-interactive containers must not hide the
-                # background belonging to the complete photo row.
-                # Interactive controls retain their current/native
-                # rendering -- in particular QCheckBox.
-                for child in widget.findChildren(
-                    QWidget
-                ):
-                    if isinstance(
-                        child,
-                        (
-                            QLineEdit,
-                            QCheckBox,
-                            QPushButton,
-                        ),
-                    ):
-                        continue
-
-                    child.setAutoFillBackground(False)
+        for index in range(1, self._undated_layout.count()):
+            row = self._undated_layout.itemAt(index).widget()
+            role = (QPalette.ColorRole.AlternateBase if index % 2 == 0
+                    else QPalette.ColorRole.Base)
+            if row is not None:
+                self._set_photo_row_palette(row, role)
 
     def _style_group_separators(self) -> None:
         # Full-width year/month banners are installed immediately
@@ -1374,16 +1363,10 @@ class PhotoPlacesWidget(QWidget):
                 QFrame.Shape.NoFrame
             )
 
-            if index % 2:
-                row.setAutoFillBackground(True)
-                palette = row.palette()
-                palette.setColor(
-                    row.backgroundRole(),
-                    self.palette()
-                    .alternateBase()
-                    .color(),
-                )
-                row.setPalette(palette)
+            self._set_photo_row_palette(
+                row, QPalette.ColorRole.AlternateBase if index % 2
+                else QPalette.ColorRole.Base,
+            )
 
             layout = QHBoxLayout(row)
             layout.setContentsMargins(
@@ -1807,11 +1790,24 @@ class PhotoPlacesWidget(QWidget):
             Qt.TransformationMode.SmoothTransformation,
         )
 
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.PaletteChange and hasattr(self, "_tree"):
+            # Refresh the tree's QSS palette as well as its embedded editors.
+            self._tree.setPalette(self.palette())
+            self._apply_photo_row_backgrounds()
+
     def eventFilter(
         self,
         watched,
         event,
     ) -> bool:
+        if watched is self._tree and event.type() in (
+            QEvent.Type.PaletteChange, QEvent.Type.EnabledChange,
+            QEvent.Type.ActivationChange,
+        ):
+            self._apply_photo_row_backgrounds()
+
         if (
             watched is self._tree.viewport()
             and event.type() == QEvent.Type.Resize
