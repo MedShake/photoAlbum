@@ -1,4 +1,4 @@
-"""Regression checks for the compact Album Settings accordion summaries.
+"""Regression checks for the native Album Settings page summaries.
 
 Run with QT_QPA_PLATFORM=offscreen on Linux without a desktop session.
 """
@@ -26,13 +26,19 @@ def view(app):
 
 
 def _summary(view: AlbumSettingsWidget, key: str) -> str:
-    return view._accordions.sections[key]._summary.text()
+    index, title = view._settings_sections[key]
+    text = view._settings_toolbox.itemText(index)
+    assert view._settings_toolbox.itemToolTip(index) == text
+    return text.removeprefix(f"{title} — ") if text != title else ""
 
 
-def test_page_format_summary_tracks_custom_format_and_collapse(view, app):
+def _show_section(view: AlbumSettingsWidget, key: str) -> None:
+    view._settings_toolbox.setCurrentIndex(view._settings_sections[key][0])
+
+
+def test_page_format_summary_tracks_custom_format_and_page_changes(view, app):
     """Format and orientation changes bypass the generic settings signal."""
-    format_section = view._accordions.sections["format"]
-    format_section.set_expanded(True)
+    _show_section(view, "format")
 
     view._page_format_combo.setCurrentIndex(view._page_format_combo.findData("custom"))
     view._custom_width_spin.setValue(345.5)
@@ -41,7 +47,7 @@ def test_page_format_summary_tracks_custom_format_and_collapse(view, app):
     assert "210 × 297 mm" in _summary(view, "format")
     view._custom_apply_button.click()
     app.processEvents()
-    format_section.set_expanded(False)
+    _show_section(view, "covers")
     assert "345.5 × 123.25 mm" in _summary(view, "format")
     assert "Paysage" in _summary(view, "format")
 
@@ -56,36 +62,34 @@ def test_page_format_summary_tracks_custom_format_and_collapse(view, app):
     assert _summary(view, "format") == "A4 — 297 × 210 mm · Paysage"
 
 
-def test_format_header_is_short_and_square_summary_never_shows_orientation(view, app):
-    section = view._accordions.sections["format"]
-    assert section._heading.text() == "Format"
+def test_format_title_and_square_summary_never_show_orientation(view, app):
+    assert view._settings_toolbox.itemText(0).startswith("Format — ")
     # The full label can remain inside the expanded form.
     assert view._page_format_combo.count() > 0
-    section.set_expanded(True)
+    _show_section(view, "format")
     view._page_format_combo.setCurrentIndex(view._page_format_combo.findData("custom"))
     view._custom_width_spin.setValue(180)
     view._custom_height_spin.setValue(180)
     view._custom_apply_button.click()
-    section.set_expanded(False)
+    _show_section(view, "covers")
     app.processEvents()
     assert _summary(view, "format") == "Personnalisé — 180 × 180 mm · Carré"
     assert "Portrait" not in _summary(view, "format")
     assert "Paysage" not in _summary(view, "format")
 
-    section.set_expanded(True)
+    _show_section(view, "format")
     view._custom_height_spin.setValue(181)
     view._custom_apply_button.click()
-    section.set_expanded(False)
+    _show_section(view, "covers")
     assert "Carré" not in _summary(view, "format")
     assert "Portrait" in _summary(view, "format")
 
 
 def test_covers_do_not_show_partial_model_names(view):
-    view._accordions.sections["covers"].set_expanded(False)
+    _show_section(view, "format")
     assert _summary(view, "covers") == ""
-    assert not view._accordions.sections["covers"]._summary.isVisible()
-    # The four selectors remain available when the accordion is opened.
-    view._accordions.sections["covers"].set_expanded(True)
+    # The four selectors remain available on the native Covers page.
+    _show_section(view, "covers")
     assert all(combo.count() > 0 for combo in (
         view._front_cover_combo,
         view._inside_front_cover_combo,
@@ -101,7 +105,7 @@ def test_dividers_show_active_and_inactive_groups_and_refresh(view):
     day.setChecked(True)
     month.setChecked(False)
     year.setChecked(True)
-    view._accordions.sections["dividers"].set_expanded(False)
+    _show_section(view, "format")
     assert _summary(view, "dividers") == "Actifs : Jour, Année · Inactifs : Mois"
 
     day.setChecked(False)
@@ -120,17 +124,17 @@ def test_dividers_show_active_and_inactive_groups_and_refresh(view):
 
 
 def test_numbering_and_printing_share_one_section_and_keep_settings(view):
-    sections = view._accordions.sections
+    sections = view._settings_sections
     assert len(sections) == 7
     assert "numbering_printing" in sections
     assert "numbers" not in sections and "printing" not in sections
-    assert sections["numbering_printing"]._heading.text() == "Numérotation"
+    index = sections["numbering_printing"][0]
+    assert view._settings_toolbox.itemText(index) == "Numérotation"
 
     view._page_numbers_checkbox.setChecked(False)
     view._page_multiple_4_checkbox.setChecked(True)
-    sections["numbering_printing"].set_expanded(False)
+    _show_section(view, "format")
     assert _summary(view, "numbering_printing") == ""
-    assert sections["numbering_printing"]._summary.isHidden()
     snapshot = view.settings()
     view.set_settings(snapshot)
     assert not view._page_numbers_checkbox.isChecked()
@@ -162,16 +166,17 @@ def test_english_labels_use_translator(app):
     try:
         assert "Active:" in _summary(view, "dividers") or "Inactive:" in _summary(view, "dividers")
         assert "Day" in _summary(view, "dividers")
-        assert view._accordions.sections["format"]._heading.text() == "Format"
+        assert view._settings_toolbox.itemText(0).startswith("Format — ")
         view._add_special_page(view._front_matter_list, view._front_matter_combo)
         assert _summary(view, "front") == "1 page configured"
-        assert view._accordions.sections["numbering_printing"]._heading.text() == "Page numbering"
+        index = view._settings_sections["numbering_printing"][0]
+        assert view._settings_toolbox.itemText(index) == "Page numbering"
         assert _summary(view, "numbering_printing") == ""
         view._page_format_combo.setCurrentIndex(view._page_format_combo.findData("custom"))
         view._custom_width_spin.setValue(180)
         view._custom_height_spin.setValue(180)
         view._custom_apply_button.click()
-        view._accordions.sections["format"].set_expanded(False)
+        _show_section(view, "covers")
         assert _summary(view, "format") == "Custom — 180 × 180 mm · Square"
     finally:
         view.close()

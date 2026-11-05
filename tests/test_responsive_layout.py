@@ -7,11 +7,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QScrollArea, QWidget
+from PySide6.QtWidgets import QApplication, QToolBox
 
 from photoalbum.gui.main_window import MainWindow, ResponsiveTabWidget
-from photoalbum.gui.widgets.accordion_section import AccordionGroup, AccordionSection
 from photoalbum.gui.widgets.album_settings_widget import AlbumSettingsWidget
 from photoalbum.gui.widgets.pdf_export_widget import PdfExportWidget
 from photoalbum.gui.widgets.source_card import SourceCard
@@ -25,78 +23,30 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
-def test_accordion_can_hide_real_body_without_losing_it(app):
-    body = QWidget()
-    body.setMinimumHeight(280)
-    section = AccordionSection("Options", body)
-    section.show()
-    app.processEvents()
-    assert not section.expanded
-    assert body.isHidden()
-    small_height = section.minimumSizeHint().height()
-
-    section.set_expanded(True)
-    app.processEvents()
-    assert section.expanded
-    assert not body.isHidden()
-    assert section.minimumSizeHint().height() > small_height + 150
-
-    section.set_expanded(False)
-    app.processEvents()
-    assert body.isHidden()
-    section.close()
-
-
-def test_accordion_group_keeps_multiple_sections_open_by_default(app):
-    group = AccordionGroup()
-    first = group.add("first", AccordionSection("First", QWidget()))
-    second = group.add("second", AccordionSection("Second", QWidget()))
-    first.set_expanded(True)
-    second.set_expanded(True)
-    assert first.expanded and second.expanded
-    first.set_expanded(False)
-    assert not first.expanded and second.expanded
-    group.collapse_all()
-    assert not any(section.expanded for section in group.sections.values())
-
-
-def test_accordion_group_can_still_be_explicitly_exclusive(app):
-    group = AccordionGroup(exclusive=True)
-    first = group.add("first", AccordionSection("First", QWidget()))
-    second = group.add("second", AccordionSection("Second", QWidget()))
-    first.set_expanded(True)
-    second.set_expanded(True)
-    assert not first.expanded and second.expanded
-
-
-def test_album_settings_has_compact_exclusive_accordions(app):
+def test_album_settings_has_compact_native_pages(app):
     view = AlbumSettingsWidget(create_template_registry(), Translator("fr"))
     view.resize(960, 450)
     view.show()
     app.processEvents()
-    assert isinstance(view._settings_scroll, QScrollArea)
-    assert len(view._accordions.sections) == 7
-    assert "numbering_printing" in view._accordions.sections
-    assert "numbers" not in view._accordions.sections
-    assert "printing" not in view._accordions.sections
-    assert [key for key, section in view._accordions.sections.items() if section.expanded] == ["format"]
+    toolbox = view._settings_toolbox
+    assert type(toolbox) is QToolBox
+    assert toolbox.count() == 7
+    assert "numbering_printing" in view._settings_sections
+    assert "numbers" not in view._settings_sections
+    assert "printing" not in view._settings_sections
+    assert toolbox.currentIndex() == view._settings_sections["format"][0]
     assert view.minimumSizeHint().height() < 450
-    assert view._settings_scroll.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
-    # Opening a section collapses the previously expanded section.
-    assert view._accordions.exclusive
-    view._accordions.sections["covers"].set_expanded(True)
+    toolbox.setCurrentIndex(view._settings_sections["covers"][0])
     app.processEvents()
-    assert not view._accordions.sections["format"].expanded
-    assert view._accordions.sections["covers"].expanded
+    assert not toolbox.widget(view._settings_sections["format"][0]).isVisibleTo(view)
     assert view._front_cover_combo.count() > 0
-    view._accordions.sections["covers"].set_expanded(False)
-    assert not view._accordions.sections["format"].expanded
-    assert not view._accordions.sections["covers"].expanded
-    # An accordion can always be reopened after everything is closed.
-    view._accordions.sections["dividers"].set_expanded(True)
-    assert view._accordions.sections["dividers"].expanded
-    assert sum(section.expanded for section in view._accordions.sections.values()) == 1
     before = view.settings()
+    for index in range(toolbox.count()):
+        toolbox.setCurrentIndex(index)
+        app.processEvents()
+        assert toolbox.widget(index).isVisibleTo(view)
+        assert view.height() == 450
+        assert view.settings() == before
     view.set_settings(before)
     assert view.settings() == before
     view.close()
@@ -114,26 +64,25 @@ def test_pdf_has_pinned_destination_generate_and_compact_options(app):
     view.resize(960, 450)
     view.show()
     app.processEvents()
-    assert len(view._pdf_accordions.sections) == 3
-    assert "document" not in view._pdf_accordions.sections
+    toolbox = view._options_container
+    assert type(toolbox) is QToolBox
+    assert toolbox.count() == 3
+    assert "document" not in view._option_sections
     assert view._pdf_output_group.title().startswith("Fichier de sortie : A4")
-    assert view._pdf_accordions.sections["content"].expanded
-    assert not view._options_scroll.isAncestorOf(view._pdf_output_edit)
-    assert not view._options_scroll.isAncestorOf(view.generate_button)
-    assert view._options_scroll.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    assert toolbox.currentIndex() == view._option_sections["content"][0]
+    assert not toolbox.isAncestorOf(view._pdf_output_edit)
+    assert not toolbox.isAncestorOf(view.generate_button)
     assert view.minimumSizeHint().height() < 450
-    assert view._pdf_accordions.exclusive
-    view._pdf_accordions.sections["metadata"].set_expanded(True)
-    assert not view._pdf_accordions.sections["content"].expanded
-    assert view._pdf_accordions.sections["metadata"].expanded
-    view._pdf_accordions.sections["metadata"].set_expanded(False)
-    assert not view._pdf_accordions.sections["content"].expanded
-    assert not view._pdf_accordions.sections["metadata"].expanded
-    view._pdf_accordions.sections["quality"].set_expanded(True)
-    assert sum(section.expanded for section in view._pdf_accordions.sections.values()) == 1
+    before = view.project_settings()
+    for index in range(toolbox.count()):
+        toolbox.setCurrentIndex(index)
+        app.processEvents()
+        assert toolbox.widget(index).isVisibleTo(view)
+        assert view.height() == 450
+        assert view.project_settings() == before
     view._pdf_title_edit.setText("Titre de test")
     view._update_option_summaries()
-    assert "Titre de test" in view._pdf_accordions.sections["metadata"]._summary.text()
+    assert "Titre de test" in toolbox.itemText(view._option_sections["metadata"][0])
     view.close()
     settings.close()
 
@@ -153,7 +102,7 @@ def test_pdf_output_title_shows_live_format_pages_and_photo_count(app):
         before_export=lambda: None,
     )
     try:
-        assert "document" not in view._pdf_accordions.sections
+        assert "document" not in view._option_sections
         title = view._pdf_output_group.title()
         assert "A4 — 210 × 297 mm" in title
         assert "595 pages" in title

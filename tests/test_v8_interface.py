@@ -3,14 +3,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from PySide6.QtCore import QPoint, Qt, QSettings, QStandardPaths
-from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QWidget
+from PySide6.QtCore import QSettings, QStandardPaths
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from photoalbum.album import PlanItemKind
 from photoalbum.gui import default_paths
 from photoalbum.gui.main_window import MainWindow
-from photoalbum.gui.widgets.accordion_section import AccordionSection
 from photoalbum.gui.widgets.album_preview_widget import AlbumPreviewWidget
 from photoalbum.i18n import Translator
 
@@ -25,37 +23,6 @@ def private_paths_settings(tmp_path, monkeypatch):
     settings = QSettings(str(tmp_path / "paths.ini"), QSettings.Format.IniFormat)
     monkeypatch.setattr(default_paths, "_settings", lambda: settings)
     return settings
-
-
-def test_accordion_hover_surface_covers_full_row_with_native_selection(app):
-    section = AccordionSection("Format", QWidget())
-    try:
-        section.resize(600, 120)
-        section.set_summary("A4 — 210 × 297 mm")
-        section.show()
-        app.processEvents()
-        # A full-width native QToolButton keeps the previous checked/pressed
-        # behaviour; no custom stylesheet should draw a white/blue focus box.
-        assert section._heading.styleSheet() == ""
-        assert section._heading.autoRaise()
-        assert section._heading.isCheckable()
-        assert section._heading.focusPolicy() == Qt.FocusPolicy.StrongFocus
-        assert section.layout().itemAt(0).widget() is section._heading
-        assert section._heading.width() == section.width()
-        assert section._summary.parentWidget() is section._heading
-        assert section._summary.width() >= section._summary.sizeHint().width()
-        assert section._summary.testAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents
-        )
-        # Clicking even near the far-right summary toggles the section.
-        near_summary = QPoint(section._heading.width() - 10,
-                              section._heading.height() // 2)
-        QTest.mouseClick(section._heading, Qt.MouseButton.LeftButton, pos=near_summary)
-        assert section.expanded
-        QTest.mouseClick(section._heading, Qt.MouseButton.LeftButton, pos=near_summary)
-        assert not section.expanded
-    finally:
-        section.close()
 
 
 @pytest.mark.parametrize("kind", [PlanItemKind.SPECIAL_PAGE, PlanItemKind.BODY_SPECIAL_PAGE])

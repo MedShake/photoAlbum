@@ -768,7 +768,7 @@ def test_plan_columns_are_all_user_resizable():
         widget.close()
 
 
-def test_plan_details_colour_intentional_editorial_pages_green_with_warning_priority():
+def test_plan_observations_preserve_editorial_and_warning_details_with_native_colors():
     from photoalbum.album import AutomaticPhotoPageSettings, PhotoPageOverride
     from photoalbum.models import Photo
 
@@ -800,9 +800,7 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
             page_instance=override_page,
         )
         overridden_item = widget._page_item(overridden)
-        assert overridden_item.foreground(4).color().name() == "#2e7d32"
         assert overridden_item.text(4) == "MSB — One photo"
-        assert overridden_item.foreground(5).color().name() == "#2e7d32"
         assert overridden_item.text(5) == "Custom template"
 
         special = PlannedPage(
@@ -814,7 +812,6 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
         )
         special_item = widget._page_item(special)
         assert special_item.text(4) == "MSB — Blank page"
-        assert special_item.foreground(5).color().name() == "#2e7d32"
         assert special_item.text(5) == "Special page"
 
         unused = PlannedPage(
@@ -826,7 +823,8 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
             photo_capacity=2,
             page_instance=override_page,
         )
-        assert widget._page_item(unused).foreground(5).color().name() == "#ef6c00"
+        unused_item = widget._page_item(unused)
+        assert unused_item.text(5) == "Custom template — 1 unused slot"
 
         widget._caption_overflows = {4: [("a.jpg", 4, 3)]}
         overflow = PlannedPage(
@@ -838,7 +836,12 @@ def test_plan_details_colour_intentional_editorial_pages_green_with_warning_prio
             photo_capacity=1,
             page_instance=override_page,
         )
-        assert widget._page_item(overflow).foreground(5).color().name() == "#c62828"
+        overflow_item = widget._page_item(overflow)
+        assert overflow_item.text(5) == "Custom template — Caption too long"
+        for item in (overridden_item, special_item, unused_item, overflow_item):
+            for column in range(widget._tree.columnCount()):
+                assert item.data(column, Qt.ItemDataRole.ForegroundRole) is None
+                assert item.data(column, Qt.ItemDataRole.BackgroundRole) is None
     finally:
         widget.close()
 
@@ -957,22 +960,23 @@ def test_plan_all_structure_rows_use_uniform_height():
         widget.close()
 
 
-def test_plan_rebuild_clears_hover_references_before_qt_items_are_destroyed():
+def test_plan_rebuild_cancels_previews_before_qt_items_are_destroyed():
     widget = create_widget()
     try:
         settings = create_structure_settings()
         result = create_result()
         widget.set_result(result, settings)
-        hovered = widget._tree.topLevelItem(0)
-        widget._set_hovered_plan_item(hovered)
-        assert widget._hovered_plan_item is hovered
+        old_icons = set(widget._preview_hover_items)
+        old_item = widget._tree.topLevelItem(0)
+        widget._pending_page_preview = (old_item, None, CoverPosition.FRONT, None)
+        widget._page_preview_timer.start()
 
         widget.set_result(result, settings)
 
-        assert widget._hovered_plan_item is None
-        assert widget._action_hover_items == {} or all(
-            item is not hovered for item in widget._action_hover_items.values()
-        )
+        assert widget._pending_page_preview is None
+        assert not widget._page_preview_timer.isActive()
+        assert old_icons.isdisjoint(widget._preview_hover_items)
+        assert all(item is not old_item for item, _, _ in widget._preview_hover_items.values())
     finally:
         widget.close()
 

@@ -5,14 +5,14 @@ from math import isclose
 from photoalbum.album.planning import PlanItemKind
 
 from PySide6.QtCore import Qt, Signal, QSignalBlocker
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
-    QFrame,
-    QScrollArea,
+    QToolBox,
     QHBoxLayout,
     QGridLayout,
     QLabel,
@@ -23,8 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from photoalbum.gui.widgets.accordion_section import AccordionGroup, AccordionSection
 
 from photoalbum.template_engine.defaults import (
     default_template_choices,
@@ -104,7 +102,7 @@ class AlbumSettingsWidget(QWidget):
         self._apply_defaults()
         self._last_page_dimensions_mm = self._page_geometry()
         self.set_available_years(set())
-        self._update_accordion_summaries()
+        self._update_section_summaries()
 
     def set_photo_provider(
         self,
@@ -113,28 +111,14 @@ class AlbumSettingsWidget(QWidget):
         self._photo_provider = provider
 
     def _create_content(self) -> None:
-        # No group may impose its full expanded height on QTabWidget.  Each
-        # accordion hides its contents, and the scroll area is an emergency
-        # fallback, not a permanently visible scrollbar.
+        # QToolBox owns page switching, keyboard navigation and per-page
+        # scrolling. No custom heading painter or outer scroll area is needed.
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
-        self._settings_scroll = QScrollArea(self)
-        self._settings_scroll.setWidgetResizable(True)
-        self._settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._settings_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self._settings_scroll.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-        outer.addWidget(self._settings_scroll)
-
-        content = QWidget()
-        content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
-        self._accordions = AccordionGroup(exclusive=True)
+        self._settings_toolbox = QToolBox(self)
+        self._settings_toolbox.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        outer.addWidget(self._settings_toolbox)
+        self._settings_sections: dict[str, tuple[int, str]] = {}
         groups = [
             ("format", self._create_page_format_group()),
             ("covers", self._create_covers_group()),
@@ -153,22 +137,29 @@ class AlbumSettingsWidget(QWidget):
             )),
         ]
         for key, group in groups:
-            # Store the original title in the accordion, then let the native
-            # QGroupBox draw only its contents.
-            section = AccordionSection(group.title(), group, expanded=False)
-            self._accordions.add(key, section)
-            # Compute the latest summary when the user closes a section,
-            # including edits that do not emit settings_changed directly.
-            section.toggled.connect(self._refresh_summary_on_collapse)
-            layout.addWidget(section)
-        self._accordions.sections["format"].set_expanded(True)
-        layout.addStretch(1)
-        self._settings_scroll.setWidget(content)
+            title = group.title()
+            group.setTitle("")
+            group.setFlat(True)
+            # QToolBox stretches its page to the viewport. Let one bottom
+            # spacer absorb that space instead of spreading the form controls.
+            page = QWidget()
+            page_layout = QVBoxLayout(page)
+            page_layout.setContentsMargins(0, 0, 0, 0)
+            page_layout.addWidget(group)
+            page_layout.addStretch(1)
+            index = self._settings_toolbox.addItem(page, title)
+            self._settings_sections[key] = (index, title)
+            # Keep native keyboard access without numbering the visible titles.
+            shortcut = QShortcut(QKeySequence(f"Alt+{index + 1}"), self._settings_toolbox)
+            shortcut.activated.connect(lambda index=index: self._settings_toolbox.setCurrentIndex(index))
+        self._settings_toolbox.currentChanged.connect(self._update_section_summaries)
         self._connect_settings_signals()
 
-    def _refresh_summary_on_collapse(self, expanded: bool) -> None:
-        if not expanded and not self._loading_settings:
-            self._update_accordion_summaries()
+    def _set_section_summary(self, key: str, summary: str) -> None:
+        index, title = self._settings_sections[key]
+        text = f"{title} — {summary}" if summary else title
+        self._settings_toolbox.setItemText(index, text)
+        self._settings_toolbox.setItemToolTip(index, text)
 
     def _page_format_summary(self) -> str:
         """Use the actual selected format (including applied custom dimensions)."""
@@ -194,14 +185,15 @@ class AlbumSettingsWidget(QWidget):
             f"{self._translator.tr(orientation_key)}"
         )
 
-    def _update_accordion_summaries(self) -> None:
-        """Show only accurate and current information in collapsed headers."""
-        a = self._accordions.sections
-        a["format"].set_summary(self._page_format_summary())
+    def _update_section_summaries(self, _index: int = -1) -> None:
+        """Keep native page titles current, including after direct form edits."""
+        if self._loading_settings:
+            return
+        self._set_section_summary("format", self._page_format_summary())
 
         # Four model names do not fit small screens. Showing only two would
         # incorrectly suggest the other covers are not configured.
-        a["covers"].set_summary("")
+        self._set_section_summary("covers", "")
 
         # Group separators by their state instead of using competing tick
         # and cross glyphs. Both states are explicitly labelled and have
@@ -232,10 +224,9 @@ class AlbumSettingsWidget(QWidget):
                 f"{self._translator.tr('album.divider_summary.inactive')} "
                 f"{', '.join(inactive)}"
             )
-        a["dividers"].set_summary(" · ".join(parts))
-        a["photos"].set_summary(self._photo_page_combo.currentText())
-        # The combined accordion deliberately has no collapsed summary.
-        a["numbering_printing"].set_summary("")
+        self._set_section_summary("dividers", " · ".join(parts))
+        self._set_section_summary("photos", self._photo_page_combo.currentText())
+        self._set_section_summary("numbering_printing", "")
 
         for key, page_list in (
             ("front", self._front_matter_list),
@@ -251,7 +242,7 @@ class AlbumSettingsWidget(QWidget):
                     else "album.special_pages_summary_many"
                 )
                 summary = self._translator.tr(translation_key, count=count)
-            a[key].set_summary(summary)
+            self._set_section_summary(key, summary)
 
     def _connect_settings_signals(self) -> None:
         # Page format and orientation are deliberately excluded here.
@@ -304,7 +295,7 @@ class AlbumSettingsWidget(QWidget):
         if self._loading_settings:
             return
 
-        self._update_accordion_summaries()
+        self._update_section_summaries()
         self.settings_changed.emit()
 
     def _create_page_format_group(self) -> QGroupBox:
@@ -655,9 +646,9 @@ class AlbumSettingsWidget(QWidget):
             self._loading_settings = was_loading
 
         # Format/orientation changes bypass _emit_settings_changed; refresh
-        # the collapsed heading after the selectors have been repopulated.
-        if "format" in self._accordions.sections:
-            self._update_accordion_summaries()
+        # the page titles after the selectors have been repopulated.
+        if "format" in self._settings_sections:
+            self._update_section_summaries()
 
         # Allow registered template extensions to react to physical page changes.
         if not was_loading:
@@ -1257,7 +1248,7 @@ class AlbumSettingsWidget(QWidget):
         self._emit_settings_changed()
 
     def _create_numbering_printing_group(self) -> QGroupBox:
-        """Keep both related options in one compact accordion."""
+        """Keep both related options in one native page."""
         group = QGroupBox(self._translator.tr("album.page_numbering"))
         layout = QVBoxLayout(group)
         self._page_numbers_checkbox = QCheckBox(
@@ -1585,7 +1576,7 @@ class AlbumSettingsWidget(QWidget):
             self._day_dividers_checkbox.setChecked(enabled)
         finally:
             self._loading_settings = was_loading
-        self._update_accordion_summaries()
+        self._update_section_summaries()
 
     def set_available_years(
         self,
@@ -1642,7 +1633,7 @@ class AlbumSettingsWidget(QWidget):
 
         finally:
             self._loading_settings = False
-            self._update_accordion_summaries()
+            self._update_section_summaries()
 
 
     def _divider_instance(
@@ -1935,7 +1926,7 @@ class AlbumSettingsWidget(QWidget):
         finally:
             self._last_page_dimensions_mm = self._page_geometry()
             self._loading_settings = False
-            self._update_accordion_summaries()
+            self._update_section_summaries()
 
     def _update_divider_controls(self) -> None:
         day_enabled = (

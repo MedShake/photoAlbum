@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QGroupBox,
     QLineEdit, QPushButton, QRadioButton, QComboBox, QProgressBar,
-    QPlainTextEdit, QFileDialog, QMessageBox, QScrollArea, QFrame, QSizePolicy,
+    QPlainTextEdit, QFileDialog, QMessageBox, QToolBox, QSizePolicy,
 )
 
 from photoalbum.album import (
@@ -24,7 +25,6 @@ from photoalbum.export import (
 from photoalbum.gui.workers import PdfExportWorker
 from photoalbum.project_metadata import PdfExportSettings, ProjectPdfMetadata
 from photoalbum.i18n import Translator
-from photoalbum.gui.widgets.accordion_section import AccordionGroup, AccordionSection
 
 
 class PdfExportWidget(QWidget):
@@ -60,19 +60,11 @@ class PdfExportWidget(QWidget):
     def _create_content(self) -> None:
         render_layout = QVBoxLayout(self)
         render_layout.setContentsMargins(6, 6, 6, 6)
-        # Configuration as compact accordion; scroll only on very short windows.
-        self._options_scroll = QScrollArea(self)
-        self._options_scroll.setWidgetResizable(True)
-        self._options_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._options_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._options_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._options_container = QWidget()
-        self._options_layout = QVBoxLayout(self._options_container)
-        self._options_layout.setContentsMargins(3, 3, 3, 3)
-        self._options_layout.setSpacing(3)
-        self._pdf_accordions = AccordionGroup(exclusive=True)
-        self._options_scroll.setWidget(self._options_container)
-        render_layout.addWidget(self._options_scroll, 1)
+        # Native pages own their scrolling; export controls remain pinned below.
+        self._options_container = QToolBox(self)
+        self._options_container.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self._option_sections: dict[str, tuple[int, str]] = {}
+        render_layout.addWidget(self._options_container, 1)
 
         # Export content.
         content_group = QGroupBox(self._translator.tr('render.content_group'))
@@ -163,8 +155,7 @@ class PdfExportWidget(QWidget):
 
         self._add_option_section("metadata", metadata_group)
 
-        self._options_layout.addStretch(1)
-        self._pdf_accordions.sections["content"].set_expanded(True)
+        self._options_container.currentChanged.connect(self._update_option_summaries)
 
         # Output file: keep the destination next to the final generate action.
         self._pdf_output_group = QGroupBox(self._translator.tr('render.output_group'))
@@ -212,21 +203,35 @@ class PdfExportWidget(QWidget):
         render_layout.addLayout(action_layout)
 
     def _add_option_section(self, key: str, group: QGroupBox) -> None:
-        section = AccordionSection(group.title(), group, expanded=False)
-        self._pdf_accordions.add(key, section)
-        self._options_layout.addWidget(section)
+        title = group.title()
+        group.setTitle("")
+        group.setFlat(True)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(group)
+        layout.addStretch(1)
+        index = self._options_container.addItem(page, title)
+        self._option_sections[key] = (index, title)
+        shortcut = QShortcut(QKeySequence(f"Alt+{index + 1}"), self._options_container)
+        shortcut.activated.connect(lambda index=index: self._options_container.setCurrentIndex(index))
 
-    def _update_option_summaries(self) -> None:
-        sections = self._pdf_accordions.sections
+    def _set_option_summary(self, key: str, summary: str) -> None:
+        index, title = self._option_sections[key]
+        text = f"{title} — {summary}" if summary else title
+        self._options_container.setItemText(index, text)
+        self._options_container.setItemToolTip(index, text)
+
+    def _update_option_summaries(self, _index: int = -1) -> None:
         if self._pdf_content_covers_radio.isChecked():
             content = self._pdf_content_covers_radio.text()
         elif self._pdf_content_body_radio.isChecked():
             content = self._pdf_content_body_radio.text()
         else:
             content = self._pdf_content_complete_radio.text()
-        sections["content"].set_summary(content)
-        sections["quality"].set_summary(self._pdf_dpi_combo.currentText())
-        sections["metadata"].set_summary(self._pdf_title_edit.text().strip())
+        self._set_option_summary("content", content)
+        self._set_option_summary("quality", self._pdf_dpi_combo.currentText())
+        self._set_option_summary("metadata", self._pdf_title_edit.text().strip())
 
     def set_project_settings(self, settings: PdfExportSettings | None) -> None:
         """Load persisted PDF preferences without writing them back."""
@@ -367,7 +372,7 @@ class PdfExportWidget(QWidget):
             )
 
         # Display document information directly after the output-file heading.
-        # Keep it outside the options accordion so it remains visible.
+        # Keep it outside the options pages so it remains visible.
         document_info = (
             f"{format_name} — {width_mm:g} × {height_mm:g} mm"
             f" / {page_text} / {photo_text}"

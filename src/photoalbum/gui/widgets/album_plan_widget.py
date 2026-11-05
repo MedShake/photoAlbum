@@ -8,7 +8,7 @@ from photoalbum.gui.icon_resources import resource_icon
 from photoalbum.gui.template_labels import template_display_name
 
 from PySide6.QtCore import QDate, QEvent, QLocale, QPoint, QRect, QSize, QTimer, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QGuiApplication, QPainter
+from PySide6.QtGui import QGuiApplication, QPainter
 from shiboken6 import isValid
 
 from PySide6.QtWidgets import (
@@ -104,8 +104,6 @@ class AlbumPlanWidget(QWidget):
         self._translator = translator or Translator()
         self._summary_builder = AlbumSummaryBuilder()
         self._caption_overflows = {}
-        self._hovered_plan_item = None
-        self._action_hover_items = {}
         self._preview_hover_items = {}
         self._preview_widget = preview_widget
         self._pending_page_preview = None
@@ -226,9 +224,6 @@ class AlbumPlanWidget(QWidget):
 
         self._tree = QTreeWidget()
         self._tree.setMouseTracking(True)
-        self._tree.itemEntered.connect(self._on_plan_item_entered)
-        self._tree.viewport().setMouseTracking(True)
-        self._tree.viewport().installEventFilter(self)
         self._tree.setHeaderLabels(
             [
                 self._translator.tr("plan.section"),
@@ -349,7 +344,6 @@ class AlbumPlanWidget(QWidget):
                 row.setContentsMargins(0, 0, 0, 0)
                 row.setSpacing(2)
                 row.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-                self._register_action_hover(container, item)
                 def button(key, icon_name, callback):
                     action = QToolButton()
                     action.setIcon(resource_icon(icon_name))
@@ -381,15 +375,12 @@ class AlbumPlanWidget(QWidget):
                 continue
             state = "plan.disabled" if not insertion.enabled else "plan.dormant"
             item = QTreeWidgetItem([self._template_name(insertion.page.template_id), "—", "—", "", "", self._translator.tr(state)])
-            for column in range(6):
-                item.setForeground(column, QColor("#777777"))
             self._tree.addTopLevelItem(item)
             container = QWidget()
             row = QHBoxLayout(container)
             row.setContentsMargins(0, 0, 0, 0)
             row.setSpacing(2)
             row.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            self._register_action_hover(container, item)
             self._insertion_buttons(row, insertion.page.instance_id, None)
             self._tree.setItemWidget(item, 3, container)
             item.setSizeHint(0, QSize(0, 26))
@@ -513,41 +504,12 @@ class AlbumPlanWidget(QWidget):
         self._sync_wrapped_label_height(self._warnings_scroll, self._warnings_label)
         self._sync_wrapped_label_height(self._suggestions_scroll, self._suggestions_label)
 
-    def _register_action_hover(self, container: QWidget, item: QTreeWidgetItem) -> None:
-        self._action_hover_items[container] = item
-        container.setMouseTracking(True)
-        container.installEventFilter(self)
-
-    def _on_plan_item_entered(self, item: QTreeWidgetItem, _column: int) -> None:
-        self._set_hovered_plan_item(item)
-
     def _reset_tree(self) -> None:
         # Rebuilding the tree destroys the underlying C++ QTreeWidgetItem
-        # objects.  Never retain hover/action references across that boundary.
-        hovered = self._hovered_plan_item
-        self._hovered_plan_item = None
-        if hovered is not None and isValid(hovered):
-            for column in range(self._tree.columnCount()):
-                hovered.setBackground(column, QBrush())
-        self._action_hover_items.clear()
+        # objects. Never retain preview references across that boundary.
         self._preview_hover_items.clear()
         self._cancel_page_preview()
         self._tree.clear()
-
-    def _set_hovered_plan_item(self, item: QTreeWidgetItem | None) -> None:
-        if item is not None and not isValid(item):
-            item = None
-        if item is self._hovered_plan_item:
-            return
-        previous = self._hovered_plan_item
-        self._hovered_plan_item = item
-        if previous is not None and isValid(previous):
-            for column in range(self._tree.columnCount()):
-                previous.setBackground(column, QBrush())
-        if item is not None:
-            background = QBrush(QColor("#eeeeee"))
-            for column in range(self._tree.columnCount()):
-                item.setBackground(column, background)
 
     def eventFilter(self, watched, event):
         # Qt can synchronously deliver events while _create_ui() is still
@@ -572,30 +534,10 @@ class AlbumPlanWidget(QWidget):
             )
             if event.type() == QEvent.Type.Enter:
                 if item is not None and isValid(item):
-                    self._set_hovered_plan_item(item)
                     self._schedule_page_preview(watched, item, page, cover_position)
             elif event.type() == QEvent.Type.Leave:
                 self._cancel_page_preview()
-                self._set_hovered_plan_item(None)
             return super().eventFilter(watched, event)
-
-        tree = getattr(self, "_tree", None)
-        if tree is not None and watched is tree.viewport():
-            if event.type() == QEvent.Type.MouseMove:
-                self._set_hovered_plan_item(tree.itemAt(event.position().toPoint()))
-            elif event.type() == QEvent.Type.Leave:
-                self._set_hovered_plan_item(None)
-            return super().eventFilter(watched, event)
-
-        action_hover_items = getattr(self, "_action_hover_items", {})
-        if watched in action_hover_items:
-            if event.type() == QEvent.Type.Enter:
-                item = action_hover_items.get(watched)
-                self._set_hovered_plan_item(
-                    item if item is not None and isValid(item) else None
-                )
-            elif event.type() == QEvent.Type.Leave:
-                self._set_hovered_plan_item(None)
 
         return super().eventFilter(watched, event)
 
@@ -1310,17 +1252,8 @@ class AlbumPlanWidget(QWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, page)
         item.setSizeHint(0, QSize(0, 26))
 
-        # The model name is green only when an automatic photo-page choice was
-        # manually overridden. Observations retain the semantic warning colours.
-        if editorial_detail_key == "plan.custom_template":
-            item.setForeground(4, QColor("#2e7d32"))
-
-        if overflows:
-            item.setForeground(5, QColor("#c62828"))
-        elif page.unused_photo_slots:
-            item.setForeground(5, QColor("#ef6c00"))
-        elif editorial_detail_key is not None:
-            item.setForeground(5, QColor("#2e7d32"))
+        # Observations carry the diagnostic/editorial meaning. Let the native
+        # delegate choose readable colors for every palette and item state.
         return item
 
     def _editorial_detail_key(self, page) -> str | None:
