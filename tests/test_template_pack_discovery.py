@@ -26,7 +26,8 @@ def test_msb_pack_is_discovered():
 
     assert "msb" in pack_ids
     assert "simplex" in pack_ids
-    assert packs[0].name == "MSB"
+    assert "complex" in pack_ids
+    assert next(pack for pack in packs if pack.pack_id == "msb").name == "MSB"
 
 
 def test_msb_templates_are_discovered():
@@ -51,6 +52,11 @@ def test_msb_templates_are_discovered():
         "dedication",
         "blank",
         "simplex-full-photo-cover",
+        "complex-photo-1",
+        "complex-photo-2",
+        "complex-photo-3",
+        "complex-photo-4",
+        "complex-photo-5",
     }
 
 

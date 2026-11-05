@@ -30,7 +30,7 @@ packaging = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src/photoalbum/templates/complex/qa"]
 pythonpath = ["src"]
 
 [tool.setuptools.packages.find]

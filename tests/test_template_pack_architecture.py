@@ -244,7 +244,10 @@ def test_invalid_default_roles_fail_discovery(tmp_path, roles):
         discovery.load_template_pack(path)
 
 
-@pytest.mark.parametrize('pack_id,blocked_id', [('msb', 'simplex'), ('simplex', 'msb')])
+@pytest.mark.parametrize('pack_id,blocked_id', [
+    ('msb', 'simplex'), ('simplex', 'msb'),
+    ('msb', 'complex'), ('complex', 'msb'),
+])
 def test_pack_loads_in_fresh_process_without_the_other(pack_id, blocked_id):
     script = '''
 import importlib.abc
@@ -259,12 +262,19 @@ from photoalbum.template_engine.discovery import (
     register_discovered_layouts, pack_settings_editor,
 )
 from photoalbum.album.composition import TemplateLayoutRegistry
+from photoalbum.album import AutomaticPhotoPageContext, PageInstance
 from photoalbum.template_engine import template_extension_registry
 pack = next(p for p in discover_template_packs() if p.pack_id == sys.argv[1])
 register_discovered_template_extensions((pack,))
 register_discovered_layouts(TemplateLayoutRegistry(), (pack,))
 pack_settings_editor(pack.pack_id)
 assert all(template_extension_registry.get(t.template_id) for t in pack.templates)
+for mode in pack.automatic_photo_page_modes:
+    module_name, selector_name = mode.selector_reference.split(':')
+    selector = getattr(importlib.import_module(module_name), selector_name)
+    selected = selector(AutomaticPhotoPageContext((), 210, 297))
+    template_id = selected.template_id if isinstance(selected, PageInstance) else selected
+    assert template_id in mode.template_ids
 '''
     subprocess.run(
         [sys.executable, '-c', script, pack_id, f'photoalbum.templates.{blocked_id}'],

@@ -60,8 +60,7 @@ Les identifiants historiques du modèle 4 sont inchangés. Les identifiants `fiv
 
 ```bash
 python src/photoalbum/templates/complex/qa/validate_geometry.py
-python src/photoalbum/templates/complex/qa/test_automatic.py
-PYTHONPATH=src python src/photoalbum/templates/complex/qa/test_pagination_integration.py
+QT_QPA_PLATFORM=offscreen python -m pytest -q src/photoalbum/templates/complex/qa
 ```
 
 Tests automatisés Qt-indépendants : 39 géométries 4/5 photos, 29 variantes de 5, signatures et rotation, pages manuelles intercalées et régénération. **L'éditeur PySide6 et le rendu/export PDF doivent encore être vérifiés sur la machine Linux cible.**

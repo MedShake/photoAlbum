@@ -28,11 +28,11 @@ def photo(index, orientation):
 @pytest.mark.parametrize("width,height,family", [
     (210, 297, "portrait"), (297, 210, "landscape"), (210, 210, "square")
 ])
-def test_layouts_and_image_fit(width, height, family):
-    QApplication.instance() or QApplication([])
+def test_layouts_and_image_fit(width, height, family, app):
     registry = TemplateLayoutRegistry()
     register_layouts(registry)
-    expected = {3:2,4:3,5:(2 if family == "square" else 5)}
+    expected = {3: 2, 4: (2 if family == "square" else 4),
+                5: {"portrait": 9, "landscape": 8, "square": 12}[family]}
     for capacity in range(1,6):
         options = variants_for(capacity,width,height)
         if capacity in expected:
@@ -60,30 +60,41 @@ def test_layouts_and_image_fit(width, height, family):
                 assert slot.caption_rect.y+slot.caption_rect.height <= 1.0000001
 
 
-def test_square_only_has_the_two_mosaics():
+def test_square_only_has_mosaics():
     from photoalbum.templates.complex.photo_page.layout import _rects_for
-    assert variants_for(5,210,210) == ("mosaic", "mosaic-mirror")
-    for banned in ("sequence", "sequence-top", "sequence-bottom"):
-        assert _rects_for(5,210,210,{"layout_variant":banned}) == _rects_for(5,210,210,{"layout_variant":"mosaic"})
+    options = variants_for(5, 210, 210)
+    assert len(options) == 12
+    assert all(variant.startswith("five-mosaic-") for variant in options)
+    for banned in ("five-sequence-top", "five-sequence-center", "five-sequence-bottom"):
+        assert _rects_for(5,210,210,{"layout_variant":banned}) == _rects_for(5,210,210,{"layout_variant":"five-mosaic-left"})
 
 
 @pytest.mark.parametrize("dims,orientations,expected,variant", [
-    ((210, 297), "PPLPL", "complex-photo-5", "mosaic"),
-    ((297, 210), "PPPLL", "complex-photo-5", "mosaic"),
-    ((210, 210), "PPLPL", "complex-photo-5", "mosaic"),
-    ((210, 297), "LLLLL", "complex-photo-5", "sequence"),
-    ((297, 210), "LLLLL", "complex-photo-5", "sequence"),
-    ((210, 297), "PLLLL", "complex-photo-4", "reportage"),
-    ((297, 210), "LPLLL", "complex-photo-4", "reportage-top-left"),
+    ((210, 297), "PPLPL", "complex-photo-5", "five-mosaic-left"),
+    ((297, 210), "PPPLL", "complex-photo-5", "five-mosaic-left"),
+    ((210, 210), "PPLPL", "complex-photo-5", "five-mosaic-left"),
+    ((210, 297), "LLLLL", "complex-photo-5", "five-sequence-top"),
+    ((297, 210), "LLLLL", "complex-photo-5", "five-sequence-top"),
+    ((210, 297), "PLLLL", "complex-photo-4", "four-current"),
+    ((297, 210), "PLLLL", "complex-photo-4", "four-top-medium-right"),
+    ((297, 210), "LPLLL", "complex-photo-1", None),
 ])
 def test_automatic_mode(dims,orientations,expected,variant):
     context=AutomaticPhotoPageContext(
         photos=tuple(photo(i,s) for i,s in enumerate(orientations)),
         page_width_mm=dims[0],page_height_mm=dims[1])
     selected=select_automatic_1_5(context)
+    if variant is None:
+        assert selected == expected
+        return
     assert isinstance(selected,PageInstance)
     assert selected.template_id==expected
     assert selected.settings["layout_variant"]==variant
+
+
+@pytest.fixture(scope="module")
+def app():
+    return QApplication.instance() or QApplication([])
 
 
 def test_manifest_discovers_independent_pack():

@@ -22,6 +22,11 @@ def test_builtin_registry_contains_photo_templates():
         "photo-page-2",
         "photo-page-3",
         "photo-page-4",
+        "complex-photo-1",
+        "complex-photo-2",
+        "complex-photo-3",
+        "complex-photo-4",
+        "complex-photo-5",
     }
 
 

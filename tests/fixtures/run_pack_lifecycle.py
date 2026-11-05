@@ -1,8 +1,12 @@
 """Run in a fresh interpreter against either a copied source tree or a wheel."""
 import sys
+import os
 from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
+# This isolated interpreter does not inherit tests/conftest.py's cache fixture.
+os.environ["XDG_CACHE_HOME"] = str(Path(sys.argv[2]) / "cache")
+os.environ["XDG_CONFIG_HOME"] = str(Path(sys.argv[2]) / "config")
 
 from dataclasses import replace
 from datetime import datetime
@@ -144,10 +148,11 @@ simplex_path = next(p.path for p in remaining.packs if p.pack_id == "simplex")
 shutil.rmtree(simplex_path)
 remaining = discover_templates()
 register_discovered_template_extensions(remaining.packs)
-assert {p.pack_id for p in remaining.packs} == {"msb"}
+assert {p.pack_id for p in remaining.packs} == {p.pack_id for p in found.packs} - {"testpack", "simplex"}
 assert template_extension_registry.get("simplex-full-photo-cover") is None
 assert AlbumSettingsWidget(remaining.registry).settings().photo_pages.automatic_mode.mode_id == "msb-orientation-1-2-3"
-shutil.rmtree(remaining.packs[0].path)
+for pack in remaining.packs:
+    shutil.rmtree(pack.path)
 empty = discover_templates()
 register_discovered_template_extensions(empty.packs)
 try:
