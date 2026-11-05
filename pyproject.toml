@@ -43,8 +43,10 @@ where = ["src"]
     "icons/*.txt",
 ]
 "*" = [
-    "manifest.json",
-    "README.md",
+    "*.json",
+    "README*.md",
+    "LICENSE*",
+    "CHANGELOG.md",
     "screenshots/*",
     "assets/*",
     "assets/**/*",

@@ -71,6 +71,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[packaging]"
 
+      - name: Build and verify Python distributions
+        run: |
+          python -m build
+          python packaging/verify_artifact.py dist/*.whl dist/*.tar.gz
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+
       - name: Build Linux application
         working-directory: packaging/pyinstaller
         run: |
@@ -80,12 +86,13 @@ jobs:
         run: |
           test -x packaging/pyinstaller/dist/photo-album/photo-album
           test -x packaging/pyinstaller/dist/photo-album/photo-album-cli
-          packaging/pyinstaller/dist/photo-album/photo-album-cli --help
-          find packaging/pyinstaller/dist/photo-album -name photoalbum.svg -print -quit | grep -q .
+          packaging/pyinstaller/dist/photo-album/photo-album-cli templates
+          python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test
 
       - name: Create Linux archive
         run: |
           tar -C packaging/pyinstaller/dist -czf PhotoAlbum-linux-x86_64.tar.gz photo-album
+          python packaging/verify_artifact.py PhotoAlbum-linux-x86_64.tar.gz
 
       - name: Build Debian package
         run: python packaging/debian/build_deb.py
@@ -94,6 +101,8 @@ jobs:
         run: |
           dpkg-deb --info photo-album_*.deb
           dpkg-deb --contents photo-album_*.deb
+          dpkg-deb --extract photo-album_*.deb packaging/debian/verify
+          python packaging/verify_artifact.py packaging/debian/verify/opt/photo-album --smoke-test
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
@@ -129,6 +138,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[packaging]"
 
+      - name: Build and verify Python distributions
+        shell: pwsh
+        run: |
+          python -m build
+          if ($LASTEXITCODE -ne 0) { throw "Python distribution build failed" }
+          $wheel = (Get-ChildItem "dist" -Filter "*.whl").FullName
+          $sdist = (Get-ChildItem "dist" -Filter "*.tar.gz").FullName
+          python packaging/verify_artifact.py $wheel $sdist
+          if ($LASTEXITCODE -ne 0) { throw "Python resources verification failed" }
+          python -m pip install --force-reinstall --no-deps $wheel
+          if ($LASTEXITCODE -ne 0) { throw "Wheel installation failed" }
+
       - name: Generate Windows icon
         shell: pwsh
         run: |
@@ -151,21 +172,14 @@ jobs:
               throw "photo-album-cli.exe not found"
           }
 
-          & "packaging/pyinstaller/dist/photo-album/photo-album-cli.exe" --help
+          & "packaging/pyinstaller/dist/photo-album/photo-album-cli.exe" templates
 
           if ($LASTEXITCODE -ne 0) {
-              throw "photo-album-cli --help failed"
+              throw "photo-album-cli template discovery failed"
           }
 
-          $icon = Get-ChildItem `
-              "packaging/pyinstaller/dist/photo-album" `
-              -Recurse `
-              -Filter "photoalbum.svg" `
-              | Select-Object -First 1
-
-          if (-not $icon) {
-              throw "photoalbum.svg not found in Windows bundle"
-          }
+          python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test
+          if ($LASTEXITCODE -ne 0) { throw "Windows bundle verification failed" }
 
       - name: Upload Windows application
         uses: actions/upload-artifact@v4
@@ -224,6 +238,14 @@ jobs:
 
           Write-Host "Installer:"
           $installer | Format-Table Name, Length
+
+          $installDir = Join-Path $env:RUNNER_TEMP "PhotoAlbum-installed"
+          $process = Start-Process -FilePath $installer.FullName -Wait -PassThru -ArgumentList @(
+              "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=`"$installDir`""
+          )
+          if ($process.ExitCode -ne 0) { throw "Windows installation failed: $($process.ExitCode)" }
+          python packaging/verify_artifact.py $installDir --smoke-test
+          if ($LASTEXITCODE -ne 0) { throw "Installed Windows application verification failed" }
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4

@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
+from pathlib import Path
 
 from PyInstaller.utils.hooks import (
     collect_data_files,
@@ -9,17 +10,24 @@ from PyInstaller.utils.hooks import (
 )
 
 
+spec_dir = Path(SPECPATH).resolve()
+sys.path.insert(0, str(spec_dir.parent))
+from verify_artifact import verify_collected_resources
+
+# Collect from the installed distribution, just as in release CI. Do not mix
+# source-tree modules with installed data: that can hide an incomplete wheel.
 datas = collect_data_files("photoalbum")
+verify_collected_resources(datas)
 datas += copy_metadata("photo-album")
 
 icon = None
 if sys.platform == "win32":
-    icon = "photoalbum.ico"
+    icon = str(spec_dir / "photoalbum.ico")
 
 
 a = Analysis(
-    ["photo_album.py"],
-    pathex=["../../src"],
+    [str(spec_dir / "photo_album.py")],
+    pathex=[],
     binaries=[],
     datas=datas,
     hiddenimports=collect_submodules("photoalbum.templates"),
@@ -47,8 +55,8 @@ exe = EXE(
 )
 
 cli_analysis = Analysis(
-    ["photo_album_cli.py"],
-    pathex=["../../src"],
+    [str(spec_dir / "photo_album_cli.py")],
+    pathex=[],
     datas=datas,
     hiddenimports=collect_submodules("photoalbum.templates"),
 )

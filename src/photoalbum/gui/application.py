@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+from PySide6.QtCore import QLibraryInfo, QLocale, QSettings, QTimer, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -78,6 +78,11 @@ def _parse_arguments() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--smoke-test",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "project",
         nargs="?",
         type=Path,
@@ -89,6 +94,12 @@ def _parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_arguments()
+
+    if args.smoke_test is not None:
+        # Release checks must not read or overwrite a user's desktop settings.
+        QSettings.setDefaultFormat(QSettings.Format.IniFormat)
+        QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                          str(args.smoke_test.parent / "settings"))
 
     application = QApplication([sys.argv[0]])
 
@@ -118,7 +129,24 @@ def main() -> int:
 
     window.show()
 
+    if args.smoke_test is not None:
+        QTimer.singleShot(250, lambda: _complete_smoke_test(application, window, args.smoke_test))
+
     return application.exec()
+
+
+def _complete_smoke_test(application: QApplication, window: MainWindow, report: Path) -> None:
+    try:
+        if not window.isVisible():
+            raise RuntimeError("The main window is not visible")
+        if not window.close():
+            raise RuntimeError("The main window could not close")
+        report.write_text("ok\n", encoding="utf-8")
+    except Exception:
+        logging.getLogger(__name__).exception("GUI startup check failed")
+        application.exit(1)
+    else:
+        application.exit(0)
 
 
 if __name__ == "__main__":
