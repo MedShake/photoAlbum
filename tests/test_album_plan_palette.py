@@ -49,7 +49,7 @@ def items(tree):
 
 
 @pytest.fixture(params=[False, True], ids=["light", "dark"])
-def plan(app, request):
+def plan(app, request, show_active_window):
     app.setPalette(plan_palette(request.param))
     widget = create_widget()
     settings = create_structure_settings()
@@ -59,11 +59,11 @@ def plan(app, request):
     ]
     widget.set_result(create_result(), settings)
     widget.resize(1500, 650)
-    widget.show()
-    app.processEvents()
+    show_active_window(widget)
     yield widget, settings, request.param
     widget.close()
     widget.deleteLater()
+    QApplication.sendPostedEvents(widget, QEvent.Type.DeferredDelete)
     app.processEvents()
 
 

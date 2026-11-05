@@ -1,8 +1,21 @@
-"""Keep cache tests and provider fixtures away from the user's real cache."""
+"""Shared GUI setup and isolation from the user's real application cache."""
 import pytest
 from PySide6.QtCore import QSettings
+from PySide6.QtTest import QTest
 
 from photoalbum.cache_manager import CacheManager
+
+
+@pytest.fixture
+def show_active_window():
+    """Wait for the window manager before testing focus or window shortcuts."""
+    def show(widget):
+        widget.show()
+        assert QTest.qWaitForWindowExposed(widget, 3000)
+        widget.activateWindow()
+        assert QTest.qWaitForWindowActive(widget, 3000)
+
+    return show
 
 
 @pytest.fixture(autouse=True)

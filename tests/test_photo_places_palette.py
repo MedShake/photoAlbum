@@ -3,8 +3,8 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QColor, QImage, QPalette
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QCheckBox, QLabel
 
@@ -46,7 +46,7 @@ def app():
 
 
 @pytest.fixture(params=[False, True], ids=["light", "dark"])
-def view(app, request):
+def view(app, request, show_active_window):
     original_palette = app.palette()
     app.setPalette(editorial_palette(request.param))
     widget = PhotoPlacesWidget()
@@ -61,15 +61,16 @@ def view(app, request):
         ])
     ]
     widget.set_photos(photos)
-    widget.show()
     year = widget._tree.topLevelItem(0)
     year.setExpanded(True)
     for index in range(year.childCount()):
         year.child(index).setExpanded(True)
-    app.processEvents()
+    show_active_window(widget)
     yield widget, photos, request.param
     widget.close()
     widget.deleteLater()
+    # Palette changes must not reach widgets awaiting their C++ destruction.
+    QApplication.sendPostedEvents(widget, QEvent.Type.DeferredDelete)
     app.processEvents()
     app.setPalette(original_palette)
     app.processEvents()
@@ -96,9 +97,13 @@ def assert_row_colors(view, photos):
 
 def assert_text_is_painted(control, role):
     expected = control.palette().color(role)
-    image = control.grab().toImage()
-    # Small native fonts use subpixel antialiasing; their strokes need not
-    # contain a pixel exactly equal to the requested text color.
+    # Render at high resolution so even small native glyphs have solid strokes.
+    # At desktop resolution, font antialiasing can blend every pixel with the
+    # background, without any contrast or palette regression in the widget.
+    image = QImage(control.size() * 3, QImage.Format.Format_ARGB32_Premultiplied)
+    image.setDevicePixelRatio(3)
+    image.fill(Qt.GlobalColor.transparent)
+    control.render(image)
     assert any(max(abs(actual - target) for actual, target in zip(
         image.pixelColor(x, y).getRgb()[:3], expected.getRgb()[:3],
     )) <= 16 for y in range(image.height()) for x in range(image.width()))
@@ -119,7 +124,8 @@ def test_alternating_rows_and_embedded_text_follow_palette(view):
                 for role in (QPalette.Base, QPalette.Text, QPalette.Button, QPalette.ButtonText,
                              QPalette.Highlight, QPalette.HighlightedText, QPalette.PlaceholderText):
                     assert control.palette().brush(group, role) == widget._tree.palette().brush(group, role)
-        assert_text_is_painted(combo, combo.foregroundRole())
+        # Non-editable native combo boxes paint their labels with ButtonText.
+        assert_text_is_painted(combo, QPalette.ButtonText)
         assert_text_is_painted(caption, QPalette.Text)
 
 

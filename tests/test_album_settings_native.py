@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 import pytest
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QApplication, QGroupBox, QScrollArea, QStyleFactory, QToolBox, QWidget
@@ -15,17 +15,18 @@ from photoalbum.template_engine import create_template_registry
 
 @pytest.fixture(params=[name for name in QStyleFactory.keys()
                         if name.lower() in {"fusion", "windows", "windowsvista", "windows11"}])
-def view(request):
+def view(request, show_active_window):
     app = QApplication.instance() or QApplication([])
     old_style, old_palette = app.style().objectName(), app.palette()
     app.setStyle(request.param)
     widget = AlbumSettingsWidget(create_template_registry(), Translator("fr"))
     widget.resize(960, 450)
-    widget.show()
-    app.processEvents()
+    show_active_window(widget)
     yield app, widget
     widget.close()
     widget.deleteLater()
+    # Dispose of the widget before restoring the application's style/palette.
+    QApplication.sendPostedEvents(widget, QEvent.Type.DeferredDelete)
     app.processEvents()
     app.setStyle(old_style)
     app.setPalette(old_palette)
@@ -160,4 +161,5 @@ def test_native_pages_preserve_settings_when_project_is_reopened(view, tmp_path,
         if restored_view is not None:
             restored_view.close()
             restored_view.deleteLater()
+            QApplication.sendPostedEvents(restored_view, QEvent.Type.DeferredDelete)
             app.processEvents()
