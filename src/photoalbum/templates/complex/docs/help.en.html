@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+body {
+    font-family: sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 24px 30px;
+}
+h1 {
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+}
+h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 26px 0 12px 0;
+}
+p {
+    margin: 0 0 16px 0;
+}
+ul {
+    margin: 6px 0 20px 24px;
+    padding: 0;
+}
+li {
+    margin: 0 0 9px 0;
+}
+</style>
+</head>
+<body>
+
+<h1>Complex</h1>
+
+<p>Complex is a self-contained pack of photo pages holding one to five photos.
+It offers asymmetric compositions, captions and an automatic mode that chooses
+a layout according to the orientation of the photos and the page.</p>
+
+<h2>Choosing a template</h2>
+
+<p>In <b>Album settings</b>, open the photo-page section and select a Complex
+template. Its settings button gives access to the layout, when several variants
+are available, and to captions. From <b>Plan</b>, you can also change the template
+of an individual page without changing the album-wide choice.</p>
+
+<p>These templates are intended for photo pages in the album body. The pack
+does not provide covers or dividers. Images keep their proportions: they are
+fitted into their slots without cropping. Captions can show the date and time,
+location and custom text, with controls for the font, size, color and order
+of the caption elements.</p>
+
+<h2>One photo</h2>
+
+<p><b>One photo</b> — A single image occupies the photographic area of the page,
+with its caption. This template accepts a portrait, landscape or square photo
+on any of these page shapes. It is also the automatic mode’s final fallback.</p>
+
+<h2>Two photos</h2>
+
+<p><b>Two photos</b> — On a portrait or square page, the images are placed one
+above the other. On a landscape page, they are side by side. Automatic mode
+pairs two landscape photos in the first case, or two portrait photos in the
+second. Manual selection remains possible with other orientations, which may
+leave more unused space around the images.</p>
+
+<h2>Three photos</h2>
+
+<p><b>Three photos</b> — One large image is accompanied by two smaller ones.
+The two variants place the large photo first or last in the sequence:</p>
+
+<ul>
+<li>Portrait or square page: large photo above, two smaller photos below;
+or two smaller photos above, large photo below.</li>
+<li>Landscape page: large photo on the left, two smaller photos on the right;
+or two smaller photos on the left, large photo on the right.</li>
+</ul>
+
+<h2>Four photos — Reportage</h2>
+
+<p><b>Four photos</b> — Reportage compositions combine one portrait and three
+landscape photos. On a portrait or landscape page, one landscape is larger than
+the other two. On a square page, three equally sized landscapes form a column
+beside the portrait. Four variants are available on a portrait page, four on a
+landscape page and two on a square page.</p>
+
+<p>Depending on the page shape, the layout changes the position of the portrait,
+the side occupied by the small images, or the position of the large landscape
+above or below them. In automatic mode, the portrait can occupy any of the four
+chronological positions on a portrait page. On a landscape or square page,
+it must be the first or fourth photo in the group.</p>
+
+<h2>Five photos — Mosaic and Sequence</h2>
+
+<p><b>Five photos</b> brings two composition families together in one template:</p>
+
+<ul>
+<li><b>Mosaic</b> — Three portrait and two landscape photos. On a portrait page,
+a column of two portraits accompanies a column of one portrait and two
+landscapes, on the left or right; the portrait in the triple column can be
+at the top, in the middle or at the bottom.
+On a landscape page, three columns containing two portraits, one portrait and
+two landscapes are permuted. On a square page, a row of two portraits and one
+landscape accompanies a row of one portrait and one landscape, above or below
+it; orientations can be permuted within each row.</li>
+<li><b>Sequence</b> — Five landscape photos. On a portrait page, the large image
+can be at the top, in the middle or at the bottom. On a landscape page, the two
+large images are at the top or bottom. This family is not available on a square page.</li>
+</ul>
+
+<p>The layout menu contains only the variants for the current page shape:</p>
+
+<table border="1" cellspacing="0" cellpadding="6">
+<tr><th>Page</th><th>Mosaic</th><th>Sequence</th><th>Total</th></tr>
+<tr><td>Portrait</td><td>6</td><td>3</td><td>9</td></tr>
+<tr><td>Landscape</td><td>6</td><td>2</td><td>8</td></tr>
+<tr><td>Square</td><td>12</td><td>None</td><td>12</td></tr>
+</table>
+
+<p>There are therefore <b>29 five-photo variants</b>. Two groups containing the
+same number of portrait and landscape photos are not necessarily compatible
+with the same layout: their exact order matters too.</p>
+
+<h2>Orientations and photo order</h2>
+
+<p>In the following table, <b>P</b> means a portrait photo and <b>L</b> a landscape
+photo. Letters follow the order of the photos in the album, rather than a
+permutation made to fill the page. The displayed orientation after applying
+EXIF orientation information is used.</p>
+
+<table border="1" cellspacing="0" cellpadding="6">
+<tr><th>Photo count</th><th>Portrait or square page</th><th>Landscape page</th></tr>
+<tr><td>Two</td><td>LL</td><td>PP</td></tr>
+<tr><td>Three</td><td>LPP or PPL</td><td>PLL or LLP</td></tr>
+<tr><td>Four</td><td>Portrait: PLLL, LPLL, LLPL or LLLP.<br>Square: PLLL or LLLP.</td><td>PLLL or LLLP</td></tr>
+<tr><td>Five</td><td>Mosaic: three P and two L, in the order of an available variant.<br>Sequence: LLLLL, on portrait pages only.</td><td>Mosaic: three P and two L, in the order of an available variant.<br>Sequence: LLLLL.</td></tr>
+</table>
+
+<p>These conditions guide <b>automatic selection</b>; they do not prevent manual
+use of a template with other orientations. A square or nearly square photo,
+or a photo with unknown dimensions, matches neither P nor L. If such a photo
+is first in the remaining group, automatic mode chooses One photo.</p>
+
+<p>Mosaic columns are read from left to right, and each column from top to bottom.
+Square mosaics and sequences arranged in rows are read from left to right, then
+top to bottom. Reportage has its own order: on a landscape page, a portrait on
+the right is the first photo, while a portrait on the left is the fourth.
+Photos are never reordered.</p>
+
+<h2>Automatic mode — 1 to 5 photos</h2>
+
+<p>Automatic mode first tries to place the next five photos, then four, three
+and two, before falling back to a single photo. It chooses the largest capacity
+compatible with the photo sequence and the layouts available for the page.
+It respects period boundaries, insertions and manual page starts defined in Plan.</p>
+
+<p>For example, five landscape photos can fill a Sequence page in portrait or
+landscape format. On a square page, the same sequence is split into pages of
+two photos, two photos and one photo, because Sequence is not available there.</p>
+
+<p>When several variants match, they are used in turn in menu order. Rotation
+is independent for each page shape and each ordered sequence of orientations.
+For five landscape photos on a portrait page, the layouts therefore cycle
+through a large image at the top, in the middle and at the bottom, then return
+to the top. On landscape pages, the two Sequence variants alternate.</p>
+
+<p>Rotation restarts with each album recalculation: the same photos and settings
+produce the same choices. A page set manually from Plan does not advance the
+rotation. To fix a specific layout on one page, use that manual choice instead
+of automatic mode.</p>
+
+</body>
+</html>

@@ -9,6 +9,10 @@
     }
   ],
   "description": "Autonomous 1–5 photo pack: 4-photo Reportage unchanged; 29 chronological 5-photo Mosaïque/Sequence layouts; per-signature deterministic automatic rotation (host integration).",
+  "documentation": {
+    "en": "docs/help.en.html",
+    "fr": "docs/help.fr.html"
+  },
   "templates": [
     {
       "id": "complex-photo-1",
