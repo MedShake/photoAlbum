@@ -3,13 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
+from photoalbum.images.formats import SUPPORTED_EXTENSIONS
+
 
 class FolderScanner:
-    SUPPORTED_EXTENSIONS = {
-        ".jpg",
-        ".jpeg",
-        ".png",
-    }
+    SUPPORTED_EXTENSIONS = SUPPORTED_EXTENSIONS
 
     def scan(
         self,

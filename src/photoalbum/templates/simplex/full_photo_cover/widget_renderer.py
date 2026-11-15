@@ -6,12 +6,13 @@ from PySide6.QtCore import QRect, QRectF, QSize, Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
-    QImageReader,
     QPixmap,
     QTextCharFormat,
     QTextCursor,
     QTextDocument,
 )
+
+from photoalbum.template_engine.api import load_qimage
 
 from .geometry import centered_cover_crop
 from .title import (
@@ -138,40 +139,9 @@ class SimplexFullPhotoCoverRenderer:
         if path is None:
             return
 
-        reader = QImageReader(str(path))
-        reader.setAutoTransform(True)
-
-        source_size = reader.size()
-
-        if not source_size.isValid():
-            return
-
-        # Decode only as large as useful for the current output while
-        # preserving enough pixels for the cover crop.
-        target_size = QSize(
-            max(1, int(width)),
-            max(1, int(height)),
+        image = load_qimage(
+            path, QSize(max(1, int(width)), max(1, int(height))), fit="cover",
         )
-
-        scale = max(
-            target_size.width() / source_size.width(),
-            target_size.height() / source_size.height(),
-        )
-
-        decode_size = QSize(
-            max(
-                target_size.width(),
-                round(source_size.width() * scale),
-            ),
-            max(
-                target_size.height(),
-                round(source_size.height() * scale),
-            ),
-        )
-
-        reader.setScaledSize(decode_size)
-
-        image = reader.read()
 
         if image.isNull():
             return

@@ -4,10 +4,11 @@ from __future__ import annotations
 from math import ceil
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, QSize, QThreadPool, Qt, Signal, Slot
-from PySide6.QtGui import QImage, QImageReader, QPixmap
+from PySide6.QtCore import QObject, QRunnable, QSize, QThreadPool, Signal, Slot
+from PySide6.QtGui import QImage, QPixmap
 
 from photoalbum.rendering.image_cache import RenderImageCache
+from photoalbum.rendering.image_loader import load_qimage
 
 
 class _Signals(QObject):
@@ -23,14 +24,7 @@ class _Decode(QRunnable):
     def run(self):
         image = QImage()
         try:
-            reader = QImageReader(self.path)
-            reader.setAutoTransform(True)
-            size = reader.size()
-            if size.isValid() and max(size.width(), size.height()) > self.edge:
-                reader.setScaledSize(size.scaled(
-                    QSize(self.edge, self.edge), Qt.AspectRatioMode.KeepAspectRatio,
-                ))
-            image = reader.read()
+            image = load_qimage(self.path, QSize(self.edge, self.edge))
         except Exception:
             image = QImage()
         finally:

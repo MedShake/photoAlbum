@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from photoalbum.template_engine.api import image_glob_patterns
+
 from photoalbum.gui.template_settings.base import (
     PageTemplateSettingsWidget,
 )
@@ -769,7 +771,7 @@ class SimplexFullPhotoCoverSettingsWidget(
             ),
             self._external_path.text().strip(),
             self._translator.tr(
-                "simplex.full-photo-cover.image-filter"
+                "simplex.full-photo-cover.image-filter", patterns=image_glob_patterns(),
             ),
         )
 

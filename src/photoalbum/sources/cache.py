@@ -37,6 +37,9 @@ class SourceAssetCache:
         if quality not in {"thumbnail", "original"}:
             raise ValueError(f"Unsupported asset quality: {quality}")
         digest = sha256((photo.identity + "\0" + (photo.content_hash or "")).encode("utf-8")).hexdigest()
+        # Keep historical cache paths for extensionless provider assets so
+        # existing originals remain available offline. This suffix describes
+        # no encoding: the image service always identifies bytes by signature.
         suffix = Path(photo.filename).suffix.lower() or ".jpg"
         return self.manager.source_directory(self.project_id, photo.source_id) / quality / digest / f"asset{suffix}"
 

@@ -14,7 +14,6 @@ from PySide6.QtCore import (
     Qt,
 )
 from PySide6.QtGui import (
-    QImageReader,
     QPixmap,
     QPalette,
 )
@@ -44,6 +43,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from shiboken6 import isValid
+
+from photoalbum.rendering.image_loader import load_qimage
 
 from photoalbum.geocoding.location_caption_builder import (
     LocationCaptionBuilder,
@@ -1651,7 +1652,7 @@ class PhotoPlacesWidget(QWidget):
 
         # Reserve the final geometry immediately. Image decoding is
         # deliberately deferred so expanding a month never waits for
-        # every JPEG to be read before the rows become visible.
+        # every image to be read before the rows become visible.
         label.setText("…")
 
         label.setToolTip(photo.filename)
@@ -1765,20 +1766,7 @@ class PhotoPlacesWidget(QWidget):
         self,
         path: Path,
     ) -> QPixmap | None:
-        reader = QImageReader(str(path))
-        reader.setAutoTransform(True)
-
-        size = reader.size()
-
-        if size.isValid():
-            size.scale(
-                self.THUMBNAIL_WIDTH,
-                self.THUMBNAIL_HEIGHT,
-                Qt.AspectRatioMode.KeepAspectRatio,
-            )
-            reader.setScaledSize(size)
-
-        image = reader.read()
+        image = load_qimage(path, QSize(self.THUMBNAIL_WIDTH, self.THUMBNAIL_HEIGHT))
 
         if image.isNull():
             return None

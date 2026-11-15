@@ -148,13 +148,13 @@ def test_real_decode_runs_off_gui_thread_and_applies_exif(tmp_path, monkeypatch)
     exif[274] = 6
     Image.new("RGB", (800, 400), "red").save(path, exif=exif)
     threads = []
-    original_reader = preview_image_cache.QImageReader
+    original_reader = preview_image_cache.load_qimage
 
-    def reader(source):
+    def reader(source, size):
         threads.append(QThread.currentThread() == app.thread())
-        return original_reader(source)
+        return original_reader(source, size)
 
-    monkeypatch.setattr(preview_image_cache, "QImageReader", reader)
+    monkeypatch.setattr(preview_image_cache, "load_qimage", reader)
     service = PreviewImageCache()
     service.set_resolution(550, 550, 1)
     finished_on_gui = []

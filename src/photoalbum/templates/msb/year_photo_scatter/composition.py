@@ -7,6 +7,8 @@ from math import isclose
 from secrets import randbelow
 from typing import Callable, Iterable
 
+from photoalbum.template_engine.api import is_guaranteed_opaque
+
 from photoalbum.models import Photo, displayed_photo_dimensions
 
 from photoalbum.album.composition import NormalizedRect
@@ -376,16 +378,8 @@ def _subtract_rect(
 def _is_opaque_photo(
     photo: Photo,
 ) -> bool:
-    """
-    JPEG photographs are opaque.
-
-    PNG is deliberately excluded because it may contain alpha.
-    """
-
-    return (
-        photo is not None
-        and photo.filename.lower().endswith((".jpg", ".jpeg"))
-    )
+    """Use the host's conservative opacity hint for occlusion geometry."""
+    return photo is not None and is_guaranteed_opaque(photo.filename)
 
 
 def _rect_is_fully_covered(

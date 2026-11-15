@@ -13,7 +13,8 @@ authors = [
     { name = "Bertrand Boutillier" }
 ]
 dependencies = [
-    "Pillow>=10.0",
+    "Pillow>=11.1,<14",
+    "pillow-heif==1.8.1",
     "pypdf>=5.0",
     "PySide6>=6.6"
 ]
@@ -42,6 +43,7 @@ where = ["src"]
     "icons/*.svg",
     "icons/*.txt",
 ]
+"photoalbum.images" = ["profiles/*.icc", "profiles/*.txt", "profiles/*.md"]
 "*" = [
     "*.json",
     "README*.md",

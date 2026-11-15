@@ -2,21 +2,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize
 from PySide6.QtGui import (
-    QImageReader,
     QPixmap,
 )
+
+from .image_loader import load_qimage
 
 
 class RenderImageCache:
     """
     Image cache shared by preview and final rendering.
 
-    Images are decoded close to the requested target size instead
-    of decoding the full camera image unnecessarily.
+    Images are retained close to the requested target size. The image service
+    can also reduce JPEG decoding; HEIF currently needs a full source decode.
 
-    EXIF orientation is applied by QImageReader.
+    The image service applies orientation and normalizes colors to sRGB.
     """
 
     def __init__(self) -> None:
@@ -77,31 +78,8 @@ class RenderImageCache:
 
         if path not in self._source_signatures:
             self._source_signatures[path] = self._source_signature(path)
-        reader = QImageReader(path)
-        reader.setAutoTransform(True)
-
-        source_size = reader.size()
-
-        if source_size.isValid():
-            maximum = max(
-                target_size.width(),
-                target_size.height(),
-            )
-
-            decode_size = source_size.scaled(
-                QSize(
-                    maximum,
-                    maximum,
-                ),
-                Qt.AspectRatioMode.KeepAspectRatio,
-            )
-
-            if decode_size.isValid():
-                reader.setScaledSize(
-                    decode_size
-                )
-
-        image = reader.read()
+        maximum = max(target_size.width(), target_size.height())
+        image = load_qimage(path, QSize(maximum, maximum))
 
         if image.isNull():
             pixmap = QPixmap()

@@ -3,10 +3,9 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
-from PIL import (
-    Image,
-    ImageOps,
-)
+from PIL import Image
+from photoalbum.template_engine.api import decode_image
+
 from PySide6.QtCore import (
     QObject,
     QRunnable,
@@ -73,49 +72,7 @@ class CoverRenderWorker(QRunnable):
                 path = Path(item.photo.path)
 
                 try:
-                    with Image.open(path) as source:
-                        source = (
-                            ImageOps.exif_transpose(
-                                source
-                            )
-                        )
-
-                        source = source.convert(
-                            "RGB"
-                        )
-
-                        rect = item.rect
-
-                        x = round(
-                            rect.x
-                            * self.width
-                        )
-                        y = round(
-                            rect.y
-                            * self.height
-                        )
-
-                        w = max(
-                            1,
-                            round(
-                                rect.width
-                                * self.width
-                            ),
-                        )
-
-                        h = max(
-                            1,
-                            round(
-                                rect.height
-                                * self.height
-                            ),
-                        )
-
-                        source.thumbnail(
-                            (w, h),
-                            Image.Resampling.LANCZOS,
-                        )
-
+                    with decode_image(path, (w, h)) as source:
                         px = (
                             x
                             + (w - source.width) // 2
@@ -131,6 +88,7 @@ class CoverRenderWorker(QRunnable):
                                 px,
                                 py,
                             ),
+                            source if source.mode == "RGBA" else None,
                         )
 
                 except Exception:

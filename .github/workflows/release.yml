@@ -69,7 +69,13 @@ jobs:
       - name: Install Photo Album and packaging tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[packaging]"
+          python -m pip install ".[packaging,dev]" "Pillow==12.3.0"
+          python -m pip check
+
+      - name: Run full test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
 
       - name: Build and verify Python distributions
         run: |
@@ -87,7 +93,7 @@ jobs:
           test -x packaging/pyinstaller/dist/photo-album/photo-album
           test -x packaging/pyinstaller/dist/photo-album/photo-album-cli
           packaging/pyinstaller/dist/photo-album/photo-album-cli templates
-          python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test
+          python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test --heic tests/fixtures/images/orientation-6.heic
 
       - name: Create Linux archive
         run: |
@@ -102,7 +108,7 @@ jobs:
           dpkg-deb --info photo-album_*.deb
           dpkg-deb --contents photo-album_*.deb
           dpkg-deb --extract photo-album_*.deb packaging/debian/verify
-          python packaging/verify_artifact.py packaging/debian/verify/opt/photo-album --smoke-test
+          python packaging/verify_artifact.py packaging/debian/verify/opt/photo-album --smoke-test --heic tests/fixtures/images/orientation-6.heic
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
@@ -136,7 +142,13 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[packaging]"
+          python -m pip install ".[packaging,dev]" "Pillow==12.3.0"
+          python -m pip check
+
+      - name: Run full test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
 
       - name: Build and verify Python distributions
         shell: pwsh
@@ -178,7 +190,7 @@ jobs:
               throw "photo-album-cli template discovery failed"
           }
 
-          python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test
+          python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test --heic tests/fixtures/images/orientation-6.heic
           if ($LASTEXITCODE -ne 0) { throw "Windows bundle verification failed" }
 
       - name: Upload Windows application
@@ -244,7 +256,7 @@ jobs:
               "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=`"$installDir`""
           )
           if ($process.ExitCode -ne 0) { throw "Windows installation failed: $($process.ExitCode)" }
-          python packaging/verify_artifact.py $installDir --smoke-test
+          python packaging/verify_artifact.py $installDir --smoke-test --heic tests/fixtures/images/orientation-6.heic
           if ($LASTEXITCODE -ne 0) { throw "Installed Windows application verification failed" }
 
       - name: Upload Windows installer

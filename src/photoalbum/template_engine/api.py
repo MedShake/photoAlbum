@@ -14,6 +14,8 @@ from photoalbum.album.composition import (
 )
 from photoalbum.gui.template_settings import PageTemplateSettingsWidget
 from photoalbum.models import Photo
+from photoalbum.images import decode_image, image_glob_patterns, is_guaranteed_opaque
+from photoalbum.rendering.image_loader import load_qimage
 from photoalbum.i18n.date_formatter import format_date_parts
 from photoalbum.template_engine import (
     PageTemplateExtension, create_template_instance, register_template_extension,
@@ -30,4 +32,5 @@ __all__ = [
     "TemplateLayoutRegistry", "TemplatePreviewBackend", "compose_page_number",
     "create_template_instance", "register_template_extension",
     "validate_template_instance", "format_date_parts",
+    "decode_image", "image_glob_patterns", "is_guaranteed_opaque", "load_qimage",
 ]

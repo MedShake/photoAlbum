@@ -96,10 +96,43 @@ def smoke_test(command: list[str]) -> None:
             print(f"OK: GUI started and exited cleanly ({language})")
 
 
+def verify_image_decoding(bundle: Path, fixture: Path) -> None:
+    """Require actual HEVC decoding, metadata, Qt pixels and PDF in GUI and CLI."""
+    fixture = fixture.resolve(strict=True)
+    internal = bundle / "_internal"
+    for prefix in ("pillow-", "pillow_heif-"):
+        distributions = [path for path in internal.glob("*.dist-info")
+                         if path.name.lower().startswith(prefix)]
+        if not distributions or not any(
+            path.is_file() for directory in distributions
+            for path in directory.rglob("*LICENSE*")
+        ):
+            raise ValueError(f"Missing bundled image dependency license notices: {prefix}")
+    for name in ("photo-album", "photo-album-cli"):
+        executable = bundle / (name + (".exe" if os.name == "nt" else ""))
+        with tempfile.TemporaryDirectory(prefix="photoalbum-heic-") as directory:
+            root = Path(directory)
+            output = root / "check.pdf"
+            env = os.environ.copy()
+            for key in ("PYTHONPATH", "PYTHONHOME"):
+                env.pop(key, None)
+            env.update(QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(root / "config"),
+                       XDG_CACHE_HOME=str(root / "cache"), APPDATA=str(root / "config"),
+                       LOCALAPPDATA=str(root / "cache"))
+            result = subprocess.run(
+                [str(executable.resolve()), "--check-image", str(fixture), str(output)],
+                cwd=root, env=env, capture_output=True, text=True, timeout=90,
+            )
+            if result.returncode or not output.is_file() or output.stat().st_size < 1000:
+                raise RuntimeError(f"HEIC check failed in {name}: {result.stdout}\n{result.stderr}")
+            print(f"OK: HEIC metadata, orientation, pixels and PDF verified in {name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifacts", nargs="+", type=Path)
     parser.add_argument("--smoke-test", action="store_true", help="Also start each bundle's GUI in FR/EN")
+    parser.add_argument("--heic", type=Path, help="Verify real HEIC decoding in both frozen executables")
     args = parser.parse_args()
     for artifact in args.artifacts:
         print(f"Verifying {artifact}")
@@ -109,6 +142,10 @@ def main() -> None:
             if not artifact.is_dir() or not executable.is_file():
                 raise ValueError("--smoke-test requires an application bundle directory")
             smoke_test([str(executable.resolve())])
+        if args.heic:
+            if not artifact.is_dir():
+                raise ValueError("--heic requires an application bundle directory")
+            verify_image_decoding(artifact, args.heic)
 
 
 if __name__ == "__main__":

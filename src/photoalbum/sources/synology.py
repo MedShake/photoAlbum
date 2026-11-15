@@ -11,6 +11,7 @@ from urllib.parse import urlencode, urljoin
 from urllib.request import HTTPSHandler, Request, build_opener
 
 from photoalbum.models import GpsCandidate, MetadataCandidates
+from photoalbum.images.formats import SUPPORTED_EXTENSIONS
 
 from .base import (
     AuthenticationError,
@@ -239,6 +240,12 @@ class SynologyPhotosSource:
         result = []
         for row in rows:
             if row.get("id") is None:
+                continue
+            suffix = Path(str(row.get("filename") or "")).suffix.lower()
+            # Keep extensionless provider assets: their downloaded bytes can
+            # still be identified by signature. Explicit extensions follow the
+            # same acceptance policy as local folders and external images.
+            if suffix and suffix not in SUPPORTED_EXTENSIONS:
                 continue
             row = dict(row)
             row["_photoalbum_space"] = "team" if team_space else "personal"

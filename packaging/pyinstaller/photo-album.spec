@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import (
+    collect_all,
     collect_data_files,
+    collect_delvewheel_libs_directory,
     collect_submodules,
     copy_metadata,
 )
@@ -19,6 +21,12 @@ from verify_artifact import verify_collected_resources
 datas = collect_data_files("photoalbum")
 verify_collected_resources(datas)
 datas += copy_metadata("photo-album")
+heif_datas, heif_binaries, heif_imports = collect_all("pillow_heif")
+datas += heif_datas + copy_metadata("Pillow")
+datas, heif_binaries = collect_delvewheel_libs_directory(
+    "pillow_heif", datas=datas, binaries=heif_binaries,
+)
+image_imports = heif_imports + ["_pillow_heif", "PIL._imagingcms"]
 
 icon = None
 if sys.platform == "win32":
@@ -27,10 +35,10 @@ if sys.platform == "win32":
 
 a = Analysis(
     [str(spec_dir / "photo_album.py")],
-    pathex=[],
-    binaries=[],
+    pathex=[str(spec_dir)],
+    binaries=heif_binaries,
     datas=datas,
-    hiddenimports=collect_submodules("photoalbum.templates"),
+    hiddenimports=collect_submodules("photoalbum.templates") + image_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -56,9 +64,10 @@ exe = EXE(
 
 cli_analysis = Analysis(
     [str(spec_dir / "photo_album_cli.py")],
-    pathex=[],
+    pathex=[str(spec_dir)],
+    binaries=heif_binaries,
     datas=datas,
-    hiddenimports=collect_submodules("photoalbum.templates"),
+    hiddenimports=collect_submodules("photoalbum.templates") + image_imports,
 )
 cli_exe = EXE(
     PYZ(cli_analysis.pure),
