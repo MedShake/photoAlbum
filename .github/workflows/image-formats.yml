@@ -3,7 +3,7 @@ name: Image formats and frozen codecs
 on:
   pull_request:
   push:
-    branches: [feature/image-formats]
+    branches: [main, feature/image-formats]
   workflow_dispatch:
 
 jobs:
@@ -20,6 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
+      PYTHONFAULTHANDLER: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,7 +37,13 @@ jobs:
           python -m pip install ".[dev,packaging]" "Pillow==12.3.0"
           python -m pip check
       - name: Run full test suite
-        run: python -m pytest -q
+        run: python -m pytest -q --junitxml=test-results.xml -o faulthandler_timeout=60
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-${{ runner.os }}
+          path: test-results.xml
       - name: Build distributions
         run: python -m build --no-isolation
       - name: Install built wheel
@@ -55,6 +62,31 @@ jobs:
       - name: Decode real HEIC and export PDF from both frozen applications
         run: python packaging/verify_artifact.py packaging/pyinstaller/dist/photo-album --smoke-test --heic tests/fixtures/images/orientation-6.heic
 
+  linux-native:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONFAULTHANDLER: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install native Qt desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 xvfb xauth openbox
+      - run: python -m pip install ".[dev,packaging]" "Pillow==12.3.0"
+      - name: Run full suite with native styles and a window manager
+        run: |
+          xvfb-run -a -s "-screen 0 1600x1000x24" sh -c 'openbox >/tmp/photoalbum-openbox.log 2>&1 & exec env QT_QPA_PLATFORM=xcb python -m pytest -q --junitxml=test-results-native.xml -o faulthandler_timeout=60'
+      - name: Upload native test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-Linux-native
+          path: test-results-native.xml
+
   dependency-compatibility:
     runs-on: ubuntu-latest
     strategy:
@@ -63,6 +95,7 @@ jobs:
         pillow: ["11.1.0", "13.0.0"]
     env:
       QT_QPA_PLATFORM: offscreen
+      PYTHONFAULTHANDLER: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

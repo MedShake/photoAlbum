@@ -106,10 +106,15 @@ def test_native_page_scrolls_large_forms_at_small_window_sizes(view):
     index = widget._settings_sections["dividers"][0]
     toolbox = widget._settings_toolbox
     toolbox.setCurrentIndex(index)
+    group = toolbox.widget(index)
+    # Enlarge the form, without making the seven toolbox headers themselves
+    # taller than the window. Compact native styles must also exercise overflow.
+    form_font = group.font()
+    form_font.setPointSize(24)
+    group.setFont(form_font)
     for _ in range(3):
         app.processEvents()
     assert widget.height() == 450
-    group = toolbox.widget(index)
     scroll = next(area for area in toolbox.findChildren(QScrollArea) if area.widget() is group)
     assert scroll.verticalScrollBar().maximum() > 0
     scroll.ensureWidgetVisible(widget._year_placement_combo)

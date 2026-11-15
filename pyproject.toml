@@ -42,6 +42,9 @@ where = ["src"]
 "photoalbum.resources" = [
     "icons/*.svg",
     "icons/*.txt",
+    "fonts/*.ttf",
+    "fonts/*.txt",
+    "fonts/*.md",
 ]
 "photoalbum.images" = ["profiles/*.icc", "profiles/*.txt", "profiles/*.md"]
 "*" = [

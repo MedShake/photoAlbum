@@ -1,5 +1,6 @@
 from dataclasses import replace
 import os
+from pathlib import PureWindowsPath
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -19,6 +20,20 @@ def cached_file(manager, project, source, kind, name, size):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"x" * size)
     return path
+
+
+def test_default_test_cache_leaves_windows_path_headroom(tmp_path, tmp_path_factory):
+    cache = SourceAssetCache(tmp_path / "project.photoalbum", project_id=uuid4().hex)
+    # Test names must not become part of the deeply nested cache path.
+    relative_root = cache.manager.root.relative_to(tmp_path_factory.getbasetemp())
+    assert len(str(relative_root)) <= 12
+    photo = Photo(path=None, filename="photo.heic", source_id="remote", asset_id="photo")
+    path = cache.path_for(photo, "original")
+    relative_asset = path.relative_to(tmp_path_factory.getbasetemp())
+    assert len(str(PureWindowsPath("C:/pat", *relative_asset.parts))) < 260
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"cached")
+    assert cache.cached_path(photo, "original") == path
 
 
 def test_default_free_quota_and_unlimited_persist():
@@ -165,7 +180,7 @@ def test_open_project_ignores_non_legacy_adjacent_directory(tmp_path):
 
     lookalike = tmp_path / ".album.photoalbum.cache"
     lookalike.mkdir()
-    (lookalike / "keep.txt").write_text("not a legacy asset cache")
+    (lookalike / "keep.txt").write_text("not a legacy asset cache", encoding="utf-8")
 
     service.open(project)
     try:

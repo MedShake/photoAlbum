@@ -175,7 +175,7 @@ def test_msb_settings_do_not_own_qpainter_rendering():
     from pathlib import Path
     offenders = []
     for settings_file in sorted(Path("src/photoalbum/templates/msb").glob("*/settings.py")):
-        source = settings_file.read_text()
+        source = settings_file.read_text(encoding="utf-8")
         found = [token for token in ("QPainter", ".paint(", "drawText(", "drawPixmap(", "drawRect(") if token in source]
         if found:
             offenders.append(f"{settings_file}: {', '.join(found)}")

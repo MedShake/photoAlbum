@@ -59,6 +59,10 @@ def test_multi_date_page_range_uses_two_lines_and_expands(lang, connecting_word)
     try:
         parent.show()
         QApplication.processEvents()
+        ruler.set_pages([NavigationPage("30 décembre 2026", page_number=1)])
+        ruler._hover_at(ruler._row_center_for(0))
+        single_height = ruler._callout.height()
+        assert single_height >= ruler._callout.HEIGHT
         ruler.set_pages([page])
         ruler._hover_at(ruler._row_center_for(0))
         popup = ruler._callout
@@ -66,14 +70,14 @@ def test_multi_date_page_range_uses_two_lines_and_expands(lang, connecting_word)
         assert popup._second_line == (
             f"30 décembre 2026\n{connecting_word} 05 janvier 2027"
         )
-        assert popup.height() > popup.HEIGHT
+        assert popup.height() > single_height
         assert popup.height() >= popup.TEXT_TOP + popup._date_height() + 10
         assert popup.geometry().right() <= parent.width()
         assert popup.geometry().bottom() <= parent.height()
         ruler.set_pages([NavigationPage("30 décembre 2026", page_number=1)])
         ruler._hover_at(ruler._row_center_for(0))
         assert popup._second_line == "30 décembre 2026"
-        assert popup.height() == popup.HEIGHT
+        assert popup.height() == single_height
     finally:
         parent.close()
 
@@ -96,7 +100,8 @@ def test_single_date_ruler_callout_remains_compact_and_keeps_single_date():
         ruler._update_callout(first_day, ruler._row_center_for(first_day))
         popup = ruler._callout
         assert popup is not None
-        assert popup.height() == popup.HEIGHT
+        # The native font can wrap this single date onto two visual lines.
+        assert popup.height() == max(popup.HEIGHT, popup.TEXT_TOP + popup._date_height() + 10)
         assert "\n" not in popup._second_line
         assert popup.geometry().left() >= 0
     finally:

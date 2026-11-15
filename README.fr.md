@@ -18,3 +18,5 @@ Téléchargement rapide :
 - [Dernière version et notes de publication](https://github.com/MedShake/photoAlbum/releases/latest)
 
 Le logiciel est distribué sous la [licence GNU GPL v3 ou ultérieure](LICENSE).
+Les polices DejaVu de rendu par défaut sont fournies avec leur
+[licence](src/photoalbum/resources/fonts/LICENSE-DejaVu.txt).

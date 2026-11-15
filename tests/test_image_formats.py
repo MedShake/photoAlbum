@@ -413,7 +413,7 @@ def test_codec_ownership_stays_in_image_layer():
     for path in root.rglob("*.py"):
         if "images" in path.relative_to(root).parts:
             continue
-        source = path.read_text()
+        source = path.read_text(encoding="utf-8")
         assert "pillow_heif" not in source, path
         assert "Image.open(" not in source, path
         assert "QImageReader" not in source, path

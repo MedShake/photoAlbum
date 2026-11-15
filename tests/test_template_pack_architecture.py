@@ -64,7 +64,7 @@ def test_msb_defaults_ignore_discovery_and_alphabetical_order(
             continue
         directory = tmp_path / pack.pack_id
         directory.mkdir()
-        (directory / 'manifest.json').write_text((pack.path / 'manifest.json').read_text())
+        (directory / 'manifest.json').write_text((pack.path / 'manifest.json').read_text(encoding="utf-8"), encoding="utf-8")
     directory = tmp_path / extra_id
     directory.mkdir()
     (directory / 'manifest.json').write_text(json.dumps({
@@ -72,7 +72,7 @@ def test_msb_defaults_ignore_discovery_and_alphabetical_order(
         'templates': [{'id': extra_id, 'name': extra_id, 'module': 'unused_backend',
                        'kinds': ['cover', 'special_page', 'photo_page',
                                  'month_divider', 'year_divider', 'day_divider'], 'photo_capacity': 1}],
-    }))
+    }), encoding="utf-8")
     paths = discovery._manifest_paths(tmp_path)
     if reverse:
         paths.reverse()
@@ -109,7 +109,7 @@ def test_absent_msb_reports_missing_default_pack(app):
 def test_invalid_msb_still_fails_discovery(tmp_path):
     pack = tmp_path / 'msb'
     pack.mkdir()
-    (pack / 'manifest.json').write_text('{"schema_version": -1}')
+    (pack / 'manifest.json').write_text('{"schema_version": -1}', encoding="utf-8")
     with pytest.raises(ValueError, match='Unsupported template manifest schema'):
         discovery.discover_templates(tmp_path)
 
@@ -196,7 +196,7 @@ def test_invalid_editor_metadata_is_rejected(tmp_path, reference):
     manifest.write_text(json.dumps({
         'schema_version': 1, 'id': 'example', 'name': 'Example',
         'settings_editor': reference, 'templates': [],
-    }))
+    }), encoding="utf-8")
     with pytest.raises(ValueError, match='settings_editor'):
         discovery.load_template_pack(manifest)
 
@@ -210,13 +210,13 @@ def test_core_and_packs_have_no_internal_import_coupling():
     )
     for path in root.rglob('*.py'):
         if 'templates' not in path.relative_to(root).parts:
-            text = path.read_text()
+            text = path.read_text(encoding="utf-8")
             assert not any(word in text for word in forbidden), path
             if path.name != 'defaults.py':
                 assert 'msb' not in text.lower() and 'simplex' not in text.lower(), path
     for name, other in [('msb', 'simplex'), ('simplex', 'msb')]:
         for path in (root / 'templates' / name).rglob('*.py'):
-            assert other not in path.read_text().lower(), path
+            assert other not in path.read_text(encoding="utf-8").lower(), path
 
 
 def test_default_roles_are_owned_by_manifest(app, monkeypatch):
@@ -235,11 +235,11 @@ def test_default_roles_are_owned_by_manifest(app, monkeypatch):
                                   {'front_cover': 'photo-page-2'}])
 def test_invalid_default_roles_fail_discovery(tmp_path, roles):
     pack = next(p for p in discovery.discover_template_packs() if p.pack_id == 'msb')
-    data = json.loads((pack.path / 'manifest.json').read_text())
+    data = json.loads((pack.path / 'manifest.json').read_text(encoding="utf-8"))
     data['default_templates'] = roles
     path = tmp_path / 'msb/manifest.json'
     path.parent.mkdir()
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ValueError):
         discovery.load_template_pack(path)
 
@@ -290,7 +290,7 @@ def test_discovery_rejects_duplicate_template_ids(tmp_path):
             'schema_version': 1, 'id': pack_id, 'name': pack_id,
             'templates': [{'id': 'collision', 'name': 'Collision', 'module': 'unused',
                            'kinds': ['special_page']}],
-        }))
+        }), encoding="utf-8")
     with pytest.raises(ValueError, match='already registered: collision'):
         discovery.discover_templates(tmp_path)
 

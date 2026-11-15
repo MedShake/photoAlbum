@@ -1716,6 +1716,7 @@ class PhotoPlacesWidget(QWidget):
 
         QTimer.singleShot(
             0,
+            self,
             lambda: self._load_next_thumbnail(
                 generation
             ),
@@ -1725,7 +1726,7 @@ class PhotoPlacesWidget(QWidget):
         self,
         generation: int,
     ) -> None:
-        if generation != self._thumbnail_generation:
+        if not isValid(self) or generation != self._thumbnail_generation:
             return
 
         if not self._thumbnail_queue:
@@ -1735,12 +1736,22 @@ class PhotoPlacesWidget(QWidget):
         label, photo = self._thumbnail_queue.pop(0)
 
         # The row may have disappeared after a filter/project change.
-        if label in self._thumbnail_labels:
+        if not isValid(label):
+            self._thumbnail_labels.pop(label, None)
+        elif label in self._thumbnail_labels:
             pixmap = self._thumbnail_cache.get(photo.identity)
             if pixmap is None:
                 pixmap = self._thumbnail_pixmap(photo.path)
 
-            if pixmap is not None:
+            # Decoding can reenter Qt or trigger a view refresh. Recheck both
+            # the generation and the C++ objects before publishing the result.
+            if not isValid(self) or generation != self._thumbnail_generation:
+                return
+            if not isValid(label):
+                self._thumbnail_labels.pop(label, None)
+            elif label not in self._thumbnail_labels:
+                pass
+            elif pixmap is not None:
                 # Keep the already-decoded pixmap available for other
                 # lightweight views such as the batch-edit dialog.
                 self._thumbnail_cache[
@@ -1757,6 +1768,7 @@ class PhotoPlacesWidget(QWidget):
         # scrolling and input responsive while thumbnails arrive.
         QTimer.singleShot(
             0,
+            self,
             lambda: self._load_next_thumbnail(
                 generation
             ),

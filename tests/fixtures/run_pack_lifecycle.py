@@ -13,7 +13,7 @@ from datetime import datetime
 import shutil
 from time import monotonic
 from PySide6.QtWidgets import QApplication
-from PySide6.QtTest import QTest
+from runpy import run_path
 from PySide6.QtGui import QImage, QPainter
 from pypdf import PdfReader
 
@@ -35,6 +35,7 @@ from photoalbum.template_engine import (
 from photoalbum.template_engine.discovery import pack_settings_editor
 
 app = QApplication([])
+wait_events = run_path(str(Path(__file__).parents[1] / "qt_support.py"))["wait_events"]
 translator = Translator("fr")
 found = discover_templates()
 assert "photoalbum.templates.testpack.components" not in sys.modules
@@ -100,8 +101,7 @@ service.preview_ready.connect(ready.append)
 key = service.request(instance, (photo,), width=210, height=297, page_width_mm=210, page_height_mm=297)
 deadline = monotonic() + 5
 while not ready and monotonic() < deadline:
-    app.processEvents()
-    QTest.qWait(5)
+    wait_events(5)
 assert ready == [key]
 assert components.preview_calls[-1] == (instance.settings, "Bananes")
 

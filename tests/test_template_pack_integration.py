@@ -27,7 +27,7 @@ def external_pack(tmp_path, monkeypatch):
 def edit_settings(settings, *, translator, parent=None):
     assert translator.tr("probe") == "Translated probe"
     return {**settings, "independent": {"color": "blue"}}
-''')
+''', encoding="utf-8")
     (pack / 'paint_backend.py').write_text('''
 from photoalbum.template_engine.api import (
     NormalizedRect, PageComposition, PhotoSlotComposition,
@@ -86,7 +86,7 @@ class Layout:
 
 def register_layouts(registry):
     registry.register("independent-photo", Layout())
-''')
+''', encoding="utf-8")
     (pack / 'manifest.json').write_text(json.dumps({
         'schema_version': 1, 'id': 'independent', 'name': 'Independent', 'version': '1',
         'settings_editor': 'editor_backend:edit_settings',
@@ -96,12 +96,12 @@ def register_layouts(registry):
             {'id': 'independent-cover', 'name': 'Cover', 'module': 'paint_backend',
              'kinds': ['cover']},
         ],
-    }))
+    }), encoding="utf-8")
     (pack / 'i18n').mkdir()
     (pack / 'i18n/en.json').write_text(json.dumps({
         'probe': 'Translated probe',
         'template.independent-photo': 'Translated photo',
-    }))
+    }), encoding="utf-8")
     monkeypatch.syspath_prepend(str(pack))
     # Keep global executable extensions isolated from other tests.
     monkeypatch.setattr(template_extension_registry, '_extensions', dict(template_extension_registry._extensions))
@@ -192,7 +192,7 @@ def test_missing_photo_layout_fails_before_rendering(external_pack, monkeypatch)
 
 def test_declared_pack_label_and_async_preview(external_pack):
     from time import monotonic
-    from PySide6.QtTest import QTest
+    from tests.qt_support import wait_events
     from photoalbum.album import PageInstance
     from photoalbum.gui.preview_render_service import PreviewRenderService
     from photoalbum.gui.template_labels import template_display_name
@@ -211,8 +211,7 @@ def test_declared_pack_label_and_async_preview(external_pack):
     )
     deadline = monotonic() + 5
     while not received and monotonic() < deadline:
-        app.processEvents()
-        QTest.qWait(5)
+        wait_events(5)
     assert received == [key]
 
 
@@ -221,7 +220,7 @@ def test_removed_manifest_then_rediscovered_pack(external_pack):
 
     _, packs, _ = external_pack
     manifest = packs[0].path / 'manifest.json'
-    content = manifest.read_text()
+    content = manifest.read_text(encoding="utf-8")
     manifest.unlink()
     found = discovery.discover_templates()
     assert found.packs == ()
@@ -231,7 +230,7 @@ def test_removed_manifest_then_rediscovered_pack(external_pack):
     assert discovery.pack_settings_editor('independent') is None
     assert template_extension_registry.get('independent-photo') is None
     assert translator_for_template('independent-photo', Translator('en')).tr('probe') == 'probe'
-    manifest.write_text(content)
+    manifest.write_text(content, encoding="utf-8")
     found = discovery.discover_templates()
     discovery.register_discovered_template_extensions(found.packs)
     assert discovery.pack_settings_editor('independent') is not None

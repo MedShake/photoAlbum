@@ -26,7 +26,7 @@ def validate(settings):
 
 
 def color(settings):
-    palette = json.loads((Path(__file__).parent / "assets/palette.json").read_text())
+    palette = json.loads((Path(__file__).parent / "assets/palette.json").read_text(encoding="utf-8"))
     return QColor(palette["dense" if settings["banana_density"] >= 20 else "sparse"])
 
 

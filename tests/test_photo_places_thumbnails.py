@@ -1,12 +1,126 @@
+import sys
 from unittest.mock import Mock
 
 import pytest
-from PySide6.QtCore import QEvent
-from PySide6.QtGui import QImage
+from PySide6.QtCore import QEvent, QTimer
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QApplication, QCheckBox, QDialog, QLabel, QRadioButton, QTableWidget
+from shiboken6 import delete, isValid
 
 from photoalbum.gui.widgets.photo_places_widget import PhotoPlacesWidget
 from photoalbum.models import Photo
+from tests.qt_support import wait_events
+
+
+@pytest.fixture
+def qt_callback_errors(monkeypatch):
+    errors = Mock()
+    monkeypatch.setattr(sys, "excepthook", errors)
+    yield errors
+    errors.assert_not_called()
+
+
+def queued_thumbnail(widget, path):
+    photo = Photo(path=path, filename=path.name)
+    label = widget._create_thumbnail_label(photo)
+    label.setParent(widget)
+    return label
+
+
+def test_destroying_widget_cancels_thumbnail_timer(tmp_path, monkeypatch, qt_callback_errors):
+    widget = PhotoPlacesWidget()
+    load = Mock(wraps=widget._load_next_thumbnail)
+    monkeypatch.setattr(widget, "_load_next_thumbnail", load)
+    label = queued_thumbnail(widget, tmp_path / "photo.jpg")
+    delete(widget)
+    assert not isValid(label)
+    wait_events(10)
+    load.assert_not_called()
+
+
+def test_destroyed_thumbnail_is_skipped_without_stopping_queue(tmp_path, monkeypatch, qt_callback_errors):
+    widget = PhotoPlacesWidget()
+    decode = Mock(return_value=None)
+    monkeypatch.setattr(widget, "_thumbnail_pixmap", decode)
+    dead = queued_thumbnail(widget, tmp_path / "dead.jpg")
+    live_path = tmp_path / "live.jpg"
+    live = queued_thumbnail(widget, live_path)
+    delete(dead)
+    wait_events(10)
+    decode.assert_called_once_with(live_path)
+    assert dead not in widget._thumbnail_labels
+    assert live.text() == "—"
+    assert not widget._thumbnail_queue
+    assert not widget._thumbnail_loading
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_thumbnail_destroyed_during_decode_keeps_queue_running(
+    tmp_path, monkeypatch, qt_callback_errors, available,
+):
+    widget = PhotoPlacesWidget()
+    dead = queued_thumbnail(widget, tmp_path / "dead.jpg")
+    live = queued_thumbnail(widget, tmp_path / "live.jpg")
+    pixmap = QPixmap(40, 30) if available else None
+    if pixmap is not None:
+        pixmap.fill()
+
+    def decode(path):
+        if path.name == "dead.jpg":
+            delete(dead)
+        return pixmap
+
+    decode = Mock(side_effect=decode)
+    monkeypatch.setattr(widget, "_thumbnail_pixmap", decode)
+    wait_events(10)
+    assert decode.call_count == 2
+    assert dead not in widget._thumbnail_labels
+    assert not live.pixmap().isNull() if available else live.text() == "—"
+    assert not widget._thumbnail_queue
+    assert not widget._thumbnail_loading
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_widget_destroyed_during_thumbnail_decode(
+    tmp_path, monkeypatch, qt_callback_errors, available,
+):
+    widget = PhotoPlacesWidget()
+    queued_thumbnail(widget, tmp_path / "photo.jpg")
+    pixmap = QPixmap(40, 30) if available else None
+    if pixmap is not None:
+        pixmap.fill()
+
+    def decode(path):
+        delete(widget)
+        return pixmap
+
+    decode = Mock(side_effect=decode)
+    monkeypatch.setattr(widget, "_thumbnail_pixmap", decode)
+    wait_events(10)
+    decode.assert_called_once()
+    assert not isValid(widget)
+
+
+def test_thumbnail_queue_decodes_one_image_per_callback(tmp_path, monkeypatch):
+    widget = PhotoPlacesWidget()
+    callbacks = []
+    monkeypatch.setattr(QTimer, "singleShot", lambda *args: callbacks.append(args[-1]))
+    decode = Mock(return_value=None)
+    monkeypatch.setattr(widget, "_thumbnail_pixmap", decode)
+    first = queued_thumbnail(widget, tmp_path / "first.jpg")
+    second = queued_thumbnail(widget, tmp_path / "second.jpg")
+    decode.assert_not_called()
+    assert len(callbacks) == 1
+    callbacks.pop(0)()
+    assert decode.call_count == 1
+    assert first.text() == "—"
+    assert second.text() == "…"
+    callbacks.pop(0)()
+    assert decode.call_count == 2
+    assert second.text() == "—"
+    callbacks.pop(0)()
+    assert not widget._thumbnail_loading
+    assert not callbacks
 
 
 def test_reloading_same_identity_replaces_changed_thumbnail(tmp_path):

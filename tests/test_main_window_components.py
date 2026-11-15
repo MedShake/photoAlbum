@@ -2,6 +2,7 @@ from datetime import datetime
 from time import monotonic
 from types import SimpleNamespace
 from unittest.mock import Mock
+from tests.qt_support import wait_events
 
 import pytest
 from PIL import Image
@@ -43,8 +44,7 @@ def app():
 def wait_until(app, predicate):
     deadline = monotonic() + 5
     while not predicate() and monotonic() < deadline:
-        app.processEvents()
-        QTest.qWait(5)
+        wait_events(5)
     assert predicate()
 
 

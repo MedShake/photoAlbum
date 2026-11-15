@@ -6,7 +6,7 @@ from time import monotonic
 import pytest
 from PIL import Image
 from PySide6.QtCore import QSize
-from PySide6.QtTest import QTest
+from tests.qt_support import wait_events
 from PySide6.QtWidgets import QApplication
 
 from photoalbum.album import (
@@ -48,7 +48,7 @@ def _wait_for_preview_layout(widget: AlbumPreviewWidget) -> None:
     # One processEvents() call need not deliver this entire chain.
     deadline = monotonic() + 2
     while True:
-        QTest.qWait(1)
+        wait_events(1)
         content_height = widget._content.height()
         viewport_height = widget._scroll.viewport().height()
         scroll = widget._scroll.verticalScrollBar()
@@ -618,8 +618,8 @@ def test_preview_prioritizes_visible_pages_and_reuses_resize_requests(monkeypatc
     monkeypatch.setattr(widget, "isVisible", lambda: True)
     widget._request_page_images()
     initial_edge = cache._edge
-    assert cache._pool.start.call_args_list[0].args[0].path == "/photo-0.jpg"
-    assert "/photo-5.jpg" not in cache._queue
+    assert cache._pool.start.call_args_list[0].args[0].path == str(result.pagination.pages[0].photos[0].path)
+    assert str(result.pagination.pages[5].photos[0].path) not in cache._queue
     for width in (310, 400, 550, 320):
         for page in pages:
             page.set_page_width(width)

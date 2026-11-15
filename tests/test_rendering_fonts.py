@@ -34,8 +34,7 @@ def test_available_fonts_are_from_declared_palette():
 def test_resolve_available_font_family():
     available = available_photo_album_fonts()
 
-    if not available:
-        return
+    assert available
 
     family = available[0]
 
@@ -45,8 +44,7 @@ def test_resolve_available_font_family():
 def test_resolve_unknown_font_uses_available_fallback():
     available = available_photo_album_fonts()
 
-    if DEFAULT_SANS_FONT not in available:
-        return
+    assert DEFAULT_SANS_FONT in available
 
     assert (
         resolve_font_family(
@@ -112,3 +110,59 @@ def test_font_palette_is_reused_and_invalidated_when_qt_fonts_change(monkeypatch
         assert families.call_count == 2
     finally:
         fonts._invalidate_font_palette()
+
+
+def test_bundled_fonts_render_text_without_system_font_configuration(tmp_path):
+    """Exercise the empty font database seen with Windows Qt offscreen."""
+    import os
+    import subprocess
+    import sys
+    from xml.sax.saxutils import escape
+
+    empty = tmp_path / "empty-fonts"
+    empty.mkdir()
+    config = tmp_path / "fonts.conf"
+    config.write_text(
+        f'<fontconfig><dir>{escape(empty.as_posix())}</dir>'
+        f'<cachedir>{escape((tmp_path / "font-cache").as_posix())}</cachedir></fontconfig>',
+        encoding="utf-8",
+    )
+    script = '''
+from pathlib import Path
+import sys
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QFontDatabase, QFontInfo, QImage, QPainter, QPdfWriter
+from PySide6.QtWidgets import QApplication
+from pypdf import PdfReader
+from photoalbum.rendering.fonts import (
+    DEFAULT_SANS_FONT, DEFAULT_SERIF_FONT, DEFAULT_MONOSPACE_FONT,
+    available_photo_album_fonts, resolve_font_family,
+)
+app = QApplication([])
+if sys.platform.startswith("linux"):
+    assert not {DEFAULT_SANS_FONT, DEFAULT_SERIF_FONT, DEFAULT_MONOSPACE_FONT}.intersection(QFontDatabase.families()), "Fontconfig isolation failed"
+assert {DEFAULT_SANS_FONT, DEFAULT_SERIF_FONT, DEFAULT_MONOSPACE_FONT} <= set(available_photo_album_fonts())
+font = QFont(resolve_font_family(None))
+font.setPixelSize(24)
+assert QFontInfo(font).family() == DEFAULT_SANS_FONT
+image = QImage(240, 80, QImage.Format.Format_RGB32)
+image.fill(Qt.GlobalColor.white)
+painter = QPainter(image)
+painter.setFont(font)
+painter.drawText(5, 35, "Photo Album")
+painter.end()
+assert any(image.pixel(x, y) != 0xffffffff for x in range(240) for y in range(80))
+output = Path(sys.argv[1])
+writer = QPdfWriter(str(output))
+painter = QPainter(writer)
+painter.setFont(font)
+painter.drawText(20, 50, "Photo Album")
+painter.end()
+del writer
+assert "Photo Album" in " ".join(PdfReader(output).pages[0].extract_text().split())
+'''
+    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "FONTCONFIG_FILE": str(config),
+           "QT_QPA_FONTDIR": str(empty)}
+    result = subprocess.run([sys.executable, "-c", script, str(tmp_path / "fonts.pdf")],
+                            env=env, capture_output=True, timeout=30)
+    assert result.returncode == 0, (result.stdout + result.stderr).decode("utf-8", errors="replace")

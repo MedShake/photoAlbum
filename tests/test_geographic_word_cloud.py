@@ -359,8 +359,14 @@ def test_widget_renderer_forwards_physical_page_geometry(
     }
 
 
-def test_constrained_geometry_preserves_global_font_proportions():
+def test_constrained_geometry_preserves_global_font_proportions(monkeypatch):
     """Constrained geometry scales every city by one common factor."""
+    # This case tests the scale search at a width boundary. Use continuous,
+    # known metrics rather than OS font hinting/rounding or a fallback family.
+    monkeypatch.setattr(
+        "photoalbum.templates.msb.geographic_word_cloud.composition._word_size_mm",
+        lambda text, size: (len(text) * size * 0.6 * 25.4 / 72.0, size * 1.2 * 25.4 / 72.0),
+    )
     specs = (
         ("Saint-Sébastien-sur-Loire", 8, 47.20, -1.50),
         ("Nantes", 6, 47.22, -1.55),

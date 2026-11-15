@@ -1,4 +1,4 @@
-"""Native editorial controls must remain readable when Qt's palette changes."""
+"""Check synthetic palettes with Fusion and native rendering with system colors."""
 from datetime import datetime
 from pathlib import Path
 
@@ -6,7 +6,9 @@ import pytest
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor, QImage, QPalette
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QCheckBox, QLabel
+from PySide6.QtWidgets import (
+    QApplication, QCheckBox, QComboBox, QLabel, QStyle, QStyleOptionComboBox, QStylePainter,
+)
 
 from photoalbum.gui.widgets.photo_places_widget import PhotoPlacesWidget
 from photoalbum.models import LocationSource, Photo
@@ -45,10 +47,17 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
-@pytest.fixture(params=[False, True], ids=["light", "dark"])
+@pytest.fixture
 def view(app, request, show_active_window):
+    original_style = app.style().objectName()
     original_palette = app.palette()
-    app.setPalette(editorial_palette(request.param))
+    dark = getattr(request, "param", None)
+    if dark is not None:
+        # Native Windows styles can adapt their ink independently of palette
+        # roles. Exercise artificial colors with Qt's palette-driven style.
+        app.setStyle("Fusion")
+        app.setPalette(editorial_palette(dark))
+    # Otherwise keep QApplication's actual system style and palette.
     widget = PhotoPlacesWidget()
     widget.resize(1500, 800)
     photos = [
@@ -66,12 +75,13 @@ def view(app, request, show_active_window):
     for index in range(year.childCount()):
         year.child(index).setExpanded(True)
     show_active_window(widget)
-    yield widget, photos, request.param
+    yield widget, photos, dark
     widget.close()
     widget.deleteLater()
     # Palette changes must not reach widgets awaiting their C++ destruction.
     QApplication.sendPostedEvents(widget, QEvent.Type.DeferredDelete)
     app.processEvents()
+    app.setStyle(original_style)
     app.setPalette(original_palette)
     app.processEvents()
 
@@ -95,8 +105,7 @@ def assert_row_colors(view, photos):
             assert row.palette().brush(group, QPalette.WindowText) == palette.brush(group, QPalette.Text)
 
 
-def assert_text_is_painted(control, role):
-    expected = control.palette().color(role)
+def render_control(control):
     # Render at high resolution so even small native glyphs have solid strokes.
     # At desktop resolution, font antialiasing can blend every pixel with the
     # background, without any contrast or palette regression in the widget.
@@ -104,11 +113,58 @@ def assert_text_is_painted(control, role):
     image.setDevicePixelRatio(3)
     image.fill(Qt.GlobalColor.transparent)
     control.render(image)
+    return image
+
+
+def assert_text_is_painted(control, role):
+    expected = control.palette().color(role)
+    image = render_control(control)
     assert any(max(abs(actual - target) for actual, target in zip(
         image.pixelColor(x, y).getRgb()[:3], expected.getRgb()[:3],
     )) <= 16 for y in range(image.height()) for x in range(image.width()))
 
 
+def assert_combo_text_matches_native(control):
+    # Windows 11 may adapt the label's ink independently of ButtonText.
+    # Use an ordinary Qt combo in the same parent/style/palette as the oracle.
+    native = QComboBox(control.parentWidget())
+    try:
+        native.ensurePolished()
+        native.setFont(control.font())
+        native.setPalette(control.palette())
+        native.setLayoutDirection(control.layoutDirection())
+        native.setEnabled(control.isEnabled())
+        native.setFrame(control.hasFrame())
+        native.setAttribute(Qt.WidgetAttribute.WA_UnderMouse, control.underMouse())
+        for index in range(control.count()):
+            native.addItem(control.itemIcon(index), control.itemText(index))
+        native.setCurrentIndex(control.currentIndex())
+        native.setGeometry(control.geometry())
+        expected = render_control(native)
+        native.setItemText(native.currentIndex(), "")
+        background = render_control(native)
+        actual = render_control(control)
+        option = QStyleOptionComboBox()
+        control.initStyleOption(option)
+        rect = control.style().subControlRect(
+            QStyle.ComplexControl.CC_ComboBox, option,
+            QStyle.SubControl.SC_ComboBoxEditField, control,
+        )
+        ink = [
+            (x, y) for y in range(max(0, rect.top() * 3), min(expected.height(), (rect.bottom() + 1) * 3))
+            for x in range(max(0, rect.left() * 3), min(expected.width(), (rect.right() + 1) * 3))
+            if max(abs(a - b) for a, b in zip(expected.pixelColor(x, y).getRgb()[:3],
+                                            background.pixelColor(x, y).getRgb()[:3])) > 32
+        ]
+        assert ink, "The native combo label has no readable text"
+        assert all(max(abs(a - b) for a, b in zip(actual.pixelColor(x, y).getRgb()[:3],
+                                                expected.pixelColor(x, y).getRgb()[:3])) <= 16
+                   for x, y in ink), "Combo label differs from readable native Qt text"
+    finally:
+        native.deleteLater()
+
+
+@pytest.mark.parametrize("view", [False, True], ids=["light", "dark"], indirect=True)
 def test_alternating_rows_and_embedded_text_follow_palette(view):
     widget, photos, dark = view
     assert widget._tree.palette().color(QPalette.Text) == editorial_palette(dark).color(QPalette.Text)
@@ -124,11 +180,30 @@ def test_alternating_rows_and_embedded_text_follow_palette(view):
                 for role in (QPalette.Base, QPalette.Text, QPalette.Button, QPalette.ButtonText,
                              QPalette.Highlight, QPalette.HighlightedText, QPalette.PlaceholderText):
                     assert control.palette().brush(group, role) == widget._tree.palette().brush(group, role)
-        # Non-editable native combo boxes paint their labels with ButtonText.
         assert_text_is_painted(combo, QPalette.ButtonText)
         assert_text_is_painted(caption, QPalette.Text)
 
 
+@pytest.mark.parametrize(
+    "view", [False, True, None], ids=["fusion-light", "fusion-dark", "system"], indirect=True,
+)
+def test_native_combo_comparison_rejects_missing_text(view):
+    class UnreadableCombo(QComboBox):
+        def paintEvent(self, event):
+            painter = QStylePainter(self)
+            option = QStyleOptionComboBox()
+            self.initStyleOption(option)
+            painter.drawComplexControl(QStyle.ComplexControl.CC_ComboBox, option)
+
+    widget, _, _ = view
+    combo = UnreadableCombo(widget)
+    combo.addItem("Nominatim")
+    combo.resize(200, 30)
+    with pytest.raises(AssertionError, match="differs from readable native Qt text"):
+        assert_combo_text_matches_native(combo)
+
+
+@pytest.mark.parametrize("view", [False, True], ids=["light", "dark"], indirect=True)
 def test_palette_switch_preserves_editors_focus_and_text_selection(view, app):
     widget, photos, dark = view
     caption = widget._caption_editors[photos[0].identity]
@@ -145,6 +220,7 @@ def test_palette_switch_preserves_editors_focus_and_text_selection(view, app):
     assert caption.selectedText() == photos[0].caption
 
 
+@pytest.mark.parametrize("view", [False, True], ids=["light", "dark"], indirect=True)
 def test_checkboxes_keep_native_keyboard_and_disabled_states(view, app):
     widget, photos, _ = view
     automatic = widget._location_mode_widgets[photos[0].identity][0]

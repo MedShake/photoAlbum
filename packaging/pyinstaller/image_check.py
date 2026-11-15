@@ -15,9 +15,13 @@ def check_image(fixture: Path, output: Path) -> None:
     from photoalbum.images import decode_image
     from photoalbum.metadata import PhotoAnalyzer
     from photoalbum.rendering.image_cache import RenderImageCache
+    from photoalbum.rendering.fonts import (
+        DEFAULT_SANS_FONT, DEFAULT_SERIF_FONT, DEFAULT_MONOSPACE_FONT, available_photo_album_fonts,
+    )
     from photoalbum.template_engine import create_template_registry, register_discovered_template_extensions
 
     application = QApplication.instance() or QApplication([])
+    assert {DEFAULT_SANS_FONT, DEFAULT_SERIF_FONT, DEFAULT_MONOSPACE_FONT} <= set(available_photo_album_fonts())
     original = fixture.read_bytes()
     photo = PhotoAnalyzer().analyze(fixture)
     assert (photo.width, photo.height) == (64, 96)
@@ -45,6 +49,7 @@ def check_image(fixture: Path, output: Path) -> None:
         page_width_mm=100, page_height_mm=150, dpi=72,
     )
     reader = PdfReader(output)
+    assert any(page.extract_text().strip() for page in reader.pages), "The exported PDF lost its text"
     images = [image.image for page in reader.pages for image in page.images]
     assert images, "The exported PDF contains no image"
     portrait_images = [im for im in images if im.height > im.width]

@@ -1,2 +1,4 @@
 recursive-include tests/fixtures *
+include tests/*.py
 recursive-include packaging *.py *.spec
+include docs/ci-v0.6.0.md

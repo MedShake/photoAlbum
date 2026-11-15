@@ -313,7 +313,7 @@ def test_manual_capture_datetime_can_be_set(
 ):
     database, repository = create_repository(tmp_path)
 
-    path = Path("/photos/holiday.jpg")
+    path = (tmp_path / "holiday.jpg").resolve()
 
     repository.save(
         Photo(
@@ -494,7 +494,7 @@ def test_repository_preserves_explicit_empty_location_selection(
     database, repository = create_repository(tmp_path)
 
     photo = Photo(
-        path=Path("/photos/empty-location-selection.jpg"),
+        path=(tmp_path / "empty-location-selection.jpg").resolve(),
         filename="empty-location-selection.jpg",
     )
 

@@ -34,8 +34,8 @@ def test_host_supplies_preview_service_to_pack_editor(inject_service):
 def test_example_pack_uses_only_public_authoring_imports():
     fixture = Path(__file__).parent / 'fixtures/template_packs/testpack'
     for path in fixture.rglob('*.py'):
-        for node in ast.walk(ast.parse(path.read_text())):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom) and (node.module or '').startswith('photoalbum.'):
                 assert node.module == 'photoalbum.template_engine.api', path
-    settings = Path('src/photoalbum/templates/msb/year_photo_scatter/settings.py').read_text()
+    settings = Path('src/photoalbum/templates/msb/year_photo_scatter/settings.py').read_text(encoding="utf-8")
     assert 'PreviewRenderService' not in settings

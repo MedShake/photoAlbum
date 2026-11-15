@@ -43,11 +43,10 @@ def make_widget(language="fr", project=None):
 
 
 @pytest.fixture
-def view(app):
+def view(app, show_active_window):
     widget = make_widget()
     widget.resize(960, 450)
-    widget.show()
-    app.processEvents()
+    show_active_window(widget)
     yield widget
     widget.close()
     widget.deleteLater()

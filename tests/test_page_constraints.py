@@ -82,7 +82,7 @@ def test_discovery_loads_real_constraints_from_a_new_pack(tmp_path):
         "kinds": ["special_page"],
         "page_constraints": {"min_width_mm": 180, "max_height_mm": 320},
     }]}
-    manifest.write_text(json.dumps(data))
+    manifest.write_text(json.dumps(data), encoding="utf-8")
     template = discover_templates(tmp_path).registry.get("bounded")
     assert template.is_compatible_with_page(180, 320)
     assert not template.is_compatible_with_page(179, 320)
@@ -90,7 +90,7 @@ def test_discovery_loads_real_constraints_from_a_new_pack(tmp_path):
     assert template.is_compatible_with_page(1000, 10)
     for invalid in ({"ratio": 2}, {"min_width_mm": "180"}, [], None):
         data["templates"][0]["page_constraints"] = invalid
-        manifest.write_text(json.dumps(data))
+        manifest.write_text(json.dumps(data), encoding="utf-8")
         with pytest.raises(ValueError):
             discover_templates(tmp_path)
 

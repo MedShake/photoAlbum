@@ -7,6 +7,7 @@ from PySide6.QtGui import QColor, QEnterEvent, QImage, QPainter, QPalette
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QApplication, QLabel, QStyle, QStyleFactory, QStyleOptionViewItem, QToolButton,
+    QStyledItemDelegate,
 )
 
 from photoalbum.album import BodyPageInsertion, ContentAnchor, CoverPosition, PageInstance
@@ -111,6 +112,7 @@ def test_diagnostic_text_uses_native_palette_for_all_item_states(plan):
     tree = widget._tree
     item = next(item for item in items(tree) if "unused slot" in item.text(5))
     index = tree.indexFromItem(item, 5)
+    native_delegate = QStyledItemDelegate(tree)
     for group in (QPalette.Active, QPalette.Inactive, QPalette.Disabled):
         for selected in (False, True):
             option = QStyleOptionViewItem()
@@ -129,11 +131,18 @@ def test_diagnostic_text_uses_native_palette_for_all_item_states(plan):
                 tree.itemDelegate().paint(painter, option, index)
             finally:
                 painter.end()
-            role = QPalette.HighlightedText if selected else QPalette.Text
-            expected = option.palette.color(group, role)
-            # Allow small native-font antialiasing differences.
-            assert any(max(abs(a - b) for a, b in zip(image.pixelColor(x, y).getRgb()[:3], expected.getRgb()[:3])) <= 16
-                       for y in range(4, image.height() - 4) for x in range(4, 160))
+            # The Windows 11 native style can adapt palette colors. Compare
+            # with the actual native delegate for this state instead of
+            # imposing Fusion's pixel colors on every platform.
+            expected = QImage(image.size(), image.format())
+            expected.fill(option.palette.color(group, QPalette.Base))
+            painter = QPainter(expected)
+            try:
+                native_delegate.paint(painter, option, index)
+            finally:
+                painter.end()
+            assert image == expected
+            assert_native_colors(tree)
 
 
 def test_inactive_insertions_remain_selectable_and_can_be_reenabled(plan):

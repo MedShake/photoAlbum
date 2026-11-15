@@ -102,7 +102,7 @@ def test_local_scan_scopes_cache_missing_and_preserves_usage(tmp_path):
 
 def legacy_database(path):
     connection = sqlite3.connect(path)
-    connection.executescript((Path(__file__).parent / "fixtures/v010_schema.sql").read_text())
+    connection.executescript((Path(__file__).parent / "fixtures/v010_schema.sql").read_text(encoding="utf-8"))
     connection.execute("INSERT INTO project_metadata VALUES ('source_directory', '/photos')")
     connection.execute("INSERT INTO project_metadata VALUES ('recursive_scan', '1')")
     connection.execute("""INSERT INTO photos(path, filename, capture_datetime, date_source,
@@ -120,7 +120,7 @@ def test_real_published_schema_migrates_directly_and_preserves_user_state(tmp_pa
     database = ProjectDatabase(path)
     database.initialize()
     source = SourceRepository(database).list_all()[0]
-    assert source.config == {"directory": "/photos", "recursive": True}
+    assert source.config == {"directory": str(Path("/photos")), "recursive": True}
     photo = PhotoRepository(database).list_all()[0]
     assert photo.identity == "local:/photos/a.jpg"
     assert photo.usage == PhotoUsage.BODY

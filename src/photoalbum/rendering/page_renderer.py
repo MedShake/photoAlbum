@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPainter
 
 from photoalbum.album.composition import PageComposition
-from photoalbum.rendering.fonts import resolve_font_family
+from photoalbum.rendering.fonts import available_photo_album_fonts, resolve_font_family
 from photoalbum.rendering.temporal_context import materialized_periods
 from photoalbum.template_engine import template_extension_registry, translator_for_template
 from photoalbum.template_engine.instances import create_template_instance
@@ -29,6 +29,9 @@ class PageRenderer:
         extension = template_extension_registry.get(instance.template_id)
         if extension is None or extension.widget_renderer is None:
             return False
+        # Independent packs can use the painter's default font directly.
+        # Make font data available before the first template draws any text.
+        available_photo_album_fonts()
         project_photos = photos if project_photos is None else project_photos
         extension.widget_renderer.paint(
             painter=painter, instance=instance,

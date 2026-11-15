@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from importlib.resources import files
+
 from PySide6.QtGui import QFontDatabase, QGuiApplication
 
 
@@ -38,6 +40,18 @@ def available_photo_album_fonts() -> tuple[str, ...]:
         _invalidate_font_palette()
         if application is not None:
             application.fontDatabaseChanged.connect(_invalidate_font_palette)
+            # Keep the existing default palette available on Windows and in
+            # headless Qt, without changing the application's native UI font.
+            installed = set(QFontDatabase.families())
+            directory = files("photoalbum.resources").joinpath("fonts")
+            for family, filename in (
+                (DEFAULT_SANS_FONT, "DejaVuSans.ttf"),
+                (DEFAULT_SERIF_FONT, "DejaVuSerif.ttf"),
+                (DEFAULT_MONOSPACE_FONT, "DejaVuSansMono.ttf"),
+            ):
+                if family not in installed:
+                    if QFontDatabase.addApplicationFont(str(directory.joinpath(filename))) < 0:
+                        raise RuntimeError(f"Could not load bundled font: {filename}")
 
     if _font_palette is None:
         installed = set(QFontDatabase.families())

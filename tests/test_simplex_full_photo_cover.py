@@ -94,7 +94,7 @@ def test_selected_photo_uses_persisted_path():
     instance = PageInstance(
         template_id="simplex-full-photo-cover",
         settings={
-            "photo_path": "/tmp/b.jpg",
+            "photo_path": str(photos[1].path),
         },
     )
 

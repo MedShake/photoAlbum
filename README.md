@@ -17,3 +17,5 @@ Quick download:
 - [Latest release and release notes](https://github.com/MedShake/photoAlbum/releases/latest)
 
 The software is distributed under the [GNU GPL v3 or later](LICENSE).
+The default DejaVu rendering fonts are bundled with their
+[font license](src/photoalbum/resources/fonts/LICENSE-DejaVu.txt).
