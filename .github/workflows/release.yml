@@ -10,7 +10,7 @@ jobs:
   validate-release:
     name: Validate release version
     if: github.event_name == 'release'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout release tag
@@ -47,7 +47,7 @@ jobs:
 
   linux:
     name: Linux application
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -288,7 +288,7 @@ jobs:
       - validate-release
       - linux
       - windows
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: write
